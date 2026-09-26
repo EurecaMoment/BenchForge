@@ -1,41 +1,93 @@
-# Validation status — 2026-09-27
+# Validation — 2026-09-27
 
-This is a partial migration. Real task success and original skill parity are separate claims; see [SKILL_PARITY.md](SKILL_PARITY.md).
+Machine-readable evidence: [production-20260927.json](validation/production-20260927.json).
+Implementation and acceptance are separate; no universal perfect-parity claim.
 
-## Live DSH + Qwen + Habitat
+## DSH and deployed Qwen
 
-Host: DSH `dsh-v0.1.7-rc.1`; provider `qwen-flash`, model `Qwen/Qwen3.8-Flash-Next`. The existing deployed provider was used. Only the BenchForge preset row was installed; unrelated preset rows, including SpatialForge, were preserved. No shared service restart was required.
+DSH `dsh-v0.1.7-rc.1`, Node 22.22.2 and deployed
+`Qwen/Qwen3.8-Flash-Next` were used in an isolated DSH instance. Its 37 BenchForge
+tools registered. The user's existing DSH/Qwen services and SpatialForge were not
+modified or restarted.
 
-1. **Independent initial task**, session `session-4fc77fca-259b-4127-aeb9-bdab0d19c4af`, completed. Qwen used actual Habitat capture, image inspection, task-code generation, evidence import, build and evaluate tools. Two 14-frame captures from apartment and castle scenes supplied an eight-item A/B near/far set. Qwen corrected cross-occluder marker choices during its task. No in-session engineering hints were supplied. The task still exposed depth semantics and portable-evidence defects.
-2. **Guided revision**, session `session-9ce420b5-2550-4c87-bcfa-5065267f7f42`, completed. After engineering fixes, an explicit revision prompt required conversion of camera-forward Z to Euclidean camera range and retention of raw arrays, camera calibration and oracle code in the private package. The same eight marker regions were used. All eight answers stayed unchanged, while numerical ranges changed. This round is guided repair, not another independent first-pass success.
-3. **Cross-machine replay**: the revision ZIP was downloaded from Linux to Windows and extracted away from the authoring tree. `python -X utf8 scripts/verify_answers.py` recomputed all eight answers from packaged `.npy` buffers, checked marker continuity/visibility and found no missing references among 38 referenced files. The supplied complete example predictions scored 5/8 = 0.625. A/B, near/far and scene allocation are each 4:4. No Habitat installation was needed for this replay; NumPy and Pillow were used.
+The first production session (`session-ac332b0f-284f-4eb2-8478-3621c9581f40`)
+needed an explicit tool-entrypoint correction after excessive source inspection.
+It captured 30 Habitat frames from three scenes, selected eight marked pairs from
+six native views, generated 24 questions and called the real model. With its
+documented response normalization, 23/24 scored correctly (one blank answer).
+This is guided repair evidence, not an autonomous first-pass success.
 
-The 0.625 score belongs to a local heuristic example, not to Qwen answering the benchmark. This is a scoring-path smoke test, not evidence of discrimination, generalization or model ranking. The eight easy items do not validate CDM/IRT or production collection quality.
+The final session (`session-8262f815-7959-4e00-bdf8-24f8b6ad5722`) used the published
+Habitat pair adapter, reusable compiler and public scorer. It generated exactly
+24 questions (8 left/right, 8 above/below, 8 camera-distance), with 0 invalid items.
+Qwen answered 24/24 correctly, 0 API failures, 0 missing. First-option and seeded
+random baselines scored 0.5833 and 0.3750. Source allocation was 9/9/6; declared
+complexity was 16 medium and 8 hard. Template majority rates were 0.5/0.625/0.625.
+These are small acceptance samples, not validated benchmark difficulty or model
+ranking. The final diagnostic matrix has one real model and two proxy controls;
+full IRT suitability is explicitly false.
 
-### Issues revealed and repaired in the core
+Actual images were inspected. GT came from native states and deterministic
+programs; no model reviewer changed answers. Qwen still performed extra inspection
+and one unnecessary small MD5 media count despite task instructions; the core
+does not require or generate content hashes. Efficient perfect instruction
+following by the host model is not guaranteed.
 
-- Collector `--help` now returns usage without falsely failing capture validation.
-- Evidence requires a source JSON document; binary arrays are retained as private assets instead of parsed as JSON.
-- Relative evidence paths are documented as relative to the input JSONL directory.
-- Private raw arrays, calibration and oracle scripts are copied to authority assets; public media rejects raw privileged buffers.
-- Habitat capture declares camera intrinsics and forward-Z semantics; a reusable geometry helper converts axial depth to Euclidean range.
-- The DSH persona and migration catalog explicitly disclose incomplete skill coverage.
+## Defects found and fixed
 
-### Generated-task limitations discovered by code review
+- LIBERO/CARLA adapter filenames shadowed SDK imports.
+- Annotation clients used incorrect interpreters/default paths; services now use
+  explicit configuration. DA3 initially could not reach Hugging Face; a configured
+  mirror downloaded weights. Cold download took about 20 minutes on this server.
+- Generic preview markers collided with question markers; spatial generation now
+  starts from clean RGB and declares its generated visible transform.
+- A generation limit double-counted the current sink and dropped the last item.
+- The installed and portable scorers differed; both now use one implementation,
+  with perfect/negative/missing controls and a single-answer JSON envelope.
+- Blank model responses were counted as present; they now count as missing, and
+  model evaluation retains raw attempts and retries empty responses.
+- The composer emitted `bundle/...` references that broke when renamed to
+  `reproduce/`; package relocation now normalizes this prefix.
+- Original pre-adapter evidence is retained so selection can be replayed over
+  the whole input pool. CARLA instance maps now use lossless PNG.
+- Collection gates cover source count, evidence reuse, answer concentration and
+  duplicate evidence/question pairs without expensive hashes or model review.
 
-The Qwen-generated standalone scorer succeeds for the complete eight-item example, but does not properly reject duplicate IDs or penalize omitted predictions; it is not equivalent to the core evaluator for malformed inputs. Its oracle's `--report-only` path also writes intermediate source JSON despite the flag description. The unmodified generated bundle remains test evidence, not an accepted general-purpose scorer/compiler. Use the core evaluator for prediction coverage checks. Windows commands use `-X utf8` because generated scripts omit explicit file encodings.
+The final standalone ZIP was transferred from Linux to Windows. Without a
+`bundle` symlink, source checkout or simulator installation, it regenerated all
+24 answers exactly, reselected 8 pairs from the retained 30-frame pool, replayed
+16 native camera-range measurements with 0 errors, and scored saved real Qwen
+responses at 1.0. NumPy and Pillow are the reproduction dependencies.
 
-## Targeted engineering checks
+## Real optional capabilities
 
-- Nine Windows core tests pass: replay rather than proposed answers, source separation, prediction-only rejection, durable failure records, missing/duplicate predictions, JSON pointers, missing backend guidance, help handling, private arrays and depth/range order reversal.
-- SAM3 HTTP protocol is tested with a fixture server only; this is not real inference.
-- The no-install offline demo builds a two-item fixture and scores one correct prediction at 0.5.
-- Python wheel construction and inclusion of core/collector/template data were previously verified.
-- Actual DSH tool definitions register 15 tools. Standard/PTC/persistent-shell/Cordis preset composition, isolated setup with an existing built DSH checkout, config resolution and authenticated web serving were verified. Live sessions used direct tools and image attachments; PTC and persistent-shell execution were not separately exercised in those sessions.
-- GitHub publication via Git SSH succeeded. First-time setup still needs a fresh-machine clone and full DSH dependency build; existing DSH was reused for live validation.
+| Capability | Actual acceptance |
+|---|---|
+| Annotation | Qwen → YOLOE → SAM3 → DA3 completed on one actual room image; 29 candidate instances, original-resolution 480×640 raw depth and semantic/mask images; review queue retained; no GT written |
+| YOLOE | CPU fallback because its installed CUDA/PyTorch was newer than the driver; SAM3 and DA3 used CUDA |
+| LIBERO | One task, 4 zero-action steps, 2 camera streams and native observations; 4 adapter records; no manipulation-success claim |
+| CARLA | Town01, 2 frames, front/top views, lossless instance rasters and native actor/camera states; 4 adapter records; actual images inspected |
+| ERQA | 3 Parquet records, 3 images and original answers normalized |
+| Data-Juicer | Actual HTML/link cleaning plus short-record filter; 1 accepted / 1 rejected; official answers unchanged |
+| Literature | Habitat primary PDF downloaded (6,108,339 bytes), text extracted and one original passage checked |
 
-## Not accepted yet
+Annotation outputs are model predictions. Their existence does not certify
+segmentation quality or metric depth calibration. The CARLA first run timed out;
+reusing the owned server with a longer RPC timeout completed. Collector-owned
+process groups are cleaned on failure; shared servers are outside those groups.
 
-Real SAM3/YOLOE/DA3 inference and complete annotation chains; LIBERO/CARLA/Isaac live capture; first-time GPU backend installation; Docker and hosted CI; source-card acquisition and normalization; full original skill parity; reusable template/oracle/metric compiler; production leakage/coverage/difficulty/answerability gates; multi-model evaluation and CDM/IRT.
+## Installation and targeted checks
 
-No fixture, process exit or eight-item example is presented as full-system acceptance.
+15 targeted tests cover source replay/privacy, metrics and response coverage,
+empty-response retry, native depth drift, temporal semantics, collection answer
+shortcuts, durable failures and configuration errors. A wheel installed into a
+fresh Windows virtual environment ran the four-image visual production demo.
+The demo consumes design bindings and exercises original compiler dependencies,
+deterministic recipes, screening, scorer controls and packaging.
+
+Fresh DSH dependency compilation and clean installation of every GPU SDK were
+not repeated; a built DSH and existing optional SDK environments were reused.
+CI is configured for Windows/Linux and Python 3.10/3.12; hosted CI status is not
+claimed here. ISAAC was not available on the test server. Its independent
+collector and unsupported CARLA temporal/planning families remain outside real
+acceptance. The original 55-skill mapping documents these limits.

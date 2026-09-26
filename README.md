@@ -1,14 +1,17 @@
 # BenchForge
 
-An independent, composable benchmark-production mode for agent harnesses.
+Benchmark construction, annotation, simulation and evaluation as composable tools
+inside [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+DSH owns the conversation; BenchForge supplies professional methods, executable
+algorithms and artifacts. There is no mandatory five-stage scheduler.
 
-**Status: partial BenchClaw migration, not full skill parity.** The [per-skill audit](docs/SKILL_PARITY.md) covers 55 original skill files: 25 partial, 17 missing, 6 delegated to generic host reasoning, and 7 orchestration wrappers replaced. These are file counts, not a feature completion percentage. Real DSH + Qwen + Habitat validation covers one eight-item task; see [validation](docs/VALIDATION.md).
+[中文快速开始](docs/QUICKSTART.zh-CN.md) · [Production tools](docs/PRODUCTION.md) ·
+[Backend setup](docs/BACKENDS.md) · [Validation](docs/VALIDATION.md) ·
+[Original skill mapping](docs/SKILL_PARITY.md)
 
-Repository: https://github.com/EurecaMoment/BenchForge
+## Start
 
-## Start the DSH-based application
-
-Install Python 3.10+, Git and Node.js 22.19+ (or 24+), then:
+Install Python 3.10+, Git and Node.js 22.19+ or 24+:
 
 ```bash
 git clone https://github.com/EurecaMoment/BenchForge.git
@@ -17,109 +20,102 @@ python benchforge.py setup
 python benchforge.py start
 ```
 
-Setup retrieves the pinned MIT-licensed DSH source into `third_party/`, installs/builds it once, prepares BenchForge's Python environment and generates the independent mode. First setup downloads and builds DSH; subsequent launches reuse it. To reuse an existing built checkout, use `python benchforge.py setup --dsh-root /path/to/deepseek-harness`.
+Setup retrieves pinned DSH source as a third-party dependency, builds it once,
+installs production dependencies and creates a project-local DSH home and preset.
+Configure the model provider in DSH's UI and select **BenchForge** in a new
+conversation. Reuse a built checkout with
+`python benchforge.py setup --dsh-root /path/to/deepseek-harness`.
 
-The launcher uses a project-local DSH home and an overlay. Configure your model provider in DSH's UI, then select **BenchForge** in a new conversation. Model credentials are not bundled. GPU annotation and simulator environments are optional and configured separately. This is not a claim that every GPU dependency installs in a few seconds.
+BenchForge does not need to fork DSH's main implementation. It uses the installed
+tool/preset interfaces and keeps DSH as a pinned third-party dependency. No
+SpatialForge dependency or configuration is used.
 
-For an immediate offline core demonstration, run `python benchforge.py demo`. See the validation document for the distinction between verified core behavior and unverified fresh DSH builds / GPU integrations.
-
-[中文快速开始](docs/QUICKSTART.zh-CN.md)
+Run `python benchforge.py demo` for an immediate offline core check. For a visual
+production example with executable templates and a portable bundle:
 
 ```bash
-python quickstart.py
+python -m pip install -e ".[production,research]"
+python examples/production_demo.py --workspace runs/production
 ```
 
-Run from the downloaded repository with Python 3.10+. The default demo needs no pip install, network, API key, GPU or DSH. To add the mode to an existing DSH installation:
+This draws four images and runs design → compilation → generation → screening →
+scorer controls → packaging. No model, simulator, dataset or GPU is required.
+It is a synthetic example, not a benchmark quality claim.
+
+## Capabilities
+
+- Search original professional methods/cards; retrieve primary papers, extract
+  full text, retain citation passages, design capability/source/template/metric
+  bindings and consume the resulting specification and Q-matrix.
+- Import JSONL/JSON/CSV/Parquet/images, retain original labels, clean media and
+  optionally run Data-Juicer on derived text. Parquet uses `.[datasets]`.
+- Native Habitat, LIBERO and CARLA collectors/adapters, plus an independent Isaac
+  cuboid/camera collector. Optional environments are configured separately.
+- Original VLM → YOLOE → SAM3 → DA3 batch chain with intermediate artifacts,
+  candidate annotations and review queue. Predictions remain predictions.
+- Migrated GT kinship, image composers, template/runtime generation, pilot/full
+  synthesis, programmatic screening and declared difficulty allocation.
+- Deterministic recipe extensions, portable generators/scorers and native camera
+  range replay from retained depth arrays and calibration.
+- Real-model evaluation on public inputs, proxy controls, deterministic metrics,
+  stratified reports, original CDM/Rasch proxy diagnostics and DSH usage counters.
+- Separate public/authority archives and persistent operation artifacts.
+
+All 55 original skill files have method/tool mappings; seven orchestration
+wrappers are replaced by DSH. This **does not claim that every dataset, CARLA task
+family or GPU environment passed real acceptance**. See the validation evidence.
+
+## Configure real execution
+
+Copy `config.example.json` to `config.local.json`. Fill in the deployed URL and
+model ID under `models.qwen`; `token_env` names an environment variable containing
+its key. Configure only the annotation services and simulator Python commands
+needed by your task. DSH's conversational provider and benchmark respondents are
+separate configurations; both can use your deployed Qwen endpoint.
+
+In BenchForge mode, a starting request can be:
+
+> Use this native Habitat capture to build 24 questions about left/right,
+> above/below and camera distance. Use BenchForge's compiler and source-derived
+> answers, inspect pilot images, evaluate the public package with configured
+> qwen, and give me a portable reproduction package and score report.
+
+`benchforge_catalog` provides request examples and executable template IDs.
+The same tools work without DSH:
 
 ```bash
-python quickstart.py --dsh-root /path/to/deepseek-harness --profile /path/to/profile/cordis.patch.yml
+benchforge catalog --workspace runs/task
+benchforge compile --workspace runs/task --input compile-request.json
+benchforge status --workspace runs/task
 ```
 
-This creates a project-local environment, generates the preset and installs only its own row with a backup. Omit `--profile` to generate without installing. Real annotation and simulation require their separately configured backends.
+Each operation retains requests, artifacts and failure logs. Reuse results and
+correct task inputs as needed. An interrupted process can leave a running record;
+inspect artifacts before restarting work.
 
-A subset of BenchClaw's acquisition, annotation, evidence packaging and scoring primitives is exposed as individual tools. The host agent can inspect results, write task code and correct a task without walking a mandatory five-stage DAG. Original professional methods and acceptance contracts still have substantial migration gaps.
+## Ground truth and reproduction
 
-This repository does not import, modify, install into or require SpatialForge. It does not modify official DSH presets. It generates a separate **BenchForge** preset.
+Answers come from official/human labels, native simulation or deterministic
+programs. Models may propose annotations or write reviewable task code; they must
+not promote their own predictions into authoritative answers. This is a trusted
+local workflow, not an adversarial sandbox.
 
-## What is implemented
+Public packages contain question text, choices and visible media. Complete
+packages additionally retain authority and reproduction code/inputs. Forward-Z
+depth and camera range are distinguished. Missing predictions score zero;
+duplicate/unknown IDs fail. A documented single `{"answer": ...}` response
+envelope is accepted. Synthesis checks installed and portable scorer controls.
 
-- DSH Standard interaction, direct tools and PTC, inherited subagents, separate persistent shells and read-only runtime inspection.
-- Individual SAM3, YOLOE, Depth Anything 3 and local VLM service clients. No automatic service restarts.
-- Bundled Habitat, LIBERO and CARLA collectors adapted from BenchClaw; independent native Isaac cuboid/camera collector.
-- Source evidence import with JSON-pointer replay, public question/media packaging, separate authority data and collection statistics.
-- Offline exact-match scoring, including missing predictions; no automatic model API evaluation.
-- SQLite operation history with requests, results and failure logs. The agent chooses which operation to rerun; prior artifacts remain.
-- Original template registry as searchable reference knowledge.
+GPU frameworks, weights and licensed datasets are external. First-time DSH builds
+and model downloads depend on the machine and network; offline examples provide
+a small initial installation check. See [backend setup](docs/BACKENDS.md).
 
-The benchmark-specific question generator, data cleaning and custom oracle/metric currently remain task code. Editable task code is useful, but it does not replace the missing reusable compilation, cleaning, annotation and diagnostic capabilities. Removing compulsory stage orchestration does not justify dropping those functions.
-
-## Install and run
-
-Python 3.10+; the core has no third-party dependency.
+## Development
 
 ```bash
-python -m pip install -e .
-benchforge catalog --workspace ./runs/example
-python examples/offline_demo.py --workspace ./runs/offline-demo
+python -m pip install -e ".[production,research]"
 python -m unittest discover -s tests -v
 ```
 
-The demo is a two-item arithmetic fixture. It exercises real local evidence replay, packaging and scoring, not GPU inference or simulator acceptance.
-
-Copy `config.example.json` to `config.local.json`, then configure only the services and simulator runtimes you use. Paths in an annotation request must be visible to its backend. No model weights, service installers or private host paths are included.
-
-```bash
-benchforge sam3 --workspace ./runs/example --config config.local.json --input request.json
-benchforge evidence --workspace ./runs/example --input import-request.json
-benchforge status --workspace ./runs/example
-```
-
-`catalog` returns request examples. The DSH tools expose each operation separately with named arguments. `benchforge_view_image` returns actual image attachments; ordinary host image tools remain available.
-
-## DSH mode
-
-```bash
-python -m pip install -e '.[dsh]'
-python integrations/dsh/build_preset.py \
-  --dsh-root /path/to/deepseek-harness \
-  --python /path/to/python \
-  --config /path/to/BenchForge/config.local.json \
-  --output benchforge.local.yml
-```
-
-Add the generated patch as a separate preset using your DSH profile's configuration mechanism. The generator never installs it, edits official presets, switches existing sessions or touches another custom mode. Generate again after upgrading DSH. Installed DSH internals are version-sensitive; see `docs/VALIDATION.md` for tested coverage.
-
-## Evidence format
-
-Create source records from original labels or simulator outputs:
-
-```json
-{"id":"e1","media":["image.png"],"provenance":{"kind":"official","path":"labels.json"},"selectors":{"answer":"/annotations/0/answer"}}
-```
-
-`evidence` resolves paths and derives selected facts from the source. `build` replays the source selector rather than trusting a caller's proposed answer. A task item binds the question to that field:
-
-```json
-{"id":"q1","question":"Your task-specific question","evidence_id":"e1","answer_field":"answer","template":"your-template","split":"dev"}
-```
-
-For a program oracle, save the program, inputs and computed JSON output as task artifacts; point selectors at that output. Pointer replay proves derivation from a supplied file, not authenticity of that file or semantic correctness of a question. The core is a trusted local workflow, not a hostile-agent sandbox.
-
-`provenance.path` must reference a JSON document. All relative evidence paths resolve against the input JSONL's directory, not the shell working directory. Keep model-visible pictures in `media`; put raw depth arrays, original annotations and oracle code in `assets`. The builder copies these assets into the private authority bundle. Do not expose privileged simulator buffers as public media.
-
-Habitat capture records declare camera-forward Z depth and pinhole intrinsics. For questions about distance to the camera, convert to Euclidean range using `benchforge_core.geometry.axial_depth_to_range`; compare the actual marked surface region rather than an unrelated pixel. The model may write task-specific code, but the answer must remain reproducible from the saved source data.
-
-Predictions from segmentation, detection and inferred depth are marked `prediction`; they cannot directly become benchmark GT. Preserve original labels, human annotations and simulator state. Source authenticity, calibration, task-specific oracle tests and dataset quality remain explicit acceptance work.
-
-`benchmark-public.zip` contains only selected question fields and media. Authority answers and source records stay outside it. Collection statistics show counts, answer distribution, template distribution and a majority baseline; they do not certify benchmark quality.
-
-## Simulators
-
-- **Habitat**: configure its Python/Conda environment; supply `--scenes`. Captures RGB, depth and agent state.
-- **LIBERO**: configure its environment and SDK dataset paths, optionally `LIBERO_BDDL_ROOT` / `LIBERO_DATASET_ROOT`. Captures observations and replayed action/state records.
-- **CARLA**: connect to an already available server with `--host` / `--port`. The imported collector retains its explicit optional server-restart argument; normal requests do not enable it.
-- **Isaac**: run on the machine with Isaac installed; set its Python launcher in config. The bundled collector handles native cuboids, cameras, depth, instance labels and a pose trajectory. `examples/isaac-scene.json` is the scene schema example. Complex asset reconstruction is not implemented here. A separate remote dispatcher may be configured through `script`; this repository does not silently reuse SpatialForge's desktop worker.
-
-Use the host's background-job tools for long CLI runs. Operation history records running/completed/failed calls but is not an autonomous queue or process supervisor; a forcibly terminated worker can leave a running record. Review artifacts before rerunning. Do not launch overlapping Isaac instances.
-
-See `docs/MIGRATION.md` for the old-to-new capability map, `docs/VALIDATION.md` for verification limits and `NOTICE` for upstream attribution. Licensed under Apache-2.0.
+Apache-2.0. Adapted BenchClaw algorithms retain attribution and their license under
+`vendor/benchclaw/`. See [NOTICE](NOTICE) and [dependencies](third_party/dependencies.json).

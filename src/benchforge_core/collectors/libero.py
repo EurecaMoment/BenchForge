@@ -4,6 +4,10 @@ import argparse
 import json
 import os
 from pathlib import Path
+import sys
+
+# Running this file as a CLI must not shadow the installed libero package.
+sys.path = [p for p in sys.path if Path(p or '.').resolve() != Path(__file__).resolve().parent]
 
 import h5py
 import numpy as np

@@ -1,624 +1,1120 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "assessed_at": "2026-09-27",
   "full_parity": false,
-  "scope": "All SKILL.md files under the inspected original skills/ snapshot. Adjacent annotation-tool, simulatorCards, realDataCards and benchmark cards are additional dependencies, not included in this count.",
-  "acceptance_rule": "A skill is integrated only when its reusable method, executable dependencies, consumed output contracts and applicable real validation exist. Generic host reasoning and task-written scripts do not establish full parity.",
+  "scope": "55 original skills plus adjacent source/simulator/annotation methods; 67 searchable professional method entries. Removed orchestration wrappers are not counted as business features.",
+  "acceptance_rule": "All original skill files have explicit method/tool mappings. Implementation coverage and real task/backend acceptance are separate; full parity is not asserted for untested families.",
   "status_counts": {
-    "partial": 25,
-    "missing": 17,
-    "orchestration_replaced": 7,
-    "host_only": 6
+    "implemented_with_limits": 48,
+    "orchestration_replaced": 7
   },
   "skills": [
     {
       "skill": "benchclaw-carla-data-collection",
       "original_path": "skills/benchmark-carla/data-collection/SKILL.md",
-      "status": "partial",
-      "implemented": "CARLA collector adapter.",
-      "missing": "CARLA source-specific acquisition/GT acceptance and real simulator validation.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, carla, adapt_capture, design, compile, synthesize, score. Original professional method is searchable using method.",
+      "missing": "Original CARLA T1-T12 domain methods retained. Additional task-specific visible transforms and sequence/route authority are required for unsupported families.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/collectors/carla.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/data-collection/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/data-collection/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "carla",
+        "adapt_capture",
+        "design",
+        "compile",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted"
     },
     {
       "skill": "benchclaw-carla-intent-understanding",
       "original_path": "skills/benchmark-carla/intent-understanding/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "CARLA intent-to-task mapping, T1-T12 templates, source-specific GT adapters and deterministic metrics are not integrated.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/intent-understanding/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, carla, adapt_capture, design, compile, synthesize, score. Original professional method is searchable using method.",
+      "missing": "Original CARLA T1-T12 domain methods retained. Additional task-specific visible transforms and sequence/route authority are required for unsupported families.",
+      "implementation_refs": [
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/collectors/carla.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/intent-understanding/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "carla",
+        "adapt_capture",
+        "design",
+        "compile",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted"
     },
     {
       "skill": "benchclaw-carla-metric-code-build",
       "original_path": "skills/benchmark-carla/metric-code/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "CARLA intent-to-task mapping, T1-T12 templates, source-specific GT adapters and deterministic metrics are not integrated.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/metric-code/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, carla, adapt_capture, design, compile, synthesize, score. Original professional method is searchable using method.",
+      "missing": "Original CARLA T1-T12 domain methods retained. Additional task-specific visible transforms and sequence/route authority are required for unsupported families.",
+      "implementation_refs": [
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/collectors/carla.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/metric-code/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "carla",
+        "adapt_capture",
+        "design",
+        "compile",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted"
     },
     {
       "skill": "benchclaw-carla-simulator-benchmark",
       "original_path": "skills/benchmark-carla/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "CARLA intent-to-task mapping, T1-T12 templates, source-specific GT adapters and deterministic metrics are not integrated.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, carla, adapt_capture, design, compile, synthesize, score. Original professional method is searchable using method.",
+      "missing": "Original CARLA T1-T12 domain methods retained. Additional task-specific visible transforms and sequence/route authority are required for unsupported families.",
+      "implementation_refs": [
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/collectors/carla.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-carla/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "carla",
+        "adapt_capture",
+        "design",
+        "compile",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted"
     },
     {
       "skill": "benchclaw-pipeline",
       "original_path": "skills/benchmark-pipeline/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-pipeline/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-pipeline/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     },
     {
       "skill": "benchclaw-stage1-draft",
       "original_path": "skills/benchmark-stage1-draft/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     },
     {
       "skill": "benchclaw-stage1-benchmark-draft-generation",
       "original_path": "skills/benchmark-stage1-draft/skills/benchmark-draft-generation/SKILL.md",
-      "status": "host_only",
-      "implemented": "Host reasoning and saved plan.",
-      "missing": "Reusable benchmark specification with source and capability constraints.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/benchmark-draft-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/benchmark-draft-generation/SKILL.md",
+      "previous_status": "host_only",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage1-capability-dimension-planning",
       "original_path": "skills/benchmark-stage1-draft/skills/capability-dimension-planning/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Capability definitions and Q-matrix seed consumed by later diagnostics.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/capability-dimension-planning/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
+      "implementation_refs": [
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/capability-dimension-planning/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage1-execution-plan-generation",
       "original_path": "skills/benchmark-stage1-draft/skills/execution-plan-generation/SKILL.md",
-      "status": "host_only",
-      "implemented": "Host chooses operations and records a brief.",
-      "missing": "Machine-readable task dependencies and acceptance criteria; legacy stage handoff files are intentionally unnecessary.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/execution-plan-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/execution-plan-generation/SKILL.md",
+      "previous_status": "host_only",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage1-intent-understanding",
       "original_path": "skills/benchmark-stage1-draft/skills/intent-understanding/SKILL.md",
-      "status": "host_only",
-      "implemented": "plan saves a free-form brief.",
-      "missing": "Intent expansion and traceable rewritten queries are not supplied as a reusable method.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/intent-understanding/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/intent-understanding/SKILL.md",
+      "previous_status": "host_only",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage1-literature-review",
       "original_path": "skills/benchmark-stage1-draft/skills/literature-review/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Citation audit and synthesis tied to read source passages.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/literature-review/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable research_review. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/literature-review/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "research_review"
+      ],
+      "validation": "Actual source passage matched; semantic interpretation is not automatically certified"
     },
     {
       "skill": "benchclaw-stage1-literature-search",
       "original_path": "skills/benchmark-stage1-draft/skills/literature-search/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Primary-source retrieval, full-text extraction and reading evidence.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/literature-search/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable literature. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/literature-search/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "literature"
+      ],
+      "validation": "Actual Habitat primary paper download and full-text extraction"
     },
     {
       "skill": "benchclaw-stage1-scope-preprocess-analysis",
       "original_path": "skills/benchmark-stage1-draft/skills/scope-preprocess-analysis/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Capability pool preprocessing and source-backed scope analysis.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/scope-preprocess-analysis/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
+      "implementation_refs": [
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/scope-preprocess-analysis/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage1-template-metric-draft-generation",
       "original_path": "skills/benchmark-stage1-draft/skills/template-metric-draft-generation/SKILL.md",
-      "status": "partial",
-      "implemented": "Searchable original template registry.",
-      "missing": "Draft metric contracts and capability/template/metric traceability; reference entries are not executable templates.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/template-metric-draft-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage1-draft/skills/template-metric-draft-generation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage2-data-collect",
       "original_path": "skills/benchmark-stage2-data-collect/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     },
     {
       "skill": "benchclaw-stage2-existing-benchmark-collection-analysis",
       "original_path": "skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-existing-benchmark-content-label-analysis",
       "original_path": "skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/content-label-analysis/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Official label coverage, field mappings and new annotation requirements.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/content-label-analysis/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
+      "implementation_refs": [
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/content-label-analysis/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-existing-benchmark-data-materialization",
       "original_path": "skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/data-materialization/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Existing-benchmark download/import adapters, raw items, original labels and media manifests.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/data-materialization/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
+      "implementation_refs": [
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/data-materialization/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-real-image-collection-analysis",
       "original_path": "skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-real-image-content-analysis",
       "original_path": "skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/content-analysis/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Real-image source inventory, field preservation, content coverage and annotation requirements.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/content-analysis/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
+      "implementation_refs": [
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/content-analysis/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-real-image-data-structure-normalization",
       "original_path": "skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/data-structure-normalization/SKILL.md",
-      "status": "partial",
-      "implemented": "evidence imports already prepared local records.",
-      "missing": "Dataset-specific media/metadata normalization and source-field preservation.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/data-structure-normalization/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/data-structure-normalization/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-simulator-collection-analysis",
       "original_path": "skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-simulator-data-acquisition",
       "original_path": "skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/data-acquisition/SKILL.md",
-      "status": "partial",
-      "implemented": "Bundled Habitat/LIBERO/CARLA collectors and independent primitive Isaac collector.",
-      "missing": "Only Habitat capture has live DSH acceptance; other backends and full source-card/task-family coverage remain unverified.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/data-acquisition/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/data-acquisition/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-simulator-gt-materialization",
       "original_path": "skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/gt-materialization/SKILL.md",
-      "status": "partial",
-      "implemented": "Collectors retain native state; evidence selectors and private assets retain source data.",
-      "missing": "Unified privileged GT contract across simulator task families; only the Habitat near/far oracle has real replay evidence.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, acquire, normalize, clean, adapt_capture. Original professional method is searchable using method.",
+      "missing": "Source access/assets remain subject to their upstream terms. Isaac runtime is not present on the test server.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/capture_adapter.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/gt-materialization/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/gt-materialization/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "method",
+        "acquire",
+        "normalize",
+        "clean",
+        "adapt_capture"
+      ],
+      "validation": "Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization"
     },
     {
       "skill": "benchclaw-stage2-plan-generation",
       "original_path": "skills/benchmark-stage2-data-collect/skills/stage2-plan-generation/SKILL.md",
-      "status": "host_only",
-      "implemented": "plan and collector catalog.",
-      "missing": "Source-card discovery, acquisition requirements and per-source acceptance.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/stage2-plan-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage2-data-collect/skills/stage2-plan-generation/SKILL.md",
+      "previous_status": "host_only",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage3-evidence-compiler",
       "original_path": "skills/benchmark-stage3-evidence-compiler/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     },
     {
       "skill": "benchclaw-stage3-existing-benchmark-evidence-compilation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage3-existing-benchmark-annotation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/annotation/SKILL.md",
-      "status": "partial",
-      "implemented": "SAM3/YOLOE/DA3/local VLM HTTP clients; original/simulator sources stay separate from predictions.",
-      "missing": "Full default annotation chain, batch handling, review queue and deployment. Service clients have fixture coverage, not real inference acceptance.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable annotate, sam3, yoloe, depthanything3, llm_local. Original professional method is searchable using method.",
+      "missing": "Candidate labels/masks/depth do not become GT. Backend setup and weights are external.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/annotation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/annotation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/annotation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "annotate",
+        "sam3",
+        "yoloe",
+        "depthanything3",
+        "llm_local"
+      ],
+      "validation": "Actual full Qwen/YOLOE/SAM3/DA3 chain: 29 candidates, 480x640 depth, prediction review queue; no GT written"
     },
     {
       "skill": "benchclaw-stage3-existing-benchmark-cleaning",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/cleaning/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Data-Juicer integration, branch-specific cleaning, rejected records and preserved original labels/state.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/cleaning/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable clean. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/cleaning/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "clean"
+      ],
+      "validation": "Actual Data-Juicer cleaning/filtering preserved original answers; native readable-image checks"
     },
     {
       "skill": "benchclaw-stage3-real-image-evidence-compilation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage3-real-image-annotation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/annotation/SKILL.md",
-      "status": "partial",
-      "implemented": "SAM3/YOLOE/DA3/local VLM HTTP clients; original/simulator sources stay separate from predictions.",
-      "missing": "Full default annotation chain, batch handling, review queue and deployment. Service clients have fixture coverage, not real inference acceptance.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable annotate, sam3, yoloe, depthanything3, llm_local. Original professional method is searchable using method.",
+      "missing": "Candidate labels/masks/depth do not become GT. Backend setup and weights are external.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/annotation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/annotation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/annotation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "annotate",
+        "sam3",
+        "yoloe",
+        "depthanything3",
+        "llm_local"
+      ],
+      "validation": "Actual full Qwen/YOLOE/SAM3/DA3 chain: 29 candidates, 480x640 depth, prediction review queue; no GT written"
     },
     {
       "skill": "benchclaw-stage3-real-image-cleaning",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/cleaning/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Data-Juicer integration, branch-specific cleaning, rejected records and preserved original labels/state.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/cleaning/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable clean. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/cleaning/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "clean"
+      ],
+      "validation": "Actual Data-Juicer cleaning/filtering preserved original answers; native readable-image checks"
     },
     {
       "skill": "benchclaw-stage3-simulator-evidence-compilation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage3-simulator-annotation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/annotation/SKILL.md",
-      "status": "partial",
-      "implemented": "SAM3/YOLOE/DA3/local VLM HTTP clients; original/simulator sources stay separate from predictions.",
-      "missing": "Full default annotation chain, batch handling, review queue and deployment. Service clients have fixture coverage, not real inference acceptance.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable annotate, sam3, yoloe, depthanything3, llm_local. Original professional method is searchable using method.",
+      "missing": "Candidate labels/masks/depth do not become GT. Backend setup and weights are external.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/annotation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/annotation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/annotation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "annotate",
+        "sam3",
+        "yoloe",
+        "depthanything3",
+        "llm_local"
+      ],
+      "validation": "Actual full Qwen/YOLOE/SAM3/DA3 chain: 29 candidates, 480x640 depth, prediction review queue; no GT written"
     },
     {
       "skill": "benchclaw-stage3-simulator-cleaning",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/cleaning/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Data-Juicer integration, branch-specific cleaning, rejected records and preserved original labels/state.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/cleaning/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable clean. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/data.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/cleaning/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "clean"
+      ],
+      "validation": "Actual Data-Juicer cleaning/filtering preserved original answers; native readable-image checks"
     },
     {
       "skill": "benchclaw-stage3-plan-generation",
       "original_path": "skills/benchmark-stage3-evidence-compiler/skills/stage3-plan-generation/SKILL.md",
-      "status": "host_only",
-      "implemented": "plan and annotation clients.",
-      "missing": "Cleaning and annotation dependency planning with explicit input/output contracts.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/stage3-plan-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage3-evidence-compiler/skills/stage3-plan-generation/SKILL.md",
+      "previous_status": "host_only",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage4-build",
       "original_path": "skills/benchmark-stage4-build/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     },
     {
       "skill": "benchclaw-stage4-full-synthesis",
       "original_path": "skills/benchmark-stage4-build/skills/full-synthesis/SKILL.md",
-      "status": "partial",
-      "implemented": "Packages supplied items and media with private sources and answers.",
-      "missing": "Bulk generation with difficulty/coverage controls and reusable generator/metric bundle; packaging is not synthesis.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable synthesize, screen, model_eval, diagnose, package. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/full-synthesis/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/full-synthesis/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "synthesize",
+        "screen",
+        "model_eval",
+        "diagnose",
+        "package"
+      ],
+      "validation": "Pilot/full real Habitat synthesis, scorer controls and package regeneration"
     },
     {
       "skill": "benchclaw-stage4-grey-batch-validation",
       "original_path": "skills/benchmark-stage4-build/skills/grey-batch-validation/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable synthesize, screen, model_eval, diagnose, package. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "synthesize",
+        "screen",
+        "model_eval",
+        "diagnose",
+        "package"
+      ],
+      "validation": "Pilot/full real Habitat synthesis, scorer controls and package regeneration"
     },
     {
       "skill": "benchclaw-stage4-cdm-irt-analysis",
       "original_path": "skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/cdm-irt-analysis/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Score-matrix diagnostics, item difficulty/discrimination, capability mastery and small-sample status.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/cdm-irt-analysis/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable diagnose. Original professional method is searchable using method.",
+      "missing": "Original algorithm is a Rasch-style proxy, not full statistical IRT fitting.",
+      "implementation_refs": [
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/cdm-irt-analysis/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "diagnose"
+      ],
+      "validation": "Real/proxy score matrix consumed; small-sample diagnostics emitted"
     },
     {
       "skill": "benchclaw-stage4-invalid-item-screening",
       "original_path": "skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/invalid-item-screening/SKILL.md",
-      "status": "partial",
-      "implemented": "Builder rejects selected malformed references and replay failures.",
-      "missing": "Reusable screening of duplicate options, missing anchors, sequence semantics, answerability and leakage with per-item findings.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable screen. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/invalid-item-screening/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/invalid-item-screening/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "screen"
+      ],
+      "validation": "Original programmatic gate runs on generated real/synthetic items"
     },
     {
       "skill": "benchclaw-stage4-per-template-batch-synthesis",
       "original_path": "skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/per-template-batch-synthesis/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "Reusable per-template pilot runner and filtered/zero-output template reports.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/per-template-batch-synthesis/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable synthesize, screen, model_eval, diagnose, package. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/per-template-batch-synthesis/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "synthesize",
+        "screen",
+        "model_eval",
+        "diagnose",
+        "package"
+      ],
+      "validation": "Pilot/full real Habitat synthesis, scorer controls and package regeneration"
     },
     {
       "skill": "benchclaw-stage4-small-batch-result-evaluation",
       "original_path": "skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/small-batch-result-evaluation/SKILL.md",
-      "status": "partial",
-      "implemented": "Exact-match predictions and heuristic scoring smoke in Habitat task.",
-      "missing": "Reusable model/proxy runners, score matrix, template diagnostics and explicit evaluation mode.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable model_eval, score, baselines, report, diagnose. Original professional method is searchable using method.",
+      "missing": "Only one deployed model was available for real respondent acceptance; baselines are labeled proxies.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/small-batch-result-evaluation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/grey-batch-validation/subskills/small-batch-result-evaluation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "model_eval",
+        "score",
+        "baselines",
+        "report",
+        "diagnose"
+      ],
+      "validation": "Real Qwen API responses, missing/duplicate controls and stratified scoring"
     },
     {
       "skill": "benchclaw-stage4-plan-generation",
       "original_path": "skills/benchmark-stage4-build/skills/stage4-plan-generation/SKILL.md",
-      "status": "host_only",
-      "implemented": "plan and template lookup.",
-      "missing": "Evidence-supported difficulty allocation and executable template/metric requirements.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable method, design, plan. Original professional method is searchable using method.",
+      "missing": "Research and intent interpretation remain host reasoning supported by original methods; their scientific correctness is not certified by schema validation.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/workbench.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/stage4-plan-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/stage4-plan-generation/SKILL.md",
+      "previous_status": "host_only",
+      "tools": [
+        "method",
+        "design",
+        "plan"
+      ],
+      "validation": "Binding validation, consumed compiler spec and Q-matrix exercised by production demo"
     },
     {
       "skill": "benchclaw-stage4-template-metric-code-generation",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/SKILL.md",
-      "status": "partial",
-      "implemented": "Some primitives exist; see child entries.",
-      "missing": "Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage4-answer-image-processing",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-image-processing/SKILL.md",
-      "status": "partial",
-      "implemented": "Image viewing and media copying; Habitat test task generated neutral A/B overlays.",
-      "missing": "Bundled reusable overlay/crop/panel builders, anchor contracts and image rejection reports. Test-task code is not a shipped general method.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable images. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-image-processing/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-image-processing/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "images"
+      ],
+      "validation": "Original composers produced inspected actual images; generic and item markers no longer overlap"
     },
     {
       "skill": "benchclaw-stage4-answer-program-generation",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-program-generation/SKILL.md",
-      "status": "partial",
-      "implemented": "Host writes task code; live Habitat task produced an oracle and generator.",
-      "missing": "Reusable synthesizer assembly consuming GT adapter, assets, templates and metrics; shipped compiler is absent.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-program-generation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-program-generation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage4-contract-checking",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/contract-checking/SKILL.md",
-      "status": "partial",
-      "implemented": "Source replay, prediction rejection and public/authority separation; nine targeted core tests.",
-      "missing": "Generated-bundle acceptance, visible-anchor answerability, difficulty mix, positive/negative scorer and consumer-contract checks.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/contract-checking/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/contract-checking/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage4-gt-kinship-analysis",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/gt-kinship-analysis/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "GT nodes/edges, kinship matrix, distant reasoning chains, field catalog and difficulty support.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/gt-kinship-analysis/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable kinship. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/gt-kinship-analysis/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "kinship"
+      ],
+      "validation": "Original graph algorithm consumed real Habitat evidence and compiler bundle"
     },
     {
       "skill": "benchclaw-stage4-metric-compilation",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/metric-compilation/SKILL.md",
-      "status": "partial",
-      "implemented": "Exact-match evaluator.",
-      "missing": "Metric registry, answer-type parsers, set/order/interval metrics and generated standalone scorers.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/metric-compilation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/metric-compilation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage4-template-compilation",
       "original_path": "skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/template-compilation/SKILL.md",
-      "status": "partial",
-      "implemented": "Reference registry lookup.",
-      "missing": "Evidence-dependent enabled/disabled templates with difficulty, marker, metric and implementation bindings.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable compile, kinship, images, synthesize, score. Original professional method is searchable using method.",
+      "missing": "New dataset/task schemas may require explicit adapters; no arbitrary-input answerability guarantee.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/recipes.py",
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/template-compilation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage4-build/skills/template-metric-code-generation/subskills/template-compilation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "compile",
+        "kinship",
+        "images",
+        "synthesize",
+        "score"
+      ],
+      "validation": "Executable original algorithms and declarative recipes exercised with real/synthetic evidence"
     },
     {
       "skill": "benchclaw-stage5-eval",
       "original_path": "skills/benchmark-stage5-eval/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage5-eval/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage5-eval/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     },
     {
       "skill": "benchclaw-stage5-full-evaluation",
       "original_path": "skills/benchmark-stage5-eval/skills/full-evaluation/SKILL.md",
-      "status": "partial",
-      "implemented": "Scores saved predictions with exact match and per-item outcomes.",
-      "missing": "Configured multi-model runners, capability/source/template aggregation, error taxonomy and reproducible reports.",
+      "status": "implemented_with_limits",
+      "implemented": "Callable model_eval, score, baselines, report, diagnose. Original professional method is searchable using method.",
+      "missing": "Only one deployed model was available for real respondent acceptance; baselines are labeled proxies.",
       "implementation_refs": [
-        "src/benchforge_core/runtime.py",
-        "integrations/dsh/build_preset.py"
+        "src/benchforge_core/evaluation.py",
+        "src/benchforge_core/production.py",
+        "src/benchforge_core/knowledge/methods.json"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage5-eval/skills/full-evaluation/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage5-eval/skills/full-evaluation/SKILL.md",
+      "previous_status": "partial",
+      "tools": [
+        "model_eval",
+        "score",
+        "baselines",
+        "report",
+        "diagnose"
+      ],
+      "validation": "Real Qwen API responses, missing/duplicate controls and stratified scoring"
     },
     {
       "skill": "benchclaw-stage5-opencode-usage-report",
       "original_path": "skills/benchmark-stage5-eval/skills/opencode-usage-report/SKILL.md",
-      "status": "missing",
-      "implemented": "",
-      "missing": "DSH replacement for parent/descendant token and cost reporting; SQLite operation logs do not supply this.",
-      "implementation_refs": [],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage5-eval/skills/opencode-usage-report/SKILL.md"
+      "status": "implemented_with_limits",
+      "implemented": "Callable usage. Original professional method is searchable using method.",
+      "missing": "No known missing reusable operation in this scope; see validation scope.",
+      "implementation_refs": [
+        "src/benchforge_core/research.py",
+        "src/benchforge_core/knowledge/methods.json"
+      ],
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/benchmark-stage5-eval/skills/opencode-usage-report/SKILL.md",
+      "previous_status": "missing",
+      "tools": [
+        "usage"
+      ],
+      "validation": "DSH exported events contain input/output/total counters; subtree coverage is explicit"
     },
     {
       "skill": "benchclaw-root",
       "original_path": "skills/SKILL.md",
       "status": "orchestration_replaced",
-      "implemented": "DSH owns conversation and tool execution; operation records retain artifacts.",
-      "missing": "Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries.",
+      "implemented": "DSH owns interaction and scheduling; independent tools retain requests, results and failure artifacts.",
+      "missing": "No compulsory stage/tmux/child-agent protocol retained.",
       "implementation_refs": [
         "src/benchforge_core/runtime.py",
         "integrations/dsh/build_preset.py"
       ],
-      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/SKILL.md"
+      "original_url": "https://github.com/EurecaMoment/BenchClaw/blob/main/skills/SKILL.md",
+      "previous_status": "orchestration_replaced",
+      "validation": "Live DSH + Qwen composition"
     }
   ]
 }

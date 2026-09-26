@@ -1,12 +1,14 @@
 import argparse
 import json
 import sys
+import subprocess
 from .runtime import Runtime, read
+from .workbench import OPERATIONS
 
 
 def main():
     parser = argparse.ArgumentParser(description="Composable BenchClaw capabilities")
-    parser.add_argument("tool", choices=["catalog", "status", "plan", "sam3", "yoloe", "depthanything3", "llm_local", "habitat", "libero", "carla", "isaac", "evidence", "build", "evaluate"])
+    parser.add_argument("tool", choices=["catalog", "status", "plan", "sam3", "yoloe", "depthanything3", "llm_local", "habitat", "libero", "carla", "isaac", "evidence", "build", "evaluate", "method", *OPERATIONS])
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--config")
     parser.add_argument("--input", help="JSON request file; '-' reads stdin")
@@ -15,7 +17,7 @@ def main():
     runtime = Runtime(args.workspace, read(args.config) if args.config else None)
     try:
         print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))
-    except (ValueError, KeyError, OSError, RuntimeError) as error:
+    except (ValueError, KeyError, OSError, RuntimeError, subprocess.TimeoutExpired) as error:
         print(json.dumps({'error':str(error),'workspace':str(runtime.root)},ensure_ascii=False),file=sys.stderr)
         raise SystemExit(1)
     finally:

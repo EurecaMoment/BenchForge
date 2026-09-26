@@ -35,7 +35,7 @@ def main():
     python=environment/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
     if not python.exists():
         venv.EnvBuilder(with_pip=True).create(environment)
-    subprocess.run([str(python),'-m','pip','install',str(root)+'[dsh]'],check=True)
+    subprocess.run([str(python),'-m','pip','install',str(root)+'[dsh,production,research]'],check=True)
     config=(args.config or root/'config.local.json').resolve()
     if not config.exists():
         config.write_text((root/'config.example.json').read_text(encoding='utf-8'),encoding='utf-8')

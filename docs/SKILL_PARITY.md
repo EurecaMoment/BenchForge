@@ -1,75 +1,61 @@
-# Original skill migration audit
+# Original skill mapping
 
-**Full integration: no.** This inventory covers all 55 original `skills/**/SKILL.md` files in the inspected snapshot. Counts describe files, not weighted feature completion. No entire original leaf skill is certified as fully migrated by this audit.
+All 55 original skill files are mapped below. `implemented_with_limits` means a callable business operation and its professional method are present; it does not mean every simulator, dataset or task family passed real acceptance. See [validation](VALIDATION.md).
 
-Generic agent reasoning, a reference registry, a service client or a successful task-specific script does not establish reusable feature parity. `orchestration_replaced` means only that the old scheduler is intentionally removed, not that its business functions are complete.
-
-Read [validation evidence](VALIDATION.md) separately: live Habitat acceptance is narrower than original skill parity. Adjacent annotation-tool and dataset/simulator cards need their own integration; this is not an inventory of every file in BenchClaw.
-
-The same inventory is shipped with the Python package and available to DSH through `benchforge_catalog` with `section: "migration"`, optional `query`, `offset`, and `limit`.
-
-| Original skill path (under skills/) | Status | Present | Missing / acceptance gap |
-|---|---|---|---|
-| `benchmark-carla/data-collection/SKILL.md` | partial | CARLA collector adapter. | CARLA source-specific acquisition/GT acceptance and real simulator validation. |
-| `benchmark-carla/intent-understanding/SKILL.md` | missing | — | CARLA intent-to-task mapping, T1-T12 templates, source-specific GT adapters and deterministic metrics are not integrated. |
-| `benchmark-carla/metric-code/SKILL.md` | missing | — | CARLA intent-to-task mapping, T1-T12 templates, source-specific GT adapters and deterministic metrics are not integrated. |
-| `benchmark-carla/SKILL.md` | missing | — | CARLA intent-to-task mapping, T1-T12 templates, source-specific GT adapters and deterministic metrics are not integrated. |
-| `benchmark-pipeline/SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-| `benchmark-stage1-draft/SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-| `benchmark-stage1-draft/skills/benchmark-draft-generation/SKILL.md` | host_only | Host reasoning and saved plan. | Reusable benchmark specification with source and capability constraints. |
-| `benchmark-stage1-draft/skills/capability-dimension-planning/SKILL.md` | missing | — | Capability definitions and Q-matrix seed consumed by later diagnostics. |
-| `benchmark-stage1-draft/skills/execution-plan-generation/SKILL.md` | host_only | Host chooses operations and records a brief. | Machine-readable task dependencies and acceptance criteria; legacy stage handoff files are intentionally unnecessary. |
-| `benchmark-stage1-draft/skills/intent-understanding/SKILL.md` | host_only | plan saves a free-form brief. | Intent expansion and traceable rewritten queries are not supplied as a reusable method. |
-| `benchmark-stage1-draft/skills/literature-review/SKILL.md` | missing | — | Citation audit and synthesis tied to read source passages. |
-| `benchmark-stage1-draft/skills/literature-search/SKILL.md` | missing | — | Primary-source retrieval, full-text extraction and reading evidence. |
-| `benchmark-stage1-draft/skills/scope-preprocess-analysis/SKILL.md` | missing | — | Capability pool preprocessing and source-backed scope analysis. |
-| `benchmark-stage1-draft/skills/template-metric-draft-generation/SKILL.md` | partial | Searchable original template registry. | Draft metric contracts and capability/template/metric traceability; reference entries are not executable templates. |
-| `benchmark-stage2-data-collect/SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-| `benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/content-label-analysis/SKILL.md` | missing | — | Official label coverage, field mappings and new annotation requirements. |
-| `benchmark-stage2-data-collect/skills/existing-benchmark-collection-analysis/subskills/data-materialization/SKILL.md` | missing | — | Existing-benchmark download/import adapters, raw items, original labels and media manifests. |
-| `benchmark-stage2-data-collect/skills/real-image-collection-analysis/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/content-analysis/SKILL.md` | missing | — | Real-image source inventory, field preservation, content coverage and annotation requirements. |
-| `benchmark-stage2-data-collect/skills/real-image-collection-analysis/subskills/data-structure-normalization/SKILL.md` | partial | evidence imports already prepared local records. | Dataset-specific media/metadata normalization and source-field preservation. |
-| `benchmark-stage2-data-collect/skills/simulator-collection-analysis/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/data-acquisition/SKILL.md` | partial | Bundled Habitat/LIBERO/CARLA collectors and independent primitive Isaac collector. | Only Habitat capture has live DSH acceptance; other backends and full source-card/task-family coverage remain unverified. |
-| `benchmark-stage2-data-collect/skills/simulator-collection-analysis/subskills/gt-materialization/SKILL.md` | partial | Collectors retain native state; evidence selectors and private assets retain source data. | Unified privileged GT contract across simulator task families; only the Habitat near/far oracle has real replay evidence. |
-| `benchmark-stage2-data-collect/skills/stage2-plan-generation/SKILL.md` | host_only | plan and collector catalog. | Source-card discovery, acquisition requirements and per-source acceptance. |
-| `benchmark-stage3-evidence-compiler/SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-| `benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/annotation/SKILL.md` | partial | SAM3/YOLOE/DA3/local VLM HTTP clients; original/simulator sources stay separate from predictions. | Full default annotation chain, batch handling, review queue and deployment. Service clients have fixture coverage, not real inference acceptance. |
-| `benchmark-stage3-evidence-compiler/skills/existing-benchmark-evidence-compilation/subskills/cleaning/SKILL.md` | missing | — | Data-Juicer integration, branch-specific cleaning, rejected records and preserved original labels/state. |
-| `benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/annotation/SKILL.md` | partial | SAM3/YOLOE/DA3/local VLM HTTP clients; original/simulator sources stay separate from predictions. | Full default annotation chain, batch handling, review queue and deployment. Service clients have fixture coverage, not real inference acceptance. |
-| `benchmark-stage3-evidence-compiler/skills/real-image-evidence-compilation/subskills/cleaning/SKILL.md` | missing | — | Data-Juicer integration, branch-specific cleaning, rejected records and preserved original labels/state. |
-| `benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/annotation/SKILL.md` | partial | SAM3/YOLOE/DA3/local VLM HTTP clients; original/simulator sources stay separate from predictions. | Full default annotation chain, batch handling, review queue and deployment. Service clients have fixture coverage, not real inference acceptance. |
-| `benchmark-stage3-evidence-compiler/skills/simulator-evidence-compilation/subskills/cleaning/SKILL.md` | missing | — | Data-Juicer integration, branch-specific cleaning, rejected records and preserved original labels/state. |
-| `benchmark-stage3-evidence-compiler/skills/stage3-plan-generation/SKILL.md` | host_only | plan and annotation clients. | Cleaning and annotation dependency planning with explicit input/output contracts. |
-| `benchmark-stage4-build/SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-| `benchmark-stage4-build/skills/full-synthesis/SKILL.md` | partial | Packages supplied items and media with private sources and answers. | Bulk generation with difficulty/coverage controls and reusable generator/metric bundle; packaging is not synthesis. |
-| `benchmark-stage4-build/skills/grey-batch-validation/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage4-build/skills/grey-batch-validation/subskills/cdm-irt-analysis/SKILL.md` | missing | — | Score-matrix diagnostics, item difficulty/discrimination, capability mastery and small-sample status. |
-| `benchmark-stage4-build/skills/grey-batch-validation/subskills/invalid-item-screening/SKILL.md` | partial | Builder rejects selected malformed references and replay failures. | Reusable screening of duplicate options, missing anchors, sequence semantics, answerability and leakage with per-item findings. |
-| `benchmark-stage4-build/skills/grey-batch-validation/subskills/per-template-batch-synthesis/SKILL.md` | missing | — | Reusable per-template pilot runner and filtered/zero-output template reports. |
-| `benchmark-stage4-build/skills/grey-batch-validation/subskills/small-batch-result-evaluation/SKILL.md` | partial | Exact-match predictions and heuristic scoring smoke in Habitat task. | Reusable model/proxy runners, score matrix, template diagnostics and explicit evaluation mode. |
-| `benchmark-stage4-build/skills/stage4-plan-generation/SKILL.md` | host_only | plan and template lookup. | Evidence-supported difficulty allocation and executable template/metric requirements. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/SKILL.md` | partial | Some primitives exist; see child entries. | Parent business capability is incomplete while child capabilities are missing; dropping its scheduler does not close those gaps. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-image-processing/SKILL.md` | partial | Image viewing and media copying; Habitat test task generated neutral A/B overlays. | Bundled reusable overlay/crop/panel builders, anchor contracts and image rejection reports. Test-task code is not a shipped general method. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/subskills/answer-program-generation/SKILL.md` | partial | Host writes task code; live Habitat task produced an oracle and generator. | Reusable synthesizer assembly consuming GT adapter, assets, templates and metrics; shipped compiler is absent. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/subskills/contract-checking/SKILL.md` | partial | Source replay, prediction rejection and public/authority separation; nine targeted core tests. | Generated-bundle acceptance, visible-anchor answerability, difficulty mix, positive/negative scorer and consumer-contract checks. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/subskills/gt-kinship-analysis/SKILL.md` | missing | — | GT nodes/edges, kinship matrix, distant reasoning chains, field catalog and difficulty support. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/subskills/metric-compilation/SKILL.md` | partial | Exact-match evaluator. | Metric registry, answer-type parsers, set/order/interval metrics and generated standalone scorers. |
-| `benchmark-stage4-build/skills/template-metric-code-generation/subskills/template-compilation/SKILL.md` | partial | Reference registry lookup. | Evidence-dependent enabled/disabled templates with difficulty, marker, metric and implementation bindings. |
-| `benchmark-stage5-eval/SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-| `benchmark-stage5-eval/skills/full-evaluation/SKILL.md` | partial | Scores saved predictions with exact match and per-item outcomes. | Configured multi-model runners, capability/source/template aggregation, error taxonomy and reproducible reports. |
-| `benchmark-stage5-eval/skills/opencode-usage-report/SKILL.md` | missing | — | DSH replacement for parent/descendant token and cost reporting; SQLite operation logs do not supply this. |
-| `SKILL.md` | orchestration_replaced | DSH owns conversation and tool execution; operation records retain artifacts. | Fixed five-stage scheduling is intentionally removed. Business capability gaps remain in the leaf entries. |
-
-## Completion order
-
-1. Preserve professional source/GT/visible-anchor/metric contracts as callable methods, with inputs and outputs consumed by downstream tools.
-2. Supply reusable template/oracle/asset/scorer assembly and deterministic item screening; validate one complete real task family before widening coverage.
-3. Integrate source normalization, Data-Juicer and the batch annotation chain with optional documented environments and actual inference tests.
-4. Add model runners, score matrices and CDM/IRT with explicit small-sample limitations, then scale synthesis and reports.
-5. Restore literature/capability planning and DSH usage reporting without reinstating mandatory stage agents, tmux/DONE hierarchies or checksum manifests.
+| Original skill | Tool mapping | Validation / limits |
+|---|---|---|
+| benchclaw-carla-data-collection | method, carla, adapt_capture, design, compile, synthesize, score | Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted |
+| benchclaw-carla-intent-understanding | method, carla, adapt_capture, design, compile, synthesize, score | Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted |
+| benchclaw-carla-metric-code-build | method, carla, adapt_capture, design, compile, synthesize, score | Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted |
+| benchclaw-carla-simulator-benchmark | method, carla, adapt_capture, design, compile, synthesize, score | Real Town01 RGB/instance/actor-state capture and native adapter; complete T1-T12 task families not all accepted |
+| benchclaw-pipeline | DSH orchestration | Live DSH + Qwen composition |
+| benchclaw-stage1-draft | DSH orchestration | Live DSH + Qwen composition |
+| benchclaw-stage1-benchmark-draft-generation | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage1-capability-dimension-planning | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage1-execution-plan-generation | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage1-intent-understanding | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage1-literature-review | research_review | Actual source passage matched; semantic interpretation is not automatically certified |
+| benchclaw-stage1-literature-search | literature | Actual Habitat primary paper download and full-text extraction |
+| benchclaw-stage1-scope-preprocess-analysis | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage1-template-metric-draft-generation | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage2-data-collect | DSH orchestration | Live DSH + Qwen composition |
+| benchclaw-stage2-existing-benchmark-collection-analysis | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-existing-benchmark-content-label-analysis | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-existing-benchmark-data-materialization | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-real-image-collection-analysis | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-real-image-content-analysis | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-real-image-data-structure-normalization | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-simulator-collection-analysis | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-simulator-data-acquisition | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-simulator-gt-materialization | method, acquire, normalize, clean, adapt_capture | Actual ERQA Parquet and Habitat/LIBERO/CARLA source materialization |
+| benchclaw-stage2-plan-generation | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage3-evidence-compiler | DSH orchestration | Live DSH + Qwen composition |
+| benchclaw-stage3-existing-benchmark-evidence-compilation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage3-existing-benchmark-annotation | annotate, sam3, yoloe, depthanything3, llm_local | Actual annotation chain acceptance is recorded separately in VALIDATION.md |
+| benchclaw-stage3-existing-benchmark-cleaning | clean | Actual Data-Juicer cleaning/filtering preserved original answers; native readable-image checks |
+| benchclaw-stage3-real-image-evidence-compilation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage3-real-image-annotation | annotate, sam3, yoloe, depthanything3, llm_local | Actual annotation chain acceptance is recorded separately in VALIDATION.md |
+| benchclaw-stage3-real-image-cleaning | clean | Actual Data-Juicer cleaning/filtering preserved original answers; native readable-image checks |
+| benchclaw-stage3-simulator-evidence-compilation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage3-simulator-annotation | annotate, sam3, yoloe, depthanything3, llm_local | Actual annotation chain acceptance is recorded separately in VALIDATION.md |
+| benchclaw-stage3-simulator-cleaning | clean | Actual Data-Juicer cleaning/filtering preserved original answers; native readable-image checks |
+| benchclaw-stage3-plan-generation | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage4-build | DSH orchestration | Live DSH + Qwen composition |
+| benchclaw-stage4-full-synthesis | synthesize, screen, model_eval, diagnose, package | Pilot/full real Habitat synthesis, scorer controls and package regeneration |
+| benchclaw-stage4-grey-batch-validation | synthesize, screen, model_eval, diagnose, package | Pilot/full real Habitat synthesis, scorer controls and package regeneration |
+| benchclaw-stage4-cdm-irt-analysis | diagnose | Real/proxy score matrix consumed; small-sample diagnostics emitted |
+| benchclaw-stage4-invalid-item-screening | screen | Original programmatic gate runs on generated real/synthetic items |
+| benchclaw-stage4-per-template-batch-synthesis | synthesize, screen, model_eval, diagnose, package | Pilot/full real Habitat synthesis, scorer controls and package regeneration |
+| benchclaw-stage4-small-batch-result-evaluation | model_eval, score, baselines, report, diagnose | Real Qwen API responses, missing/duplicate controls and stratified scoring |
+| benchclaw-stage4-plan-generation | method, design, plan | Binding validation, consumed compiler spec and Q-matrix exercised by production demo |
+| benchclaw-stage4-template-metric-code-generation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage4-answer-image-processing | images | Original composers produced inspected actual images; generic and item markers no longer overlap |
+| benchclaw-stage4-answer-program-generation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage4-contract-checking | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage4-gt-kinship-analysis | kinship | Original graph algorithm consumed real Habitat evidence and compiler bundle |
+| benchclaw-stage4-metric-compilation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage4-template-compilation | compile, kinship, images, synthesize, score | Executable original algorithms and declarative recipes exercised with real/synthetic evidence |
+| benchclaw-stage5-eval | DSH orchestration | Live DSH + Qwen composition |
+| benchclaw-stage5-full-evaluation | model_eval, score, baselines, report, diagnose | Real Qwen API responses, missing/duplicate controls and stratified scoring |
+| benchclaw-stage5-opencode-usage-report | usage | DSH exported events contain input/output/total counters; subtree coverage is explicit |
+| benchclaw-root | DSH orchestration | Live DSH + Qwen composition |

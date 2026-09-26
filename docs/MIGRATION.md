@@ -1,22 +1,26 @@
-# Migration status
+# Migration
 
-BenchForge currently migrates part of the runtime, not all functionality expressed by the original BenchClaw skills. See the [55-file inventory](SKILL_PARITY.md), also exposed by `benchforge_catalog` with `section: "migration"`.
+Original business methods and algorithms are independent callable tools. The
+compulsory five-stage scheduler, nested OpenCode/tmux/DONE protocol and fixed
+model roster are removed. DSH chooses the next useful operation from artifacts.
 
-| Area | Current implementation | Missing for reusable parity |
-|---|---|---|
-| Intent, literature, capability design | Generic host reasoning and saved brief | Source retrieval/read evidence, citation audit, capability pool and Q-matrix |
-| Data acquisition | Collector adapters; evidence import for already prepared records | Real/benchmark source adapters, normalization and full simulator validation |
-| Annotation and cleaning | SAM3/YOLOE/DA3/local VLM HTTP clients | Default batch annotation chain, review queue, Data-Juicer and deployment |
-| Templates and answers | Reference registry, host-written task scripts, source selectors | GT kinship, executable template selection, asset/oracle/metric compilation |
-| Quality and pilot | Basic build validation, collection counts, exact-match scoring | Answerability/anchor contracts, invalid screening, model score matrix, CDM/IRT and difficulty allocation |
-| Scale-up and evaluation | Supplied-item packaging and saved-prediction scoring | Bulk synthesis, multi-model runners, custom metrics, stratified reports and DSH usage accounting |
+See [production tools](PRODUCTION.md) for executable contracts and the
+[55-skill map](SKILL_PARITY.md) for each original entry. The machine-readable map
+is available through `catalog section=migration`. It separates implementation
+from validation. Original methods and cards are searchable through `method`;
+they are reference knowledge, not active legacy orchestration.
 
-## Intentionally removed
+Migrated algorithms include runtime/template generation, image composers, GT
+kinship, invalid-item screening and CDM/Rasch proxy analysis. BenchForge adds
+portable paths, declarative answer programs, consistent standalone metrics,
+configured real-model respondents, data normalization, annotation composition,
+consumed design bindings and package relocation.
 
-The mandatory five-stage sequence, nested OpenCode child-skill scheduler, tmux/DONE hierarchy, fixed model roster and checksum manifests are not part of the new mode. DSH owns the conversation and execution tools. This change does not remove the requirement to retain useful professional methods, input/output contracts, original GT and actual validation evidence.
+Habitat/LIBERO/CARLA use native collectors. CARLA T1–T12 methods are retained;
+future trajectories and route actions require sequence/authority/visible-input
+adapters. Single RGB frames do not automatically make these tasks answerable.
+Isaac is an independent primitive collector and has not been accepted in an
+installed Isaac runtime. Universal perfect parity is not asserted.
 
-## Reuse boundaries
-
-Habitat/LIBERO/CARLA collectors and the template reference were adapted from BenchClaw. Isaac is an independent primitive collector, not SpatialForge's reconstruction pipeline. No SpatialForge code or configuration was modified.
-
-Data-Juicer, IRT/CDM, the full annotation pipeline, template compiler and model runners are not bundled turnkey integrations. Saying the agent can write or invoke such code is not a completed migration. External datasets and credentials remain external.
+No SpatialForge code or service was used. Private credentials, GPU weights and
+source datasets are excluded. No content checksum manifests are generated.

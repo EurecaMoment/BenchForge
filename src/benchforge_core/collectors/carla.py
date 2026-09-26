@@ -9,6 +9,11 @@ import random
 import socket
 import subprocess
 import time
+import sys
+from pathlib import Path
+
+# The adapter name must not shadow the CARLA SDK during direct script execution.
+sys.path = [p for p in sys.path if Path(p or '.').resolve() != Path(__file__).resolve().parent]
 
 import carla
 import numpy as np
@@ -180,7 +185,7 @@ def connect_client(host, port, ready_timeout):
     while time.time() < deadline:
         try:
             client = carla.Client(host, port)
-            client.set_timeout(10.0)
+            client.set_timeout(60.0)
             client.get_world()
             return client
         except RuntimeError as exc:
@@ -253,7 +258,7 @@ def ensure_map_loaded(client, map_name, wait_seconds, load_world_timeout):
         print(f"loading map {map_name}")
         client.set_timeout(load_world_timeout)
         world = client.load_world(map_name)
-        client.set_timeout(10.0)
+        client.set_timeout(60.0)
         time.sleep(wait_seconds)
     return world
 
@@ -636,6 +641,7 @@ def reset_world(world, traffic_manager):
 
 
 def capture_map(client, world, map_name, args, rng):
+    client.set_timeout(60.0)
     traffic_manager = client.get_trafficmanager(args.tm_port)
     configure_world(world, traffic_manager, args.delta_seconds)
     traffic_manager.global_percentage_speed_difference(args.speed_diff)
@@ -775,6 +781,8 @@ def capture_map(client, world, map_name, args, rng):
 
             # Save frame for each camera
             cam_dirs = []
+            image_paths = {}
+            instance_paths = {}
             for cam_name, info in camera_sensors.items():
                 cam_dir = os.path.join(map_dir, cam_name)
                 os.makedirs(cam_dir, exist_ok=True)
@@ -784,6 +792,7 @@ def capture_map(client, world, map_name, args, rng):
                 path = os.path.join(cam_dir, fname)
                 if images.get(cam_name) is not None:
                     images[cam_name].save_to_disk(path)
+                    image_paths[cam_name] = path
                 if (
                     args.save_instance_maps
                     and info["collect_metadata"]
@@ -791,9 +800,9 @@ def capture_map(client, world, map_name, args, rng):
                 ):
                     inst_dir = os.path.join(map_dir, f"{cam_name}_instance")
                     os.makedirs(inst_dir, exist_ok=True)
-                    instance_images[cam_name].save_to_disk(
-                        os.path.join(inst_dir, fname)
-                    )
+                    instance_path = os.path.join(inst_dir, Path(fname).stem + '.png')
+                    instance_images[cam_name].save_to_disk(instance_path)
+                    instance_paths[cam_name] = instance_path
                 cam_dirs.append(cam_name)
 
             saved_frames += 1
@@ -808,6 +817,8 @@ def capture_map(client, world, map_name, args, rng):
                 "speed_mps": round(current_speed, 3),
                 "distance_since_start": round(total_distance, 3),
                 "cameras": cam_dirs,
+                "image_paths": image_paths,
+                "instance_paths": instance_paths,
                 "camera_poses": {
                     cam_name: {
                         "mount": info["mount"],

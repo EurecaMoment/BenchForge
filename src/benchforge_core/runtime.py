@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import urllib.request
 import uuid
+import signal
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,13 +64,15 @@ class Runtime:
                         'skills': matches[offset:offset+limit], 'total': len(matches),
                         'next_offset': offset+limit if offset+limit < len(matches) else None}
             if args.get('section') == 'templates':
-                templates = read(Path(__file__).with_name('knowledge') / 'template-registry.json')
+                import runpy
+                module=Path(__file__).with_name('vendor')/'benchclaw/compiler/write_one_click_runtime.py'
+                templates=runpy.run_path(str(module))['DEFAULT_TEMPLATES']
                 query = args.get('query', '').casefold()
-                matches = [t for t in templates if query in json.dumps(t, ensure_ascii=False).casefold()]
+                matches = [t for t in templates if not query or any(word in json.dumps(t, ensure_ascii=False).casefold() for word in query.split())]
                 offset, limit = args.get('offset', 0), args.get('limit', 10)
                 return {'templates': matches[offset:offset+limit], 'total': len(matches),
                         'next_offset': offset+limit if offset+limit < len(matches) else None,
-                        'status': 'reference templates; task-specific executable oracle still required'}
+                        'status': 'Bundled executable templates; supported evidence and visible-anchor requirements still apply. Original broader taxonomy is available through method.'}
             return read(Path(__file__).with_name("capabilities.json"))
         if tool == "status":
             result = self.db.execute("SELECT id,tool,state,artifact,error FROM operations ORDER BY rowid DESC LIMIT 30").fetchall()
@@ -92,6 +95,9 @@ class Runtime:
             raise
 
     def execute(self, tool, args, directory):
+        from .workbench import OPERATIONS, execute
+        if tool in OPERATIONS or tool == 'method':
+            return execute(tool,args,directory,self.config)
         if tool == "plan":
             write(directory / "brief.json", args)
             return {"brief": str(directory / "brief.json"), "next": "Choose sources, collect or import evidence, then build. No stage locks."}
@@ -148,8 +154,17 @@ class Runtime:
             command = list(cfg["command"]) + [str(script), *args.get("argv", []), "--output-dir", str(output)]
         env = {**os.environ, **cfg.get("env", {})}
         with (directory / "stdout.log").open("w", encoding="utf-8") as stdout, (directory / "stderr.log").open("w", encoding="utf-8") as stderr:
-            completed = subprocess.run(command, cwd=self.root, env=env, stdout=stdout, stderr=stderr,
-                                       timeout=args.get("timeout_seconds", 3600), check=False)
+            options={'start_new_session':True} if os.name!='nt' else {'creationflags':subprocess.CREATE_NO_WINDOW}
+            completed = subprocess.Popen(command,cwd=self.root,env=env,stdout=stdout,stderr=stderr,**options)
+            try:
+                completed.wait(timeout=args.get('timeout_seconds',3600))
+            finally:
+                # Only the collector's own process group, including any explicitly
+                # launched test server; attached shared servers are outside it.
+                if os.name!='nt':
+                    try:os.killpg(completed.pid,signal.SIGTERM)
+                    except ProcessLookupError:pass
+                elif completed.poll() is None:completed.terminate()
         if completed.returncode:
             detail = (directory / 'stderr.log').read_text(encoding='utf-8')[-6000:]
             raise RuntimeError(f"{tool} exited {completed.returncode}: {detail}; full log: {directory / 'stderr.log'}")
