@@ -42,12 +42,14 @@ def sensor_specs(width, height):
     rgb.sensor_type = habitat_sim.SensorType.COLOR
     rgb.resolution = [height, width]
     rgb.position = [0.0, 1.5, 0.0]
+    rgb.hfov = 90.0
 
     depth = habitat_sim.CameraSensorSpec()
     depth.uuid = "depth_sensor"
     depth.sensor_type = habitat_sim.SensorType.DEPTH
     depth.resolution = [height, width]
     depth.position = [0.0, 1.5, 0.0]
+    depth.hfov = 90.0
 
     return [rgb, depth]
 
@@ -148,6 +150,10 @@ def collect_scene(scene_path, output_root, frames_per_scene, width, height):
         "scene_path": scene_path,
         "frames": len(records),
         "image_size": [width, height],
+        "camera": {"fx": width / 2, "fy": width / 2, "cx": (width - 1) / 2, "cy": (height - 1) / 2,
+                   "width": width, "height": height, "hfov_degrees": 90.0},
+        "depth_semantics": {"type": "camera_forward_z", "units": "meters", "raw_format": "float32_npy",
+                            "note": "Camera-forward depth is not Euclidean range. Convert with pixel coordinates and intrinsics for distance-to-camera questions."},
         "records": records,
     }
     with open(scene_dir / "gt.json", "w", encoding="utf-8") as f:

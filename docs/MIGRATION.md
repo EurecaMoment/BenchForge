@@ -1,30 +1,22 @@
-# From five stages to callable capabilities
+# Migration status
 
-The original system encoded orchestration in nested skills, numbered artifacts, ready sets, tmux sessions, child-agent identities and DONE records. The new mode retains the useful production work while letting the host harness manage conversation, context, execution and parallel agents.
+BenchForge currently migrates part of the runtime, not all functionality expressed by the original BenchClaw skills. See the [55-file inventory](SKILL_PARITY.md), also exposed by `benchforge_catalog` with `section: "migration"`.
 
-| Original work | New mode |
-|---|---|
-| Intent, literature search/review, capability decomposition | Host reasoning, web/file tools, saved `plan` brief and task workspace |
-| Simulator, real-data and benchmark source selection | Catalog, bundled collector adapters and explicit source paths |
-| Templates and metric draft | Searchable original template registry; task code selects and implements the oracle |
-| Three acquisition branches | Independent simulator calls; local dataset/image import through `evidence`; download/conversion through ordinary task code |
-| YOLOE + VLM semantic candidate discovery | Separate `yoloe` / `llm_local` tools, with original outputs retained |
-| SAM3 masks, DA3 depth | Separate `sam3` / `depthanything3` tools; inspect masks/images, reuse selected outputs |
-| Semi-supervised chain | The agent composes those same tools using direct calls or PTC. No second invisible planner |
-| Cleaning and source normalization | Editable task code followed by source-evidence import; predictions retain their provenance |
-| Template compilation and answer program | Task code emits questions and deterministic source JSON; selectors bind items to answers |
-| Pilot, invalid-item screening, IRT/CDM, scale-up | Task-selected analysis and sampling code; no compulsory rerun of unrelated stages |
-| Packaging and quality checks | `build`: selected public fields, copied media, private sources/answers, collection statistics |
-| Fixed model roster and evaluation reports | Saved predictions plus `evaluate`; additional models/metrics are explicit task-specific runners |
+| Area | Current implementation | Missing for reusable parity |
+|---|---|---|
+| Intent, literature, capability design | Generic host reasoning and saved brief | Source retrieval/read evidence, citation audit, capability pool and Q-matrix |
+| Data acquisition | Collector adapters; evidence import for already prepared records | Real/benchmark source adapters, normalization and full simulator validation |
+| Annotation and cleaning | SAM3/YOLOE/DA3/local VLM HTTP clients | Default batch annotation chain, review queue, Data-Juicer and deployment |
+| Templates and answers | Reference registry, host-written task scripts, source selectors | GT kinship, executable template selection, asset/oracle/metric compilation |
+| Quality and pilot | Basic build validation, collection counts, exact-match scoring | Answerability/anchor contracts, invalid screening, model score matrix, CDM/IRT and difficulty allocation |
+| Scale-up and evaluation | Supplied-item packaging and saved-prediction scoring | Bulk synthesis, multi-model runners, custom metrics, stratified reports and DSH usage accounting |
 
-## Deliberately removed orchestration
+## Intentionally removed
 
-No fixed order across five stages; no OpenCode-specific child runner; no duplicate scheduler; no required tmux/DONE hierarchy; no global preset edits; no model-written GT or model question-review gate; no mandatory target-model API calls.
+The mandatory five-stage sequence, nested OpenCode child-skill scheduler, tmux/DONE hierarchy, fixed model roster and checksum manifests are not part of the new mode. DSH owns the conversation and execution tools. This change does not remove the requirement to retain useful professional methods, input/output contracts, original GT and actual validation evidence.
 
-The loss of a mandatory stage DAG does not remove evidence. Every mutating tool call stores its arguments, result or failure, and prior runs stay available. The model should choose corrections based on real evidence and show useful images.
+## Reuse boundaries
 
-## Scope of reuse
+Habitat/LIBERO/CARLA collectors and the template reference were adapted from BenchClaw. Isaac is an independent primitive collector, not SpatialForge's reconstruction pipeline. No SpatialForge code or configuration was modified.
 
-The collector algorithms and template reference were migrated from the original BenchClaw checkout. The old stage instructions are not loaded into the new system prompt. This avoids reintroducing their execution constraints.
-
-Data-Juicer, custom template generators, IRT/CDM analysis and model API runners can be invoked as task code in their own environments. They are not presented as bundled turnkey integrations in this version. ERQA and user image datasets remain external data; the repository contains neither private images nor dataset credentials.
+Data-Juicer, IRT/CDM, the full annotation pipeline, template compiler and model runners are not bundled turnkey integrations. Saying the agent can write or invoke such code is not a completed migration. External datasets and credentials remain external.

@@ -54,6 +54,14 @@ class Runtime:
 
     def call(self, tool, args):
         if tool == "catalog":
+            if args.get('section') == 'migration':
+                inventory = read(Path(__file__).with_name('knowledge') / 'skill-migration.json')
+                query = args.get('query', '').casefold()
+                matches = [row for row in inventory['skills'] if query in json.dumps(row, ensure_ascii=False).casefold()]
+                offset, limit = max(0, args.get('offset', 0)), max(1, min(100, args.get('limit', 10)))
+                return {**{k: v for k, v in inventory.items() if k != 'skills'},
+                        'skills': matches[offset:offset+limit], 'total': len(matches),
+                        'next_offset': offset+limit if offset+limit < len(matches) else None}
             if args.get('section') == 'templates':
                 templates = read(Path(__file__).with_name('knowledge') / 'template-registry.json')
                 query = args.get('query', '').casefold()
@@ -143,10 +151,14 @@ class Runtime:
             completed = subprocess.run(command, cwd=self.root, env=env, stdout=stdout, stderr=stderr,
                                        timeout=args.get("timeout_seconds", 3600), check=False)
         if completed.returncode:
-            raise RuntimeError(f"{tool} exited {completed.returncode}; see {directory / 'stderr.log'}")
+            detail = (directory / 'stderr.log').read_text(encoding='utf-8')[-6000:]
+            raise RuntimeError(f"{tool} exited {completed.returncode}: {detail}; full log: {directory / 'stderr.log'}")
+        if tool != 'isaac' and any(flag in args.get('argv', []) for flag in ('--help', '-h')):
+            return {'help': (directory / 'stdout.log').read_text(encoding='utf-8'),
+                    'capture_started': False, 'collector': tool}
         files = [str(p.relative_to(output)) for p in output.rglob("*") if p.is_file()]
         if not files:
-            raise RuntimeError(f"{tool} returned without capture artifacts")
+            raise RuntimeError(f"{tool} returned without capture artifacts; stdout: {directory / 'stdout.log'}")
         return {"output_dir": str(output), "files": files, "execution_complete": True,
                 "quality": "not_assessed", "next": "Inspect real images and raw state before compiling benchmark evidence."}
 
@@ -168,6 +180,8 @@ class Runtime:
             record["provenance"] = {**origin, "path": str(reference.resolve())}
             if origin["kind"] != "prediction":
                 # Recompute fields from the source, rather than trusting supplied answers.
+                if reference.suffix.lower() != '.json':
+                    raise ValueError('provenance.path must reference a JSON source record. For raw depth/images, compute a reproducible JSON oracle in task code and list binary inputs under private assets.')
                 raw = read(reference)
                 facts = {}
                 for name, pointer in record["selectors"].items():
@@ -178,6 +192,10 @@ class Runtime:
                 if not (p if p.is_absolute() else source.parent / p).is_file():
                     raise ValueError(f"Missing media: {p}")
             record["media"] = [str((source.parent / p).resolve()) for p in record.get("media", [])]
+            record['assets'] = [str((source.parent / p).resolve()) for p in record.get('assets', [])]
+            for asset in record['assets']:
+                if not Path(asset).is_file():
+                    raise ValueError(f'Missing private evidence asset: {asset}')
             accepted.append(record)
         jsonl(directory / "evidence.jsonl", accepted)
         counts = Counter(r["provenance"]["kind"] for r in accepted)
@@ -195,6 +213,7 @@ class Runtime:
         private = directory / "authority"
         (public / "media").mkdir(parents=True)
         (private / "sources").mkdir(parents=True)
+        (private / 'assets').mkdir()
         visible, gold, ids = [], [], set()
         for item in items:
             if item["id"] in ids:
@@ -209,6 +228,8 @@ class Runtime:
             answer = select(raw, pointer)
             media_paths = []
             for index, media in enumerate(record.get("media", [])):
+                if Path(media).suffix.lower() not in {'.png','.jpg','.jpeg','.webp','.gif','.bmp','.mp4','.webm','.wav','.mp3','.ogg'}:
+                    raise ValueError(f'Public media must be model-visible images/audio/video; put raw depth, labels and arrays in private assets: {media}')
                 target = public / "media" / f"{len(visible)}_{index}{Path(media).suffix}"
                 shutil.copyfile(media, target)
                 media_paths.append(str(target.relative_to(public)).replace("\\", "/"))
@@ -219,8 +240,14 @@ class Runtime:
             source = Path(record["provenance"]["path"])
             target = private / "sources" / f"{len(gold)}{source.suffix}"
             shutil.copyfile(source, target)
+            assets = []
+            for index, asset in enumerate(record.get('assets', [])):
+                asset_target = private / 'assets' / f'{len(gold)}_{index}{Path(asset).suffix}'
+                shutil.copyfile(asset, asset_target)
+                assets.append(str(asset_target.relative_to(private)).replace('\\', '/'))
             gold.append({"id": item["id"], "answer": answer, "evidence_id": record["id"],
                          "answer_field": item["answer_field"], "provenance": {**record["provenance"], "path": str(target.relative_to(private))},
+                         'assets': assets,
                          "template": item.get("template", "unspecified"), "split": item.get("split", "dev")})
         jsonl(public / "items.jsonl", visible)
         jsonl(private / "gold.jsonl", gold)

@@ -30,7 +30,7 @@ export async function apply(ctx, config) {
   const output = {schema:{type:'object',properties:{},additionalProperties:true},
     render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]};
   const definitions = {
-    catalog:'Discover benchmark capabilities, exact request examples and evidence schemas. Start here.',
+    catalog:'Discover benchmark capabilities, request examples and evidence schemas. section=migration lists original skills with implemented scope and missing functionality; do not claim full migration.',
     status:'Read persisted operation results and artifact paths. Does not retry operations.',
     plan:'Save a benchmark brief. Planning and capability choices belong to you; no fixed stage sequence.',
     sam3:'Segment an image through the configured SAM3 service. Returns predictions and mask paths, never authoritative GT.',
@@ -41,13 +41,13 @@ export async function apply(ctx, config) {
     libero:'Collect LIBERO observations and simulator state using demo or zero actions in its configured environment.',
     carla:'Capture CARLA views and actor metadata from a configured running server.',
     isaac:'Capture a native cuboid scene with the independent Isaac collector in a configured Isaac environment. Supports cameras, depth, labels and recorded poses.',
-    evidence:'Import local dataset or simulation records and replay JSON source selectors. Preserve prediction provenance.',
-    build:'Build model-visible items/media plus a separate authority bundle, deriving answers from source records and reporting coverage.',
+    evidence:'Import evidence JSONL. provenance.path references one JSON source document; selectors are JSON pointers into it. All relative paths resolve against the input JSONL directory. media contains public images only; assets retains private raw depth, labels and oracle code. Derive JSON oracle outputs from binary simulation inputs in task code.',
+    build:'Build model-visible items/media plus separate authority sources and private assets, deriving answers from source JSON and reporting coverage. Never put raw depth or label files into media.',
     evaluate:'Score saved predictions with exact match; report missing answers. Does not call model APIs.'
   };
   const object={type:'object',properties:{},additionalProperties:true};
   const schemas={
-    catalog:{section:{type:'string',enum:['overview','templates']},query:{type:'string'},offset:{type:'integer'},limit:{type:'integer'}},
+    catalog:{section:{type:'string',enum:['overview','templates','migration']},query:{type:'string'},offset:{type:'integer'},limit:{type:'integer'}},
     status:{},
     plan:{objective:{type:'string',required:true},sources:{type:'array',items:{type:'string'}},target_items:{type:'integer'},notes:{type:'string'}},
     evidence:{input:{type:'string',required:true,description:'Source records JSONL with provenance and JSON-pointer selectors.'}},

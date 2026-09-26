@@ -3,10 +3,12 @@ import tempfile
 import threading
 import unittest
 import zipfile
+import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from benchforge_core.runtime import Runtime, write, jsonl, read, rows, select
+from benchforge_core.geometry import pinhole_camera, axial_depth_to_range
 
 
 class RuntimeTests(unittest.TestCase):
@@ -59,9 +61,38 @@ class RuntimeTests(unittest.TestCase):
     def test_pointer_escapes_and_empty_key(self):
         self.assertEqual(select({'a/b':{'':2}},'/a~1b/'),2)
 
+    def test_range_order_can_differ_from_axial_depth(self):
+        camera=pinhole_camera(640,480)
+        self.assertEqual(axial_depth_to_range(2,camera['cx'],camera['cy'],camera),2)
+        self.assertGreater(axial_depth_to_range(2,0,0,camera),axial_depth_to_range(2.3,camera['cx'],camera['cy'],camera))
+
     def test_missing_backend_has_setup_guidance(self):
         with self.assertRaisesRegex(ValueError, 'Configure services.sam3.url'):
             self.runtime.call('sam3', {'payload':{}})
+
+    def test_collector_help_is_not_a_failed_capture(self):
+        self.runtime.config={'collectors':{'habitat':{'command':[sys.executable,'-c','print("usage: habitat --scenes")']}}}
+        result=self.runtime.call('habitat',{'argv':['--help']})
+        self.assertIn('--scenes',result['help'])
+        self.assertFalse(result['capture_started'])
+
+    def test_depth_array_stays_private(self):
+        evidence=self.evidence()
+        record=rows(evidence['evidence'])[0]
+        depth=self.root/'depth.npy'
+        depth.write_bytes(b'raw simulator evidence')
+        record['media']=[str(depth)]
+        jsonl(evidence['evidence'],[record])
+        with self.assertRaisesRegex(ValueError,'private assets'):
+            self.build(evidence)
+        record['media']=[]
+        record['assets']=[str(depth)]
+        jsonl(evidence['evidence'],[record])
+        package=self.build(evidence)
+        gold=rows(Path(package['authority'])/'gold.jsonl')[0]
+        self.assertEqual((Path(package['authority'])/gold['assets'][0]).read_bytes(),depth.read_bytes())
+        with zipfile.ZipFile(package['package']) as archive:
+            self.assertFalse(any(name.endswith('.npy') for name in archive.namelist()))
 
     def test_http_contract_without_starting_services(self):
         requests=[]

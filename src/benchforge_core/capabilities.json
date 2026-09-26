@@ -149,7 +149,11 @@
     },
     "selectors": {
       "answer": "/annotations/0/answer"
-    }
+    },
+    "assets": [
+      "raw_depth.npy",
+      "oracle.py"
+    ]
   },
   "item_record": {
     "id": "q1",
@@ -159,5 +163,20 @@
     "template": "task-template",
     "split": "dev"
   },
-  "limitations": "JSON pointer replay verifies derivation from supplied source files, not their external authenticity or question semantics. Core does not provide an adversarial sandbox. Model predictions cannot be promoted into GT by the build tool. Isaac requires an installed SDK and supports the documented primitive scene schema. No simulator or model weights are bundled."
+  "limitations": "JSON pointer replay verifies derivation from supplied source files, not their external authenticity or question semantics. Core does not provide an adversarial sandbox. Model predictions cannot be promoted into GT by the build tool. Isaac requires an installed SDK and supports the documented primitive scene schema. No simulator or model weights are bundled.",
+  "evidence_contract": {
+    "provenance_path": "JSON document; use a computed JSON oracle for binary simulator inputs",
+    "relative_paths": "Resolve against the input JSONL parent directory",
+    "media": "Public pictures/audio/video only; never raw depth or labels",
+    "assets": "Private source arrays, calibration and oracle code copied to authority/assets",
+    "depth": "Habitat returns camera-forward Z. Use camera intrinsics to obtain Euclidean camera range for distance questions."
+  },
+  "migration": {
+    "full_parity": false,
+    "inventory": {
+      "section": "migration",
+      "limit": 10
+    },
+    "note": "See per-skill gaps before promising a capability. Task code and reference templates do not establish full migration."
+  }
 }
