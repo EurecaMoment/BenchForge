@@ -85,6 +85,11 @@ fresh Windows virtual environment ran the four-image visual production demo.
 The demo consumes design bindings and exercises original compiler dependencies,
 deterministic recipes, screening, scorer controls and packaging.
 
+After publication, a fresh GitHub clone on Linux ran both the no-install core
+demo and visual production demo successfully, using the existing Python SDK
+environment. A Windows HTTPS clone attempt hit a network connection reset;
+the source ZIP and installed wheel were validated on Windows.
+
 Fresh DSH dependency compilation and clean installation of every GPU SDK were
 not repeated; a built DSH and existing optional SDK environments were reused.
 CI is configured for Windows/Linux and Python 3.10/3.12; hosted CI status is not

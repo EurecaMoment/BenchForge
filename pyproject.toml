@@ -30,3 +30,6 @@ include = ["benchforge_core*"]
 
 [tool.setuptools.package-data]
 benchforge_core = ["capabilities.json", "collectors/*.py", "knowledge/*.json", "vendor/**/*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.pyo"]
