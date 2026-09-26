@@ -1,0 +1,14 @@
+{
+  "services": {
+    "sam3": {"url": "http://127.0.0.1:8765"},
+    "yoloe": {"url": "http://127.0.0.1:8766"},
+    "depthanything3": {"url": "http://127.0.0.1:8008"},
+    "llm_local": {"url": "http://127.0.0.1:9001", "token_env": "BENCHCLAW_LLM_TOKEN"}
+  },
+  "collectors": {
+    "habitat": {"command": ["conda", "run", "--no-capture-output", "-n", "habitat", "python"]},
+    "libero": {"command": ["conda", "run", "--no-capture-output", "-n", "libero", "python"], "env": {}},
+    "carla": {"command": ["conda", "run", "--no-capture-output", "-n", "carla", "python"]},
+    "isaac": {"command": ["YOUR_ISAAC_PYTHON_LAUNCHER"]}
+  }
+}

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "benchforge"
+version = "0.1.0"
+description = "Composable benchmark production tools for agent harnesses"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/EurecaMoment/BenchForge"
+Issues = "https://github.com/EurecaMoment/BenchForge/issues"
+
+[project.optional-dependencies]
+dsh = ["PyYAML>=6"]
+
+[project.scripts]
+benchforge = "benchforge_core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["benchforge_core*"]
+
+[tool.setuptools.package-data]
+benchforge_core = ["capabilities.json", "collectors/*.py", "knowledge/*.json"]
