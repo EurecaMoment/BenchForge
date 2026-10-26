@@ -1,0 +1,56 @@
+{
+  "provenance": {
+    "source_supplement_page": [12, 13],
+    "scope": "selected_fields_transcribed_from_supplement"
+  },
+  "disclosure": "This JSON transcribes selected fields reported in the supplementary material. It omits complete simulator-restoration data and executable scoring/verifier code; it is not a complete runnable task package.",
+  "task": {
+    "task_id": "Kitchen27-00-slice-tomato",
+    "eval_set": "short_hard",
+    "instructions": {
+      "micro": "Pick up the tomato from the dining table, slice it, and put the slices on the counter top."
+    },
+    "scene": {
+      "floor_plan": "FloorPlan27",
+      "room_type": "Kitchen",
+      "random_spawn": {
+        "seed": 0,
+        "object_counts": { "Tomato": 1 }
+      }
+    },
+    "pddl_params": {
+      "object_target": "Tomato",
+      "parent_target": "CounterTop",
+      "object_sliced": true
+    },
+    "subtasks": [
+      {
+        "task_type": "pick_slice_then_place_in_recep",
+        "pddl_params": {
+          "object_target": "Tomato",
+          "parent_target": "CounterTop",
+          "object_sliced": true
+        }
+      }
+    ],
+    "completion": { "mode": "all" }
+  },
+  "execution": {
+    "model": "GPT-5.5",
+    "steps": 7,
+    "invalid_actions": 0,
+    "success": true,
+    "trajectory_eqa": { "correct": 10, "total": 15, "display": "10/15" },
+    "trajectory_scope": "Complete trajectory as listed in the supplement; Step 0 is the restored initial state.",
+    "trajectory": [
+      { "step": 0, "event": "Restored initial state." },
+      { "step": 1, "action": "Look down." },
+      { "step": 2, "action": "Pick up the butter knife." },
+      { "step": 3, "action": "Slice the tomato." },
+      { "step": 4, "action": "Put down the knife." },
+      { "step": 5, "action": "Pick up a tomato slice." },
+      { "step": 6, "action": "Turn toward the counter." },
+      { "step": 7, "action": "Place the slice on the counter." }
+    ]
+  }
+}

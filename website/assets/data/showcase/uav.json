@@ -1,0 +1,300 @@
+{
+  "dataset": "uav",
+  "suite": "SpatialUAV",
+  "source": "Real aerial imagery",
+  "examples": [
+    {
+      "id": "UAV_007453_img_2646_UAV_C08_marked_object_choice_marked_category_choice_05",
+      "capability_id": "UAV_C08",
+      "capability": "类别约束下的对象选择与匹配",
+      "capability_en": "Category matching for a marked object",
+      "question_type": "marked_object_choice",
+      "question_type_en": "Marked-object classification",
+      "difficulty": "simple",
+      "question_original": "请判断标注物体 A 是什么类别。",
+      "question_en": "Select the category of labeled object A from the options.",
+      "choices_original": [
+        "A. wind turbine",
+        "B. building",
+        "C. track",
+        "D. barrier"
+      ],
+      "choices_en": [
+        "A. Wind turbine",
+        "B. Building",
+        "C. Track",
+        "D. Barrier"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. track",
+      "answer_display_en": "C. Track",
+      "images": [
+        {
+          "src": "assets/images/showcase/uav/uav-007453-img-2646-uav-c08-marked-object-choice-marked-category-choice-05-a-marked-aerial-image.webp",
+          "label": "A-marked aerial image",
+          "width": 1400,
+          "height": 1050,
+          "source_relative_path": "assets/img_2646/UAV_007453_img_2646_UAV_C08_marked_object_choice_marked_category_choice_05_bbox_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/uav/uav-007453-img-2646-uav-c08-marked-object-choice-marked-category-choice-05-unmarked-aerial-image.webp",
+          "label": "Unmarked aerial image",
+          "width": 1400,
+          "height": 1050,
+          "source_relative_path": "assets/img_2646/img_2646_base.jpg"
+        }
+      ],
+      "selection_note_en": "The center marker for A lands on the running lanes, and the labeled region is large enough to read the target in its aerial context.",
+      "provenance": {
+        "dataset": "uav",
+        "record_id": "UAV_007453_img_2646_UAV_C08_marked_object_choice_marked_category_choice_05",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "UAV_005797_img_2718_UAV_C08_marked_object_choice_marked_category_choice_07",
+      "capability_id": "UAV_C08",
+      "capability": "类别约束下的对象选择与匹配",
+      "capability_en": "Category matching for a marked object",
+      "question_type": "marked_object_choice",
+      "question_type_en": "Marked-object classification",
+      "difficulty": "simple",
+      "question_original": "从候选类别中选出标注物体 A 的类别。",
+      "question_en": "Choose the category of labeled object A.",
+      "choices_original": [
+        "A. lane",
+        "B. car",
+        "C. motorcycle",
+        "D. person"
+      ],
+      "choices_en": [
+        "A. Lane",
+        "B. Car",
+        "C. Motorcycle",
+        "D. Person"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. car",
+      "answer_display_en": "B. Car",
+      "images": [
+        {
+          "src": "assets/images/showcase/uav/uav-005797-img-2718-uav-c08-marked-object-choice-marked-category-choice-07-a-marked-aerial-image.webp",
+          "label": "A-marked aerial image",
+          "width": 1400,
+          "height": 1050,
+          "source_relative_path": "assets/img_2718/UAV_005797_img_2718_UAV_C08_marked_object_choice_marked_category_choice_07_bbox_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/uav/uav-005797-img-2718-uav-c08-marked-object-choice-marked-category-choice-07-unmarked-aerial-image.webp",
+          "label": "Unmarked aerial image",
+          "width": 1400,
+          "height": 1050,
+          "source_relative_path": "assets/img_2718/img_2718_base.jpg"
+        }
+      ],
+      "selection_note_en": "The center marker inside box A falls on a parked passenger car; the lane, motorcycle, and person distractors are visually distinct.",
+      "provenance": {
+        "dataset": "uav",
+        "record_id": "UAV_005797_img_2718_UAV_C08_marked_object_choice_marked_category_choice_07",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "UAV_002782_img_1412_UAV_C03_grounding_choice_object_grid_region_01",
+      "capability_id": "UAV_C03",
+      "capability": "图像平面位置与区域定位",
+      "capability_en": "Image-plane localization",
+      "question_type": "grounding_choice",
+      "question_type_en": "Spatial grounding",
+      "difficulty": "simple",
+      "question_original": "从九宫格选项中选出标注物体 A 的位置。",
+      "question_en": "Which grid cell contains marked object A?",
+      "choices_original": [
+        "A. 左上",
+        "B. 上中",
+        "C. 右上",
+        "D. 左中",
+        "E. 中心",
+        "F. 右中",
+        "G. 左下",
+        "H. 下中",
+        "I. 右下"
+      ],
+      "choices_en": [
+        "A. Top-left",
+        "B. Top-center",
+        "C. Top-right",
+        "D. Middle-left",
+        "E. Center",
+        "F. Middle-right",
+        "G. Bottom-left",
+        "H. Bottom-center",
+        "I. Bottom-right"
+      ],
+      "answer_raw": "E",
+      "answer_display_original": "E. 中心",
+      "answer_display_en": "E. Center",
+      "images": [
+        {
+          "src": "assets/images/showcase/uav/uav-002782-img-1412-uav-c03-grounding-choice-object-grid-region-01-a-marked-aerial-image.webp",
+          "label": "A-marked aerial image",
+          "width": 1400,
+          "height": 788,
+          "source_relative_path": "assets/img_1412/UAV_002782_img_1412_UAV_C03_grounding_choice_object_grid_region_01_bbox_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/uav/uav-002782-img-1412-uav-c03-grounding-choice-object-grid-region-01-unmarked-aerial-image.webp",
+          "label": "Unmarked aerial image",
+          "width": 1400,
+          "height": 788,
+          "source_relative_path": "assets/img_1412/img_1412_base.jpg"
+        }
+      ],
+      "selection_note_en": "The marked lane’s centroid lies in the center cell; the large outlined target makes its image-plane location readable.",
+      "provenance": {
+        "dataset": "uav",
+        "record_id": "UAV_002782_img_1412_UAV_C03_grounding_choice_object_grid_region_01",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "UAV_000005_img_3206_UAV_C04_single_choice_largest_area_06",
+      "capability_id": "UAV_C04",
+      "capability": "可见面积与显著尺度",
+      "capability_en": "Visible area and apparent scale",
+      "question_type": "single_choice",
+      "question_type_en": "Largest visible area",
+      "difficulty": "medium",
+      "question_original": "哪个标注框对应的实例可见区域最多？",
+      "question_en": "Which labeled instance occupies the largest visible area?",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C",
+        "D. 标注物体 D"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C",
+        "D. Marked object D"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 标注物体 C",
+      "answer_display_en": "C. Marked object C",
+      "images": [
+        {
+          "src": "assets/images/showcase/uav/uav-000005-img-3206-uav-c04-single-choice-largest-area-06-annotated-aerial-image.webp",
+          "label": "Annotated aerial image",
+          "width": 1800,
+          "height": 1013,
+          "source_relative_path": "assets/img_3206/UAV_000005_img_3206_UAV_C04_single_choice_largest_area_06_bbox_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/uav/uav-000005-img-3206-uav-c04-single-choice-largest-area-06-unmarked-aerial-image.webp",
+          "label": "Unmarked aerial image",
+          "width": 1800,
+          "height": 1013,
+          "source_relative_path": "assets/img_3206/img_3206_base.jpg"
+        }
+      ],
+      "selection_note_en": "The C-labeled street region covers substantially more of the frame than the other outlined instances.",
+      "provenance": {
+        "dataset": "uav",
+        "record_id": "UAV_000005_img_3206_UAV_C04_single_choice_largest_area_06",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "UAV_007691_img_5216_UAV_C07_matching_boundary_side_matching_04",
+      "capability_id": "UAV_C07",
+      "capability": "框几何形状与图像边界关系",
+      "capability_en": "Bounding-box geometry and image-boundary relations",
+      "question_type": "matching",
+      "question_type_en": "Nearest image edge matching",
+      "difficulty": "hard",
+      "question_original": "按标注框到图像边界的距离完成匹配。",
+      "question_en": "Match each labeled object to its nearest image edge.",
+      "choices_original": [
+        "A. 左边缘",
+        "B. 右边缘",
+        "C. 上边缘",
+        "D. 下边缘"
+      ],
+      "choices_en": [
+        "A. Left edge",
+        "B. Right edge",
+        "C. Top edge",
+        "D. Bottom edge"
+      ],
+      "answer_raw": "{\"A\":\"B\",\"B\":\"D\",\"C\":\"C\"}",
+      "answer_display_original": "A → 右边缘；B → 下边缘；C → 上边缘",
+      "answer_display_en": "A → right edge; B → bottom edge; C → top edge",
+      "images": [
+        {
+          "src": "assets/images/showcase/uav/uav-007691-img-5216-uav-c07-matching-boundary-side-matching-04-annotated-aerial-image.webp",
+          "label": "Annotated aerial image",
+          "width": 1800,
+          "height": 1012,
+          "source_relative_path": "assets/img_5216/UAV_007691_img_5216_UAV_C07_matching_boundary_side_matching_04_bbox_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/uav/uav-007691-img-5216-uav-c07-matching-boundary-side-matching-04-unmarked-aerial-image.webp",
+          "label": "Unmarked aerial image",
+          "width": 1800,
+          "height": 1012,
+          "source_relative_path": "assets/img_5216/img_5216_base.jpg"
+        }
+      ],
+      "selection_note_en": "The A, B, and C boxes are separated across the right, lower, and top edges, so each requested relation is visible in the frame.",
+      "provenance": {
+        "dataset": "uav",
+        "record_id": "UAV_007691_img_5216_UAV_C07_matching_boundary_side_matching_04",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "UAV_000313_img_5188_UAV_C01_multi_choice_category_visible_multi_05",
+      "capability_id": "UAV_C01",
+      "capability": "可见类别识别",
+      "capability_en": "Visible object-category recognition",
+      "question_type": "multi_choice",
+      "question_type_en": "Visible-category selection",
+      "difficulty": "medium",
+      "question_original": "从候选项中选择当前图像中可见的物体类别，可多选。",
+      "question_en": "Which object categories are visible in this aerial image? Select all that apply.",
+      "choices_original": [
+        "A. door",
+        "B. roof",
+        "C. boat",
+        "D. bridge",
+        "E. trees"
+      ],
+      "choices_en": [
+        "A. Door",
+        "B. Roof",
+        "C. Boat",
+        "D. Bridge",
+        "E. Trees"
+      ],
+      "answer_raw": "[\"B\",\"C\",\"E\"]",
+      "answer_display_original": "B. roof；C. boat；E. trees",
+      "answer_display_en": "B. Roof; C. Boat; E. Trees",
+      "images": [
+        {
+          "src": "assets/images/showcase/uav/uav-000313-img-5188-uav-c01-multi-choice-category-visible-multi-05-aerial-rgb-image.webp",
+          "label": "Aerial RGB image",
+          "width": 1800,
+          "height": 1012,
+          "source_relative_path": "assets/img_5188/UAV_000313_img_5188_UAV_C01_multi_choice_category_visible_multi_05_image.jpg"
+        }
+      ],
+      "selection_note_en": "The aerial frame shows rooftops along the bank, trees, and a small but clearly visible boat on the water.",
+      "provenance": {
+        "dataset": "uav",
+        "record_id": "UAV_000313_img_5188_UAV_C01_multi_choice_category_visible_multi_05",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    }
+  ]
+}

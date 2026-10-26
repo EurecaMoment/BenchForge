@@ -1,0 +1,288 @@
+{
+  "dataset": "alfred",
+  "suite": "SpatialHome-Task",
+  "source": "ALFRED",
+  "examples": [
+    {
+      "id": "ALFRED_GT_OBJECTIVE_003761",
+      "capability_en": "Image-plane spatial relations",
+      "question_type": "marked_object_choice",
+      "question_type_en": "Marked-object choice",
+      "difficulty": "medium",
+      "question_original": "观察 A、B、C、D 的标记位置，哪一个最靠画面右边？",
+      "question_en": "Looking at the marked positions A–D, which one lies farthest to the right in the image?",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C",
+        "D. 标注物体 D"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C",
+        "D. Marked object D"
+      ],
+      "answer_raw": "D",
+      "answer_display_original": "D. 标注物体 D",
+      "answer_display_en": "D. Marked object D",
+      "images": [
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_003761_1.webp",
+          "label": "Marked observation",
+          "width": 500,
+          "height": 500,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_003761/ALFRED_GT_OBJECTIVE_003761_main.jpg"
+        },
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_003761_2.webp",
+          "label": "Unmarked observation",
+          "width": 500,
+          "height": 500,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_003761/ALFRED_GT_OBJECTIVE_003761_aux_01.png"
+        }
+      ],
+      "selection_note_en": "Compares four clearly marked points to test left-to-right localization in the image plane.",
+      "provenance": {
+        "dataset": "alfred",
+        "record_id": "ALFRED_GT_OBJECTIVE_003761",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "C03_IMAGE_PLANE_SPATIAL",
+      "capability": "图像平面空间关系"
+    },
+    {
+      "id": "ALFRED_GT_OBJECTIVE_004018",
+      "capability_en": "Counting and set size",
+      "question_type": "interval_choice",
+      "question_type_en": "Interval choice",
+      "difficulty": "medium",
+      "question_original": "画面中的生菜可见实例数落在哪个范围？",
+      "question_en": "How many visible lettuce instances are in the image?",
+      "choices_original": [
+        "A. 0 个",
+        "B. 1 个",
+        "C. 2 个",
+        "D. 3-4 个",
+        "E. 5-8 个",
+        "F. 9 个及以上"
+      ],
+      "choices_en": [
+        "A. 0",
+        "B. 1",
+        "C. 2",
+        "D. 3–4",
+        "E. 5–8",
+        "F. 9 or more"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 2 个",
+      "answer_display_en": "C. 2",
+      "images": [
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_004018_1.webp",
+          "label": "Rendered observation",
+          "width": 300,
+          "height": 300,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_004018/ALFRED_GT_OBJECTIVE_004018_main.png"
+        }
+      ],
+      "selection_note_en": "Counts visible lettuce instances and maps the count to a discrete answer range.",
+      "provenance": {
+        "dataset": "alfred",
+        "record_id": "ALFRED_GT_OBJECTIVE_004018",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "C02_COUNTING_SET_SIZE",
+      "capability": "实例计数与集合大小"
+    },
+    {
+      "id": "ALFRED_GT_OBJECTIVE_006098",
+      "capability_en": "Receptacle and containment relations",
+      "question_type": "multi_choice",
+      "question_type_en": "Multiple choice",
+      "difficulty": "hard",
+      "question_original": "请多选当前放在 R 上或 R 里面的标注物体。",
+      "question_en": "Select all marked objects that are currently on or inside R.",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C",
+        "D. 标注物体 D"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C",
+        "D. Marked object D"
+      ],
+      "answer_raw": "[\"A\",\"C\"]",
+      "answer_display_original": "A. 标注物体 A; C. 标注物体 C",
+      "answer_display_en": "A. Marked object A; C. Marked object C",
+      "images": [
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_006098_1.webp",
+          "label": "Marked observation",
+          "width": 500,
+          "height": 500,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_006098/ALFRED_GT_OBJECTIVE_006098_main.jpg"
+        },
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_006098_2.webp",
+          "label": "Unmarked observation",
+          "width": 500,
+          "height": 500,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_006098/ALFRED_GT_OBJECTIVE_006098_aux_01.png"
+        }
+      ],
+      "selection_note_en": "Uses a marked support surface and four marked candidates to test on/inside relations.",
+      "provenance": {
+        "dataset": "alfred",
+        "record_id": "ALFRED_GT_OBJECTIVE_006098",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "C05_RECEPTACLE_CONTAINMENT",
+      "capability": "容器与承载关系"
+    },
+    {
+      "id": "ALFRED_GT_OBJECTIVE_002001",
+      "capability_en": "Temporal visibility and trajectories",
+      "question_type": "multi_view_choice",
+      "question_type_en": "Multi-view choice",
+      "difficulty": "medium",
+      "question_original": "比较图 A 和图 B，勺子是否只在其中一张图里可见？",
+      "question_en": "Compare images A and B. Is the spoon visible in only one of them?",
+      "choices_original": [
+        "A. 是",
+        "B. 否"
+      ],
+      "choices_en": [
+        "A. Yes",
+        "B. No"
+      ],
+      "answer_raw": "A",
+      "answer_display_original": "A. 是",
+      "answer_display_en": "A. Yes",
+      "images": [
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_002001_1.webp",
+          "label": "A/B comparison",
+          "width": 720,
+          "height": 398,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_002001/ALFRED_GT_OBJECTIVE_002001_main.jpg"
+        },
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_002001_2.webp",
+          "label": "Observation A",
+          "width": 300,
+          "height": 300,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_002001/ALFRED_GT_OBJECTIVE_002001_aux_01.png"
+        },
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_002001_3.webp",
+          "label": "Observation B",
+          "width": 300,
+          "height": 300,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_002001/ALFRED_GT_OBJECTIVE_002001_aux_02.png"
+        }
+      ],
+      "selection_note_en": "Requires comparing two observation views to identify a change in object visibility.",
+      "provenance": {
+        "dataset": "alfred",
+        "record_id": "ALFRED_GT_OBJECTIVE_002001",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "C07_TEMPORAL_VISIBILITY_TRAJECTORY",
+      "capability": "多帧可见性与轨迹顺序"
+    },
+    {
+      "id": "ALFRED_GT_OBJECTIVE_002876",
+      "capability_en": "Object visibility",
+      "question_type": "multi_choice",
+      "question_type_en": "Multiple choice",
+      "difficulty": "medium",
+      "question_original": "下面这些类别中，哪些确实出现在当前画面里？",
+      "question_en": "Which of the following categories are actually present in the current view? Select all that apply.",
+      "choices_original": [
+        "A. 皮搋子",
+        "B. 淋浴玻璃",
+        "C. 毛巾架",
+        "D. 盘子"
+      ],
+      "choices_en": [
+        "A. Toilet plunger",
+        "B. Shower glass",
+        "C. Towel rack",
+        "D. Plate"
+      ],
+      "answer_raw": "[\"B\",\"C\"]",
+      "answer_display_original": "B. 淋浴玻璃; C. 毛巾架",
+      "answer_display_en": "B. Shower glass; C. Towel rack",
+      "images": [
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_002876_1.webp",
+          "label": "Rendered observation",
+          "width": 300,
+          "height": 300,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_002876/ALFRED_GT_OBJECTIVE_002876_main.png"
+        }
+      ],
+      "selection_note_en": "Tests multi-select recognition of object categories in a rendered bathroom view.",
+      "provenance": {
+        "dataset": "alfred",
+        "record_id": "ALFRED_GT_OBJECTIVE_002876",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "C01_OBJECT_VISIBILITY",
+      "capability": "可见对象与类别识别"
+    },
+    {
+      "id": "ALFRED_GT_OBJECTIVE_002365",
+      "capability_en": "Object state and affordance",
+      "question_type": "multi_choice",
+      "question_type_en": "Multiple choice",
+      "difficulty": "medium",
+      "question_original": "A、B、C、D 中，请选出所有当前支持被切开的物体。",
+      "question_en": "Which of objects A–D can currently be sliced? Select all that apply.",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C",
+        "D. 标注物体 D"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C",
+        "D. Marked object D"
+      ],
+      "answer_raw": "[\"B\"]",
+      "answer_display_original": "B. 标注物体 B",
+      "answer_display_en": "B. Marked object B",
+      "images": [
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_002365_1.webp",
+          "label": "Marked observation",
+          "width": 500,
+          "height": 500,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_002365/ALFRED_GT_OBJECTIVE_002365_main.jpg"
+        },
+        {
+          "src": "assets/images/showcase/alfred/ALFRED_GT_OBJECTIVE_002365_2.webp",
+          "label": "Unmarked observation",
+          "width": 500,
+          "height": 500,
+          "source_relative_path": "assets/ALFRED_GT_OBJECTIVE_002365/ALFRED_GT_OBJECTIVE_002365_aux_01.png"
+        }
+      ],
+      "selection_note_en": "Tests identifying the marked candidate whose visible object type supports slicing.",
+      "provenance": {
+        "dataset": "alfred",
+        "record_id": "ALFRED_GT_OBJECTIVE_002365",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "C08_OBJECT_STATE_AFFORDANCE",
+      "capability": "对象状态与可操作属性"
+    }
+  ]
+}

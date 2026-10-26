@@ -1,0 +1,284 @@
+{
+  "dataset": "tartanground",
+  "suite": "SpatialQuadruped",
+  "source": "TartanGround simulated RGB observations and trajectories",
+  "examples": [
+    {
+      "id": "TG_000064_GreatMarsh_P0000_000947_TG_C01_multi_choice_seg_category_multi_03",
+      "capability_id": "TG_C01",
+      "capability": "语义类别可见性",
+      "capability_en": "Semantic-category visibility",
+      "question_type": "multi_choice",
+      "question_type_en": "Visible-category selection",
+      "difficulty": "medium",
+      "question_original": "哪些选项对应图中有可见像素的类别？",
+      "question_en": "Which options correspond to semantic regions visible in the image? Select all that apply.",
+      "choices_original": [
+        "A. chair 区域",
+        "B. 地面区域",
+        "C. bedframe 区域",
+        "D. tree 区域"
+      ],
+      "choices_en": [
+        "A. Chair region",
+        "B. Ground region",
+        "C. Bed-frame region",
+        "D. Tree region"
+      ],
+      "answer_raw": "[\"B\",\"D\"]",
+      "answer_display_original": "B. 地面区域；D. tree 区域",
+      "answer_display_en": "B. Ground region; D. Tree region",
+      "images": [
+        {
+          "src": "assets/images/showcase/tartanground/tg-000064-greatmarsh-p0000-000947-tg-c01-multi-choice-seg-category-multi-03-rgb-scene-observation.webp",
+          "label": "RGB scene observation",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/GreatMarsh_P0000_000947/TG_000064_GreatMarsh_P0000_000947_TG_C01_multi_choice_seg_category_multi_03_image.png"
+        }
+      ],
+      "selection_note_en": "The RGB frame clearly shows tree canopy above a broad ground layer; the other listed categories do not fit the scene.",
+      "provenance": {
+        "dataset": "tartanground",
+        "record_id": "TG_000064_GreatMarsh_P0000_000947_TG_C01_multi_choice_seg_category_multi_03",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "TG_000045_ConstructionSite_P0000_000033_TG_C02_single_choice_seg_area_largest_04",
+      "capability_id": "TG_C02",
+      "capability": "语义区域面积比较",
+      "capability_en": "Visible semantic-region area",
+      "question_type": "single_choice",
+      "question_type_en": "Largest visible region",
+      "difficulty": "medium",
+      "question_original": "比较这些候选区域，哪一项的可见面积最大？",
+      "question_en": "Among these candidate regions, which has the largest visible area?",
+      "choices_original": [
+        "A. wirespool 区域",
+        "B. tarp 区域",
+        "C. 地面区域",
+        "D. concretecolumn 区域"
+      ],
+      "choices_en": [
+        "A. Wire spool region",
+        "B. Tarp region",
+        "C. Ground region",
+        "D. Concrete-column region"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 地面区域",
+      "answer_display_en": "C. Ground region",
+      "images": [
+        {
+          "src": "assets/images/showcase/tartanground/tg-000045-constructionsite-p0000-000033-tg-c02-single-choice-seg-area-largest-04-rgb-scene-observation.webp",
+          "label": "RGB scene observation",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/ConstructionSite_P0000_000033/TG_000045_ConstructionSite_P0000_000033_TG_C02_single_choice_seg_area_largest_04_image.png"
+        }
+      ],
+      "selection_note_en": "The ground occupies most of this construction-site view, with the candidate objects occupying smaller regions.",
+      "provenance": {
+        "dataset": "tartanground",
+        "record_id": "TG_000045_ConstructionSite_P0000_000033_TG_C02_single_choice_seg_area_largest_04",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "TG_000004_ForestEnv_P0000_001183_TG_C03_grounding_choice_grid_category_location_01",
+      "capability_id": "TG_C03",
+      "capability": "图像区域语义定位",
+      "capability_en": "Grid-based semantic localization",
+      "question_type": "grounding_choice",
+      "question_type_en": "Semantic grounding in a grid",
+      "difficulty": "medium",
+      "question_original": "如果只在 A-I 区域中选择一个，groundembankment 区域 最集中在哪一区域？",
+      "question_en": "If choosing one cell from A–I, in which cell is the ground-embankment region most concentrated?",
+      "choices_original": [
+        "A. 标注区域 D",
+        "B. 标注区域 F",
+        "C. 标注区域 E",
+        "D. 标注区域 A"
+      ],
+      "choices_en": [
+        "A. Grid cell D",
+        "B. Grid cell F",
+        "C. Grid cell E",
+        "D. Grid cell A"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. 标注区域 F",
+      "answer_display_en": "B. Grid cell F",
+      "images": [
+        {
+          "src": "assets/images/showcase/tartanground/tg-000004-forestenv-p0000-001183-tg-c03-grounding-choice-grid-category-location-01-grid-labeled-rgb-scene.webp",
+          "label": "Grid-labeled RGB scene",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/ForestEnv_P0000_001183/TG_000004_ForestEnv_P0000_001183_TG_C03_grounding_choice_grid_category_location_01_grid_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/tartanground/tg-000004-forestenv-p0000-001183-tg-c03-grounding-choice-grid-category-location-01-unmarked-rgb-scene.webp",
+          "label": "Unmarked RGB scene",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/ForestEnv_P0000_001183/TG_000004_ForestEnv_P0000_001183_TG_C03_grounding_choice_grid_category_location_01_aux_base.png"
+        }
+      ],
+      "selection_note_en": "The A–I grid is drawn over the scene, and the ground-embankment region is most concentrated in cell F.",
+      "provenance": {
+        "dataset": "tartanground",
+        "record_id": "TG_000004_ForestEnv_P0000_001183_TG_C03_grounding_choice_grid_category_location_01",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08",
+      "capability_id": "TG_C06",
+      "capability": "多视角语义一致性",
+      "capability_en": "Semantic comparison across synchronized views",
+      "question_type": "multi_view_choice",
+      "question_type_en": "Multi-view area comparison",
+      "difficulty": "hard",
+      "question_original": "请从标注视图中选择 sign 区域 占比最高的一项。",
+      "question_en": "Which labeled view shows the largest visible sign region?",
+      "choices_original": [
+        "A. 标注视图 V",
+        "B. 标注视图 W",
+        "C. 标注视图 X",
+        "D. 标注视图 Y"
+      ],
+      "choices_en": [
+        "A. View V",
+        "B. View W",
+        "C. View X",
+        "D. View Y"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 标注视图 X",
+      "answer_display_en": "C. View X",
+      "images": [
+        {
+          "src": "assets/images/showcase/tartanground/tg-000007-japanesealley-p0000-000792-tg-c06-multi-view-choice-multiview-category-area-08-four-view-comparison-strip.webp",
+          "label": "Four-view comparison strip",
+          "width": 1200,
+          "height": 300,
+          "source_relative_path": "assets/JapaneseAlley_P0000_000792/TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08_multiview_overlay.jpg"
+        },
+        {
+          "src": "assets/images/showcase/tartanground/tg-000007-japanesealley-p0000-000792-tg-c06-multi-view-choice-multiview-category-area-08-view-v.webp",
+          "label": "View V",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/JapaneseAlley_P0000_000792/TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08_aux_V.png"
+        },
+        {
+          "src": "assets/images/showcase/tartanground/tg-000007-japanesealley-p0000-000792-tg-c06-multi-view-choice-multiview-category-area-08-view-w.webp",
+          "label": "View W",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/JapaneseAlley_P0000_000792/TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08_aux_W.png"
+        },
+        {
+          "src": "assets/images/showcase/tartanground/tg-000007-japanesealley-p0000-000792-tg-c06-multi-view-choice-multiview-category-area-08-view-x.webp",
+          "label": "View X",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/JapaneseAlley_P0000_000792/TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08_aux_X.png"
+        },
+        {
+          "src": "assets/images/showcase/tartanground/tg-000007-japanesealley-p0000-000792-tg-c06-multi-view-choice-multiview-category-area-08-view-y.webp",
+          "label": "View Y",
+          "width": 640,
+          "height": 640,
+          "source_relative_path": "assets/JapaneseAlley_P0000_000792/TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08_aux_Y.png"
+        }
+      ],
+      "selection_note_en": "The four synchronized views are shown together and separately; the sign region is largest in view X.",
+      "provenance": {
+        "dataset": "tartanground",
+        "record_id": "TG_000007_JapaneseAlley_P0000_000792_TG_C06_multi_view_choice_multiview_category_area_08",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "TG_000012_Downtown_P0000_000285_TG_C07_temporal_choice_trajectory_stage_interval_05",
+      "capability_id": "TG_C07",
+      "capability": "轨迹顺序与路径结构",
+      "capability_en": "Trajectory order and route structure",
+      "question_type": "temporal_choice",
+      "question_type_en": "Trajectory-stage classification",
+      "difficulty": "simple",
+      "question_original": "观察 S-G 轨迹，A 属于哪个阶段区间？",
+      "question_en": "Along the S-to-G trajectory, which stage interval contains point A?",
+      "choices_original": [
+        "A. 中段",
+        "B. 前段",
+        "C. 后段"
+      ],
+      "choices_en": [
+        "A. Middle stage",
+        "B. Early stage",
+        "C. Late stage"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. 前段",
+      "answer_display_en": "B. Early stage",
+      "images": [
+        {
+          "src": "assets/images/showcase/tartanground/tg-000012-downtown-p0000-000285-tg-c07-temporal-choice-trajectory-stage-interval-05-trajectory-overlay.webp",
+          "label": "Trajectory overlay",
+          "width": 900,
+          "height": 680,
+          "source_relative_path": "assets/Downtown_P0000_000285/TG_000012_Downtown_P0000_000285_TG_C07_temporal_choice_trajectory_stage_interval_05_trajectory_overlay.jpg"
+        }
+      ],
+      "selection_note_en": "The route is marked from S to G, and point A lies close to the start of the path.",
+      "provenance": {
+        "dataset": "tartanground",
+        "record_id": "TG_000012_Downtown_P0000_000285_TG_C07_temporal_choice_trajectory_stage_interval_05",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "TG_000106_OldIndustrialCity_P0000_000201_TG_C08_single_choice_motion_turn_choice_09",
+      "capability_id": "TG_C08",
+      "capability": "运动趋势与朝向变化",
+      "capability_en": "Motion trend and heading change",
+      "question_type": "single_choice",
+      "question_type_en": "Trajectory turn direction",
+      "difficulty": "medium",
+      "question_original": "观察轨迹方向变化，这段路径主要是在向哪边转？",
+      "question_en": "Observe the change in trajectory direction. Which way does this path mainly turn?",
+      "choices_original": [
+        "A. 基本直行",
+        "B. 主要向右转",
+        "C. 主要向左转"
+      ],
+      "choices_en": [
+        "A. Mostly straight",
+        "B. Mainly turns right",
+        "C. Mainly left"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. 主要向右转",
+      "answer_display_en": "B. Mainly turns right",
+      "images": [
+        {
+          "src": "assets/images/showcase/tartanground/tg-000106-oldindustrialcity-p0000-000201-tg-c08-single-choice-motion-turn-choice-09-trajectory-overlay.webp",
+          "label": "Trajectory overlay",
+          "width": 900,
+          "height": 680,
+          "source_relative_path": "assets/OldIndustrialCity_P0000_000201/TG_000106_OldIndustrialCity_P0000_000201_TG_C08_single_choice_motion_turn_choice_09_trajectory_overlay.jpg"
+        }
+      ],
+      "selection_note_en": "The route runs from S to G and makes a pronounced rightward change through the labeled intermediate points.",
+      "provenance": {
+        "dataset": "tartanground",
+        "record_id": "TG_000106_OldIndustrialCity_P0000_000201_TG_C08_single_choice_motion_turn_choice_09",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    }
+  ]
+}
