@@ -10,7 +10,8 @@ import uuid
 from capabilities.capture.capture_scope import capture_scope
 from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
 from capabilities.isaac_sim.evidence import measured_entities, physics_summary, resolve_artifact, save_frame
-from capabilities.isaac_sim.grpc.tasks import DurableTasks, receipt_lock, request_id
+from capabilities.isaac_sim.grpc.receipts import receipt_lock
+from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
 from capabilities.isaac_sim.grpc.transport import A100Client, document
 from service_access.configuration import isaac_config
 from service_access.progress import record_progress

@@ -119,14 +119,17 @@ test('nested task and watch receipts ignore input paths and prose', () => {
 
 test('native Isaac Sim downloads use the ordinary artifact projection without a UI protocol client', () => {
   let state = call(artifactProjection.init({cwd: '/tmp/work'}), 'benchforge_isaac_sim', {action: 'download'});
-  state = result(state, {action: 'download', job: {job_id: 'native', state: 'SUCCEEDED'},
-    artifacts: [{path: '/tmp/work/artifacts/isaac_sim/native/image/render.png', title: 'Isaac Sim · render.png'},
-      {path: '/tmp/work/artifacts/isaac_sim/native/depth/depth.npy', title: 'Isaac Sim · depth.npy'}],
+  state = result(state, {action: 'download', job: {job_id: 'native', state: 'SUCCEEDED', operation: 'extension.world.collect'},
+    artifacts: [{path: '/tmp/work/artifacts/isaac_sim/native/image/render.png', title: 'Isaac Sim · render.png', stage: 'S3'},
+      {path: '/tmp/work/artifacts/isaac_sim/native/depth/depth.npy', title: 'Isaac Sim · depth.npy', stage: 'S3'},
+      {path: '/tmp/work/artifacts/isaac_sim/native/archive/dataset.zip', title: 'Isaac Sim · dataset.zip', stage: 'S3'}],
     receipt_path: '/tmp/work/operations/download/job.json'});
   assert.deepEqual(state.view.files.map(row => row.path), [
     '/tmp/work/artifacts/isaac_sim/native/image/render.png',
     '/tmp/work/artifacts/isaac_sim/native/depth/depth.npy',
+    '/tmp/work/artifacts/isaac_sim/native/archive/dataset.zip',
     '/tmp/work/operations/download/job.json']);
+  assert.deepEqual(state.view.files.map(row => row.stage), ['S3', 'S3', 'S3', null]);
   assert.deepEqual(state.view.captureIds, []);
 });
 

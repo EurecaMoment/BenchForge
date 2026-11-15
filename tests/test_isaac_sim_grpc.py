@@ -1,6 +1,7 @@
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Lock
@@ -14,7 +15,16 @@ from capabilities.isaac_sim.grpc import simulator_pb2 as pb
 from capabilities.isaac_sim.grpc.simulator_pb2_grpc import SimulatorServicer, add_SimulatorServicer_to_server
 from capabilities.isaac_sim.grpc.tasks import DurableTasks
 from capabilities.isaac_sim.grpc.transport import A100Client, RemoteJobFailed
+from capabilities.isaac_sim.tool_api import execute
 from service_access.request_context import RunCancelled
+
+
+def download_in_process(config, serialized_job, directory):
+    client = A100Client(config)
+    try:
+        return client.download(pb.Job.FromString(serialized_job), directory)
+    finally:
+        client.close()
 
 
 class Simulator(SimulatorServicer):
@@ -24,6 +34,7 @@ class Simulator(SimulatorServicer):
         self.jobs, self.payloads, self.blobs = {}, {}, {}
         self.submissions, self.cancels, self.offsets = 0, 0, []
         self.lose_reply, self.drop_download = False, False
+        self.download_gates = {}
 
     def GetCapabilities(self, request, context):
         return pb.Capabilities(api_version='a100sim.v1', simulator_version='contract-test')
@@ -67,6 +78,11 @@ class Simulator(SimulatorServicer):
 
     def DownloadArtifact(self, request, context):
         self.offsets.append(request.offset)
+        if request.artifact_id in self.download_gates:
+            entered, release = self.download_gates[request.artifact_id]
+            entered.set()
+            if not release.wait(15):
+                context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, 'test download gate timed out')
         data = self.blobs[request.artifact_id]
         end = min(len(data), request.offset + 3)
         yield pb.DownloadChunk(offset=request.offset, data=data[request.offset:end])
@@ -96,8 +112,9 @@ class GrpcContractTests(unittest.TestCase):
         add_SimulatorServicer_to_server(self.simulator, self.server)
         port = self.server.add_insecure_port('127.0.0.1:0')
         self.server.start()
-        self.client = A100Client({'providers': {'IsaacSim4A100': {
-            'grpc': {'host': '127.0.0.1', 'port': port, 'timeout_seconds': 2}}}})
+        self.config = {'providers': {'IsaacSim4A100': {
+            'grpc': {'host': '127.0.0.1', 'port': port, 'timeout_seconds': 20}}}}
+        self.client = A100Client(self.config)
 
     def tearDown(self):
         self.client.close()
@@ -192,6 +209,49 @@ class GrpcContractTests(unittest.TestCase):
             self.client.download(job, self.root / 'bad')
         with self.assertRaises(ValueError):
             self.requests().submit('..', {'snapshot': {}})
+
+    def test_concurrent_download_processes_share_one_receipt_without_blocking_other_jobs(self):
+        self.simulator.blobs = {'shared': b'abcdef', 'independent': b'ghijkl'}
+        entered, release = Event(), Event()
+        self.simulator.download_gates['shared'] = (entered, release)
+        jobs = {key: pb.Job(job_id=key, state=pb.SUCCEEDED, artifacts=[
+            pb.Artifact(artifact_id=key, name='dataset.zip', size_bytes=len(data))])
+            for key, data in self.simulator.blobs.items()}
+        with ProcessPoolExecutor(max_workers=4, mp_context=get_context('spawn')) as pool:
+            shared = [pool.submit(download_in_process, self.config, jobs['shared'].SerializeToString(),
+                                  self.root / 'shared') for _ in range(3)]
+            try:
+                self.assertTrue(entered.wait(10), 'Shared download never started')
+                other = pool.submit(download_in_process, self.config, jobs['independent'].SerializeToString(),
+                                    self.root / 'independent').result(timeout=10)
+                self.assertEqual(Path(other[0]['source_path']).read_bytes(), b'ghijkl')
+            finally:
+                release.set()
+            results = [future.result(timeout=10) for future in shared]
+        self.assertTrue(all(result == results[0] for result in results))
+        self.assertEqual(Path(results[0][0]['source_path']).read_bytes(), b'abcdef')
+        self.assertEqual(self.simulator.offsets, [0, 0])
+        self.assertEqual(list(self.root.rglob('*.partial')), [])
+
+    def test_native_operation_sets_stage_in_download_artifact_contract(self):
+        self.simulator.blobs['dataset'] = b'collected data'
+        for index, (operation, stage) in enumerate([
+            ('extension.world.collect', 'S3'), ('extension.scene.capture', 'S2'),
+            ('extension.scene.export', 'S2'), ('extension.other', None),
+        ]):
+            with self.subTest(operation=operation):
+                identity = f'download-{index}'
+                self.simulator.jobs[identity] = pb.Job(job_id=identity, operation=operation,
+                    state=pb.SUCCEEDED, artifacts=[pb.Artifact(artifact_id='dataset', name='dataset.zip',
+                                                              size_bytes=len(self.simulator.blobs['dataset']))])
+                result = execute({'action': 'download', 'job_id': identity},
+                                 self.root / 'operations' / identity, self.config)
+                artifact = result['artifacts'][0]
+                self.assertEqual(artifact.get('stage'), stage)
+                self.assertEqual(artifact['path'], result['files'][0]['source_path'])
+                self.assertEqual(Path(artifact['path']).read_bytes(), self.simulator.blobs['dataset'])
+                if stage is None:
+                    self.assertNotIn('stage', artifact)
 
     def test_streaming_upload_checks_source_digest(self):
         source = self.root / 'scene.usda'

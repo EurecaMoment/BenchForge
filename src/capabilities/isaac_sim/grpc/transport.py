@@ -11,6 +11,7 @@ from google.protobuf.empty_pb2 import Empty
 from google.protobuf.json_format import MessageToDict, ParseDict
 
 from capabilities.isaac_sim.grpc import simulator_pb2 as pb
+from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.simulator_pb2_grpc import SimulatorStub
 from service_access.configuration import isaac_config, isaac_endpoint
 from service_access.request_context import RunCancelled
@@ -146,6 +147,10 @@ class A100Client:
 
     def download(self, job, directory, *, stop=None):
         """Download manifest identities with checked offsets, resumable files and receipts."""
+        with receipt_lock(directory):
+            return self._download(job, directory, stop=stop)
+
+    def _download(self, job, directory, *, stop=None):
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
         manifest = document(job)

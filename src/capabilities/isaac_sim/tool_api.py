@@ -68,7 +68,12 @@ def execute(args, directory, config):
                     raise ValueError('Only a succeeded native job can publish artifacts')
                 destination = safe_path(workspace / 'artifacts' / 'isaac_sim', job_id)
                 result['files'] = client.download(job, destination)
-                result['artifacts'] = [{'path': item['source_path'], 'title': 'Isaac Sim · ' + item['name']}
+                # The native operation establishes what was produced; filenames
+                # such as dataset.zip do not establish a question-generation stage.
+                stage = {'extension.world.collect': 'S3', 'extension.scene.capture': 'S2',
+                         'extension.scene.export': 'S2'}.get(job.operation)
+                result['artifacts'] = [{'path': item['source_path'], 'title': 'Isaac Sim · ' + item['name'],
+                                        **({'stage': stage} if stage else {})}
                                        for item in result['files']]
             write_json(directory / 'job.json', document(job))
             result['receipt_path'] = str(directory / 'job.json')

@@ -10,6 +10,7 @@ BenchForge capture daemon, device lock, callback endpoint or local Kit runtime i
 | `grpc/simulator.proto`, generated stubs, `protocol.json` | Upstream protocol and provenance |
 | `grpc/transport.py` | RPC, bounded job observation and manifest-based file transfer |
 | `grpc/tasks.py` | Durable request IDs, frozen payloads and job receipts |
+| `grpc/receipts.py` | Per-request and per-download ownership across subprocesses |
 | `tool_api.py` | Workspace operation behind the DSH `benchforge_isaac_sim` tool |
 | `authoring.py` | Portable SceneProgram-to-USD authoring |
 | `capture_stage.py` | Import, simulate, inspect, capture and publish |
@@ -44,3 +45,14 @@ Request journals and native artifacts stay under the task attempt directory.
 Publication checks the current stage owner and preserves previous captures.
 UI modules consume ordinary operation receipts and scene artifacts; they do not
 import gRPC, SQL or simulator code.
+
+DSH registration remains in the preset through `defineTool` and
+`ctx.tools.register`. `src/dsh/host/python_tools.mjs` owns subprocess lifetime,
+cancellation and cleanup; the ordinary tool pipeline retains validation,
+permissions and logging. `src/dsh/workbench/artifacts/` projects the returned
+artifact references. Native operation metadata assigns their stage, including
+S3 for `world.collect`, without a simulator-specific frontend protocol.
+
+Use **Isaac Sim** in displayed text, **IsaacSim4A100** for the repository and
+provider, and **isaac_sim** for the integration module and tool suffix. The old
+provider spelling appears only in one-way configuration migration and its tests.

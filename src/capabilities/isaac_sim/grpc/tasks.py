@@ -1,44 +1,18 @@
 """Durable request identity and restart recovery above the public A100 protocol."""
 from __future__ import annotations
 
-from contextlib import contextmanager
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import time
 
 import grpc
 
+from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.transport import document, TRANSIENT
 from service_access.request_context import RunCancelled
 from storage.files import write_json
-
-
-@contextmanager
-def receipt_lock(directory):
-    """Serialize one request receipt across subprocesses, not independent scenes."""
-    directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
-    with (directory / '.lock').open('a+b', buffering=0) as marker:
-        if os.name == 'nt':
-            import msvcrt
-            marker.write(b'\0')
-            marker.seek(0)
-            msvcrt.locking(marker.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                marker.seek(0)
-                msvcrt.locking(marker.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(marker, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(marker, fcntl.LOCK_UN)
 
 
 def request_id(namespace, key):
