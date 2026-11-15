@@ -67,6 +67,7 @@ const client = await build({
   outfile: path.join(directory, 'client.js'),
   bundle: true,
   external: ['zod'],
+  preserveSymlinks: true,
   nodePaths: [path.join(dsh, 'node_modules')],
   platform: 'browser',
   format: 'iife',
