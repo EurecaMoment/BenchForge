@@ -4,6 +4,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from capabilities.task_catalog.spatial import graph
+from service_access.tool_names import NAMES
 
 ROOT = Path(__file__).with_name('resources')
 
@@ -30,7 +31,7 @@ def capability_id(value):
     nodes = graph()['nodes']
     match = next((n['id'] for n in nodes if value == n['id'] or value == n['name']), None)
     if not match:
-        raise ValueError(f'Unknown capability: {value}; use pipeline_catalog section=capabilities')
+        raise ValueError(f'Unknown capability: {value}; use {NAMES["pipeline_catalog"]} section=capabilities')
     return match
 
 

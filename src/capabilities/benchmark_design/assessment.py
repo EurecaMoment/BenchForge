@@ -3,6 +3,7 @@ import json
 from collections import Counter
 from copy import deepcopy
 from pathlib import Path
+from service_access.tool_names import qualify
 
 
 class AssessmentValidationError(ValueError):
@@ -15,6 +16,8 @@ class AssessmentValidationError(ValueError):
 def assessment_template():
     from capabilities.dataset_authoring.question_writing import contract
     value = json.loads((Path(__file__).with_name('resources') / 'assessment_template.json').read_text(encoding='utf-8'))
+    for field in ('instructions', 'scene_binding'):
+        value[field] = qualify(value[field])
     value['question_authoring'] = contract()
     value['native_episode_contract'] = {
         'field': 'assessment.annotations.require_native_episode',

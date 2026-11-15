@@ -184,6 +184,9 @@ def build(standard, python, service_config, *, config_path=None,
     # DSH provides the current directory through its native runtime context.
     # Only provider/model are built-in persona template variables.
     persona_plugin['config'].update(prefix=persona(), suffix='You are using {{model}}.')
+    plugins.append({'id': 'benchforge-invocation',
+                    'name': '@eurecamoment/benchforge-dsh/invocation' if package_imports
+                            else (DSH / 'dist/invocation.mjs').as_uri()})
     model_tools = base.model_tools(config_path, portable=package_imports)
     for plugin_id, entry, tools in (
         ('benchforge-tools', 'benchmark-tools', [*BENCHMARK_TOOLS, *model_tools]),

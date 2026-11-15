@@ -101,6 +101,7 @@ await build({
     'capture-runtime': 'dsh/tools/scene/capture/capture_runtime.mjs',
     'session-operations': 'dsh/host/session_operations.mjs',
     'subagent-policy': 'dsh/presets/subagent_policy.mjs',
+    invocation: 'dsh/tools/invocation/executor.mjs',
   },
   outdir: path.join(dsh, 'dist'), outExtension: {'.js': '.mjs'},
   bundle: true, platform: 'node', format: 'esm', target: ['node24'],

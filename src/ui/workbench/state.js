@@ -1,4 +1,4 @@
-import {qualifyToolNames} from '../../dsh/tools/benchmark/names.mjs';
+import {qualifyToolNames, toolName} from '../../dsh/tools/benchmark/names.mjs';
 
 export function createWorkbenchState({STAGES, sceneName}) {
   function initialState(sessionId) {
@@ -50,14 +50,14 @@ export function createWorkbenchState({STAGES, sceneName}) {
     ].filter(Boolean).join('\n') + sceneConstraint(selection);
   }
   function productionContext(selection, template) {
-    return qualifyToolNames(sceneConstraint(selection) +
-      '\n每个阶段 S1 计划、S2 场景、S3 标注、S4 题目、S5 报告完成后，展示真实产物并等待用户 5 分钟。使用 stage_review 打开及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。\n' +
+    return sceneConstraint(selection) +
+      '\n每个阶段 S1 计划、S2 场景、S3 标注、S4 题目、S5 报告完成后，展示真实产物并等待用户 5 分钟。使用 '+toolName('stage_review')+' 打开及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。\n' +
       '\n制定或修改评测计划时必须遵守以下完整模板；已有完整计划且本次只要求继续执行时，复用已有计划。\n' +
-      template.instructions + '\n' + template.scene_binding + '\n各章节要求：\n' + JSON.stringify(template.sections, null, 2) +
+      qualifyToolNames(template.instructions) + '\n' + qualifyToolNames(template.scene_binding) + '\n各章节要求：\n' + JSON.stringify(template.sections, null, 2) +
       (template.native_episode_contract ? '\n连续运动与机器人轨迹验收合同：\n' + JSON.stringify(template.native_episode_contract, null, 2) : '') +
       (template.annotation_source_contract ? '\n标注来源与复算合同：\n' + JSON.stringify(template.annotation_source_contract, null, 2) : '') +
       (template.scene_authoring ? '\n场景标题、摘要、空间关系与双向修订合同：\n' + JSON.stringify(template.scene_authoring, null, 2) : '') +
-      '\n传入 pipeline_plan.assessment 的填写结构：\n' + JSON.stringify(template.assessment, null, 2));
+      '\n传入 '+toolName('pipeline_plan')+'.assessment 的填写结构：\n' + JSON.stringify(template.assessment, null, 2);
   }
   function displayRef(value) {
     const parts = String(value || '').split(/[\\/]/).filter(Boolean);

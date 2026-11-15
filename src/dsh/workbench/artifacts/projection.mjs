@@ -1,5 +1,6 @@
 import path from 'node:path';
 import {z} from 'zod';
+import {canonicalToolName} from '../../tools/invocation/identifiers.mjs';
 
 export const ARTIFACT_PROJECTION = 'benchforgeArtifacts';
 const Stage = z.enum(['S1', 'S2', 'S3', 'S4', 'S5']).nullable();
@@ -125,7 +126,7 @@ function publish(state, {files = [], workspace, captureId}, seq) {
 
 /** A framework-owned, replayable fold. Pending calls never enter the wire view. */
 export const artifactProjection = {
-  key: ARTIFACT_PROJECTION, stateVersion: 4, stateSchema: State,
+  key: ARTIFACT_PROJECTION, stateVersion: 5, stateSchema: State,
   init: (header) => ({cwd: header.cwd || '', calls: {}, view: {
     revision: 0, workspaces: [], primaryWorkspace: null, files: [], captureIds: [],
   }}),
@@ -137,7 +138,7 @@ export const artifactProjection = {
       return publish(state, {files}, event.seq);
     }
     if (event.type === 'tool/call') {
-      const {name, callId} = event.data;
+      const {callId} = event.data, name = canonicalToolName(event.data.name);
       if (!name.startsWith('benchforge_') && !['write', 'edit', 'str_replace_editor'].includes(name)) return state;
       const args = argumentsOf(event.data.arguments);
       if (!args) return state;
@@ -148,7 +149,9 @@ export const artifactProjection = {
     if (event.type !== 'tool/result' || event.surfaceOp === 'replace') return state;
     const {message, meta, error} = event.data;
     const callId = message?.source?.callId || message?.toolCallId;
-    const call = state.calls[callId];
+    const recorded = state.calls[callId], resolved = meta?.benchforgeInvocation?.resolved;
+    const call = recorded && {...recorded, name: resolved?.name || recorded.name,
+      workspace: resolved?.arguments?.workspace || recorded.workspace};
     if (!call) return state;
     const calls = {...state.calls}; delete calls[callId];
     const settled = {...state, calls};

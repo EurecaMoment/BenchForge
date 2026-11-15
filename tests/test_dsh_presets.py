@@ -8,6 +8,8 @@ import unittest
 from dsh.presets import build_preset as base
 from dsh.presets.build_presets import build
 from dsh.presets.profile_migration import migrate_profile
+from capabilities.benchmark_design.assessment import assessment_template
+from service_access.tool_names import NAMES
 
 
 def standard():
@@ -71,6 +73,27 @@ class DshPresetTests(unittest.TestCase):
         custom = 'Deployment {{custom_context}}; use {{model}}.'
         persona(old)['suffix'] = custom
         self.assertEqual(persona(migrate_profile(old, generated))['suffix'], custom)
+
+    def test_tool_reference_policy_is_installed_once_and_survives_merge(self):
+        for portable in (False, True):
+            generated = self.generated(portable)
+            merged = migrate_profile(generated, generated)
+            entries = [row for row in plugins(merged) if row['id'] == 'benchforge-invocation']
+            self.assertEqual(len(entries), 1)
+            self.assertTrue(entries[0]['name'].endswith('/invocation' if portable else '/invocation.mjs'))
+
+    def test_assessment_guidance_uses_registered_tool_names(self):
+        template = assessment_template()
+        self.assertIn(NAMES['pipeline_catalog'], template['instructions'])
+        self.assertIn(NAMES['pipeline_plan'], template['scene_binding'])
+        for field in ('instructions', 'scene_binding'):
+            self.assertNotRegex(template[field], r'\b(' + '|'.join(NAMES) + r')\b')
+
+    def test_portable_persona_and_invocation_match_the_generator(self):
+        file = Path(__file__).parents[1] / 'src/dsh/cordis.patch.yml'
+        published = base.yaml.load(file.read_text(encoding='utf-8'), Loader=base.Loader)
+        self.assertEqual(persona(published), persona(self.generated(True)))
+        self.assertEqual(len([row for row in plugins(published) if row['id'] == 'benchforge-invocation']), 1)
 
 
 if __name__ == '__main__':

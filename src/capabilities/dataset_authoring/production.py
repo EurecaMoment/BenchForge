@@ -8,6 +8,7 @@ import zipfile
 from collections import Counter
 from contextlib import closing
 from pathlib import Path
+from service_access.tool_names import NAMES
 from storage.artifacts import read
 from storage.artifacts import write
 from storage.artifacts import rows
@@ -272,7 +273,7 @@ def produce(args, directory, config=None):
     templates = {r['id']: r for r in all_templates()}
     counts = counts_for(args['selections'])
     if set(counts)-set(templates):
-        raise ValueError('Unknown template IDs; choose exact IDs from pipeline_catalog')
+        raise ValueError(f'Unknown template IDs; choose exact IDs from {NAMES["pipeline_catalog"]} section=templates')
     answer_contracts = {
         template_id: validate_contract_declaration(templates[template_id])
         for template_id in counts

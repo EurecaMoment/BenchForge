@@ -21,6 +21,7 @@
     "./session-operations": "./dist/session-operations.mjs",
     "./production/types": "./production/types.d.ts",
     "./subagent-policy": "./dist/subagent-policy.mjs",
+    "./invocation": "./dist/invocation.mjs",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
     "./spatial-tools": "./dist/spatial-tools.mjs"

@@ -3,6 +3,22 @@ import test from 'node:test';
 import {createProductionLifecycle} from './lifecycle.mjs';
 import {productionProjection} from './projection.mjs';
 
+test('production projection consumes canonical execution metadata after a misspelled call', () => {
+  let state = productionProjection.init({cwd: '/workspace'});
+  state = productionProjection.apply(state, {type: 'tool/call', seq: 1, time: 1, data: {
+    callId: 'c1', name: 'benchmarkforge_pipeline_plan', arguments: '{"workspace":"/wrokspace"}',
+  }});
+  state = productionProjection.apply(state, {type: 'tool/result', seq: 2, time: 2, data: {
+    message: {toolCallId: 'c1', content: [{type: 'text', text: JSON.stringify({state: 'planned', plan: '/workspace/plan.json',
+      production_contract: 'benchforge.production-stages/v1'})}]},
+    meta: {benchforgeInvocation: {resolved: {name: 'benchforge_pipeline_plan', arguments: {workspace: '/workspace'}}}},
+  }});
+  assert.equal(state.view.active, true);
+  assert.equal(state.view.workspace, '/workspace');
+  assert.equal(state.view.lastTool, 'benchforge_pipeline_plan');
+  assert.equal(state.view.plan, '/workspace/plan.json');
+});
+
 function harness() {
   let clock=100000,state=productionProjection.init({cwd:'/workspace'}),seq=0,live=true,restored=0;
   const events=[],sent=[],records=new Map(),timers=[];

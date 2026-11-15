@@ -11,6 +11,7 @@ start with the workbench closed.
 | `host/` | Shared session scope, native session operations, handoffs and Python tool runner |
 | `client/` | Browser manifest and generated bundle; editable views live in `../ui/` |
 | `tools/` | Register reusable operations and built-in pipeline entry points |
+| `tools/invocation/` | Resolve exact public tool names and verified workspace references before native dispatch |
 | `remote/` | Host/Client contract compiled by the official Typert generator |
 | `workbench/` | Host projections and Remote handlers for the single workbench |
 | `production/` | Production projection, bounded progress reminders and durable review continuation |
@@ -105,11 +106,29 @@ Missing native robot trajectories remain `needs_evidence`, and older incomplete
 plans return `needs_plan_revision`. Tool identifiers are shared by registration,
 prompts and UI through `capabilities/benchmark_design/resources/tool-names.json`.
 
+The BenchForge preset selects a native executor through `ctx.tools.setExecutor`.
+It delegates scheduling, schema validation, guards, cancellation and result policy
+to DSH's `ToolExecutionPipeline` and `executeToolBatch`. Only the observed
+`benchmarkforge_` prefix and the declared pipeline operation IDs can resolve to
+an existing, admitted canonical tool. It registers no duplicate tools and never
+retries a side effect. Other unknown names retain the native error.
+
+The current session owns the workspace: the executor supplies that parameter to
+BenchForge tools and omits it from model schemas. Use relative paths for images.
+For a nonexistent absolute read reference, only an exact trailing three-component
+workspace anchor and an existing file inside its real root permit ancestor repair.
+Existing paths, missing filenames, traversal and escaping symlinks are not repaired.
+Original calls remain in session events; `meta.benchforgeInvocation` records the
+resolved name and changed fields, and explicit corrections feed back to the model.
+Workbench projections consume this metadata. Guidance qualification touches prose
+only, preserving user content, CLI operation IDs and filesystem paths.
+
 Run the focused regression checks from the repository root:
 
 ```bash
 python -m unittest discover -s tests -v
 node --test src/dsh/host/session_operations.test.mjs src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs
+node --test src/dsh/tools/invocation/*.test.mjs src/dsh/tools/benchmark/guidance.test.mjs
 npm run prepare --prefix src/dsh
 ```
 

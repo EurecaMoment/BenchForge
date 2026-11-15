@@ -35,6 +35,17 @@ test('production receipts and capture ids are scoped to successful calls', () =>
   assert.equal(failed.view.files.some((file) => file.path.endsWith('failed.json')), false);
 });
 
+test('resolved invocation metadata preserves canonical artifact scope after a typo', () => {
+  let state = artifactProjection.init({cwd: '/tmp/work'});
+  state = call(state, 'benchmarkforge_pipeline_plan', {workspace: '/tmp/wrok'});
+  state = result(state, {state: 'planned', plan: 'operations/one/plan.json'}, {meta: {
+    benchforgeInvocation: {requested: {name: 'benchmarkforge_pipeline_plan', arguments: {workspace: '/tmp/wrok'}},
+      resolved: {name: 'benchforge_pipeline_plan', arguments: {workspace: '/tmp/work'}}},
+  }});
+  assert.equal(state.view.primaryWorkspace, '/tmp/work');
+  assert.deepEqual(state.view.files.map(file => file.path), ['/tmp/work/operations/one/plan.json']);
+});
+
 test('waiting pipeline receipts expose step outputs without inventing missing stages', () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchforge_pipeline_run', {workspace: '/tmp/work'}, 1);

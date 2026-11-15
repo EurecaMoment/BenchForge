@@ -3,7 +3,8 @@ import path from 'node:path';
 import {defineTool} from '@deepseek-ai/dsh-tools';
 import Schema from '@deepseek-ai/schemastery';
 import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
-import {toolName, qualifyToolNames} from '../tools/benchmark/names.mjs';
+import {toolName, qualifyToolNames, qualifyDescriptions} from '../tools/benchmark/names.mjs';
+import {presentOperationCatalog} from '../tools/benchmark/catalog.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
 export const Config = Schema.object({
@@ -80,7 +81,7 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
     if (config.includeTools && !config.includeTools.includes(tool)) continue;
     if (tool === 'model_infer' && !annotation?.url) continue;
     ctx.tools.register(defineTool({name:toolName(tool), description:qualifyToolNames(description),
-      parameters:{workspace:{type:'string',required:true,description:'Absolute task workspace. Use the same workspace for related calls.'},...schemas[tool]},
+      parameters:{workspace:{type:'string',required:true,description:'Task workspace bound to the current conversation by the host.'},...qualifyDescriptions(schemas[tool])},
       output:tool==='catalog'?output:tool==='status'?statusOutput:operationOutput,
       execute:async (args,exec)=>{const {workspace,...request}=args; const signal=exec.signal ? AbortSignal.any([exec.signal,lifetime.signal]) : lifetime.signal;
         if (exec.agent?.session?.header?.cwd && await fs.realpath(workspace) !== await fs.realpath(exec.agent.session.header.cwd)) {
@@ -88,6 +89,9 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
         }
         const scoped = tool === 'model_infer' ? annotationEnvironment : environment;
         const sessionEnvironment = {...scoped, BENCHFORGE_DSH_SESSION_ID: exec.agent?.session?.id || '', BENCHFORGE_DSH_CALL_ID: exec.callId || ''};
-        return invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module});}}));
+        const result = await invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module});
+        return tool === 'catalog' && result.workflow
+          ? presentOperationCatalog(result, name => Boolean(ctx.tools.executable(name, exec.agent, exec.toolSet)))
+          : result;}}));
   }
 }

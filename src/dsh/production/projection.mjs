@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {canonicalToolName} from '../tools/invocation/identifiers.mjs';
 
 export const PRODUCTION_PROJECTION = 'benchforgeProduction';
 const Review = z.object({review_id:z.number(), stage:z.string(), artifact:z.string(), deadline:z.number(), state:z.string()});
@@ -17,7 +18,7 @@ const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benc
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:1, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:2, stateSchema:State,
   init:header => ({calls:{},notices:[],interruption:'',view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
@@ -35,7 +36,7 @@ export const productionProjection = {
       return patch(state,event,{lastTextAt:event.time,lastTextSeq:event.seq});
     if(event.type === 'deliverables/presented') return patch(state,event,{delivered:true});
     if(event.type === 'tool/call') {
-      const {name,callId} = event.data, args = parse(event.data.arguments) || {};
+      const {callId} = event.data, name = canonicalToolName(event.data.name), args = parse(event.data.arguments) || {};
       if(!name.startsWith('benchforge_')&&!view.active)return state;
       const next = {...state,calls:{...state.calls,[callId]:{name,workspace:args.workspace || view.workspace,plan:args.plan || ''}}};
       return patch(next,event,{lastTool:name,tools:view.tools+1,shells:view.shells+(name==='bash'?1:0),
@@ -43,7 +44,10 @@ export const productionProjection = {
     }
     if(event.type !== 'tool/result' || event.surfaceOp === 'replace') return state;
     const message = event.data.message, callId = message?.source?.callId || message?.toolCallId;
-    const call = state.calls[callId];
+    const recorded = state.calls[callId];
+    const resolved = event.data.meta?.benchforgeInvocation?.resolved;
+    const call = recorded && {...recorded, name: resolved?.name || recorded.name,
+      workspace: resolved?.arguments?.workspace || recorded.workspace};
     if(!call) return state;
     const calls = {...state.calls}; delete calls[callId];
     const next = {...state,calls};
