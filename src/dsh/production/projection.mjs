@@ -18,7 +18,7 @@ const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benc
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:3, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:4, stateSchema:State,
   init:header => ({calls:{},notices:[],interruption:'',interruptionSeq:0,view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
@@ -27,7 +27,7 @@ export const productionProjection = {
     if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
     if(event.type === 'turn/end') return patch({...state,interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
       ...(event.data.reason?.kind === 'aborted' ? {state:'interrupted'} : {})});
-    if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/production-resume') {
+    if(event.type === 'user/message' && ['benchforge/production-resume','benchforge/production-check-failed'].includes(event.data.source?.kind)) {
       const key=event.data.source.noticeKey;
       return typeof key==='string'&&!state.notices.includes(key)
         ? {...state,notices:[...state.notices.slice(-63),key]} : state;

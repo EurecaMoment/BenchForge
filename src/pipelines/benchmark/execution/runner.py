@@ -9,8 +9,7 @@ from pipelines.benchmark.execution.repair import create_plan
 from capabilities.dataset_authoring.production import produce
 from capabilities.dataset_authoring.production import package
 from pipelines.benchmark.execution.stage_review import STAGES
-from storage.stage_reviews import gate
-from storage.stage_reviews import review
+from pipelines.benchmark.execution.review_service import gate, review
 from pipelines.benchmark.design.plan_versions import current as active_plan
 from capabilities.scene_library.source_policy import check_source
 from capabilities.scene_library.source_policy import load_policy
@@ -160,12 +159,12 @@ def _run_locked(args, directory, config, client):
     if blocked:return blocked
     def waiting(value):
         state.update(state=value['state'], stage_review=value,
-                     next=qualify('Present this stage artifact. Use stage_review(action=wait), then resume this same run. Apply pending user instructions first.'))
+                     next=value['next'])
         write(state_path,state)
         return {'run':str(run_root.resolve()), **state}
     if session:
         current = review(args['_workspace'],session)
-        if current['state'] in ('waiting_user','paused','needs_input'):
+        if current['state'] in ('waiting_user','paused','needs_input','check_failed'):
             return waiting(current)
         if not args.get('_review_nested'):
             initial = gate(args['_workspace'],session,'S1',plan.get('stage_review_key',str(plan_path)),str(plan_path))
@@ -230,7 +229,7 @@ def _run_locked(args, directory, config, client):
                                   operation=operation, arguments=arguments, result=result,
                                   parent_ids=parent_ids, declared_type=step.get('artifact_type'),
                                   result_path=str(result_path.resolve()))
-            if result.get('state') in ('needs_evidence', 'needs_input', 'waiting','waiting_user','paused',
+            if result.get('state') in ('needs_evidence', 'needs_input', 'waiting','waiting_user','paused','check_failed',
                                        'needs_plan_application', 'needs_plan_revision', 'plan_superseded'):
                 state['steps'][step['id']] = {'state': result['state'], 'result': result, 'artifact': artifact}
                 state['state'] = result['state']

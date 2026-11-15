@@ -18,7 +18,7 @@ export const definitions = {
   "pipeline_repair_plan": "Create a deterministic, reviewable repair proposal for one failed artifact. It selects the smallest repair scope from the failure code and never changes GT, templates or remote services.",
   "pipeline_evaluate": "Score saved answers against the exact imported template protocol: numeric error with units, grouped ordering and IoU/detection sets. Separate per-template metrics; no model API judging or pooled 27-capability claim.",
   "adapt_capture": "Convert native Habitat/LIBERO/CARLA capture to compiler evidence. Habitat samples continuous visible surface regions and computes calibrated camera range from raw depth; semantic labels come from the selected source records.",
-  "stage_review": "Inspect or wait for the durable 300-second review owned by the plan and runner. S2 selects or creates and accepts scenes; S3 collection includes annotations. Opening a review requires the saved current plan or completed runner receipt, never a handwritten summary. Call wait with a default 60-second budget only while waiting_user. When elapsed or user-continued, resume production directly; do not wait again. Review identity comes from the saved plan or runner, regardless of a caller-provided key. Only the user's workbench controls can continue early or submit a review instruction. Read and edit drafts while waiting; production, scripts and simulation submissions stay blocked. Apply a saved user instruction before acknowledge. Do not report review waits as device queue blockage.",
+  "stage_review": "Inspect or wait for three durable backend self-check rounds, each followed by a 60-second user wait. Status, wait and host timers advance the same persisted ledger; repeated calls never count extra rounds. After all checks and waits pass with no pending instruction, can_continue becomes true and the host resumes the same task. S2 selects or creates and accepts scenes; S3 collection includes annotations. Opening requires the current saved plan or completed runner receipt, never a handwritten summary. Ordinary repairs retain the window; changed hard requirements open a new review. When check_failed, repair the reported artifact issue then retry; expiry cannot release a failed check or a user pause. Only the user's workbench controls continue early or submit instructions. Apply instructions before acknowledge. Reads and draft edits remain available; dependent production, scripts and simulation stay blocked until can_continue.",
   "acquire": "Import local records or download an explicitly selected dataset file, preserving original labels and source fields.",
   "normalize": "Normalize JSONL/JSON/CSV/Parquet/images into reusable evidence records; preserve original source fields.",
   "clean": "Clean selected records and readable media; optional Data-Juicer cleans derived text without overwriting labels.",
@@ -55,7 +55,8 @@ export const schemas = {
         "continue",
         "pause",
         "instruction",
-        "acknowledge"
+        "acknowledge",
+        "retry"
       ]
     },
     "stage": {
@@ -83,7 +84,7 @@ export const schemas = {
     "timeout_seconds": {
       "type": "number",
       "default": 60,
-      "description": "Single wait call budget in seconds, 0..300; default 60. The saved review deadline remains 300 seconds."
+      "description": "Single observation call budget, 0..300 seconds; default 60. Three separate backend checks and 60-second waits are required; API call count never grants approval."
     }
   },
   "pipeline_catalog": {

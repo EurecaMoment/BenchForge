@@ -22,7 +22,7 @@ from pipelines.benchmark.design.plan_input import FIELDS
 from pipelines.benchmark.design.plan_review import revision_review
 from pipelines.benchmark.design.production_steps import complete_production_steps, validate_production_steps
 from storage.execution_lock import exclusive_run, RunBusyError
-from storage.stage_reviews import gate, review as review_status
+from pipelines.benchmark.execution.review_service import gate, review as review_status
 from service_access.tool_names import qualify
 from service_access.scene_service import environment_value
 

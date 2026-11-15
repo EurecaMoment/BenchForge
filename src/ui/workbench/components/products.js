@@ -18,15 +18,20 @@ export function createProductComponents({React, helpers, components}) {
     if (!value?.review_id) return null;
     const waiting = value.state === 'waiting_user';
     const remaining = Math.max(0,Math.ceil(value.deadline-value.server_time-(tick-received.current.at)/1000));
-    const label = {waiting_user:'reviewWaiting',paused:'reviewPaused',needs_input:'reviewInstruction'}[value.state] || 'reviewFinished';
+    const label = {waiting_user:value.check_pending || !remaining ? 'reviewChecking' : 'reviewWaiting',
+      paused:'reviewPaused',needs_input:'reviewInstruction',check_failed:'reviewCheckFailed'}[value.state] || 'reviewFinished';
     return h('section',{className:'bfw-review','data-stage-review':value.stage,'data-review-state':value.state,'aria-live':'polite'},
-      h('strong',null,t(STAGES.find(stage => stage.id === value.stage)?.key+'Nav')+' · '+t(label)), ' ', waiting && h('strong',{'data-review-countdown':true},
+      h('strong',null,t(STAGES.find(stage => stage.id === value.stage)?.key+'Nav')+' · '+t(label)), ' ', waiting && !value.check_pending && remaining > 0 && h('strong',{'data-review-countdown':true},
         Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0')),
+      value.policy_version === 1 && h('span',{'data-review-round':value.round_number,className:'bfw-muted'},
+        ' · '+t('reviewChecks')+' '+value.checks_completed+'/'+value.rounds_required+' · '+t('reviewWaits')+' '+value.waits_completed+'/'+value.rounds_required),
       waiting && h('span',{className:'bfw-muted'},' · '+t('reviewNote')),
-      ['waiting_user','paused','needs_input'].includes(value.state) && h('div',{className:'bfw-review-actions'},
-        value.state !== 'needs_input' && button(t('reviewContinue'),() => act('continue'),{'data-review-continue':true}),
+      ['waiting_user','paused','needs_input','check_failed'].includes(value.state) && h('div',{className:'bfw-review-actions'},
+        ['waiting_user','paused'].includes(value.state) && button(t('reviewContinue'),() => act('continue'),{'data-review-continue':true}),
+        value.state === 'check_failed' && button(t('reviewRetry'),() => act('retry'),{'data-review-retry':true}),
         waiting && button(t('reviewPause'),() => act('pause'),{'data-review-pause':true}),
         button(t('reviewChange'),change,{'data-review-instruction':true})),
+      value.check_failure?.error && h('p',{className:'bfw-error',role:'status'},value.check_failure.error),
       value.instruction && h('p',null,value.instruction));
   }
   function PlanProduct({plan, source, artifacts, preview, request, save, applyEdit, scenes = [],template, t}) {

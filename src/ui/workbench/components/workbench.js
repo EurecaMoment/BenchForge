@@ -196,7 +196,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       selectionSubmitLock.current = true; setSending(true); setError('');
       let readError = 'sceneSelectionReadFailed';
       try {
-        if (!payload.reviewContinued && ['waiting_user','paused','needs_input'].includes(reviewRecord.value?.state)) {
+        if (!payload.reviewContinued && ['waiting_user','paused','needs_input','check_failed'].includes(reviewRecord.value?.state)) {
           await reviewAction('instruction',payload.text);
           if (conversationRunning) await stopExecution();
           payload={...payload,text:'阶段等待中的用户指令已保存。先读取 stage_review(action=status)，应用以下要求后再处理后续阶段；不要绕过等待关口。\n'+payload.text};
@@ -393,7 +393,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         try {
           const result=await reviewAction(action);
           if (action === 'pause' && conversationRunning) await stopExecution();
-          if (action === 'continue' && !result.continuation_managed && !conversationRunning) {
+          if (action === 'continue' && result.can_continue && !result.continuation_managed && !conversationRunning) {
             await submitWithScenes({text:'用户已点击立即继续。读取 benchforge_stage_review 的阶段状态，复用当前计划和产物继续生产。',inserted:false,reviewContinued:true},setDemandError);
           }
         }

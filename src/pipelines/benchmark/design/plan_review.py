@@ -14,7 +14,10 @@ def _contract(plan):
     for key in ('evidence', 'scene_sources'):
         value.get('inputs', {}).pop(key, None)
     for design in value.get('assessment', {}).get('scenes', {}).get('designs', []):
-        design.pop('artifact', None)
+        # Descriptive repairs and their audit trail do not alter measurement
+        # requirements, object permissions, relations or physical assumptions.
+        for key in ('artifact', 'name', 'summary', 'revision_history', 'previous_capture_directory'):
+            design.pop(key, None)
     return value
 
 

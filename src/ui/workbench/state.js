@@ -52,7 +52,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
   }
   function productionContext(selection, template) {
     return sceneConstraint(selection) +
-      '\n五阶段：' + stageSummary() + '。S3 采集包含标注。每阶段完成后展示真实产物并等待用户 5 分钟。由计划和执行器建立阶段回执，使用 '+toolName('stage_review')+' 读取及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。审核期间可读资料、看预览和编辑准备稿，不得提前采集依赖该阶段的正式数据或绕过审核另起脚本。\n' +
+      '\n五阶段：' + stageSummary() + '。S3 采集包含标注。每阶段完成后展示真实产物，后端执行三轮自检，每轮检查通过后等待用户 60 秒。由计划和执行器建立阶段回执，使用 '+toolName('stage_review')+' 读取及等待持久关口；三轮均通过且无待处理指令时自动继续。普通修补保留原轮次与等待，明确暂停或自检失败不得超时放行。审核期间可读资料、看预览和编辑准备稿，不得提前采集依赖该阶段的正式数据或绕过审核另起脚本。\n' +
       '\n制定或修改评测计划时必须遵守以下完整模板；已有完整计划且本次只要求继续执行时，复用已有计划。\n' +
       qualifyToolNames(template.instructions) + '\n' + qualifyToolNames(template.scene_binding) + '\n各章节要求：\n' + JSON.stringify(template.sections, null, 2) +
       (template.native_episode_contract ? '\n连续运动与机器人轨迹验收合同：\n' + JSON.stringify(template.native_episode_contract, null, 2) : '') +

@@ -2,7 +2,8 @@
 - insert:
   - id: benchforge-session-operations
     name: '@eurecamoment/benchforge-dsh/session-operations'
-    config: {}
+    config:
+      python: python3
   - id: preset-benchforge
     name: '@deepseek-ai/dsh-agent-preset'
     config:
@@ -24,7 +25,7 @@
 
             用户已授权的制作应持续推进。子任务初始化失败、准备稿交接、由父级选择串行或并行的调度，以及不降低用户硬要求的软摘要/引用修正，都由父流程按当前证据处理，不再用
             ask_user_question 重问是否继续、保持全部冻结或等旧失败批次。先复用已保存交付，缺什么只暂停依赖它的步骤。冻结计划是子任务输入的一致性快照；父流程仍可按既有授权通过正式计划接口保存修订，保留用户硬要求、测量合同、已接受产物与已提交采集。只为真实缺失的用户信息或未授权的硬要求变更提问，并明确指出缺什么。ask_user_question
-            等待答复期间属于等待用户，消息入箱不代表等待已解除，也不代表生产有进展；不能把这种调度确认冒充阶段的五分钟用户窗口。
+            等待答复期间属于等待用户，消息入箱不代表等待已解除，也不代表生产有进展；不能把这种调度确认冒充阶段的三轮自检和用户等待。
 
             每个生产场景先保存标题、详细段落摘要（长度按内容需要）、受保护的用户硬要求、物体角色、明确的支撑/安装/朝向/邻接/净空/取用关系及物理假设；按
             benchforge_pipeline_catalog.scene_authoring.scene_brief 填写 scenes.designs
@@ -58,21 +59,27 @@
             authorized stage; dependent stages start only after the preceding review
             releases them.
 
-            After every completed production stage, show its actual saved artifacts
-            and wait for one durable 5-minute user instruction window for that stage
-            and revision. The plan and pipeline runner own these benchforge_stage_review
-            windows and aggregate independent scenes or shards; preparation tasks
-            and subagents do not open extra windows. For an already completed stage,
-            benchforge_stage_review(action=open) may reference its actual saved runner
-            receipt, never a handwritten completion summary. Wait with bounded benchforge_stage_review(action=wait,review_id=...,timeout_seconds=60)
-            calls until can_continue is true. The user may continue early through
-            workbench controls; the model cannot release the window itself. While
-            waiting, read catalogs, inspect existing previews and edit drafts under
-            tasks/; do not start scripts, dependent collection or direct service submissions.
-            If paused, stop dependent production. If needs_input, apply the saved
-            user instruction before acknowledge or revising the plan. User review
-            waits are distinct from device queue waits. Shells and background jobs
-            are not a way to bypass a review.
+            After every completed production stage, show its actual saved artifacts.
+            The backend owns one durable review with three real self-check rounds,
+            each followed by a 60-second user instruction wait. Status, bounded benchforge_stage_review(action=wait,review_id=...,timeout_seconds=60),
+            workbench reads and host timers share the same ledger; repeated tool calls
+            do not count extra rounds. When all three checks and waits pass without
+            pending instructions, can_continue becomes true and the host resumes the
+            same task, including after reload. You may end the turn after presenting
+            artifacts and the current round; the host timer keeps advancing without
+            an open browser or model polling. Ordinary execution, reference and soft-description
+            repairs retain this window and completed rounds; changed hard requirements
+            require a new review. The plan and runner aggregate independent scenes/shards;
+            preparation tasks and subagents do not open extra windows. benchforge_stage_review(action=open)
+            requires the actual current plan or completed runner receipt, never a
+            handwritten summary. If check_failed, explain and repair the actual failed
+            artifact check, then call retry; failed checks and explicit user pauses
+            cannot time out into approval. Only the user may continue early through
+            workbench controls, and artifact validation still applies. If needs_input,
+            apply the saved instruction before acknowledge. While waiting, read catalogs,
+            inspect previews and edit drafts under tasks/; do not start dependent
+            production, scripts or simulation submissions. These waits are separate
+            from device queues.
 
             Scene policy: default to recognizable real assets. Simplified geometry
             is allowed when the saved assessment scene production plan explicitly
@@ -554,16 +561,16 @@
             production results.
 
             The parent owns plan changes, authoritative merging, production/capture
-            submissions, exports, acceptance and each stage''s single 5-minute user
-            window. Question workers deliver S4 preparation, evidence or shards; the
-            parent packages S5 after aggregate S4 acceptance and its user window.
-            Do not create additional stage windows, spawn more workers or bypass parent-owned
-            tools through a shell, HTTP or task code. You may use available read,
-            file and independent model tools for the assigned preparation. Update
-            manifest.json to reflect the actual preparation outcome and quote its
-            path in the final response. Preparation completion and accepted scene/data
-            production are separate outcomes; the parent verifies and integrates your
-            handoff.
+            submissions, exports, acceptance and each stage''s single review with
+            three backend checks and 60-second waits. Question workers deliver S4
+            preparation, evidence or shards; the parent packages S5 after aggregate
+            S4 acceptance and its user window. Do not create additional stage windows,
+            spawn more workers or bypass parent-owned tools through a shell, HTTP
+            or task code. You may use available read, file and independent model tools
+            for the assigned preparation. Update manifest.json to reflect the actual
+            preparation outcome and quote its path in the final response. Preparation
+            completion and accepted scene/data production are separate outcomes; the
+            parent verifies and integrates your handoff.
 
             中心距离题先用公开深度、标定与掩码确认原有误差界内的原生中心覆盖，再采样对象。计数范围必须在题面、编号图和公开掩码中一致。排序题按当前已应用计划用未取整原生距离验收实际阈值，区分严格大于和至少；公开候选按保存的
             seed 打乱，避免列举顺序直接泄漏正确排序，并同步题面、图、参数与答案。复用未受影响的题目和几何证书。evidence 从已验收捕获回执写入真实

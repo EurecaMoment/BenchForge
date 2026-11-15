@@ -119,10 +119,15 @@ var benchforgeClient = (() => {
       reviewContinue: "\u7ACB\u5373\u7EE7\u7EED",
       reviewPause: "\u6682\u505C\u81EA\u52A8\u7EE7\u7EED",
       reviewChange: "\u8865\u5145\u6307\u4EE4",
-      reviewNote: "\u65E0\u65B0\u6307\u4EE4\uFF0C5 \u5206\u949F\u540E\u7EE7\u7EED",
-      reviewFinished: "\u9636\u6BB5\u7B49\u5F85\u5DF2\u7ED3\u675F",
+      reviewNote: "\u6BCF\u8F6E\u7B49\u5F85 60 \u79D2\uFF0C\u4E09\u8F6E\u68C0\u67E5\u901A\u8FC7\u540E\u81EA\u52A8\u7EE7\u7EED",
+      reviewFinished: "\u9636\u6BB5\u5BA1\u6838\u5DF2\u7ED3\u675F",
+      reviewChecking: "\u6B63\u5728\u81EA\u68C0",
+      reviewCheckFailed: "\u81EA\u68C0\u672A\u901A\u8FC7",
+      reviewRetry: "\u4FEE\u590D\u540E\u91CD\u65B0\u68C0\u67E5",
+      reviewChecks: "\u81EA\u68C0",
+      reviewWaits: "\u7B49\u5F85",
       executionProgress: "\u6267\u884C\u8FDB\u5C55",
-      productionHint: "\u6BCF\u9636\u6BB5\u5B8C\u6210\u540E\u7B49\u5F85\u4F60\u7684\u6307\u4EE4 5 \u5206\u949F\u3002",
+      productionHint: "\u6BCF\u9636\u6BB5\u8FDB\u884C\u4E09\u8F6E\u81EA\u68C0\u548C\u7B49\u5F85\uFF0C\u6BCF\u8F6E 60 \u79D2\u3002",
       ...stageCopy("zh"),
       stageDone: "\u5DF2\u5B8C\u6210",
       previewable: "\u53EF\u9884\u89C8",
@@ -590,8 +595,13 @@ var benchforgeClient = (() => {
       reviewContinue: "Continue now",
       reviewPause: "Pause automatic continuation",
       reviewChange: "Add instructions",
-      reviewNote: "Continue after 5 minutes without new instructions",
+      reviewNote: "Three checked rounds, each with a 60-second wait, then continue automatically",
       reviewFinished: "Stage review finished",
+      reviewChecking: "Checking artifacts",
+      reviewCheckFailed: "Self-check failed",
+      reviewRetry: "Recheck after repair",
+      reviewChecks: "Checks",
+      reviewWaits: "Waits",
       executionProgress: "Execution",
       productionHint: "Runs all five stages; outputs update below.",
       ...stageCopy("en"),
@@ -1373,7 +1383,7 @@ var benchforgeClient = (() => {
       ].filter(Boolean).join("\n") + sceneConstraint(selection);
     }
     function productionContext(selection, template) {
-      return sceneConstraint(selection) + "\n\u4E94\u9636\u6BB5\uFF1A" + stageSummary() + "\u3002S3 \u91C7\u96C6\u5305\u542B\u6807\u6CE8\u3002\u6BCF\u9636\u6BB5\u5B8C\u6210\u540E\u5C55\u793A\u771F\u5B9E\u4EA7\u7269\u5E76\u7B49\u5F85\u7528\u6237 5 \u5206\u949F\u3002\u7531\u8BA1\u5212\u548C\u6267\u884C\u5668\u5EFA\u7ACB\u9636\u6BB5\u56DE\u6267\uFF0C\u4F7F\u7528 " + toolName("stage_review") + " \u8BFB\u53D6\u53CA\u7B49\u5F85\u6301\u4E45\u5173\u53E3\uFF1B\u65E0\u65B0\u6307\u4EE4\u5230\u671F\u7EE7\u7EED\uFF0C\u6709\u6307\u4EE4\u5148\u5904\u7406\uFF0C\u6682\u505C\u540E\u4E0D\u5F97\u81EA\u52A8\u7EE7\u7EED\u3002\u5BA1\u6838\u671F\u95F4\u53EF\u8BFB\u8D44\u6599\u3001\u770B\u9884\u89C8\u548C\u7F16\u8F91\u51C6\u5907\u7A3F\uFF0C\u4E0D\u5F97\u63D0\u524D\u91C7\u96C6\u4F9D\u8D56\u8BE5\u9636\u6BB5\u7684\u6B63\u5F0F\u6570\u636E\u6216\u7ED5\u8FC7\u5BA1\u6838\u53E6\u8D77\u811A\u672C\u3002\n\n\u5236\u5B9A\u6216\u4FEE\u6539\u8BC4\u6D4B\u8BA1\u5212\u65F6\u5FC5\u987B\u9075\u5B88\u4EE5\u4E0B\u5B8C\u6574\u6A21\u677F\uFF1B\u5DF2\u6709\u5B8C\u6574\u8BA1\u5212\u4E14\u672C\u6B21\u53EA\u8981\u6C42\u7EE7\u7EED\u6267\u884C\u65F6\uFF0C\u590D\u7528\u5DF2\u6709\u8BA1\u5212\u3002\n" + qualifyToolNames(template.instructions) + "\n" + qualifyToolNames(template.scene_binding) + "\n\u5404\u7AE0\u8282\u8981\u6C42\uFF1A\n" + JSON.stringify(template.sections, null, 2) + (template.native_episode_contract ? "\n\u8FDE\u7EED\u8FD0\u52A8\u4E0E\u673A\u5668\u4EBA\u8F68\u8FF9\u9A8C\u6536\u5408\u540C\uFF1A\n" + JSON.stringify(template.native_episode_contract, null, 2) : "") + (template.annotation_source_contract ? "\n\u6807\u6CE8\u6765\u6E90\u4E0E\u590D\u7B97\u5408\u540C\uFF1A\n" + JSON.stringify(template.annotation_source_contract, null, 2) : "") + (template.scene_authoring ? "\n\u573A\u666F\u6807\u9898\u3001\u6458\u8981\u3001\u7A7A\u95F4\u5173\u7CFB\u4E0E\u53CC\u5411\u4FEE\u8BA2\u5408\u540C\uFF1A\n" + JSON.stringify(template.scene_authoring, null, 2) : "") + "\n\u4F20\u5165 " + toolName("pipeline_plan") + ".assessment \u7684\u586B\u5199\u7ED3\u6784\uFF1A\n" + JSON.stringify(template.assessment, null, 2);
+      return sceneConstraint(selection) + "\n\u4E94\u9636\u6BB5\uFF1A" + stageSummary() + "\u3002S3 \u91C7\u96C6\u5305\u542B\u6807\u6CE8\u3002\u6BCF\u9636\u6BB5\u5B8C\u6210\u540E\u5C55\u793A\u771F\u5B9E\u4EA7\u7269\uFF0C\u540E\u7AEF\u6267\u884C\u4E09\u8F6E\u81EA\u68C0\uFF0C\u6BCF\u8F6E\u68C0\u67E5\u901A\u8FC7\u540E\u7B49\u5F85\u7528\u6237 60 \u79D2\u3002\u7531\u8BA1\u5212\u548C\u6267\u884C\u5668\u5EFA\u7ACB\u9636\u6BB5\u56DE\u6267\uFF0C\u4F7F\u7528 " + toolName("stage_review") + " \u8BFB\u53D6\u53CA\u7B49\u5F85\u6301\u4E45\u5173\u53E3\uFF1B\u4E09\u8F6E\u5747\u901A\u8FC7\u4E14\u65E0\u5F85\u5904\u7406\u6307\u4EE4\u65F6\u81EA\u52A8\u7EE7\u7EED\u3002\u666E\u901A\u4FEE\u8865\u4FDD\u7559\u539F\u8F6E\u6B21\u4E0E\u7B49\u5F85\uFF0C\u660E\u786E\u6682\u505C\u6216\u81EA\u68C0\u5931\u8D25\u4E0D\u5F97\u8D85\u65F6\u653E\u884C\u3002\u5BA1\u6838\u671F\u95F4\u53EF\u8BFB\u8D44\u6599\u3001\u770B\u9884\u89C8\u548C\u7F16\u8F91\u51C6\u5907\u7A3F\uFF0C\u4E0D\u5F97\u63D0\u524D\u91C7\u96C6\u4F9D\u8D56\u8BE5\u9636\u6BB5\u7684\u6B63\u5F0F\u6570\u636E\u6216\u7ED5\u8FC7\u5BA1\u6838\u53E6\u8D77\u811A\u672C\u3002\n\n\u5236\u5B9A\u6216\u4FEE\u6539\u8BC4\u6D4B\u8BA1\u5212\u65F6\u5FC5\u987B\u9075\u5B88\u4EE5\u4E0B\u5B8C\u6574\u6A21\u677F\uFF1B\u5DF2\u6709\u5B8C\u6574\u8BA1\u5212\u4E14\u672C\u6B21\u53EA\u8981\u6C42\u7EE7\u7EED\u6267\u884C\u65F6\uFF0C\u590D\u7528\u5DF2\u6709\u8BA1\u5212\u3002\n" + qualifyToolNames(template.instructions) + "\n" + qualifyToolNames(template.scene_binding) + "\n\u5404\u7AE0\u8282\u8981\u6C42\uFF1A\n" + JSON.stringify(template.sections, null, 2) + (template.native_episode_contract ? "\n\u8FDE\u7EED\u8FD0\u52A8\u4E0E\u673A\u5668\u4EBA\u8F68\u8FF9\u9A8C\u6536\u5408\u540C\uFF1A\n" + JSON.stringify(template.native_episode_contract, null, 2) : "") + (template.annotation_source_contract ? "\n\u6807\u6CE8\u6765\u6E90\u4E0E\u590D\u7B97\u5408\u540C\uFF1A\n" + JSON.stringify(template.annotation_source_contract, null, 2) : "") + (template.scene_authoring ? "\n\u573A\u666F\u6807\u9898\u3001\u6458\u8981\u3001\u7A7A\u95F4\u5173\u7CFB\u4E0E\u53CC\u5411\u4FEE\u8BA2\u5408\u540C\uFF1A\n" + JSON.stringify(template.scene_authoring, null, 2) : "") + "\n\u4F20\u5165 " + toolName("pipeline_plan") + ".assessment \u7684\u586B\u5199\u7ED3\u6784\uFF1A\n" + JSON.stringify(template.assessment, null, 2);
     }
     function displayRef(value) {
       const parts = String(value || "").split(/[\\/]/).filter(Boolean);
@@ -2711,25 +2721,37 @@ var benchforgeClient = (() => {
       if (!value?.review_id) return null;
       const waiting = value.state === "waiting_user";
       const remaining = Math.max(0, Math.ceil(value.deadline - value.server_time - (tick - received.current.at) / 1e3));
-      const label = { waiting_user: "reviewWaiting", paused: "reviewPaused", needs_input: "reviewInstruction" }[value.state] || "reviewFinished";
+      const label = {
+        waiting_user: value.check_pending || !remaining ? "reviewChecking" : "reviewWaiting",
+        paused: "reviewPaused",
+        needs_input: "reviewInstruction",
+        check_failed: "reviewCheckFailed"
+      }[value.state] || "reviewFinished";
       return h(
         "section",
         { className: "bfw-review", "data-stage-review": value.stage, "data-review-state": value.state, "aria-live": "polite" },
         h("strong", null, t(STAGES2.find((stage) => stage.id === value.stage)?.key + "Nav") + " \xB7 " + t(label)),
         " ",
-        waiting && h(
+        waiting && !value.check_pending && remaining > 0 && h(
           "strong",
           { "data-review-countdown": true },
           Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0")
         ),
+        value.policy_version === 1 && h(
+          "span",
+          { "data-review-round": value.round_number, className: "bfw-muted" },
+          " \xB7 " + t("reviewChecks") + " " + value.checks_completed + "/" + value.rounds_required + " \xB7 " + t("reviewWaits") + " " + value.waits_completed + "/" + value.rounds_required
+        ),
         waiting && h("span", { className: "bfw-muted" }, " \xB7 " + t("reviewNote")),
-        ["waiting_user", "paused", "needs_input"].includes(value.state) && h(
+        ["waiting_user", "paused", "needs_input", "check_failed"].includes(value.state) && h(
           "div",
           { className: "bfw-review-actions" },
-          value.state !== "needs_input" && button(t("reviewContinue"), () => act("continue"), { "data-review-continue": true }),
+          ["waiting_user", "paused"].includes(value.state) && button(t("reviewContinue"), () => act("continue"), { "data-review-continue": true }),
+          value.state === "check_failed" && button(t("reviewRetry"), () => act("retry"), { "data-review-retry": true }),
           waiting && button(t("reviewPause"), () => act("pause"), { "data-review-pause": true }),
           button(t("reviewChange"), change, { "data-review-instruction": true })
         ),
+        value.check_failure?.error && h("p", { className: "bfw-error", role: "status" }, value.check_failure.error),
         value.instruction && h("p", null, value.instruction)
       );
     }
@@ -3316,7 +3338,7 @@ var benchforgeClient = (() => {
         setError("");
         let readError = "sceneSelectionReadFailed";
         try {
-          if (!payload.reviewContinued && ["waiting_user", "paused", "needs_input"].includes(reviewRecord.value?.state)) {
+          if (!payload.reviewContinued && ["waiting_user", "paused", "needs_input", "check_failed"].includes(reviewRecord.value?.state)) {
             await reviewAction("instruction", payload.text);
             if (conversationRunning) await stopExecution();
             payload = { ...payload, text: "\u9636\u6BB5\u7B49\u5F85\u4E2D\u7684\u7528\u6237\u6307\u4EE4\u5DF2\u4FDD\u5B58\u3002\u5148\u8BFB\u53D6 stage_review(action=status)\uFF0C\u5E94\u7528\u4EE5\u4E0B\u8981\u6C42\u540E\u518D\u5904\u7406\u540E\u7EED\u9636\u6BB5\uFF1B\u4E0D\u8981\u7ED5\u8FC7\u7B49\u5F85\u5173\u53E3\u3002\n" + payload.text };
@@ -3718,7 +3740,7 @@ var benchforgeClient = (() => {
           try {
             const result = await reviewAction(action);
             if (action === "pause" && conversationRunning) await stopExecution();
-            if (action === "continue" && !result.continuation_managed && !conversationRunning) {
+            if (action === "continue" && result.can_continue && !result.continuation_managed && !conversationRunning) {
               await submitWithScenes({ text: "\u7528\u6237\u5DF2\u70B9\u51FB\u7ACB\u5373\u7EE7\u7EED\u3002\u8BFB\u53D6 benchforge_stage_review \u7684\u9636\u6BB5\u72B6\u6001\uFF0C\u590D\u7528\u5F53\u524D\u8BA1\u5212\u548C\u4EA7\u7269\u7EE7\u7EED\u751F\u4EA7\u3002", inserted: false, reviewContinued: true }, setDemandError);
             }
           } catch (error) {
@@ -3824,7 +3846,7 @@ var benchforgeClient = (() => {
           if (!selection.sources?.length && !selection.allow_new_scenes) throw new Error(t("chooseSceneRequired"));
           if (template.schema !== "benchforge.assessment-template/v1" || !template.assessment) throw new Error(t("templateReadFailed"));
           let prefix = productionRequest({ ...demand, objective: t("composerObjective") }) + productionContext(selection, template);
-          if (["waiting_user", "paused", "needs_input"].includes(review.state)) {
+          if (["waiting_user", "paused", "needs_input", "check_failed"].includes(review.state)) {
             const result = await requestWorkbench({ ...query, view: "stage_review" }, {
               body: { action: "instruction", review_id: review.review_id, instruction: objective },
               signal

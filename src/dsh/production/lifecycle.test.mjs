@@ -28,7 +28,7 @@ function harness() {
   const table={get:id=>records.get(id),put:async(id,value)=>{records.set(id,value);},entries:()=>records.entries()};
   const event=(type,data)=>{const row={seq:++seq,time:clock,type,data};events.push(row);state=productionProjection.apply(state,row);productionProjection.stateSchema.parse(state);return row;};
   let review={id:1,state:'waiting_user',deadline:400,stage:'S1'};
-  const create=()=>createProductionLifecycle({projection:{stateOf:()=>state},table,agents:{get:()=>live?agent:undefined},
+  const create=(advanceReview)=>createProductionLifecycle({projection:{stateOf:()=>state},table,agents:{get:()=>live?agent:undefined},advanceReview,
     restoreAgent:async()=>{restored++;live=true;return agent;},
     readReview:async()=>({...review,state:review.state==='waiting_user'&&clock>=400000?'elapsed':review.state}),
     createMessage:value=>value,now:()=>clock,schedule:(fn,ms)=>{timers.push({fn,ms});return timers.length;},unschedule:()=>{}});
@@ -218,5 +218,56 @@ test('progress reminders preserve fresh user input and can recur without floodin
   const result=await runtime.preStep({agent:h.agent},async()=>({kind:'enter',messages:[input]}));
   assert.equal(result.messages[0],input);assert.equal(result.messages.length,2);
   h.setTime(222000);await h.preStep(runtime);assert.equal(h.sent.length,1);
+  await runtime.dispose();
+});
+
+test('backend rounds advance with the browser closed, retain their deadline after reload, then resume once',async()=>{
+  const h=harness();h.plan();let calls=0;
+  const advance=async()=>{
+    calls++;
+    return calls===1 ? {state:'waiting_user',deadline:220,stage:'S1'} :
+      calls===2 ? {state:'waiting_user',deadline:280,stage:'S1'} : {state:'elapsed',deadline:280,stage:'S1'};
+  };
+  let runtime=h.create(advance);await runtime.observe(h.agent);
+  h.agent.status='idle';h.setTime(160000);await runtime.refresh(h.agent.id);
+  assert.equal(h.records.get(h.agent.id).review.deadline,220);
+  assert.equal(h.sent.length,0);await runtime.dispose();
+  runtime=h.create(advance);await runtime.resume(h.agent);
+  assert.equal(h.timers.at(-1).ms,60000);
+  h.setTime(220000);await runtime.refresh(h.agent.id);
+  assert.equal(h.records.get(h.agent.id).review.deadline,280);
+  assert.equal(h.sent.length,0);
+  h.setTime(280000);await runtime.refresh(h.agent.id);await runtime.refresh(h.agent.id);
+  assert.equal(h.sent.length,1);assert.match(h.sent[0].content[0].text,/三轮自检和等待已完成/);
+  await runtime.dispose();
+});
+
+test('a pending backend check cannot cause a zero-delay timer spin',async()=>{
+  const h=harness();h.plan();const runtime=h.create(async()=>({state:'waiting_user',deadline:100,stage:'S1'}));
+  await runtime.observe(h.agent);await runtime.refresh(h.agent.id);
+  assert.ok(h.timers.at(-1).ms>=1000);assert.equal(h.sent.length,0);
+  await runtime.dispose();
+});
+
+test('stale tool projections cannot reset a deadline already advanced by the backend',async()=>{
+  const h=harness();h.plan();const runtime=h.create();
+  h.setReview({id:1,state:'waiting_user',deadline:460,stage:'S1'});
+  await runtime.observe(h.agent);
+  assert.equal(h.view().review.deadline,400);
+  assert.equal(h.records.get(h.agent.id).review.deadline,460);
+  h.event('tool/call',{name:'read',callId:'draft',arguments:'{}'});
+  await runtime.observe(h.agent);
+  assert.equal(h.records.get(h.agent.id).review.deadline,460);
+  await runtime.dispose();
+});
+
+test('failed artifact checks report the issue once without a production-resume notice',async()=>{
+  const h=harness();h.plan();h.agent.status='idle';
+  const runtime=h.create(async()=>({state:'check_failed',deadline:100,stage:'S1',last_check:{checked_at:160},
+    check_failure:{error:'Saved collection source changed'}}));
+  await runtime.observe(h.agent);await runtime.refresh(h.agent.id);await runtime.refresh(h.agent.id);
+  assert.equal(h.sent.length,1);assert.equal(h.sent[0].source.kind,'benchforge/production-check-failed');
+  assert.match(h.sent[0].content[0].text,/Saved collection source changed/);
+  assert.equal(h.records.get(h.agent.id).suspended,true);
   await runtime.dispose();
 });

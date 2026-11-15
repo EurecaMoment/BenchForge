@@ -65,7 +65,7 @@ export function createProductionInput({ctx, requestWorkbench, productionRequest,
         if (!selection.sources?.length && !selection.allow_new_scenes) throw new Error(t('chooseSceneRequired'));
         if (template.schema !== 'benchforge.assessment-template/v1' || !template.assessment) throw new Error(t('templateReadFailed'));
         let prefix = productionRequest({...demand, objective: t('composerObjective')}) + productionContext(selection, template);
-        if (['waiting_user', 'paused', 'needs_input'].includes(review.state)) {
+        if (['waiting_user', 'paused', 'needs_input', 'check_failed'].includes(review.state)) {
           const result = await requestWorkbench({...query, view: 'stage_review'}, {
             body: {action: 'instruction', review_id: review.review_id, instruction: objective}, signal,
           });

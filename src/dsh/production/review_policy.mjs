@@ -5,7 +5,7 @@ import {stageName} from './stages.mjs';
 export const name = 'benchforge-review-policy';
 export const inject = ['tools'];
 
-const pending = new Set(['waiting_user', 'paused', 'needs_input']);
+const pending = new Set(['waiting_user', 'paused', 'needs_input', 'check_failed']);
 const reads = new Set(['read', 'read_image', 'read_file', 'list_directory', 'list_files', 'glob', 'grep',
   'search', 'web_search', 'web_fetch', 'fetch', 'present', 'todo', 'todo_write', 'todowrite', 'think',
   'ask_user_question', 'skill', 'read_resource', 'list_resources',
@@ -34,10 +34,15 @@ export function reviewDenial(exec, review, workspace) {
   if (exec.name === 'benchforge_cancel') return; // Stopping existing work never advances a stage.
   if (exec.name === 'benchforge_pipeline_plan') return; // Validated drafts/revisions are domain-owned.
   if (exec.name === 'benchforge_stage_review' &&
-      ['status', 'wait', 'pause', 'acknowledge', 'open'].includes(args.action || 'status')) return;
+      ['status', 'wait', 'pause', 'acknowledge', 'open', 'retry'].includes(args.action || 'status')) return;
   if (exec.name === 'benchforge_isaac_sim' && (inspections.has(args.action) || args.action === 'cancel')) return;
+  const progress = review.state === 'check_failed'
+    ? `产物自检失败：${review.check_failure?.error || '读取检查结果并修复后 retry'}。`
+    : review.state === 'paused' ? '用户已暂停，须用户继续后才能推进。'
+    : review.state === 'needs_input' ? '有待处理的用户指令，落实后再 acknowledge。'
+    : `已完成自检 ${review.checks_completed || 0}/3、等待 ${review.waits_completed || 0}/3，本轮剩余 ${review.remaining_seconds || 0} 秒；三轮通过后由后端自动继续。`;
   return {
-    reason: `${review.stage} ${stageName(review.stage)} 的审核尚未结束（${review.state}）。先展示真实产物并用 benchforge_stage_review 等待或处理用户指令。可读取、检查和编辑 tasks/ 下的准备稿；依赖该阶段的生产、脚本执行和仿真提交须等审核放行。S2 选取或新建并验收场景；S3 采集轨迹、观测及标注。`,
+    reason: `${review.stage} ${stageName(review.stage)} 的审核尚未结束（${review.state}）。${progress}展示真实产物并用 benchforge_stage_review 读取、等待或处理用户指令。可读取和编辑 tasks/ 下的准备稿，依赖该阶段的生产、脚本及仿真提交须等放行。`,
     info: {name: 'ProductionReviewError', code: 'STAGE_REVIEW_PENDING'},
   };
 }

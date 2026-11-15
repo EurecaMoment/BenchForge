@@ -1,5 +1,6 @@
 """Regression: scene repairs must not restart a released S1 window."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from copy import deepcopy
 from hashlib import sha256
 import json
@@ -13,7 +14,7 @@ from pipelines.benchmark.design.planner import plan
 from pipelines.benchmark.design.plan_versions import current
 from storage.artifacts import read, write
 from storage.execution_lock import exclusive_run
-from storage.stage_reviews import review
+from pipelines.benchmark.execution.review_service import review
 
 
 class PlanReviewRevisionTests(unittest.TestCase):
@@ -25,6 +26,8 @@ class PlanReviewRevisionTests(unittest.TestCase):
         for name in ('validate_assessment', 'assessment_with_current_schema'):
             validator = patch('pipelines.benchmark.design.planner.' + name, side_effect=lambda value, *args: value)
             validator.start(); self.addCleanup(validator.stop)
+        validator = patch('capabilities.benchmark_design.assessment.validate_assessment', side_effect=lambda value, *args: value)
+        validator.start(); self.addCleanup(validator.stop)
         clock = patch('storage.stage_reviews.time.time', side_effect=lambda: self.clock)
         clock.start(); self.addCleanup(clock.stop)
         self.args = {'objective': 'An indoor benchmark',
@@ -49,7 +52,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
 
     def test_repeated_saves_keep_the_original_window_and_publish_the_latest_artifact(self):
         first = self.save()
-        self.clock += 70
+        self.clock += 30
         for _ in range(3):
             saved = self.save()
             self.assertEqual(saved['stage_review']['review_id'], first['stage_review']['review_id'])
@@ -61,7 +64,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(current(self.root, self.session)['plan'], saved['plan'])
         self.assertTrue(Path(first['plan']).is_file())
 
-    def test_continue_then_scene_repairs_do_not_add_another_five_minutes(self):
+    def test_continue_then_scene_repairs_do_not_restart_checked_rounds(self):
         first = self.save()
         review(self.root, self.session, 'continue')
         changed = deepcopy(self.args)
@@ -84,12 +87,29 @@ class PlanReviewRevisionTests(unittest.TestCase):
 
     def test_elapsed_window_remains_released_on_resave(self):
         first = self.save()
-        self.clock += 301
+        for _ in range(3):
+            self.clock += 60
+            review(self.root, self.session)
         saved = self.save()
         self.assertEqual(saved['stage_review']['review_id'], first['stage_review']['review_id'])
         self.assertEqual(saved['stage_review']['state'], 'elapsed')
         self.assertTrue(saved['stage_review']['can_continue'])
         self.assertNotIn('action=wait', saved['next'])
+
+    def test_soft_description_repair_retains_waits_but_hard_contract_does_not(self):
+        first = self.save()
+        self.clock += 60
+        second = review(self.root, self.session)
+        changed = deepcopy(self.args)
+        changed['assessment']['scenes']['designs'][0].update(
+            summary='Corrected furniture description based on the saved view',
+            revision_history=[{'revision': 2, 'changes': ['Clarified the description']}])
+        repaired = self.save(changed)
+        self.assertEqual(repaired['stage_review']['review_id'], first['stage_review']['review_id'])
+        self.assertEqual(repaired['stage_review']['deadline'], second['deadline'])
+        self.assertEqual(repaired['stage_review']['waits_completed'], 1)
+        changed['assessment']['scenes']['designs'][0]['hard_requirements'] = ['A proxy is sufficient']
+        self.assertNotEqual(self.save(changed)['stage_review']['review_id'], first['stage_review']['review_id'])
 
     def test_contract_changes_require_a_new_review_and_report_changed_fields(self):
         cases = {
@@ -188,7 +208,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
             results = list(pool.map(save, range(10)))
         self.assertTrue(any(results))
         self.assertEqual(review(self.root, self.session)['artifact'], current(self.root, self.session)['plan'])
-        with sqlite3.connect(self.root / 'stage-reviews.sqlite') as db:
+        with closing(sqlite3.connect(self.root / 'stage-reviews.sqlite')) as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM reviews WHERE session=?', (self.session,)).fetchone()[0], 1)
 
     def test_plan_save_lock_does_not_block_another_conversation(self):

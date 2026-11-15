@@ -14,7 +14,7 @@ import base64
 import urllib.request
 import urllib.error
 
-from storage.stage_reviews import review
+from pipelines.benchmark.execution.review_service import review
 
 
 def author_completion(prompt, directory, images, max_tokens=14000):

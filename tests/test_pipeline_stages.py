@@ -12,7 +12,8 @@ from capabilities.task_catalog.benchmark import all_templates
 from pipelines.benchmark.design.production_steps import complete_production_steps
 from pipelines.benchmark.execution.runner import run
 from storage.artifacts import write, jsonl
-from storage.stage_reviews import review
+from pipelines.benchmark.execution.review_service import review
+from pipelines.benchmark.design.plan_versions import activate
 
 
 class PipelineStageTests(unittest.TestCase):
@@ -53,6 +54,11 @@ class PipelineStageTests(unittest.TestCase):
                           'assessment': {'scenes': {'target_scene_count': 1, 'allow_new_scenes': False,
                                                   'selected_scenes': [{'task_id': 'sf_test.scene0', 'revision': 0}]}},
                           'steps': complete_production_steps(recipe['steps'])})
+        activate(self.root, self.session, str(self.plan))
+        # This runner fixture supplies controlled stage receipts, not a full
+        # model-authored assessment. Review validation has its own real tests.
+        assessment = patch('capabilities.benchmark_design.assessment.validate_assessment', side_effect=lambda value, *args: value)
+        assessment.start(); self.addCleanup(assessment.stop)
         self.calls = []
         self.policy = patch('pipelines.benchmark.execution.runner.load_policy', side_effect=self.load_policy)
         self.policy.start(); self.addCleanup(self.policy.stop)
@@ -152,8 +158,10 @@ class PipelineStageTests(unittest.TestCase):
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
         self.advance({'evidence': str(self.evidence)}); self.continue_review()
         Path(self.record['provenance']['path']).write_text('{"changed":true}')
-        with self.assertRaisesRegex(ValueError, 'annotation source changed'):
-            self.advance()
+        result = self.advance()
+        self.assertEqual(result['state'], 'check_failed')
+        self.assertIn('annotation source changed', result['stage_review']['check_failure']['error'])
+        self.assertNotIn('questions', result['steps'])
 
     def test_s3_rejects_cross_partition_rename_and_missing_template_quantity(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
@@ -194,8 +202,10 @@ class PipelineStageTests(unittest.TestCase):
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
         self.advance({'evidence': str(self.evidence)}); self.continue_review()
         write(self.native_source, {'distance': 1, 'speed': 1})
-        with self.assertRaisesRegex(ValueError, 'annotation source changed'):
-            self.advance()
+        result = self.advance()
+        self.assertEqual(result['state'], 'check_failed')
+        self.assertIn('annotation source changed', result['stage_review']['check_failure']['error'])
+        self.assertNotIn('questions', result['steps'])
 
     def test_robot_task_stops_at_s3_without_a_native_robot_episode(self):
         plan = json.loads(self.plan.read_text(encoding='utf-8'))

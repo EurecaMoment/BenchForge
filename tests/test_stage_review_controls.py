@@ -5,7 +5,7 @@ import unittest
 from pipelines.benchmark.execution.stage_review import call
 from pipelines.benchmark.design.plan_versions import activate
 from storage.artifacts import write
-from storage.stage_reviews import review
+from pipelines.benchmark.execution.review_service import review
 
 
 class StageReviewControlTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class StageReviewControlTests(unittest.TestCase):
         return call({'_dsh_context': {'session_id': self.session}, **args}, self.directory)
 
     def test_only_the_user_can_continue_early_or_submit_a_user_instruction(self):
-        pending = review(self.root, self.session, 'open', stage='S1', key='plan', artifact=str(self.plan))
+        pending = review(self.root, self.session, 'open', stage='S1', key=str(self.plan.resolve()), artifact=str(self.plan))
         with self.assertRaisesRegex(ValueError, 'Only the user'):
             self.tool(action='continue', review_id=pending['review_id'])
         with self.assertRaisesRegex(ValueError, 'come from the user'):

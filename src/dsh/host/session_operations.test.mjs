@@ -17,6 +17,7 @@ test('production host activates in Cordis and releases its domain on unload', as
   }});
   ctx.provide('agents', {list: () => [], get: () => undefined});
   ctx.provide('sessionController', {resolveAgent: async () => ({agent: undefined})});
+  ctx.provide('subprocess', {});
 
   const fiber = ctx.plugin(operations, {});
   try {

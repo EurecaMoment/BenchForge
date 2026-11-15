@@ -17,9 +17,10 @@ def insert_host_dependencies(profile):
     rows = [row for patch in profile for row in patch.get('insert', [])]
     ids = {row.get('id') for row in rows}
     entries = []
-    if base.SESSION_OPERATIONS_PLUGIN_ID not in ids and any(base.preset_id(row) in base.PRESETS for row in rows):
-        entries.append(definition.session_operations_entry())
     workbench = next((row for row in rows if row.get('id') == base.WORKBENCH_PLUGIN_ID), None)
+    if base.SESSION_OPERATIONS_PLUGIN_ID not in ids and any(base.preset_id(row) in base.PRESETS for row in rows):
+        python = (workbench or {}).get('config', {}).get('productionPython', 'python3')
+        entries.append(definition.session_operations_entry(python=python))
     if workbench and base.CAPTURE_PLUGIN_ID not in ids:
         entries.append(definition.capture_entry(workbench))
     if entries:
