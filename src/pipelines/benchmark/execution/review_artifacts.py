@@ -17,7 +17,8 @@ def require_stage_artifact(workspace, session, stage, artifact):
     if stage == 'S1':
         if file != plan_path:
             raise ValueError('S1 review must reference the current saved plan')
-        return
+        saved = read(plan_path)
+        return saved.get('stage_review_key', str(plan_path))
     # The runner owns stage aggregation and writes the receipt after all stage
     # members finish. A standalone summary or a count of files is not this receipt.
     from pipelines.benchmark.execution.review_steps import review_scope, completed_stage
@@ -34,3 +35,4 @@ def require_stage_artifact(workspace, session, stage, artifact):
     outputs = completed_stage(review_scope(plan, run_root, str(plan_path)), stage)
     if not outputs or outputs != value.get('outputs'):
         raise ValueError('Stage review does not match the completed pipeline outputs')
+    return str(run_root.resolve()) + ':stage:' + stage

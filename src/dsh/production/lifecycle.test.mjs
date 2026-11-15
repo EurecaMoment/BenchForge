@@ -63,6 +63,33 @@ test('tool-only work is visible and prompts a concise update after one minute',a
   await runtime.dispose();
 });
 
+test('a stale projection never describes a released domain review as waiting',async()=>{
+  for(const state of ['elapsed','continued']) {
+    const h=harness(),runtime=h.create();h.plan();h.setTime(161000);
+    h.setReview({id:1,state,deadline:400,stage:'S1'});
+    await h.preStep(runtime);
+    assert.equal(h.view().review.state,'waiting_user');
+    const text=h.sent[0].content[0].text;
+    assert.match(text,/该审核已放行/);assert.doesNotMatch(text,/审核仍未放行|审核期间不启动/);
+    await runtime.dispose();
+  }
+});
+
+test('an applied execution repair does not enqueue a second continuation for the same window',async()=>{
+  const h=harness();h.plan();const runtime=h.create();await runtime.observe(h.agent);
+  h.setReview({id:1,state:'continued',deadline:400,stage:'S1'});h.setTime(400000);
+  await runtime.refresh(h.agent.id);
+  assert.equal(h.sent.length,1);
+  h.event('user/message',h.sent[0]);h.agent.inbox.nextStep=[];
+  h.receipt('benchforge_pipeline_plan',{state:'planned',production_contract:'benchforge.production-stages/v1',
+    plan:'/workspace/repaired-plan.json',total_steps:4,
+    stage_review:{review_id:1,stage:'S1',artifact:'/workspace/repaired-plan.json',deadline:400,state:'continued'}});
+  await runtime.observe(h.agent);await h.fire();
+  assert.equal(h.sent.length,1);
+  assert.equal(h.records.get(h.agent.id).plan,'/workspace/repaired-plan.json');
+  await runtime.dispose();
+});
+
 test('long tool errors do not become model progress text',()=>{
   const h=harness();h.plan();const before=h.view().lastTextAt;
   h.setTime(160000);h.receipt('benchforge_scene_status',{state:'SUCCEEDED'});

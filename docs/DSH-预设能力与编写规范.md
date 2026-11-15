@@ -1229,6 +1229,8 @@ export default class SessionRuns extends Service {
 
 进度提醒只要求公开工作摘要，不展示隐藏推理，也不把工具调用次数当成完成比例。续行记录归属会话和原计划；用户暂停、取消或新增待处理指令会阻止自动续行。普通聊天不启用生产生命周期。旧计划缺少 S2 场景验收或 S3 标注验证时，返回 `needs_plan_revision`；缺少真实采集或原生轨迹时返回 `needs_evidence`，不能以相机动画或端点重置宣告机器人行走已完成。工具名由 `src/capabilities/benchmark_design/resources/tool-names.json` 统一供注册、提示和界面引用。
 
+S1 的审核身份由 `src/pipelines/benchmark/design/plan_review.py` 根据当前会话的有效计划确定，不以每次保存生成的文件名建立新窗口。重复保存、角色含义不变的一一对象改名、产物绑定更新、缩小已有几何例外的对象集合，保留原审核编号、截止时间、暂停状态及用户指令；新文件仍保存为独立版本。目标、数量、原生采集要求、评分规则、场景硬性要求和扩大的几何例外仍参与合同比较，变更记录在 `review_revision.changed_fields`。不同请求文件或显式 `new_task=true` 开始独立任务。已经验证应用的工作台用户编辑沿用其原窗口，不能伪造 `applies_edit` 来继承放行。保存、版本激活和审核发布按会话串行，其他会话可并行。模型打开阶段窗口时，审核键取自当前计划或执行器回执；不能靠换键反复重开同一审核。已放行状态不再提示等待，执行失败必须作为执行问题报告，不能退回“等待用户确认”。
+
 回归入口为 `python -m unittest discover -s tests -v` 和 `node --test src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs`。受控服务回执用于验证流程，不代表真实模型或仿真能力验收。
 
 ## Web 界面、业务 RPC 与会话状态

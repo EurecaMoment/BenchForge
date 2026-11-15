@@ -1,6 +1,7 @@
 """Agent-owned semantic decomposition, deterministic IDs and executable recipes."""
 import re
 import json
+from hashlib import sha256
 from copy import deepcopy
 from pathlib import Path
 from storage.artifacts import read
@@ -18,13 +19,32 @@ from pipelines.benchmark.design.plan_versions import activate
 from pipelines.benchmark.design.plan_versions import verify_application
 from pipelines.benchmark.design.plan_input import resolve_request
 from pipelines.benchmark.design.plan_input import FIELDS
+from pipelines.benchmark.design.plan_review import revision_review
 from pipelines.benchmark.design.production_steps import complete_production_steps, validate_production_steps
+from storage.execution_lock import exclusive_run, RunBusyError
+from storage.stage_reviews import gate, review as review_status
 from service_access.tool_names import qualify
 from service_access.scene_service import environment_value
 
 
 def plan(args, directory, config=None):
+    session = args.get('_dsh_context', {}).get('session_id')
+    if not session or args.get('validate_only'):
+        return _plan(args, directory, config)
+    # Serialize only saves in this conversation, including activation and gate
+    # publication. Parallel conversations and read-only validation remain free.
+    lock = Path(directory).parents[1] / 'plan-locks' / sha256(session.encode()).hexdigest()
+    try:
+        with exclusive_run(lock):
+            return _plan(args, directory, config)
+    except RunBusyError as error:
+        raise ValueError('Another plan revision is being saved in this conversation. Retry after it finishes.') from error
+
+
+def _plan(args, directory, config=None):
     args, authoring_sources = resolve_request(args, Path(directory).parents[1])
+    if type(args.get('new_task', False)) is not bool:
+        raise ValueError('new_task must be a boolean')
     catalog = {t['id']: t for t in all_templates()}
     objective = args.get('objective', '')
     selectors = {k: args[k] for k in ('capability', 'capabilities', 'template_ids', 'task_ids') if args.get(k)}
@@ -141,14 +161,16 @@ def plan(args, directory, config=None):
             value['edit_revision']['markdown_path']=str(markdown_path.resolve())
     if args.get('applies_edit'):value['applies_edit']=args['applies_edit']
     target = Path(directory)/'plan.json'
-    # A revision of one production goal keeps its parent's S1 window. The new
-    # document remains viewable without repeatedly adding five idle minutes.
-    value['stage_review_key'] = str(target.resolve())
-    if args.get('applies_edit'):
-        base_plan = value.get('edit_revision', {}).get('base_plan')
-        if base_plan:
-            previous = read(base_plan)
-            value['stage_review_key'] = previous.get('stage_review_key', str(Path(base_plan).resolve()))
+    applied_edit = bool(active and active['pending'] and args.get('applies_edit') == active['plan'])
+    base_plan = value.get('edit_revision', {}).get('base_plan') if applied_edit else active['plan'] if active else None
+    previous = read(base_plan) if base_plan else None
+    value['stage_review_key'], value['review_revision'] = revision_review(
+        value, target, previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit)
+    if session and not edit:
+        pending = review_status(workspace, session)
+        if (pending['state'] in ('paused', 'needs_input')
+                and (pending.get('stage'), pending.get('key')) != ('S1', value['stage_review_key'])):
+            raise ValueError('Resolve the paused review or saved user instruction before replacing its production contract.')
     write(target, value)
     if session:
         activate(workspace,session,str(target.resolve()),expected=edit['base_plan'] if edit else active['plan'] if active else None,
@@ -157,13 +179,14 @@ def plan(args, directory, config=None):
     # A saved edit still needs executable application. Its final applied plan
     # owns S1; opening a draft window here would make the user wait twice.
     if session and not edit:
-        from storage.stage_reviews import gate
-        review = gate(Path(directory).parents[1], session, 'S1', value['stage_review_key'], str(target.resolve()))
+        review = gate(workspace, session, 'S1', value['stage_review_key'], str(target.resolve()))
     unsupported = [t['id'] for t in value['template_contracts'] if not t['execution']['program_generator']]
     return {'state': 'planned', 'plan': str(target.resolve()), 'pipeline_id': recipe,
             'production_contract': value.get('production_contract'), 'total_steps': len(value['steps']),
             'stage_review': review,
+             'review_revision': value['review_revision'],
             'assessment_status': 'structured' if value.get('assessment') else 'legacy_summary',
             'selections': selections, 'evidence_required_for': unsupported,
             'next': qualify('Apply the saved user edit with pipeline_plan(applies_edit=plan) before pipeline_run. S1 review opens after the executable application is validated.'
-                     if edit else 'Wait for S1 review, then pipeline_run. S2 selects or creates scenes and requires service-issued scene_sources. After S2 review, S3 collects observations, trajectories and annotations, validated by collection.validate through native-source evidence JSONL. Resume this same production and present each saved stage artifact.')}
+                     if edit else (review['next'] if review else 'Continue with pipeline_run.') +
+                     ' S2 selects or creates scenes and requires service-issued scene_sources. After S2 review, S3 collects observations, trajectories and annotations, validated by collection.validate through native-source evidence JSONL. Resume this production and present each saved stage artifact. Execution repairs reuse S1; changed requirements are listed in review_revision.changed_fields.')}

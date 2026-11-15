@@ -48,6 +48,24 @@ class StageReviewControlTests(unittest.TestCase):
         result = self.tool(action='open', stage='S1', key='current', artifact=str(self.plan))
         self.assertEqual(result['state'], 'waiting_user')
 
+    def test_model_cannot_restart_a_released_review_by_inventing_another_key(self):
+        first = self.tool(action='open', stage='S1', key='first-key', artifact=str(self.plan))
+        review(self.root, self.session, 'continue', review_id=first['review_id'])
+        repeated = self.tool(action='open', stage='S1', key='another-key', artifact=str(self.plan))
+        self.assertEqual(repeated['review_id'], first['review_id'])
+        self.assertEqual(repeated['deadline'], first['deadline'])
+        self.assertTrue(repeated['can_continue'])
+        self.assertNotIn('action=wait', repeated['next'])
+
+    def test_domain_cannot_replace_a_pause_or_pending_instruction_with_a_new_key(self):
+        for action in ('pause', 'instruction'):
+            session = 'domain-' + action
+            first = review(self.root, session, 'open', stage='S1', key='first', artifact=str(self.plan))
+            review(self.root, session, action, instruction='Keep the scene requirements')
+            with self.assertRaisesRegex(ValueError, 'Resolve the paused review'):
+                review(self.root, session, 'open', stage='S1', key='different', artifact=str(self.plan))
+            self.assertEqual(review(self.root, session)['review_id'], first['review_id'])
+
     def test_runner_receipt_is_checked_against_actual_completed_members(self):
         run = self.root / 'run'
         step = {'id': 'scenes', 'uses': 'scene.acceptance'}

@@ -15,7 +15,7 @@ def call(args, directory, config=None):
         raise ValueError('A completed stage, stable key and viewable artifact are required')
     if action == 'open':
         from pipelines.benchmark.execution.review_artifacts import require_stage_artifact
-        require_stage_artifact(workspace, session, options['stage'], options.get('artifact', ''))
+        options['key'] = require_stage_artifact(workspace, session, options['stage'], options.get('artifact', ''))
         current = review(workspace, session)
         if (current['state'] in ('waiting_user', 'paused', 'needs_input')
                 and (current.get('stage'), current.get('key')) != (options['stage'], options.get('key'))):

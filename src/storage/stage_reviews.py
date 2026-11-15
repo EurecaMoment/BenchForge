@@ -26,6 +26,10 @@ def review(workspace, session, action='status', *, stage=None, key=None, artifac
         db.execute('CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY, session TEXT, key TEXT, stage TEXT, artifact TEXT, started REAL, deadline REAL, state TEXT, instruction TEXT, UNIQUE(session,key,stage))')
         db.execute('BEGIN IMMEDIATE')
         if action == 'open':
+            latest = db.execute('SELECT * FROM reviews WHERE session=? ORDER BY id DESC LIMIT 1', (session,)).fetchone()
+            if (latest and latest['state'] in ('paused', 'needs_input')
+                    and (latest['key'], latest['stage']) != (key, stage)):
+                raise ValueError('Resolve the paused review or saved user instruction before opening another review')
             db.execute('INSERT OR IGNORE INTO reviews(session,key,stage,artifact,started,deadline,state,instruction) VALUES(?,?,?,?,?,?,?,?)',
                        (session,key,stage,str(artifact),clock,clock+SECONDS,'waiting_user',''))
             db.execute('UPDATE reviews SET artifact=? WHERE session=? AND key=? AND stage=?',
@@ -58,8 +62,13 @@ def review(workspace, session, action='status', *, stage=None, key=None, artifac
     result.update(review_id=result.pop('id'), remaining_seconds=max(0,round(result['deadline']-clock)),
                   server_time=clock, wait_seconds=SECONDS,
                   can_continue=result['state'] in ('elapsed','continued'))
-    result['next'] = qualify('Apply the saved user instruction before acknowledging or revising the plan.' if result['state']=='needs_input'
-                      else 'Use stage_review(action=wait), then resume the existing production when can_continue is true.')
+    result['next'] = qualify({
+        'needs_input': 'Apply the saved user instruction before acknowledging or revising the plan.',
+        'paused': 'The user paused this review. Keep production stopped until the user continues it.',
+        'waiting_user': 'Present this artifact and use stage_review(action=wait). Keep the existing deadline; do not reopen S1 for execution repairs.',
+        'elapsed': 'The review deadline has elapsed. Continue the existing production; do not wait again or reopen this review.',
+        'continued': 'The user has continued this review. Continue the existing production; do not wait again or reopen this review.',
+    }[result['state']])
     return result
 
 

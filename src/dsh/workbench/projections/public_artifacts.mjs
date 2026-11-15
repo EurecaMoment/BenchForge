@@ -30,7 +30,7 @@ export function createPublicArtifactProjector({pick, taskTemplates}) {
     const markdown = typeof plan.user_markdown === 'string' ? plan.user_markdown.replace(
       /^```assessment-yaml\s*\r?\n[\s\S]*?^```\s*$/gm,
       () => '```assessment-yaml\n' + JSON.stringify(assessment || {}, null, 2) + '\n```\n') : undefined;
-    return {...pick(plan, ['pipeline_id', 'version', 'objective', 'edit_revision', 'applies_edit', 'user_markdown_path']),
+    return {...pick(plan, ['pipeline_id', 'version', 'objective', 'edit_revision', 'review_revision', 'applies_edit', 'user_markdown_path']),
       ...(markdown === undefined ? {} : {user_markdown: markdown}), assessment,
       selections: (plan.selections || []).map((row) => pick(row, ['template_ids', 'count', 'reason'])),
       inputs: pick(plan.inputs || {}, ['seed', 'split', 'preserve_source_splits', 'target_items']),

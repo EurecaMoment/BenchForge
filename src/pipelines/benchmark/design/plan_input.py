@@ -7,7 +7,7 @@ FIELDS = {
     'assessment', 'assessment_path', 'objective', 'pipeline_id', 'capability',
     'capabilities', 'template_ids', 'task_ids', 'target_items', 'selections',
     'steps', 'inputs', 'evidence', 'seed', 'split', 'service_config',
-    'applies_edit', 'user_markdown', 'markdown_resolution',
+    'applies_edit', 'user_markdown', 'markdown_resolution', 'new_task',
 }
 
 
