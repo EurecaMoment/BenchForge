@@ -1,122 +1,65 @@
 {
-  "services": {
-    "sam3": {
-      "url": "http://127.0.0.1:8765"
-    },
-    "yoloe": {
-      "url": "http://127.0.0.1:8766"
-    },
-    "depthanything3": {
-      "url": "http://127.0.0.1:8008"
-    }
+  "config_version": 5,
+  "dsh": {
+    "repository": "https://github.com/EurecaMoment/deepseek-harness4BenchForge.git",
+    "path": "third_party/deepseek-harness4BenchForge",
+    "version": "0.2.2-rc.3",
+    "node": ">=24.9.0",
+    "package_manager": "pnpm@11.28.5"
   },
-  "collectors": {
-    "habitat": {
-      "command": [
-        "conda",
-        "run",
-        "--no-capture-output",
-        "-n",
-        "habitat",
-        "python"
-      ]
-    },
-    "libero": {
-      "command": [
-        "conda",
-        "run",
-        "--no-capture-output",
-        "-n",
-        "libero",
-        "python"
-      ],
-      "env": {}
-    },
-    "carla": {
-      "command": [
-        "conda",
-        "run",
-        "--no-capture-output",
-        "-n",
-        "carla",
-        "python"
-      ]
-    },
-    "isaac": {
-      "command": [
-        "YOUR_ISAAC_PYTHON_LAUNCHER"
-      ]
-    }
+  "web": {
+    "port": 3081,
+    "default_workspace": null
   },
-  "models": {
-    "qwen": {
-      "url": "http://127.0.0.1:9001/v1",
-      "model": "YOUR_DEPLOYED_QWEN_VL_MODEL",
-      "token_env": "QWEN_RELAY_API_KEY",
-      "max_tokens": 4096,
-      "timeout_seconds": 180,
-      "retries": 1
-    }
+  "server": {
+    "port": 3841,
+    "execution_mode": "production"
   },
-  "cleaning": {
-    "command": [
-      "dj-process"
-    ]
+  "database": {
+    "project": "benchforge",
+    "port": 55432
   },
-  "backends": {},
-  "model_services": {
-    "url": "http://127.0.0.1:4960",
-    "availability_url": "http://127.0.0.1:4960",
-    "health_timeout_seconds": 10,
-    "http_timeout_seconds": 30,
-    "tools": {
-      "yoloe": {
-        "request_defaults": {}
+  "providers": {
+    "DSpark4A100": {
+      "url": null,
+      "model": null,
+      "token_env": "BENCHFORGE_MODEL_API_KEY"
+    },
+    "FastFLUX2Klein": {
+      "url": null,
+      "model": "flux2klein",
+      "token_env": null,
+      "timeout_seconds": 180
+    },
+    "FastSAM3": {
+      "url": null,
+      "model": "sam3",
+      "token_env": null,
+      "timeout_seconds": 60
+    },
+    "FastDA3": {
+      "url": null,
+      "model": "da3",
+      "token_env": null,
+      "timeout_seconds": 180
+    },
+    "FastTrellis2": {
+      "url": null,
+      "model": "fasttrellis2",
+      "token_env": null,
+      "timeout_seconds": 1800
+    },
+    "IsaacSim4A100": {
+      "grpc": {
+        "host": null,
+        "port": 50051,
+        "timeout_seconds": 60
       },
-      "sam3": {
-        "request_defaults": {}
-      },
-      "moge": {
-        "request_defaults": {}
-      },
-      "lama": {
-        "request_defaults": {}
-      },
-      "flux": {
-        "request_defaults": {}
-      },
-      "osor_flux": {
-        "request_defaults": {}
-      },
-      "objectclear": {
-        "request_defaults": {}
-      },
-      "qwen_image_edit": {
-        "request_defaults": {}
-      },
-      "diffusion": {
-        "request_defaults": {
-          "width": 1024,
-          "height": 1024,
-          "steps": 4
-        }
-      },
-      "depth_anything": {
-        "request_defaults": {}
-      },
-      "sam3d": {
-        "request_defaults": {
-          "texture_baking": false
-        }
-      },
-      "blender": {
-        "request_defaults": {
-          "width": 1024,
-          "height": 1024,
-          "samples": 16,
-          "frame": 1
-        }
-      }
+      "capture_timeout_seconds": 1800,
+      "max_concurrent_captures": 4,
+      "image_size": 768,
+      "samples_per_pixel": 32,
+      "asset_sources": {}
     }
   }
 }

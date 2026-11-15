@@ -1,0 +1,43 @@
+{
+  "schema": "benchforge.production-stages/v1",
+  "stages": [
+    {
+      "id": "S1", "key": "blueprint",
+      "zh": {"name": "计划", "nav": "计划", "heading": "评测计划", "description": "定义测量目标、场景来源、采集与标注方案、题量和验收条件。", "output": "需求、场景选择、采集方案与数量分配"},
+      "en": {"name": "Plan", "nav": "Plan", "heading": "Evaluation plan", "description": "Define the goal, scene sources, collection and annotation plan, quantities and acceptance criteria.", "output": "Goal, scene selection, collection plan and allocation"}
+    },
+    {
+      "id": "S2", "key": "scenes",
+      "zh": {"name": "场景选取或新建", "nav": "场景", "heading": "场景选取或新建", "description": "选取允许复用的场景或按计划新建，查看预览并验收场景版本。正式轨迹与传感器数据在 S3 采集。", "output": "选定或新建的场景、预览与场景验收回执"},
+      "en": {"name": "Select or create scenes", "nav": "Scenes", "heading": "Select or create scenes", "description": "Select permitted existing scenes or build planned scenes, inspect previews and accept scene revisions. Dataset trajectories and sensor recordings belong to S3.", "output": "Selected or new scenes, previews and scene acceptance receipts"}
+    },
+    {
+      "id": "S3", "key": "collection",
+      "zh": {"name": "采集", "nav": "采集", "heading": "采集", "description": "在已验收场景中采集轨迹、传感器观测和状态，完成标注、对齐与来源校验。预览样本不代表整批采集完成。", "output": "采集数据、标注、标定与来源校验回执"},
+      "en": {"name": "Collection", "nav": "Collection", "heading": "Collection", "description": "Collect trajectories, sensor observations and states in accepted scenes, including annotation, alignment and source validation. Preview samples do not establish batch completion.", "output": "Collected data, annotations, calibration and validation receipts"}
+    },
+    {
+      "id": "S4", "key": "synthesis",
+      "zh": {"name": "出题", "nav": "题目", "heading": "评测配置与题目表", "description": "依据已验收的采集数据与标注按模板出题，查看数据集全集和样本。", "output": "题目、公开观测与数据集版本"},
+      "en": {"name": "Questions", "nav": "Items", "heading": "Evaluation config & questions", "description": "Produce questions from validated collection data and annotations; inspect dataset versions and samples.", "output": "Questions, public observations and dataset versions"}
+    },
+    {
+      "id": "S5", "key": "verification",
+      "zh": {"name": "质检与交付", "nav": "报告", "heading": "质检与交付", "description": "审查有效性、分区与覆盖，生成报告和交付版本。", "output": "质量结果、修复建议与交付包"},
+      "en": {"name": "Quality review and delivery", "nav": "Report", "heading": "Quality review and delivery", "description": "Inspect validity, splits and coverage; prepare reports and releases.", "output": "Quality results, repair proposals and packages"}
+    }
+  ],
+  "required_operations": {
+    "scene.acceptance": "S2",
+    "collection.validate": "S3",
+    "evidence.validate": "S3",
+    "templates.produce": "S4",
+    "data.package": "S5"
+  },
+  "default_operations": {
+    "benchforge.start": "S2", "benchforge.capture": "S2", "benchforge.observe": "S2",
+    "benchforge.refine": "S2", "benchforge.extend": "S2", "benchforge.asset": "S2",
+    "benchforge.evidence": "S3"
+  },
+  "collection_operations": ["collection.validate", "evidence.validate"]
+}

@@ -5,6 +5,8 @@ __pycache__/
 .venv/
 venv/
 node_modules/
+/src/dsh/benchforge/
+/src/dsh/remote/lib/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -71,3 +73,4 @@ rad.json
 *.g.xlf
 *.bclicense
 *.flf
+config/generated/

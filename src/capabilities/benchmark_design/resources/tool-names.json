@@ -1,0 +1,11 @@
+{
+  "pipeline_catalog": "benchforge_pipeline_catalog",
+  "pipeline_plan": "benchforge_pipeline_plan",
+  "pipeline_run": "benchforge_pipeline_run",
+  "pipeline_status": "benchforge_pipeline_status",
+  "pipeline_artifacts": "benchforge_pipeline_artifacts",
+  "pipeline_repair_plan": "benchforge_pipeline_repair_plan",
+  "pipeline_evaluate": "benchforge_pipeline_evaluate",
+  "stage_review": "benchforge_stage_review",
+  "isaac_sim": "benchforge_isaac_sim"
+}

@@ -1,0 +1,80 @@
+{
+  "name": "@eurecamoment/benchforge-dsh",
+  "version": "0.2.1",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "BenchForge preset with an expandable workbench for DeepSeek Harness",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EurecaMoment/BenchForgeV2.git",
+    "directory": "src/dsh"
+  },
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "exports": {
+    ".": "./dist/benchmark-tools.mjs",
+    "./benchforge-tools": "./dist/benchmark-tools.mjs",
+    "./benchforge-scene-tools": "./dist/scene-tools.mjs",
+    "./benchforge-ui": "./client/index.js",
+    "./capture-runtime": "./dist/capture-runtime.mjs",
+    "./session-operations": "./dist/session-operations.mjs",
+    "./production/types": "./production/types.d.ts",
+    "./subagent-policy": "./dist/subagent-policy.mjs",
+    "./invocation": "./dist/invocation.mjs",
+    "./review-policy": "./dist/review-policy.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./spatial-tools": "./dist/spatial-tools.mjs"
+  },
+  "scripts": {
+    "build:benchforge-ui": "node ./build.mjs",
+    "prepare": "node ./build.mjs",
+    "prepack": "node ./build.mjs"
+  },
+  "files": [
+    "presets/*.py",
+    "production/*.d.ts",
+    "dist/*.mjs",
+    "dist/resources/*.json",
+    "check_config.py",
+    "cli.py",
+    "client/index.js",
+    "client/client.js",
+    "client/package.json",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/schemastery": "3.19.0",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-subprocess": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-web-app": "0.2.2-rc.3",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-api-gateway": "0.2.2-rc.3",
+    "@deepseek-ai/schemastery": "3.19.0",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-subprocess": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-web-app": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-typert-generator": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.3",
+    "esbuild": "0.25.12",
+    "typescript": "6.0.3"
+  }
+}

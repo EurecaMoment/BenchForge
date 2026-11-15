@@ -1,0 +1,76 @@
+"""Durable five-minute review windows scoped to a conversation."""
+import json
+import re
+import sqlite3
+import time
+from contextlib import closing
+from pathlib import Path
+from service_access.tool_names import qualify
+
+SECONDS = 300
+
+
+def review(workspace, session, action='status', *, stage=None, key=None, artifact=None,
+           review_id=None, instruction='', now=None):
+    if not session or not re.fullmatch(r'[\w-]{1,160}', session):
+        raise ValueError('A valid DSH session is required')
+    if action not in ('status', 'open', 'continue', 'pause', 'instruction', 'acknowledge'):
+        raise ValueError('Unknown stage review action')
+    if action == 'open' and (not isinstance(stage, str) or not stage or not key or not artifact):
+        raise ValueError('A completed stage, stable key and viewable artifact are required')
+    clock = time.time() if now is None else now
+    database = Path(workspace) / 'stage-reviews.sqlite'
+    database.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(database, timeout=10)) as db:
+        db.row_factory = sqlite3.Row
+        db.execute('CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY, session TEXT, key TEXT, stage TEXT, artifact TEXT, started REAL, deadline REAL, state TEXT, instruction TEXT, UNIQUE(session,key,stage))')
+        db.execute('BEGIN IMMEDIATE')
+        if action == 'open':
+            latest = db.execute('SELECT * FROM reviews WHERE session=? ORDER BY id DESC LIMIT 1', (session,)).fetchone()
+            if (latest and latest['state'] in ('paused', 'needs_input')
+                    and (latest['key'], latest['stage']) != (key, stage)):
+                raise ValueError('Resolve the paused review or saved user instruction before opening another review')
+            db.execute('INSERT OR IGNORE INTO reviews(session,key,stage,artifact,started,deadline,state,instruction) VALUES(?,?,?,?,?,?,?,?)',
+                       (session,key,stage,str(artifact),clock,clock+SECONDS,'waiting_user',''))
+            db.execute('UPDATE reviews SET artifact=? WHERE session=? AND key=? AND stage=?',
+                       (str(artifact),session,key,stage))
+            row = db.execute('SELECT * FROM reviews WHERE session=? AND key=? AND stage=?', (session,key,stage)).fetchone()
+        elif review_id is not None:
+            row = db.execute('SELECT * FROM reviews WHERE session=? AND id=?', (session,review_id)).fetchone()
+            if row is None:
+                raise ValueError('Review does not belong to this conversation')
+        else:
+            row = db.execute('SELECT * FROM reviews WHERE session=? ORDER BY id DESC LIMIT 1', (session,)).fetchone()
+        if row is None:
+            db.commit()
+            return {'state':'none', 'wait_seconds':SECONDS}
+        if row['state'] == 'waiting_user' and clock >= row['deadline']:
+            db.execute("UPDATE reviews SET state='elapsed' WHERE id=?", (row['id'],))
+            row = db.execute('SELECT * FROM reviews WHERE id=?', (row['id'],)).fetchone()
+        if action in ('continue', 'pause', 'instruction', 'acknowledge'):
+            if action == 'instruction' and not instruction.strip():
+                raise ValueError('User instruction must not be empty')
+            if action in ('pause','instruction') and row['state'] not in ('waiting_user','paused','needs_input'):
+                raise ValueError('This stage review has already ended')
+            if action == 'acknowledge' and row['state'] != 'needs_input':
+                raise ValueError('No pending instruction to acknowledge')
+            state = {'continue':'continued', 'pause':'paused', 'instruction':'needs_input', 'acknowledge':'continued'}[action]
+            db.execute('UPDATE reviews SET state=?,instruction=? WHERE id=?',
+                       (state,instruction.strip() if action == 'instruction' else row['instruction'],row['id']))
+        db.commit()
+        result = dict(db.execute('SELECT * FROM reviews WHERE id=?', (row['id'],)).fetchone())
+    result.update(review_id=result.pop('id'), remaining_seconds=max(0,round(result['deadline']-clock)),
+                  server_time=clock, wait_seconds=SECONDS,
+                  can_continue=result['state'] in ('elapsed','continued'))
+    result['next'] = qualify({
+        'needs_input': 'Apply the saved user instruction before acknowledging or revising the plan.',
+        'paused': 'The user paused this review. Keep production stopped until the user continues it.',
+        'waiting_user': 'Present this artifact and use stage_review(action=wait). Keep the existing deadline; do not reopen S1 for execution repairs.',
+        'elapsed': 'The review deadline has elapsed. Continue the existing production; do not wait again or reopen this review.',
+        'continued': 'The user has continued this review. Continue the existing production; do not wait again or reopen this review.',
+    }[result['state']])
+    return result
+
+
+def gate(workspace, session, stage, key, artifact):
+    return review(workspace,session,'open',stage=stage,key=key,artifact=artifact)

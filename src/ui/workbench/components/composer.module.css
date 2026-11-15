@@ -1,0 +1,138 @@
+/* The shared dock also hosts context statistics. Give this feature its own row. */
+:global([data-composer-dock]):has(.root) {
+  inline-size: 100%;
+  max-inline-size: var(--dsh-composer-card-max-width);
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.root {
+  box-sizing: border-box;
+  flex: 0 0 100%;
+  order: -1;
+  inline-size: 100%;
+  min-inline-size: 0;
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.hero {
+  align-self: center;
+  flex: none;
+  order: 1;
+  inline-size: calc(100% - 2 * var(--dsh-composer-side-clearance));
+  max-inline-size: var(--dsh-composer-card-max-width);
+}
+
+.toolbar,
+.toggleRow,
+.count {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-block-size: 32px;
+  padding-inline: 4px;
+}
+
+.toggleRow {
+  flex: 0 0 auto;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggleLabel {
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.controls {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.select {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  block-size: 32px;
+  padding-inline: 8px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: inherit;
+  font: inherit;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.select:disabled {
+  opacity: 0.5;
+}
+
+.count {
+  flex: 0 0 auto;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+}
+
+.count > span:last-child {
+  box-sizing: border-box;
+  inline-size: 64px;
+}
+
+.advanced {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-inline-size: 0;
+  margin: 8px 4px 4px;
+  padding: 12px 0 0;
+  border: 0;
+  border-block-start: 0.5px solid var(--dsw-alias-border-l4);
+}
+
+.field,
+.capability {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  flex: 1 1 136px;
+  min-inline-size: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.capability {
+  flex: 2 1 260px;
+}
+
+.error {
+  margin: 4px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

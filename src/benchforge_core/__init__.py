@@ -1,1 +1,0 @@
-"""Independent BenchClaw production harness."""

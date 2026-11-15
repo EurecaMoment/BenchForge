@@ -1,16 +1,4 @@
 {
-  "dsh": {
-    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
-    "ref": "dsh-v0.1.7-rc.1",
-    "license": "MIT",
-    "node": "^22.19.0 || >=24.0.0",
-    "package_manager": "pnpm@11.7.0"
-  },
-  "benchclaw_reference": {
-    "repository": "https://github.com/EurecaMoment/BenchClaw.git",
-    "license": "Apache-2.0",
-    "usage": "Attributed collector and template sources; no legacy stage scheduler"
-  },
   "provider_submodules": {
     "FastTrellis2": {
       "path": "third_party/FastTrellis2",
@@ -20,8 +8,8 @@
       "path": "third_party/DSpark4A100",
       "usage": "Large-model inference and serving"
     },
-    "IssacSim4A100": {
-      "path": "third_party/IssacSim4A100",
+    "IsaacSim4A100": {
+      "path": "third_party/IsaacSim4A100",
       "usage": "Isaac Sim deployment and simulation support on A100"
     },
     "FastSAM3": {
@@ -31,6 +19,16 @@
     "FastFLUX2Klein": {
       "path": "third_party/FastFLUX2Klein",
       "usage": "FLUX.2 Klein image generation and editing"
+    },
+    "FastDA3": {
+      "path": "third_party/FastDA3",
+      "usage": "Depth Anything 3 inference for metric depth, camera pose, and long-video geometry"
+    }
+  },
+  "optional_submodules": {
+    "FastQwen": {
+      "path": "third_party/FastQwen",
+      "usage": "Qwen model inference and serving"
     }
   }
 }
