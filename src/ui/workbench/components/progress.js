@@ -116,7 +116,25 @@ export function createProgressComponents({React, helpers}) {
       completed.length > 0 && h('details', {className: 'bfw-parallel-completed', open: false},
         h('summary', null, t('parallelCompleted') + ' ' + completed.length), h('div', {className: 'bfw-parallel-grid'}, completed.map(renderTask))));
   }
-  function StageProgress({stage, pipeline, scene, record, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t}) {
+  function ProductionActivity({value,t}) {
+    const [clock,setClock]=React.useState(Date.now());
+    const current=value?.active&&value.running&&value.workflowTurn===value.turn;
+    React.useEffect(()=>{
+      if(!current)return;
+      const timer=setInterval(()=>setClock(Date.now()),10000);
+      return ()=>clearInterval(timer);
+    },[current]);
+    if(!value?.active)return null;
+    const phase={planned:'productionPlanned',waiting_user:'reviewWaiting',needs_evidence:'productionNeedsEvidence',
+      needs_input:'productionNeedsInput',needs_plan_revision:'productionNeedsRevision',paused:'reviewPaused',
+      interrupted:'productionInterrupted',completed:'productionCompleted',failed:'sessionFailed',running:'sessionRunning'}[value.state]||'sessionRunning';
+    const silent=current&&clock-value.lastTextAt>=60000;
+    return h('div',{className:'bfw-muted','data-production-activity':value.state,role:'status','aria-live':'polite'},
+      t('productionSystemStatus')+' · '+t(phase)+(value.stage?' · '+value.stage:''),
+      silent?' · '+t('productionAwaitingUpdate'):'',
+      value.error?h('span',null,' · '+t('productionRecentFailure')):null);
+  }
+  function StageProgress({stage, pipeline, scene, record, activity, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t}) {
     const collection = stage.id === 'S2' && (collectionPlan?.assessment?.scenes || collectionPlan?.inputs?.target_scene_count || record.value?.current_collection)
       ? sceneCollectionProgress(collectionPlan, record.value?.scenes?.runs || [], record.value?.current_collection) : null;
     const generation = stage.id === 'S4' ? currentGeneration(record.value?.generation) : null;
@@ -180,6 +198,7 @@ export function createProgressComponents({React, helpers}) {
     const amount = detail?.bytes ? (done / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB' : done + ' / ' + total;
     return h('section', {className: 'bfw-stage-progress', 'data-stage-progress': stage.id,
       'data-progress-state': stale ? 'stale' : state, 'aria-label': t('stageProgress')},
+      h(ProductionActivity,{value:activity,t}),
       h('div', {className: 'bfw-progress-caption'},
         h('div', {className: 'bfw-progress-heading'}, h('h2', null, t(stage.key)), status(state, t)),
         h('strong', {className: 'bfw-progress-metric'}, metric)),

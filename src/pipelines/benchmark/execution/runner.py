@@ -21,6 +21,8 @@ from pipelines.benchmark.execution.review_steps import stage_of
 from pipelines.benchmark.execution.review_steps import review_scope
 from pipelines.benchmark.execution.review_steps import completed_stage
 from service_access.scene_service import service_call
+from pipelines.benchmark.design.production_steps import validate_production_steps
+from service_access.tool_names import qualify
 
 SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture',
                   'benchforge.asset': '/asset', 'benchforge.refine': '/refine', 'benchforge.extend': '/extend',
@@ -30,6 +32,10 @@ SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture'
 
 def execute_step(step, arguments, directory, environment, client):
     operation = step['uses']
+    if operation in ('scene.acceptance', 'evidence.validate'):
+        from pipelines.benchmark.execution.production_stages import scene_acceptance, validate_evidence
+        handler = scene_acceptance if operation == 'scene.acceptance' else validate_evidence
+        return handler(arguments, directory, environment, client)
     if operation == 'pipeline':
         from pipelines.catalog import pipeline_files
         recipes = {p['id']: p for p in pipeline_files()}
@@ -48,9 +54,11 @@ def execute_step(step, arguments, directory, environment, client):
                     '_review_scope': environment.get('_review_scope')}, directory, client=client)
     if operation == 'templates.produce':
         return produce({**arguments, '_workspace': environment['_workspace'],
+                        '_require_native_episode': (environment.get('_assessment') or {}).get('annotations', {}).get('require_native_episode', False),
                         '_service_config': environment['inputs'].get('service_config')}, directory)
     if operation == 'data.package':
-        return package(arguments, directory)
+        return package({**arguments, '_workspace': environment['_workspace'],
+                        '_service_config': environment['inputs'].get('service_config')}, directory)
     if operation in SERVICE_ROUTES:
         session_id = environment.get('_dsh_context', {}).get('session_id')
         if session_id:
@@ -81,10 +89,6 @@ def run(args, directory, config=None, client=service_call):
 def _run_locked(args, directory, config, client):
     plan_path = Path(args['plan']).resolve()
     plan = read(plan_path)
-    inputs = {**plan.get('inputs', {}), **args.get('bindings', {})}
-    service_config = inputs.get('service_config')
-    policy = load_policy(args['_workspace'], service_config)
-    check_source(policy, source_path=plan_path)
     run_root = Path(args['run']).resolve() if args.get('run') else Path(directory)/'pipeline_run'
     run_root.mkdir(parents=True, exist_ok=True)
     frozen = run_root/'plan.json'
@@ -93,14 +97,33 @@ def _run_locked(args, directory, config, client):
     write(frozen, plan)
     state_path = run_root/'state.json'
     state = read(state_path) if state_path.exists() else {'schema': 'benchforge.pipeline-state/v1', 'steps': {}, 'state': 'running'}
-    if 'schema' in state:
-        state['schema'] = state['schema']
+    state['bindings'] = {**state.get('bindings', {}), **args.get('bindings', {})}
+    inputs = {**plan.get('inputs', {}), **state['bindings']}
+    policy = load_policy(args['_workspace'], inputs.get('service_config'))
+    check_source(policy, source_path=plan_path)
+    for key in ('error', 'next', 'missing_binding', 'step', 'stage_review'):
+        state.pop(key, None)
+    state['total_steps'] = len(plan['steps'])
+    state['production_contract'] = plan.get('production_contract')
     state.setdefault('run_id', f'run-{run_root.name}')
     execution_mode = policy['execution_mode']
     prior_mode = state.get('execution_mode')
     if prior_mode and prior_mode != execution_mode:
         raise ValueError('Execution mode changed; create a new pipeline run to preserve its original policy')
     state['execution_mode'] = execution_mode
+    if execution_mode == 'production' and not plan.get('assessment') and any(step.get('uses') == 'templates.produce' for step in plan['steps']):
+        state.update(state='needs_plan_revision', error='Production requires a saved assessment with S1-S5 dependencies',
+                     next='Use benchforge_pipeline_plan with assessment_path, then continue the saved production plan.')
+        write(state_path, state)
+        return {'run': str(run_root.resolve()), **state}
+    if execution_mode == 'production' and plan.get('assessment'):
+        try:
+            validate_production_steps(plan['steps'])
+        except ValueError as error:
+            state.update(state='needs_plan_revision', error=str(error),
+                         next='Use benchforge_pipeline_plan to compile S1-S5 and retain existing artifacts. This old plan cannot skip S2/S3.')
+            write(state_path, state)
+            return {'run': str(run_root.resolve()), **state}
     context = args.get('_dsh_context', {})
     session = context.get('session_id')
     scope = args.get('_review_scope') or (review_scope(plan, run_root, plan_path) if session else None)
@@ -114,7 +137,8 @@ def _run_locked(args, directory, config, client):
     # The full persisted run path distinguishes nested recipes in separate plans
     # and stays the same when an interrupted submission is resumed.
     environment = {'inputs': inputs, '_workspace': args['_workspace'], '_dsh_context': context,
-                   '_run_key': 'pipeline:'+run_root.as_posix(), '_review_scope': scope}
+                   '_run_key': 'pipeline:'+run_root.as_posix(), '_review_scope': scope,
+                   '_assessment': plan.get('assessment'), '_plan_path': str(plan_path)}
     def plan_guard():
         owner_plan = scope['plan'] if scope else str(plan_path)
         active=active_plan(args['_workspace'],session) if session else None
@@ -134,7 +158,7 @@ def _run_locked(args, directory, config, client):
     if blocked:return blocked
     def waiting(value):
         state.update(state=value['state'], stage_review=value,
-                     next='Wait for the user review window with stage_review(action=wait), then resume this same run. Apply pending user instructions first.')
+                     next=qualify('Present this stage artifact. Use stage_review(action=wait), then resume this same run. Apply pending user instructions first.'))
         write(state_path,state)
         return {'run':str(run_root.resolve()), **state}
     if session:
@@ -172,6 +196,14 @@ def _run_locked(args, directory, config, client):
             arguments = bind(step.get('arguments', {}), environment)
             if read(run_root/'steps'/step['id']/'request.json') != arguments:
                 raise ValueError('Completed step inputs changed; create a new plan/run')
+            if step['uses'] == 'evidence.validate':
+                file = Path(prior['result']['evidence'])
+                if not file.is_file() or prior['result'].get('evidence_version') != [file.stat().st_size, file.stat().st_mtime_ns]:
+                    raise ValueError('Validated annotations changed; save a revised plan and validate S3 again')
+                for name, version in prior['result'].get('source_versions', {}).items():
+                    source = Path(name)
+                    if not source.is_file() or version != [source.stat().st_size, source.stat().st_mtime_ns]:
+                        raise ValueError('Validated annotation source changed; validate S3 again: ' + name)
             environment[step['id']] = prior['result']
             prior_artifact = prior.get('artifact')
             if prior_artifact:
@@ -197,7 +229,7 @@ def _run_locked(args, directory, config, client):
                                   parent_ids=parent_ids, declared_type=step.get('artifact_type'),
                                   result_path=str(result_path.resolve()))
             if result.get('state') in ('needs_evidence', 'needs_input', 'waiting','waiting_user','paused',
-                                       'needs_plan_application', 'plan_superseded'):
+                                       'needs_plan_application', 'needs_plan_revision', 'plan_superseded'):
                 state['steps'][step['id']] = {'state': result['state'], 'result': result, 'artifact': artifact}
                 state['state'] = result['state']
                 state['next'] = result.get('next') or 'Read exact template conditions, generate/source evidence and rerun with bindings.evidence. Completed upstream steps remain reusable.'
@@ -241,6 +273,7 @@ def _run_locked(args, directory, config, client):
             graph.append_repair(repair)
             state['steps'][step['id']] = {'state': 'failed', 'error': str(error), 'artifact': artifact, 'repair': repair}
             state['state'] = 'failed'
+            state['error'] = str(error)
             write(state_path, state)
             raise
     state['state'] = 'completed'

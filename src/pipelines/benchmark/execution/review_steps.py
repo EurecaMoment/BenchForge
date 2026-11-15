@@ -7,6 +7,10 @@ from pipelines.benchmark.execution.stage_review import STAGES
 from pipelines.benchmark.execution.artifact_graph import binding_roots
 
 def stage_of(step):
+    required = {'scene.acceptance': 'S2', 'evidence.validate': 'S3',
+                'templates.produce': 'S4', 'data.package': 'S5'}
+    if step['uses'] in required:
+        return required[step['uses']]
     if step.get('review_stage') in ('S1','S2','S3','S4','S5'):
         return step['review_stage']
     return {'benchforge.start':'S2','benchforge.capture':'S2','benchforge.observe':'S2',

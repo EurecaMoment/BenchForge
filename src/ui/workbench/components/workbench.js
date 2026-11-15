@@ -10,7 +10,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
   const {TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress,
     StageProgress, PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneGallery, SceneVideo,
     SceneLibrary, PreviewDialog, ArtifactGallery, StageReviewPanel, PlanProduct, ReportProduct, Quality} = components;
-  function Workbench({t, sessionId, useResource, useSessions, useSession, useInput, inputActions, canSubmit = false,
+  function Workbench({t, sessionId, useResource, useSessions, useSession, useProjection, useInput, inputActions, canSubmit = false,
     stopExecution, requestWorkbench, useStore, actions, configureProduction}) {
     const useRecord = (params, revision, interval, active) =>
       useWorkbenchRecord(requestWorkbench, params, revision, interval, active);
@@ -41,6 +41,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const lastSubmitted = React.useRef('');
     const inputState = useInput((state) => state);
     const sessionState = useSession((state) => state);
+    const productionActivity = useProjection('benchforgeProduction');
     const update = actions.updateRoute;
     const workspacePath = useSessions((state) => state.byId[sessionId]?.cwd || '');
     const productResource = useResource(productsResourceAddress(sessionId, workspacePath));
@@ -386,12 +387,17 @@ export function createWorkbenchComponent({React, helpers, components}) {
         h('span', {className: 'bfw-stage-state', 'data-stage-state': navigationState(step.id)},
           t(navigationState(step.id) === 'completed' ? 'stageDone' : navigationState(step.id))))))),
       h(StageProgress, {stage: liveProgressStage, pipeline: liveProgressPipeline, scene: liveProgressScene, record: progress,
-        planReceipt, collectionPlan, artifacts: allStageFiles, conversationRunning,
+        activity:productionActivity, planReceipt, collectionPlan, artifacts: allStageFiles, conversationRunning,
         completedStages: Object.values(progressStates).filter((state) => state === 'completed').length, t}),
       h(StageReviewPanel,{value:reviewRecord.value,t,change:() => prepare(''),act:async (action) => {
-        try {await reviewAction(action); if (action === 'pause' && conversationRunning) await stopExecution(); if (action === 'continue' && !conversationRunning) {
-          await submitWithScenes({text:'用户已点击立即继续。读取阶段等待状态并复用当前计划和产物继续生产。',inserted:false,reviewContinued:true},setDemandError);
-        }} catch(error) {setNotice(error.message);}
+        try {
+          const result=await reviewAction(action);
+          if (action === 'pause' && conversationRunning) await stopExecution();
+          if (action === 'continue' && !result.continuation_managed && !conversationRunning) {
+            await submitWithScenes({text:'用户已点击立即继续。读取 benchforge_stage_review 的阶段状态，复用当前计划和产物继续生产。',inserted:false,reviewContinued:true},setDemandError);
+          }
+        }
+        catch(error) {setNotice(error.message);}
       }}),
       demandError && h('p', {className: 'bfw-error', role: 'alert'}, demandError),
       notice && h('div', {className: 'bfw-notice', role: 'status'}, notice),

@@ -15,6 +15,7 @@ from capabilities.scene_library.source_policy import check_source
 from capabilities.scene_library.source_policy import classify_planned
 from capabilities.scene_library.source_policy import CLASSIFIER_VERSION
 from capabilities.scene_library.source_policy import scene_design_parser
+from capabilities.scene_library.acceptance import verified_scene
 
 SCHEMA = 'benchforge.scene-library/v1'
 SELECTION_SCHEMA = 'benchforge.scene-selection/v1'
@@ -237,18 +238,13 @@ def scanned_items(config, folder, previous, tasks=None):
                 continue
             if not admission['allowed']:
                 continue
-        receipt=read_json(source/'scene_acceptance.json',{})
-        accepted=receipt.get('passed') is True and receipt.get('enforced') is True
-        if accepted:
-            accepted=all((source/relative).is_file() and receipt.get('evidence_versions',{}).get(relative)==[(source/relative).stat().st_size,(source/relative).stat().st_mtime_ns]
-                for relative in ('program.json','capture/report.json','capture/evidence.json'))
+        receipt = ((task.get('result') or {}).get('scene_review') or {}).get('production_acceptance') or {}
+        try:
+            verified_scene(source_root, {**task, 'unit': unit})
+            accepted = True
+        except (ValueError, KeyError, OSError, TypeError):
+            accepted = False
         if (policy.get('require_scene_brief') or policy.get('enforce_realism')) and not receipt.get('scene_brief'):accepted=False
-        for declaration in (receipt.get('geometry_exception'), receipt.get('scene_brief')):
-            if not accepted or not declaration:continue
-            accepted = scene_design_parser().plan_declaration_current(declaration)
-        for name,version in receipt.get('mesh_versions',{}).items():
-            mesh=Path(name)
-            if not mesh.is_file() or [mesh.stat().st_size,mesh.stat().st_mtime_ns]!=version:accepted=False
         brief = receipt.get('scene_brief') or {}
         items.append({'id': task['id'], 'task_id': task['id'], 'run_id': task['run_id'], 'revision': revision,
                       'name': brief.get('name') or intent.get('name') or task['id'],

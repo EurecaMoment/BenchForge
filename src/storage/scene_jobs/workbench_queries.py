@@ -1,6 +1,7 @@
 """Read-only metadata projections for the workbench."""
 
 from contextlib import contextmanager
+import json
 import re
 
 from sqlalchemy import text
@@ -56,6 +57,7 @@ def completed_scene_page(connection, request):
         "SELECT t.id,t.run_id,r.created_at,t.unit->>'revision' AS revision,"
         "t.unit->'intent'->>'name' AS name,t.unit->'intent'->>'split' AS split,"
         "t.unit->'intent'->>'scene_family' AS scene_family,t.unit->'intent'->>'description' AS description,"
+        "t.result->'scene_review' AS scene_review,"
         "(SELECT k.id FROM benchforge_request_keys k WHERE k.run_id=r.id ORDER BY k.id LIMIT 1) AS request_key "
         "FROM work_items t JOIN runs r ON r.id=t.run_id "
         "WHERE r.plan->>'schema' IN ('benchforge.pipeline/v1','spatialforge.pipeline/v1') "
@@ -73,9 +75,13 @@ def completed_scene_page(connection, request):
             continue
         origin = re.match(r'dsh:(session-[a-zA-Z0-9-]+):', row['request_key'] or '')
         description = row['description']
+        scene_review = row['scene_review']
+        if isinstance(scene_review, str):
+            scene_review = json.loads(scene_review)
         records.append({
             'id': row['id'], 'run_id': row['run_id'], 'created_at': row['created_at'],
             'origin_session': origin.group(1) if origin else None,
+            'state': 'SUCCEEDED', 'result': {'scene_review': scene_review},
             'unit': {
                 'revision': revision,
                 'intent': {**{key: row[key] for key in ('name', 'split', 'scene_family') if row[key] is not None},

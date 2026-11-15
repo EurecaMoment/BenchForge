@@ -25,7 +25,7 @@ const OUTPUT_FILES = new Map([
   ['result_path', [null, '执行结果']], ['output_path', [null, '生成文件']], ['output_file', [null, '生成文件']],
   ['receipt_path', [null, '执行回执']], ['manifest_path', [null, '产物清单']], ['authority_path', [null, '真值数据']],
 ]);
-const STEP_STAGES = {scene: 'S2', capture: 'S2', annotations: 'S3', questions: 'S4', package: 'S5'};
+const STEP_STAGES = {scene: 'S2', capture: 'S2', accepted_scenes:'S2', annotations: 'S3', questions: 'S4', package: 'S5'};
 const OUTPUT_CONTAINERS = new Set(['result', 'artifact', 'outputs', 'watch']);
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => typeof value === 'string' && value.trim() ? value : null;
@@ -125,7 +125,7 @@ function publish(state, {files = [], workspace, captureId}, seq) {
 
 /** A framework-owned, replayable fold. Pending calls never enter the wire view. */
 export const artifactProjection = {
-  key: ARTIFACT_PROJECTION, stateVersion: 3, stateSchema: State,
+  key: ARTIFACT_PROJECTION, stateVersion: 4, stateSchema: State,
   init: (header) => ({cwd: header.cwd || '', calls: {}, view: {
     revision: 0, workspaces: [], primaryWorkspace: null, files: [], captureIds: [],
   }}),

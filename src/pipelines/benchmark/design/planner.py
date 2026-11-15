@@ -18,6 +18,9 @@ from pipelines.benchmark.design.plan_versions import activate
 from pipelines.benchmark.design.plan_versions import verify_application
 from pipelines.benchmark.design.plan_input import resolve_request
 from pipelines.benchmark.design.plan_input import FIELDS
+from pipelines.benchmark.design.production_steps import complete_production_steps, validate_production_steps
+from service_access.tool_names import qualify
+from service_access.scene_service import environment_value
 
 
 def plan(args, directory, config=None):
@@ -44,6 +47,8 @@ def plan(args, directory, config=None):
         raise ValueError(f'Unknown pipeline {recipe}')
     inputs = deepcopy(args.get('inputs', {}))
     inputs.update({k: args[k] for k in ('evidence', 'seed', 'split', 'service_config') if k in args})
+    if not inputs.get('service_config') and environment_value('BENCHFORGE_SERVICE_CONFIG'):
+        inputs['service_config'] = environment_value('BENCHFORGE_SERVICE_CONFIG')
     pipeline = deepcopy(definitions[recipe])
     if args.get('steps'):
         pipeline['steps'] = deepcopy(args['steps'])
@@ -76,6 +81,21 @@ def plan(args, directory, config=None):
         try:
             value['assessment'] = validate_assessment(args['assessment'], selections, inputs)
             value['assessment'] = assessment_with_current_schema(value['assessment'])
+            objective_requires_episode = bool(re.search(
+                r'(?:trajectory|locomotion|navigation|exploration|\bwalk\w*\b|轨迹|探索|行走|导航|移动)', objective, re.I))
+            objective_names_robot = bool(re.search(
+                r'(?:\b(?:robot|quadruped|dog|rover|drone)\b|机器狗|无人狗|机器人|无人车|无人机)', objective, re.I))
+            if objective_requires_episode:
+                value['assessment'].setdefault('annotations', {})['require_native_episode'] = True
+                if objective_names_robot:
+                    value['assessment']['annotations']['require_robot_locomotion'] = True
+            inputs.setdefault('scene_sources', [])
+            inputs.setdefault('selections', selections)
+            if recipe == 'data.capability' and not args.get('steps'):
+                value['steps'] = complete_production_steps(value['steps'])
+            else:
+                validate_production_steps(value['steps'])
+            value['production_contract'] = 'benchforge.production-stages/v1'
         except ValueError as error:
             if not authoring_sources:
                 draft = Path(directory) / 'plan-request-draft.json'
@@ -141,8 +161,9 @@ def plan(args, directory, config=None):
         review = gate(Path(directory).parents[1], session, 'S1', value['stage_review_key'], str(target.resolve()))
     unsupported = [t['id'] for t in value['template_contracts'] if not t['execution']['program_generator']]
     return {'state': 'planned', 'plan': str(target.resolve()), 'pipeline_id': recipe,
+            'production_contract': value.get('production_contract'), 'total_steps': len(value['steps']),
             'stage_review': review,
             'assessment_status': 'structured' if value.get('assessment') else 'legacy_summary',
             'selections': selections, 'evidence_required_for': unsupported,
-            'next': ('Apply the saved user edit with pipeline_plan(applies_edit=plan) before pipeline_run. S1 review opens after the executable application is validated.'
-                     if edit else 'pipeline_run; when evidence is required, use exact template protocol with task code or existing collectors, then supply evidence. No legacy 3240-template substitution.')}
+            'next': qualify('Apply the saved user edit with pipeline_plan(applies_edit=plan) before pipeline_run. S1 review opens after the executable application is validated.'
+                     if edit else 'pipeline_run; S2 requires service-issued scene_sources, S3 requires native-source evidence JSONL. Use the configured capture and model tools, then resume this same production. Present each saved stage artifact.')}

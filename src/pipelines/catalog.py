@@ -5,6 +5,7 @@ from pathlib import Path
 from capabilities.benchmark_design.assessment import assessment_template
 from capabilities.dataset_authoring.question_writing import contract
 from capabilities.task_catalog import benchmark
+from pipelines.benchmark.design.production_steps import execution_contract
 
 ROOT = Path(__file__).parent
 
@@ -19,7 +20,7 @@ def pipeline_files():
 def catalog(args, directory=None, config=None):
     section = args.get('section', 'pipelines')
     if section == 'plan_template':
-        return assessment_template()
+        return {**assessment_template(), 'execution_contract': execution_contract()}
     if section == 'protocol':
         return benchmark.catalog(args)
     if section == 'pipelines':
@@ -36,4 +37,5 @@ def catalog(args, directory=None, config=None):
         **result,
         'capability_policy': 'Catalog links select candidates; task operation and measurement variant define measured scope.',
         'question_authoring': contract(),
+        'execution_contract': execution_contract(),
     }

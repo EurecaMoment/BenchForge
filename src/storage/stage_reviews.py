@@ -5,6 +5,7 @@ import sqlite3
 import time
 from contextlib import closing
 from pathlib import Path
+from service_access.tool_names import qualify
 
 SECONDS = 300
 
@@ -57,7 +58,7 @@ def review(workspace, session, action='status', *, stage=None, key=None, artifac
     result.update(review_id=result.pop('id'), remaining_seconds=max(0,round(result['deadline']-clock)),
                   server_time=clock, wait_seconds=SECONDS,
                   can_continue=result['state'] in ('elapsed','continued'))
-    result['next'] = ('Apply the saved user instruction before acknowledging or revising the plan.' if result['state']=='needs_input'
+    result['next'] = qualify('Apply the saved user instruction before acknowledging or revising the plan.' if result['state']=='needs_input'
                       else 'Use stage_review(action=wait), then resume the existing production when can_continue is true.')
     return result
 

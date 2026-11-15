@@ -100,34 +100,13 @@ def check_source(policy, *, task_id=None, run_id=None, scene_group=None, source_
         raise ValueError(EXCLUDED_SCENE)
 
 
-def check_evidence(workspace, record, evidence_path, service_config=None):
-    policy=load_policy(workspace, service_config)
+def check_evidence(workspace, record, evidence_path, service_config=None, *, receipts=None, policy=None):
+    policy=policy or load_policy(workspace, service_config)
     if not policy.get('enabled') or not policy.get('enforce_realism'):return
-    references=[str(record.get('scene_group_id','')),*[str(v) for v in record.get('media',[])],
-                str(record.get('provenance',{}).get('path',''))]
-    catalog=Path(workspace)/'scene-library/catalog.json'
-    items=json.loads(catalog.read_text(encoding='utf-8'))['items'] if catalog.is_file() else []
-    task_id=record.get('provenance',{}).get('task_id')
-    matches=[row for row in items if row['task_id']==task_id or any(row['task_id'] in value for value in references)
-             or record.get('scene_group_id') in {'scene-v1:'+row.get('name',''),'scene-v1:'+row['task_id']}]
-    if not matches:raise ValueError('Scene evidence must bind an accepted source scene; copied media and scene labels alone are insufficient')
-    for row in matches:
-        directory=Path(row['source_directory'])
-        file=directory/'scene_acceptance.json'
-        receipt=json.loads(file.read_text(encoding='utf-8')) if file.is_file() else {}
-        if receipt.get('passed') is not True:raise ValueError('Scene lacks physical and life acceptance; recapture and review before question production')
-        if policy.get('require_scene_brief') and not receipt.get('scene_brief'):
-            raise ValueError('Scene needs a saved brief and capture alignment before question production')
-        for declaration in (receipt.get('geometry_exception'), receipt.get('scene_brief')):
-            if not declaration:continue
-            if not scene_design_parser().plan_declaration_current(declaration):
-                raise ValueError('Scene design changed since acceptance; recapture and review the changed scene')
-        for relative in ('program.json','capture/report.json','capture/evidence.json'):
-            path=directory/relative
-            if not path.is_file() or receipt.get('evidence_versions',{}).get(relative) != [path.stat().st_size,path.stat().st_mtime_ns]:
-                raise ValueError('Scene evidence changed after acceptance')
-        for name,version in receipt.get('mesh_versions',{}).items():
-            path=Path(name)
-            if not path.is_file() or [path.stat().st_size,path.stat().st_mtime_ns]!=version:
-                raise ValueError('Transported scene mesh changed after acceptance')
+    from service_access.production_receipts import SceneReceipts
+    receipt = (receipts or SceneReceipts(service_config)).for_record(record)
+    split = record.get('split')
+    if split and receipt.get('split') and split != receipt['split']:
+        raise ValueError('Evidence split conflicts with the service-accepted scene partition')
+    return receipt
 

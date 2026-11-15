@@ -13,6 +13,7 @@ start with the workbench closed.
 | `tools/` | Register reusable operations and built-in pipeline entry points |
 | `remote/` | Host/Client contract compiled by the official Typert generator |
 | `workbench/` | Host projections and Remote handlers for the single workbench |
+| `production/` | Production projection, bounded progress reminders and durable review continuation |
 | `build.mjs` | Generate Typert Remote artifacts and bundle Host/browser entries |
 | `dist/` | Generated package entries and resources; excluded from version control |
 
@@ -80,3 +81,31 @@ preserving user plugins. It does not rewrite saved conversation histories.
 The workbench displays saved plans, captures, annotations, questions and reports.
 Stage reviews and production decisions belong to the owning services. See
 [client behavior](../ui/workbench/DESIGN.md).
+
+Production uses a replayable `benchforgeProduction` session projection. The Host
+stores pending review notices through `dsh-storage-domain`; pre-step and turn-stop
+hooks request concise public progress and delivery. A review deadline resumes the
+same saved plan once, including after reload. Paused or canceled work stays stopped.
+The browser reads this projection and sends review actions through the existing
+Remote API. It owns no continuation timer or acceptance policy.
+
+The Python runner requires explicit S2 scene acceptance and S3 annotation checks
+before S4 questions and S5 packaging. Acceptance comes from the production service's
+task record and captured file versions. Local `passed` files cannot approve a scene.
+Derived answer files use `benchforge.native-derivation/v1`: supported deterministic
+template oracles are replayed from accepted native JSON selectors, and their source
+versions remain frozen between stages. Unsupported derivations stay unverified.
+Missing native robot trajectories remain `needs_evidence`, and older incomplete
+plans return `needs_plan_revision`. Tool identifiers are shared by registration,
+prompts and UI through `capabilities/benchmark_design/resources/tool-names.json`.
+
+Run the focused regression checks from the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+node --test src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs
+npm run prepare --prefix src/dsh
+```
+
+These tests use controlled receipts to verify lifecycle and validation behavior;
+they do not certify simulator controllers or generated benchmark data.

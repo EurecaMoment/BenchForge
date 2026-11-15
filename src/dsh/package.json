@@ -19,6 +19,7 @@
     "./benchforge-ui": "./client/index.js",
     "./capture-runtime": "./dist/capture-runtime.mjs",
     "./session-operations": "./dist/session-operations.mjs",
+    "./production/types": "./production/types.d.ts",
     "./subagent-policy": "./dist/subagent-policy.mjs",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
@@ -31,6 +32,7 @@
   },
   "files": [
     "presets/*.py",
+    "production/*.d.ts",
     "dist/*.mjs",
     "dist/resources/*.json",
     "check_config.py",
@@ -53,6 +55,7 @@
     "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.3",
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
     "@deepseek-ai/dsh-subprocess": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.3",
     "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.3",
     "@deepseek-ai/dsh-web-app": "0.2.2-rc.3",
     "zod": "4.6.6"
@@ -64,6 +67,7 @@
     "@deepseek-ai/dsh-tools": "0.2.2-rc.3",
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
     "@deepseek-ai/dsh-subprocess": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.3",
     "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.3",
     "@deepseek-ai/dsh-web-app": "0.2.2-rc.3",
     "@deepseek-ai/dsh-typert-generator": "0.2.2-rc.3",

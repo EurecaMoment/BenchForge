@@ -1,5 +1,8 @@
 export const dictionaries = {
   zh: {
+    productionSystemStatus: '系统状态', productionPlanned: '计划已保存', productionNeedsEvidence: '等待有效采集或标注',
+    productionNeedsInput: '等待输入', productionNeedsRevision: '计划需要修订', productionInterrupted: '执行已中断',
+    productionCompleted: '流水线已完成', productionAwaitingUpdate: '正在等待进展说明', productionRecentFailure: '最近一次调用失败，等待处理',
     toggleWorkbench: '展开／收起工作台',
     reviewWaiting:'等待你的指令', reviewPaused:'已暂停，等待你的指令', reviewInstruction:'新指令已保存，等待处理', reviewContinue:'立即继续', reviewPause:'暂停自动继续', reviewChange:'补充指令', reviewNote:'无新指令，5 分钟后继续', reviewFinished:'阶段等待已结束',
     executionProgress: '执行进展', productionHint: '每阶段完成后等待你的指令 5 分钟。',
@@ -143,6 +146,9 @@ export const dictionaries = {
     savedAt: '草稿保存于', navigation: 'BenchForge 五步', liveRecords: '当前会话的实际产物', requiredGoal: '先填写评测目标。', perTemplate: '题 / 模板',
   },
   en: {
+    productionSystemStatus: 'System status', productionPlanned: 'Plan saved', productionNeedsEvidence: 'Awaiting valid captures or annotations',
+    productionNeedsInput: 'Awaiting input', productionNeedsRevision: 'Plan needs revision', productionInterrupted: 'Execution interrupted',
+    productionCompleted: 'Pipeline completed', productionAwaitingUpdate: 'Awaiting a progress update', productionRecentFailure: 'Recent tool failure awaiting resolution',
     toggleWorkbench: 'Expand or collapse workbench',
     reviewWaiting:'Waiting for your instructions', reviewPaused:'Paused for your instructions', reviewInstruction:'Instruction saved for processing', reviewContinue:'Continue now', reviewPause:'Pause automatic continuation', reviewChange:'Add instructions', reviewNote:'Continue after 5 minutes without new instructions', reviewFinished:'Stage review finished',
     executionProgress: 'Execution', productionHint: 'Runs all five stages; outputs update below.',

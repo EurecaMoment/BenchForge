@@ -86,8 +86,11 @@ def builtin_spec(template, sample):
     text = template['prompt_template'].format_map({key: public_value(value) for key, value in sample['parameters'].items()})
     parts = [part.strip() for part in re.split(r'(?<=[？?。；;])', text) if part.strip()]
     stem, *conditions = parts
+    options = []
+    if template.get('output_kind') == 'choice':
+        options = [row['id'] for row in sample['source'].get('objects', [])]
     return {'schema': SCHEMA, 'stem': stem, 'context': [],
-            'conditions': conditions or [public_value(sample['reference_frame'])], 'options': [],
+            'conditions': conditions or [public_value(sample['reference_frame'])], 'options': options,
             'response': '按该题型公开的输出格式作答。',
             'media_labels': [f'图{index + 1}：公开观测' for index in range(len(sample['media']))],
             'parameter_bindings': sample['parameters']}

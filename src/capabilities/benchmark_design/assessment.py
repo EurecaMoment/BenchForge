@@ -16,6 +16,20 @@ def assessment_template():
     from capabilities.dataset_authoring.question_writing import contract
     value = json.loads((Path(__file__).with_name('resources') / 'assessment_template.json').read_text(encoding='utf-8'))
     value['question_authoring'] = contract()
+    value['native_episode_contract'] = {
+        'field': 'assessment.annotations.require_native_episode',
+        'type': 'optional boolean; set true for trajectory production',
+        'binding': 'evidence.provenance.native_episode_id identifies an accepted native action recording',
+        'robot_field': 'assessment.annotations.require_robot_locomotion',
+        'robot_binding': 'evidence.provenance.robot_actor_id binds a service-accepted robot_locomotion episode with per-step native actor states',
+        'scope': 'Requires intermediate simulation states and service acceptance. A camera recording or Franka object-push is not robot locomotion; unsupported controllers must be reported as a blocker.',
+    }
+    value['annotation_source_contract'] = {
+        'direct': 'provenance.path may reference a service-accepted native answer file',
+        'derived': 'Otherwise provenance.derivation must use benchforge.native-derivation/v1 with oracle=builtin-template/v1',
+        'inputs': 'Each oracle input leaf is {path,selector}, pointing to an accepted native JSON file and JSON Pointer; nested lists/objects preserve oracle structure',
+        'scope': 'Existing built-in template oracles are replayed from those inputs. Unsupported derivations remain unverified; local answer/admission flags alone are insufficient.',
+    }
     value['instructions'] += ' 题面写作约束：' + value['question_authoring']['instructions']
     value['scene_authoring'] = {
         'default': '真实可辨识资产；简化几何用于计划明确声明的空间实验。',
@@ -190,6 +204,10 @@ def validate_assessment(value, selections, inputs):
     if coverage_ready and selections_ready and coverage != expected_counts:
         issue('assessment.coverage', 'counts must match pipeline selections per template')
     dataset = value.get('dataset') if isinstance(value.get('dataset'), dict) else {}
+    annotations = value.get('annotations') if isinstance(value.get('annotations'), dict) else {}
+    for key in ('require_native_episode', 'require_robot_locomotion'):
+        if key in annotations and type(annotations[key]) is not bool:
+            issue('assessment.annotations.' + key, 'must be a boolean')
     target = dataset.get('target_items')
     if ready('assessment.dataset.target_items'):
         if type(target) is not int or coverage_ready and target != sum(coverage.values()):

@@ -26,6 +26,10 @@ from capabilities.dataset_authoring.answer_contracts import validate_contract_de
 from capabilities.scene_library.source_policy import load_policy
 from capabilities.scene_library.source_policy import check_source
 from capabilities.scene_library.source_policy import check_evidence
+from capabilities.dataset_authoring.quality import validate_choice
+from capabilities.dataset_authoring.trajectory_evidence import validate_native_episode
+from capabilities.dataset_authoring.source_binding import validate_source_binding
+from service_access.production_receipts import SceneReceipts
 
 PARTITIONS = ('train', 'dev', 'test', 'sealed')
 PRIVATE_ASSET_FIELDS = {'answer', 'answers', 'oracle', 'oracle_detail', 'ground_truth', 'gold',
@@ -279,13 +283,20 @@ def produce(args, directory, config=None):
     records = rows(evidence_path) if evidence_path else []
     service_config = args.get('_service_config') or args.get('service_config')
     policy = load_policy(args['_workspace'], service_config)
+    receipts = SceneReceipts(service_config)
+    canonical = {}
+    if policy.get('enforce_realism') and records:
+        receipts.require([record.get('provenance', {}) for record in records])
     if evidence_path:check_source(policy,source_path=evidence_path)
     for record in records:
         _require_production_evidence(record)
         source = record.get('provenance', {})
         check_source(policy, task_id=source.get('task_id'), run_id=source.get('run_id'),
                      scene_group=record.get('scene_group_id'), source_path=source.get('path'))
-        check_evidence(args['_workspace'], record, evidence_path, service_config)
+        accepted = check_evidence(args['_workspace'], record, evidence_path, service_config,
+                                  receipts=receipts, policy=policy)
+        if accepted:
+            canonical[id(record)] = accepted
     public, authority, rejected = [], [], []
     asset_roots, asset_copies, asset_checks = {}, {}, {}
     usage = Counter()
@@ -314,7 +325,7 @@ def produce(args, directory, config=None):
             media_dir = root/'media'/item_id
             if using_source:
                 row = candidates[usage[tid]]
-                group = row['scene_group_id']
+                group = canonical[id(row)]['scene_group_id'] if id(row) in canonical else row['scene_group_id']
                 if preserve and 'split' not in row:
                     raise ValueError('preserve_source_splits requires an explicit split on each evidence record')
                 item_split = row.get('split', split)
@@ -323,6 +334,12 @@ def produce(args, directory, config=None):
                 if not preserve and item_split != split:
                     raise ValueError('Evidence split is immutable; select records from the requested partition')
                 sample = bind_record(template, row, evidence_path.parent)
+                if id(row) in canonical:
+                    validate_source_binding(template, row, evidence_path.parent, canonical[id(row)], sample['oracle'])
+                    interactive = template['protocol']['interaction_required']
+                    validate_native_episode(row, canonical[id(row)],
+                                            required=interactive or args.get('_require_native_episode', False),
+                                            interaction=interactive)
             else:
                 world_seed = seed+attempts-1
                 sample = generate(tid, world_seed, media_dir)
@@ -337,6 +354,7 @@ def produce(args, directory, config=None):
             spec = sample.get('question_spec') if using_source else builtin_spec(template, sample)
             presentation = validate_spec(spec, sample['parameters'], len(sample['media']))
             validate_answer(template, sample['oracle'])
+            validate_choice(template, sample['oracle'], presentation)
             question = question_text(presentation)
             # Workspace ledger prevents train/test reassignment across resumed or separate plans.
             ledger = Path(args['_workspace'])/'pipeline-groups.sqlite'
@@ -397,6 +415,9 @@ def produce(args, directory, config=None):
               'scene_groups': len({r['scene_group_id'] for r in public}), 'rejections': rejected,
               'source': document()['meta']['version'], 'benchmark_approved': False,
               'capability_scope': 'document task operations and measurement variants; links are not validated mastery',
+              'source_scenes': [{'task_id': row['task_id'], 'revision': row['revision']}
+                                for row in receipts.receipts.values()],
+              'execution_mode': policy['execution_mode'],
               'state': 'completed' if len(public) == sum(counts.values()) else 'needs_evidence'}
     if report['shortfall']:
         specification = root/'production_spec.json'
@@ -417,6 +438,33 @@ def package(args, directory, config=None):
     if report['shortfall']:
         raise ValueError('Dataset has a template shortfall; supply missing evidence before publishing')
     questions = rows(root/'questions.jsonl')
+    receipts = None
+    if report.get('execution_mode') == 'production' or args.get('_workspace') and load_policy(args['_workspace'], args.get('_service_config')).get('execution_mode') == 'production':
+        if not report.get('source_scenes'):
+            raise ValueError('Production packaging requires service-verified source scenes; regenerate old unverified datasets')
+        receipts = SceneReceipts(args.get('_service_config'))
+        receipts.require(report['source_scenes'])
+    truth = rows(root/'authority.jsonl')
+    answers = {row['item_id']: row for row in truth}
+    if (not questions or len(answers) != len(truth) or len(answers) != len(questions)
+            or len({row['item_id'] for row in questions}) != len(questions)):
+        raise ValueError('Every public item requires exactly one authority answer')
+    counts = dict(Counter(row['template_id'] for row in questions))
+    if counts != report['requested_per_template'] or len(questions) != report['requested']:
+        raise ValueError('Dataset does not satisfy its per-template allocation')
+    for question in questions:
+        if question['item_id'] not in answers:
+            raise ValueError('Missing authority answer: ' + question['item_id'])
+        answer = answers[question['item_id']]['answer']
+        validate_answer(question, answer)
+        validate_choice(question, answer, question['question_presentation'])
+        if receipts:
+            source = answers[question['item_id']].get('source_provenance') or {}
+            accepted = receipts.receipts.get((source.get('task_id'), source.get('revision')))
+            if not accepted or question['scene_group_id'] != accepted['scene_group_id']:
+                raise ValueError('Packaged item does not belong to its accepted scene identity')
+            if accepted.get('split') and question['split'] != accepted['split']:
+                raise ValueError('Packaged item conflicts with its accepted scene partition')
     partitions = partition_counts(questions)
     dataset_split = 'mixed' if len(partitions) > 1 else next(iter(partitions), report['split'])
     if len(partitions) > 1 and report.get('preserve_source_splits') is not True:

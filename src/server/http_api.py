@@ -236,6 +236,9 @@ def main():
                 elif self.path=='/evidence':
                     from capabilities.capture.operator_evidence import evidence
                     self.reply(evidence(store,value['task_id'],value.get('revision'),value.get('file'),value.get('workspace_id')))
+                elif self.path=='/production/acceptance':
+                    from capabilities.scene_library.acceptance import accepted_scenes
+                    self.reply(accepted_scenes(store, value.get('scene_sources')))
                 elif self.path=='/retry':self.reply(store.retry(value['task_id'],value.get('feedback'),value.get('capture_mode','auto')))
                 elif self.path=='/download':
                     task_id=value['task_id'];snap=store.snapshot(task_id.split('.')[0]);task=next(t for t in snap['tasks'] if t['id']==task_id)

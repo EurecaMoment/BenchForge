@@ -1,5 +1,7 @@
 """Production capabilities for the single BenchForge preset."""
 from pathlib import Path
+import json
+import re
 
 if __package__:
     from dsh.presets import build_preset as base
@@ -7,6 +9,8 @@ else:
     import build_preset as base
 
 DSH = Path(__file__).resolve().parents[1]
+_names = DSH.parent / 'capabilities/benchmark_design/resources/tool-names.json'
+TOOL_NAMES = json.loads((_names if _names.is_file() else DSH / 'dist/resources/tool-names.json').read_text(encoding='utf-8'))
 
 LEARNING_TOOLS = ['spatial_catalog', 'spatial_generate', 'spatial_export', 'spatial_evaluate',
                   'curriculum', 'spatial_train', 'spatial_experiment', 'training_monitor',
@@ -127,7 +131,12 @@ def persona():
     display_name = base.PRESETS[base.BENCHFORGE_ID]['name']
     identity = (f'You are the {display_name} assistant.\n')
     prefix = identity + PERSONA + '\n' + PARALLEL_SYNTHESIS
-    return prefix + '\n' + UI_GUIDANCE
+    text = prefix + '\n' + UI_GUIDANCE + '''\n
+执行期间使用用户的语言简短说明真实进展：开始、阶段切换、失败、等待和交付时必须说明；持续工作超过一分钟没有可见正文时，先汇报已完成、当前问题和下一步。工具调用或隐藏推理不替代正文。阶段完成后用 present 展示实际产物，再进入持久用户窗口。
+五阶段计划会编译 scene.acceptance 和 evidence.validate。先保存计划，使用正式采集/模型工具，得到服务 task_id/revision 后通过 bindings.scene_sources 继续同一个 run。验收由生产服务数据库持有，不得创建或改写验收通过记录。缺少能力时明确报告阻塞，不能用起终点重置冒充连续仿真轨迹。需要连续轨迹时逐步控制、步进、记录实际状态与同步传感器；规划插值属于设计值。
+按需要使用已配置的 Diffusion、SAM3、DA3、TRELLIS 与 Isaac 工具，说明实际选用及不适用的原因；不可将预测当真值。使用当前会话的 workspace，任务代码与可编辑输入保存在 tasks/ 下。
+'''
+    return re.sub(r'\b(' + '|'.join(TOOL_NAMES) + r')\b', lambda match: TOOL_NAMES[match[0]], text)
 
 
 def workbench_entry(python, service_config, *, package_imports=False):
@@ -179,7 +188,8 @@ def build(standard, python, service_config, *, config_path=None,
         ('benchforge-tools', 'benchmark-tools', [*BENCHMARK_TOOLS, *model_tools]),
         ('spatial-learning-tools', 'spatial-tools', LEARNING_TOOLS),
     ):
-        options = {'python': str(python), 'includeTools': tools}
+        options = {'python': str(python), 'includeTools': tools,
+                   'serviceConfig': base.config_reference(service_config, package_imports)}
         if config_path is not None:
             options['configPath'] = base.config_reference(config_path, package_imports)
         export = 'benchforge-tools' if entry == 'benchmark-tools' else entry

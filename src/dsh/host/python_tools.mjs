@@ -3,11 +3,13 @@ import path from 'node:path';
 import {defineTool} from '@deepseek-ai/dsh-tools';
 import Schema from '@deepseek-ai/schemastery';
 import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
+import {toolName, qualifyToolNames} from '../tools/benchmark/names.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
 export const Config = Schema.object({
   python: Schema.string().default('python3'),
   configPath: Schema.string(),
+  serviceConfig: Schema.string(),
   dshRoot: Schema.string(),
   includeTools: Schema.array(Schema.string()),
   environment: Schema.dict(Schema.string()).default({}),
@@ -56,6 +58,7 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   const snapshot = launchEnvironmentOf(ctx);
   const environment = Object.fromEntries((config.forwardEnvironment || []).map(key => [key,snapshot.get(key)?.value]).filter(([,value])=>value!==undefined));
   Object.assign(environment,config.environment);
+  if (config.serviceConfig) environment.BENCHFORGE_SERVICE_CONFIG = path.resolve(config.serviceConfig);
   const output = {schema:{type:'object',properties:{},additionalProperties:true},
     render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]};
   const operationOutput = {...output,schema:{type:'object',properties:{operation_id:{type:'string',required:true},artifact_dir:{type:'string',required:true}},additionalProperties:true}};
@@ -76,10 +79,13 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   for (const [tool, description] of Object.entries(definitions)) {
     if (config.includeTools && !config.includeTools.includes(tool)) continue;
     if (tool === 'model_infer' && !annotation?.url) continue;
-    ctx.tools.register(defineTool({name:`benchforge_${tool}`, description,
+    ctx.tools.register(defineTool({name:toolName(tool), description:qualifyToolNames(description),
       parameters:{workspace:{type:'string',required:true,description:'Absolute task workspace. Use the same workspace for related calls.'},...schemas[tool]},
       output:tool==='catalog'?output:tool==='status'?statusOutput:operationOutput,
       execute:async (args,exec)=>{const {workspace,...request}=args; const signal=exec.signal ? AbortSignal.any([exec.signal,lifetime.signal]) : lifetime.signal;
+        if (exec.agent?.session?.header?.cwd && await fs.realpath(workspace) !== await fs.realpath(exec.agent.session.header.cwd)) {
+          throw new Error('Use this conversation workspace: ' + exec.agent.session.header.cwd + '. Save task files in its tasks/ subdirectory.');
+        }
         const scoped = tool === 'model_infer' ? annotationEnvironment : environment;
         const sessionEnvironment = {...scoped, BENCHFORGE_DSH_SESSION_ID: exec.agent?.session?.id || '', BENCHFORGE_DSH_CALL_ID: exec.callId || ''};
         return invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module});}}));

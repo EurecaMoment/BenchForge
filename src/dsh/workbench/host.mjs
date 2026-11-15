@@ -602,8 +602,15 @@ export async function apply(ctx, config) {
   const {associations} = ctx.benchforgeCapture;
   const readEvidence = createArtifactEvidenceReader(ctx.get('sessionQuery'));
   await ctx.sessionProjections.register(artifactProjection);
-  const dispatch = createWorkbenchDispatcher(config, () => ctx.workspaceRegistry.list(), sessionFamilyReader(ctx),
+  const baseDispatch = createWorkbenchDispatcher(config, () => ctx.workspaceRegistry.list(), sessionFamilyReader(ctx),
     preparation, execution, associations, readEvidence);
+  const dispatch = async (url, request) => {
+    const result = await baseDispatch(url, request);
+    if(request.method==='POST'&&url.searchParams.get('view')==='stage_review') {
+      result.continuation_managed=await ctx.benchforgeSessions.production.refresh(url.searchParams.get('session_id'));
+    }
+    return result;
+  };
   ctx.provide('benchforgeWorkbench', new WorkbenchRemote(dispatch));
   // Local file overlays do not have a bare package row for the Typert loader.
   ctx.effect(() => ctx.typert.register(TYPERT), 'benchforge-workbench: Remote API');

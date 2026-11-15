@@ -1214,6 +1214,23 @@ export default class SessionRuns extends Service {
 
 该服务由 Host 挂一次，数据库域以名称识别，同一域已经打开时会拒绝重复打开。有多个进程或服务共同写入时，使用拥有并发协议的业务后端。`SessionEventMap` 的 TypeScript 声明合并只处理类型，新增必读持久事件还要同步 DSH fork 的事件词表、reader、格式和迁移。外置预设插件可折叠内置事件，或把自己的持久状态写入独立领域。当前 `appendPluginRecord()` 保留给 DSH 自己的实验包。需要等待会话日志写盘时，用 `await ctx.sessions.flush(session)` 作为持久化屏障。 [外部插件持久化规则](https://github.com/deepseek-ai/deepseek-harness/blob/39163dd30f703a79079e2d2446545cff3c453738/packages/preset/agent-preset/skills/dsh-doc/references/practices.md#L17-L22) · [Session 写入与刷新](https://github.com/deepseek-ai/deepseek-harness/blob/39163dd30f703a79079e2d2446545cff3c453738/packages/core/session/README.zh.md#L70-L91) · [持久格式准入](https://github.com/deepseek-ai/deepseek-harness/blob/39163dd30f703a79079e2d2446545cff3c453738/docs/subsystems/persistence.zh.md#L188-L197)
 
+### BenchForge 生产流程的落点
+
+本仓库按上述接口划分生产流程，新增能力继续沿用这些边界：
+
+| 位置 | 职责 |
+| --- | --- |
+| `src/dsh/production/projection.mjs` | 从标准工具、正文、轮次和交付事件回放生产状态；向 Client 公开会话投影。 |
+| `src/dsh/production/lifecycle.mjs` | 消费投影，在正式 `agent/pre-step`、`agent/turn-stopping` 接口提供有界进度和交付提醒；用户窗口到期后按持久回执续行。 |
+| `src/dsh/host/session_operations.mjs` | Host 唯一注册投影与 `storageDomain`；管理续行记录和插件资源释放。 |
+| `src/pipelines/benchmark/` | 将评测编译为 S1–S5 的显式依赖，保存阶段回执和原运行的续行状态。 |
+| `src/capabilities/scene_library/`、`src/service_access/production_receipts.py` | 由生产服务任务记录确认场景版本与采集证据，批量读取验收回执；本地手写通过文件不建立验收。 |
+| `src/ui/workbench/` | 读取投影、调用 Remote、展示真实状态与产物；不持有续行定时器或判断业务验收。 |
+
+进度提醒只要求公开工作摘要，不展示隐藏推理，也不把工具调用次数当成完成比例。续行记录归属会话和原计划；用户暂停、取消或新增待处理指令会阻止自动续行。普通聊天不启用生产生命周期。旧计划缺少 S2 场景验收或 S3 标注验证时，返回 `needs_plan_revision`；缺少真实采集或原生轨迹时返回 `needs_evidence`，不能以相机动画或端点重置宣告机器人行走已完成。工具名由 `src/capabilities/benchmark_design/resources/tool-names.json` 统一供注册、提示和界面引用。
+
+回归入口为 `python -m unittest discover -s tests -v` 和 `node --test src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs`。受控服务回执用于验证流程，不代表真实模型或仿真能力验收。
+
 ## Web 界面、业务 RPC 与会话状态
 
 对同一个 Web profile，可以交付评测工作台和训练工作台、会话专属按钮和侧栏、工具卡片、实时状态与可回放记录。**预设负责选择会话的 Host 能力，Web Client 读会话的预设 ID 决定渲染。** Web 模块注册表扫描主 Loader 树的已启用行。预设子插件位于独立的内存树，`PresetTree` 构造时恢复主树 owner 原有的 `subtree` 与 `subgroup` 链接。想把一个组件送到浏览器，要在 Web profile 的主树启用它的双面包。 [预设树实现](https://github.com/deepseek-ai/deepseek-harness/blob/39163dd30f703a79079e2d2446545cff3c453738/packages/preset/agent-preset-registry/src/mount.ts#L8-L23) · [Web 模块扫描](https://github.com/deepseek-ai/deepseek-harness/blob/39163dd30f703a79079e2d2446545cff3c453738/packages/client/modules/src/index.ts#L1118-L1127)

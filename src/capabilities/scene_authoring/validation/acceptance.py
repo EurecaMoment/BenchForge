@@ -316,6 +316,18 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
     if review.get('acceptable') is not True or review.get('visual_realism', {}).get('status') != expected_status:
         issues.append('Captured views failed appearance/semantic acceptance')
     files = [Path(capture).parent/'program.json',Path(capture)/'report.json',Path(capture)/'evidence.json']
+    for frame in evidence.get('frames', []):
+        if isinstance(frame, dict) and isinstance(frame.get('frame_id'), str) and Path(frame['frame_id']).name == frame['frame_id']:
+            files.extend(Path(capture)/(frame['frame_id']+suffix)
+                         for suffix in ('.png', '.json', '_depth.npy', '_semantic.npy', '_instance.npy'))
+    for action in evidence.get('interaction', {}).get('action_results', []):
+        if not isinstance(action, dict):
+            continue
+        recording = action.get('recording') or {}
+        for name in (action.get('trajectory_file'), action.get('before_image'), action.get('after_image'),
+                     recording.get('timeline_file'), recording.get('video')):
+            if isinstance(name, str) and Path(name).name == name:
+                files.append(Path(capture) / name)
     versions = {file.relative_to(Path(capture).parent).as_posix():[file.stat().st_size,file.stat().st_mtime_ns] for file in files if file.is_file()}
     return {'schema':'benchforge.scene-acceptance/v1','enforced':True,'passed':not issues,'issues':issues,
             'physical_issues':physical_issues,
@@ -338,10 +350,14 @@ def require_accepted(root, directory, execution_mode=None):
         raise ValueError('Scene has no passing physical and life acceptance; do not export, select or mark complete')
     if policy.get('require_scene_brief') and not receipt.get('scene_brief'):
         raise ValueError('Scene has no saved brief and capture alignment acceptance')
-    for relative in ('program.json','capture/report.json','capture/evidence.json'):
-        path=directory/relative
-        if not path.is_file() or receipt.get('evidence_versions',{}).get(relative) != [path.stat().st_size,path.stat().st_mtime_ns]:
+    for relative, version in receipt.get('evidence_versions', {}).items():
+        path = directory / relative
+        if (Path(relative).is_absolute() or '..' in Path(relative).parts or path.is_symlink()
+                or not path.is_file() or path.resolve() != path
+                or version != [path.stat().st_size,path.stat().st_mtime_ns]):
             raise ValueError('Scene changed since acceptance; recapture and review before production')
+    if not {'program.json', 'capture/report.json', 'capture/evidence.json'} <= set(receipt.get('evidence_versions', {})):
+        raise ValueError('Scene acceptance is missing a required native evidence version')
     for declaration in (receipt.get('geometry_exception'), receipt.get('scene_brief')):
         if not declaration:continue
         plan=Path(declaration['plan_path'])

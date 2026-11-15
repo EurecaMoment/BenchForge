@@ -37,6 +37,15 @@ var benchforgeClient = (() => {
   // src/ui/workbench/i18n.js
   var dictionaries = {
     zh: {
+      productionSystemStatus: "\u7CFB\u7EDF\u72B6\u6001",
+      productionPlanned: "\u8BA1\u5212\u5DF2\u4FDD\u5B58",
+      productionNeedsEvidence: "\u7B49\u5F85\u6709\u6548\u91C7\u96C6\u6216\u6807\u6CE8",
+      productionNeedsInput: "\u7B49\u5F85\u8F93\u5165",
+      productionNeedsRevision: "\u8BA1\u5212\u9700\u8981\u4FEE\u8BA2",
+      productionInterrupted: "\u6267\u884C\u5DF2\u4E2D\u65AD",
+      productionCompleted: "\u6D41\u6C34\u7EBF\u5DF2\u5B8C\u6210",
+      productionAwaitingUpdate: "\u6B63\u5728\u7B49\u5F85\u8FDB\u5C55\u8BF4\u660E",
+      productionRecentFailure: "\u6700\u8FD1\u4E00\u6B21\u8C03\u7528\u5931\u8D25\uFF0C\u7B49\u5F85\u5904\u7406",
       toggleWorkbench: "\u5C55\u5F00\uFF0F\u6536\u8D77\u5DE5\u4F5C\u53F0",
       reviewWaiting: "\u7B49\u5F85\u4F60\u7684\u6307\u4EE4",
       reviewPaused: "\u5DF2\u6682\u505C\uFF0C\u7B49\u5F85\u4F60\u7684\u6307\u4EE4",
@@ -511,6 +520,15 @@ var benchforgeClient = (() => {
       perTemplate: "\u9898 / \u6A21\u677F"
     },
     en: {
+      productionSystemStatus: "System status",
+      productionPlanned: "Plan saved",
+      productionNeedsEvidence: "Awaiting valid captures or annotations",
+      productionNeedsInput: "Awaiting input",
+      productionNeedsRevision: "Plan needs revision",
+      productionInterrupted: "Execution interrupted",
+      productionCompleted: "Pipeline completed",
+      productionAwaitingUpdate: "Awaiting a progress update",
+      productionRecentFailure: "Recent tool failure awaiting resolution",
       toggleWorkbench: "Expand or collapse workbench",
       reviewWaiting: "Waiting for your instructions",
       reviewPaused: "Paused for your instructions",
@@ -1209,6 +1227,22 @@ var benchforgeClient = (() => {
     };
   }
 
+  // src/capabilities/benchmark_design/resources/tool-names.json
+  var tool_names_default = {
+    pipeline_catalog: "benchforge_pipeline_catalog",
+    pipeline_plan: "benchforge_pipeline_plan",
+    pipeline_run: "benchforge_pipeline_run",
+    pipeline_status: "benchforge_pipeline_status",
+    pipeline_artifacts: "benchforge_pipeline_artifacts",
+    pipeline_repair_plan: "benchforge_pipeline_repair_plan",
+    pipeline_evaluate: "benchforge_pipeline_evaluate",
+    stage_review: "benchforge_stage_review"
+  };
+
+  // src/dsh/tools/benchmark/names.mjs
+  var bareNames = new RegExp("\\b(" + Object.keys(tool_names_default).join("|") + ")\\b", "g");
+  var qualifyToolNames = (text) => text.replace(bareNames, (key) => tool_names_default[key]);
+
   // src/ui/workbench/state.js
   function createWorkbenchState({ STAGES: STAGES2, sceneName }) {
     function initialState(sessionId) {
@@ -1295,7 +1329,7 @@ var benchforgeClient = (() => {
       ].filter(Boolean).join("\n") + sceneConstraint(selection);
     }
     function productionContext(selection, template) {
-      return sceneConstraint(selection) + "\n\u6BCF\u4E2A\u9636\u6BB5 S1 \u8BA1\u5212\u3001S2 \u573A\u666F\u3001S3 \u6807\u6CE8\u3001S4 \u9898\u76EE\u3001S5 \u62A5\u544A\u5B8C\u6210\u540E\uFF0C\u5C55\u793A\u771F\u5B9E\u4EA7\u7269\u5E76\u7B49\u5F85\u7528\u6237 5 \u5206\u949F\u3002\u4F7F\u7528 stage_review \u6253\u5F00\u53CA\u7B49\u5F85\u6301\u4E45\u5173\u53E3\uFF1B\u65E0\u65B0\u6307\u4EE4\u5230\u671F\u7EE7\u7EED\uFF0C\u6709\u6307\u4EE4\u5148\u5904\u7406\uFF0C\u6682\u505C\u540E\u4E0D\u5F97\u81EA\u52A8\u7EE7\u7EED\u3002\n\n\u5236\u5B9A\u6216\u4FEE\u6539\u8BC4\u6D4B\u8BA1\u5212\u65F6\u5FC5\u987B\u9075\u5B88\u4EE5\u4E0B\u5B8C\u6574\u6A21\u677F\uFF1B\u5DF2\u6709\u5B8C\u6574\u8BA1\u5212\u4E14\u672C\u6B21\u53EA\u8981\u6C42\u7EE7\u7EED\u6267\u884C\u65F6\uFF0C\u590D\u7528\u5DF2\u6709\u8BA1\u5212\u3002\n" + template.instructions + "\n" + template.scene_binding + "\n\u5404\u7AE0\u8282\u8981\u6C42\uFF1A\n" + JSON.stringify(template.sections, null, 2) + (template.scene_authoring ? "\n\u573A\u666F\u6807\u9898\u3001\u6458\u8981\u3001\u7A7A\u95F4\u5173\u7CFB\u4E0E\u53CC\u5411\u4FEE\u8BA2\u5408\u540C\uFF1A\n" + JSON.stringify(template.scene_authoring, null, 2) : "") + "\n\u4F20\u5165 pipeline_plan.assessment \u7684\u586B\u5199\u7ED3\u6784\uFF1A\n" + JSON.stringify(template.assessment, null, 2);
+      return qualifyToolNames(sceneConstraint(selection) + "\n\u6BCF\u4E2A\u9636\u6BB5 S1 \u8BA1\u5212\u3001S2 \u573A\u666F\u3001S3 \u6807\u6CE8\u3001S4 \u9898\u76EE\u3001S5 \u62A5\u544A\u5B8C\u6210\u540E\uFF0C\u5C55\u793A\u771F\u5B9E\u4EA7\u7269\u5E76\u7B49\u5F85\u7528\u6237 5 \u5206\u949F\u3002\u4F7F\u7528 stage_review \u6253\u5F00\u53CA\u7B49\u5F85\u6301\u4E45\u5173\u53E3\uFF1B\u65E0\u65B0\u6307\u4EE4\u5230\u671F\u7EE7\u7EED\uFF0C\u6709\u6307\u4EE4\u5148\u5904\u7406\uFF0C\u6682\u505C\u540E\u4E0D\u5F97\u81EA\u52A8\u7EE7\u7EED\u3002\n\n\u5236\u5B9A\u6216\u4FEE\u6539\u8BC4\u6D4B\u8BA1\u5212\u65F6\u5FC5\u987B\u9075\u5B88\u4EE5\u4E0B\u5B8C\u6574\u6A21\u677F\uFF1B\u5DF2\u6709\u5B8C\u6574\u8BA1\u5212\u4E14\u672C\u6B21\u53EA\u8981\u6C42\u7EE7\u7EED\u6267\u884C\u65F6\uFF0C\u590D\u7528\u5DF2\u6709\u8BA1\u5212\u3002\n" + template.instructions + "\n" + template.scene_binding + "\n\u5404\u7AE0\u8282\u8981\u6C42\uFF1A\n" + JSON.stringify(template.sections, null, 2) + (template.native_episode_contract ? "\n\u8FDE\u7EED\u8FD0\u52A8\u4E0E\u673A\u5668\u4EBA\u8F68\u8FF9\u9A8C\u6536\u5408\u540C\uFF1A\n" + JSON.stringify(template.native_episode_contract, null, 2) : "") + (template.annotation_source_contract ? "\n\u6807\u6CE8\u6765\u6E90\u4E0E\u590D\u7B97\u5408\u540C\uFF1A\n" + JSON.stringify(template.annotation_source_contract, null, 2) : "") + (template.scene_authoring ? "\n\u573A\u666F\u6807\u9898\u3001\u6458\u8981\u3001\u7A7A\u95F4\u5173\u7CFB\u4E0E\u53CC\u5411\u4FEE\u8BA2\u5408\u540C\uFF1A\n" + JSON.stringify(template.scene_authoring, null, 2) : "") + "\n\u4F20\u5165 pipeline_plan.assessment \u7684\u586B\u5199\u7ED3\u6784\uFF1A\n" + JSON.stringify(template.assessment, null, 2));
     }
     function displayRef(value) {
       const parts = String(value || "").split(/[\\/]/).filter(Boolean);
@@ -1885,7 +1919,37 @@ var benchforgeClient = (() => {
         )
       );
     }
-    function StageProgress({ stage, pipeline, scene, record, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t }) {
+    function ProductionActivity({ value, t }) {
+      const [clock, setClock] = React.useState(Date.now());
+      const current = value?.active && value.running && value.workflowTurn === value.turn;
+      React.useEffect(() => {
+        if (!current) return;
+        const timer = setInterval(() => setClock(Date.now()), 1e4);
+        return () => clearInterval(timer);
+      }, [current]);
+      if (!value?.active) return null;
+      const phase = {
+        planned: "productionPlanned",
+        waiting_user: "reviewWaiting",
+        needs_evidence: "productionNeedsEvidence",
+        needs_input: "productionNeedsInput",
+        needs_plan_revision: "productionNeedsRevision",
+        paused: "reviewPaused",
+        interrupted: "productionInterrupted",
+        completed: "productionCompleted",
+        failed: "sessionFailed",
+        running: "sessionRunning"
+      }[value.state] || "sessionRunning";
+      const silent = current && clock - value.lastTextAt >= 6e4;
+      return h(
+        "div",
+        { className: "bfw-muted", "data-production-activity": value.state, role: "status", "aria-live": "polite" },
+        t("productionSystemStatus") + " \xB7 " + t(phase) + (value.stage ? " \xB7 " + value.stage : ""),
+        silent ? " \xB7 " + t("productionAwaitingUpdate") : "",
+        value.error ? h("span", null, " \xB7 " + t("productionRecentFailure")) : null
+      );
+    }
+    function StageProgress({ stage, pipeline, scene, record, activity, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t }) {
       const collection = stage.id === "S2" && (collectionPlan?.assessment?.scenes || collectionPlan?.inputs?.target_scene_count || record.value?.current_collection) ? sceneCollectionProgress(collectionPlan, record.value?.scenes?.runs || [], record.value?.current_collection) : null;
       const generation = stage.id === "S4" ? currentGeneration(record.value?.generation) : null;
       scene = progressSceneForStage(stage.id, scene, record.value?.scenes?.runs || []);
@@ -1954,6 +2018,7 @@ var benchforgeClient = (() => {
           "data-progress-state": stale ? "stale" : state,
           "aria-label": t("stageProgress")
         },
+        h(ProductionActivity, { value: activity, t }),
         h(
           "div",
           { className: "bfw-progress-caption" },
@@ -2931,6 +2996,7 @@ var benchforgeClient = (() => {
       useResource,
       useSessions,
       useSession,
+      useProjection,
       useInput,
       inputActions,
       canSubmit = false,
@@ -2968,6 +3034,7 @@ var benchforgeClient = (() => {
       const lastSubmitted = React.useRef("");
       const inputState = useInput((state) => state);
       const sessionState = useSession((state) => state);
+      const productionActivity = useProjection("benchforgeProduction");
       const update = actions.updateRoute;
       const workspacePath = useSessions((state) => state.byId[sessionId]?.cwd || "");
       const productResource = useResource(productsResourceAddress2(sessionId, workspacePath));
@@ -3585,6 +3652,7 @@ var benchforgeClient = (() => {
           pipeline: liveProgressPipeline,
           scene: liveProgressScene,
           record: progress,
+          activity: productionActivity,
           planReceipt,
           collectionPlan,
           artifacts: allStageFiles,
@@ -3594,10 +3662,10 @@ var benchforgeClient = (() => {
         }),
         h(StageReviewPanel, { value: reviewRecord.value, t, change: () => prepare(""), act: async (action) => {
           try {
-            await reviewAction(action);
+            const result = await reviewAction(action);
             if (action === "pause" && conversationRunning) await stopExecution();
-            if (action === "continue" && !conversationRunning) {
-              await submitWithScenes({ text: "\u7528\u6237\u5DF2\u70B9\u51FB\u7ACB\u5373\u7EE7\u7EED\u3002\u8BFB\u53D6\u9636\u6BB5\u7B49\u5F85\u72B6\u6001\u5E76\u590D\u7528\u5F53\u524D\u8BA1\u5212\u548C\u4EA7\u7269\u7EE7\u7EED\u751F\u4EA7\u3002", inserted: false, reviewContinued: true }, setDemandError);
+            if (action === "continue" && !result.continuation_managed && !conversationRunning) {
+              await submitWithScenes({ text: "\u7528\u6237\u5DF2\u70B9\u51FB\u7ACB\u5373\u7EE7\u7EED\u3002\u8BFB\u53D6 benchforge_stage_review \u7684\u9636\u6BB5\u72B6\u6001\uFF0C\u590D\u7528\u5F53\u524D\u8BA1\u5212\u548C\u4EA7\u7269\u7EE7\u7EED\u751F\u4EA7\u3002", inserted: false, reviewContinued: true }, setDemandError);
             }
           } catch (error) {
             setNotice(error.message);
@@ -3945,7 +4013,7 @@ var benchforgeClient = (() => {
   // src/dsh/remote/lib/typert.remote-client.js
   var import_zod = __require("zod");
 
-  // src/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
+  // ../../../src/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
   function createTypertRemoteInfo(spec, zod) {
     return new RemoteInfo(spec, zod);
   }
