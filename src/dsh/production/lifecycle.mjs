@@ -54,16 +54,19 @@ export function createProductionLifecycle({projection,table,agents,readReview,cr
       const agent=agents.get(id)||await restoreAgent(id);
       if(!agent||disposed)return false;
       const state=projection.stateOf(agent.session),view=state.view;
-      if(view.state==='interrupted'&&review.state!=='continued') {
+      if(view.state==='interrupted') {
         // Unload is recoverable; explicit user cancellation must remain stopped.
         if(state.interruption!=='disposed') {
           await table.put(id,{...record,suspended:true});return false;
         }
       }
       if(!['elapsed','continued'].includes(review.state))return false;
-      if(pendingNotice(agent,record.key))return true;
-      if(state.notices.includes(record.key))return agent.status==='running';
-      const message=notice('benchforge/production-resume',record.key,
+      if(['paused','needs_input','needs_evidence','needs_plan_revision','failed','completed'].includes(view.state))return false;
+      const recovered=state.notices.includes(record.key)&&view.state==='interrupted'&&state.interruption==='disposed';
+      const key=recovered ? `${record.key}:disposal:${state.interruptionSeq}` : record.key;
+      if(pendingNotice(agent,key))return true;
+      if(state.notices.includes(key))return agent.status==='running';
+      const message=notice('benchforge/production-resume',key,
         `生产阶段通知（系统状态）：${review.stage} ${stageName(review.stage)} 的用户窗口已结束。读取 benchforge_stage_review 的当前状态，处理已有用户指令，然后使用 benchforge_pipeline_run 继续同一个任务。阶段含义：${stageSummary()}，S3 包含标注。workspace=${record.workspace}；plan=${record.plan}；run=${record.run || '尚未创建'}。不要重建已完成阶段。先向用户简短说明当前阶段和下一步。`);
       if(agent.status==='running')agent.steer(message);else agent.followup(message);
       // A queued notice may be lost before its first step is committed. The inbox

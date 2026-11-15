@@ -33,13 +33,13 @@
 
             修订已有场景时，brief.previous_capture_directory 引用上一版实际采集目录，revision_history
             必须追加而非覆盖，逐项记录递增版本、该目录、具体 changes、unresolved（无未解决问题时为空数组）和图片/原生物理回执引用；服务端从前一版冻结摘要检查全部硬要求继承及历史连续性。标题与摘要应是给用户看的有效中文，不能写成技术
-            ID 清单。先检查原生几何和物理回执，失败先修；通过后才进行逐图审查。采集传输超时或 worker 退出是执行故障，应保留作业并按同一请求身份恢复，不得把它当作场景设计失败消耗修订次数。
+            ID 清单。先检查原生几何和物理回执，失败先修；通过后才进行逐图审查。采集传输超时或后端重启是执行故障，应保留作业并按同一请求身份恢复，不得把它当作场景设计失败消耗修订次数。
 
             按 benchforge_pipeline_catalog.scene_authoring.realism_review 逐项检查生活与物理真实性。先说明人的活动和物件用途，再检查可辨识结构、原比例、椅子朝向和腿部空间、门柜开启、取物高度、通路及操作范围；容器必须有真实开口和底板，层架有真实层板。叶片、把手、桌腿都要留余量。动态实验核对沉降、施力轨迹和动作后姿态与支撑，不得悄悄删除动作或放宽用户硬指标以通过验收。看不清接触或用途就补近景，不能按物体名字臆断。保留每次失败画面与未解问题。
 
             审查模型的网络超时可对原 task_id 使用 benchforge_retry 重试同一冻结采集，最多两次，不消耗场景设计修订预算。采集执行/传输故障同样使用原
-            task_id：capture_mode=auto 在没有完整采集确认时用新 attempt 重采，已确认完整采集则续传；确认完整原生文件存在时可指定
-            resume_upload，进程退出则使用 restart_capture。保留原 revision、冻结程序与旧尝试日志，不能为执行故障反复创建新场景版本；质量失败仍须定点修复程序并重新采集。长时间采集调用
+            task_id：capture_mode=auto 恢复已保留的原生 job 和下载；只有原生任务明确终态失败才创建新 attempt。resume
+            保留 request_id，restart 必须确认旧作业已结束。保留原 revision、冻结程序与旧尝试日志，不能为执行故障反复创建新场景版本；质量失败仍须定点修复程序并重新采集。长时间采集调用
             benchforge_wait(background=true) 注册一次后台观察后继续独立工作或结束本轮等待通知，不每分钟运行模型轮询。后台终态通知不是验收通过，S1..S5
             的用户窗口与真实质量验收照常保留。物理支撑和安装逐项引用原生回执，生活用途、净空、朝向和可见缺陷由逐图审查验证。
 
@@ -103,8 +103,10 @@
 
             Use persistent shells when a sequence benefits from a retained environment.
             Filesystem, jobs, file tools and runtime inspection remain available.
-            Use BenchForge tools for production operations; the configured queue owns
-            the connected desktop Isaac instance.
+            Use BenchForge tools for production operations; the backend submits directly
+            to the configured a100sim.v1.Simulator service. Use benchforge_isaac_sim
+            for live catalog discovery, explicit native session/robot/world commands
+            and job artifact downloads. No separate capture process is required.
 
             Use benchforge_diffusion for images, benchforge_scene_sam3 for masks,
             benchforge_depth for DA3 depth, and benchforge_trellis for TRELLIS.2 meshes.
@@ -462,6 +464,7 @@
           - pipeline_repair_plan
           - pipeline_evaluate
           - stage_review
+          - isaac_sim
           - model_infer
           serviceConfig: config/generated/benchforge-client.local.json
           configPath: config/benchforge.local.json

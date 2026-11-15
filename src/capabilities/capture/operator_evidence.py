@@ -12,7 +12,8 @@ PUBLIC_RELEASE_FILES = {'release/'+name for name in (
 def _allowed(name):
     return (name in {'program.json','submitted_program.json','program_handoff.json','proposal.json','repair_seed.json','scene_review.json','progress.json','geometry_preview.json','repair_context.json','repair_changes.json','data_selection.json','generation_stage.json',
                      'layout_reference.png','layout_reference.json','generation/reference.png','generation/input_mask.png','generation/asset_ref.json','generation/asset_request.json','capture/program.json','capture/report.json','capture/evidence.json','layout/reference.png','layout/receipt.json'}
-            or bool(re.fullmatch(r'capture/view_\d+(?:\.png|\.json|_(?:depth|semantic|instance)\.npy)',name))
+            or bool(re.fullmatch(r'capture/view_\d+(?:\.png|\.json|_(?:depth|semantic|instance|normal_world|range|valid)\.npy)',name))
+            or name in {'capture/scene.usda', 'capture/scene.usdc', 'capture/scene.usdz'}
             or bool(re.fullmatch(r'capture/interaction_\d+_(?:before\.png|after\.png|trajectory\.json)',name))
             or bool(re.fullmatch(r'capture/interaction_\d+(?:\.mp4|_recording\.json|_frames\.zip|_spatialtree\.json|_spatialtree\.zip)',name))
             or name in PUBLIC_RELEASE_FILES

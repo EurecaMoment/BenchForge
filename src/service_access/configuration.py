@@ -12,7 +12,7 @@ MODEL_PROVIDERS = {
     'trellis': 'FastTrellis2',
 }
 LLM_PROVIDER = 'DSpark4A100'
-ISAAC_PROVIDER = 'IssacSim4A100'
+ISAAC_PROVIDER = 'IsaacSim4A100'
 MODEL_FIELDS = {
     'url', 'model', 'token_env', 'name', 'api', 'context_window', 'max_tokens',
     'input', 'reasoning_efforts', 'reasoning_effort', 'compat', 'retries',
@@ -45,16 +45,16 @@ def isaac_endpoint(grpc):
         raise ValueError(f'Configure providers.{ISAAC_PROVIDER}.grpc.host in config/benchforge.local.json')
     port = grpc.get('port', 50051)
     if type(port) is not int or not 1 <= port <= 65535:
-        raise ValueError('The Isaac gRPC port must be an integer between 1 and 65535')
+        raise ValueError('The Isaac Sim gRPC port must be an integer between 1 and 65535')
     if ':' in host:
         host = host.strip('[]')
         try:
             IPv6Address(host)
         except ValueError:
-            raise ValueError('The Isaac gRPC host must not include the port') from None
+            raise ValueError('The Isaac Sim gRPC host must not include the port') from None
         return f'[{host}]:{port}'
     if not re.fullmatch(r'[A-Za-z0-9_.-]+', host):
-        raise ValueError('The Isaac gRPC host must be a host name or IP address')
+        raise ValueError('The Isaac Sim gRPC host must be a host name or IP address')
     return f'{host}:{port}'
 
 
@@ -119,24 +119,27 @@ def validate_providers(config):
                 raise ValueError(f'{field}.input must be a list of text or image modalities')
     isaac = isaac_config(config)
     field = f'providers.{ISAAC_PROVIDER}'
-    _validate_fields(isaac, field, {'mode', 'grpc', 'local', 'capture_timeout_seconds'})
-    mode = isaac.get('mode', 'grpc')
-    if mode not in ('grpc', 'local'):
-        raise ValueError(f'{field}.mode must be grpc or local')
-    local = isaac.get('local', {})
-    if not isinstance(local, dict):
-        raise ValueError(f'{field}.local must be a JSON object')
-    _validate_fields(local, field + '.local', {'python', 'asset_root', 'idle_seconds'})
-    if mode == 'local':
-        for key in ('python', 'asset_root'):
-            if not isinstance(local.get(key), str) or not local[key].strip():
-                raise ValueError(f'{field}.local.{key} is required for local mode')
-    if type(local.get('idle_seconds', 300)) is not int or local.get('idle_seconds', 300) <= 0:
-        raise ValueError(f'{field}.local.idle_seconds must be a positive integer')
+    _validate_fields(isaac, field, {'grpc', 'capture_timeout_seconds', 'max_concurrent_captures',
+                                  'image_size', 'samples_per_pixel', 'asset_sources'})
+    for key, low, high, default in (('max_concurrent_captures', 1, 32, 4),
+                                   ('image_size', 64, 1024, 768), ('samples_per_pixel', 1, 256, 32)):
+        value = isaac.get(key, default)
+        if type(value) is not int or not low <= value <= high:
+            raise ValueError(f'{field}.{key} must be an integer in {low}..{high}')
+    bindings = isaac.get('asset_sources', {})
+    if not isinstance(bindings, dict):
+        raise ValueError(f'{field}.asset_sources must map native catalog IDs to uploaded A100 assets')
+    for identity, binding in bindings.items():
+        if not isinstance(binding, dict):
+            raise ValueError('Isaac Sim asset binding must be an object')
+        _validate_fields(binding, field + '.asset_sources.' + identity, {'asset_id', 'relative_path', 'fix_base'})
+        if not all(isinstance(binding.get(key), str) and binding[key] for key in ('asset_id', 'relative_path')):
+            raise ValueError('Isaac Sim asset binding needs asset_id and relative_path')
     grpc = isaac.get('grpc', {})
     if not isinstance(grpc, dict):
         raise ValueError(f'providers.{ISAAC_PROVIDER}.grpc must be a JSON object')
-    _validate_fields(grpc, f'providers.{ISAAC_PROVIDER}.grpc', {'host', 'port', 'timeout_seconds'})
+    _validate_fields(grpc, f'providers.{ISAAC_PROVIDER}.grpc', {'host', 'port', 'timeout_seconds', 'token_env', 'tls_ca_file'})
+    _validate_token(grpc, f'providers.{ISAAC_PROVIDER}.grpc')
     if grpc.get('host') is not None:
         isaac_endpoint(grpc)
     if 'timeout_seconds' in grpc and (type(grpc['timeout_seconds']) is not int or grpc['timeout_seconds'] <= 0):

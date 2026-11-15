@@ -67,6 +67,8 @@ def package_capture(directory, release, evidence, *, stop=None):
     report = json.loads(files['report.json'].read_text())
     if report.get('scene_format') == 'usdc':
         files['scene.usdc'] = capture_file(capture, 'scene.usdc')
+    if (capture / 'scene.usdz').is_file():
+        files['scene.usdz'] = capture_file(capture, 'scene.usdz')
     for resource in report.get('scene_resources', []):
         relative = resource['file']
         files[relative] = capture_file(capture, relative)
@@ -83,6 +85,10 @@ def package_capture(directory, release, evidence, *, stop=None):
         for suffix in ('.json', '_depth.npy', '_semantic.npy', '_instance.npy'):
             relative = stem.as_posix() + suffix
             files[relative] = capture_file(capture, relative)
+        for suffix in ('_normal_world.npy', '_range.npy', '_valid.npy'):
+            relative = stem.as_posix() + suffix
+            if (capture / relative).is_file():
+                files[relative] = capture_file(capture, relative)
 
     dependencies = {
         'asset_dependencies': evidence.get('asset_dependencies', []),

@@ -1,5 +1,5 @@
 {
-  "config_version": 4,
+  "config_version": 5,
   "dsh": {
     "repository": "https://github.com/EurecaMoment/deepseek-harness4BenchForge.git",
     "path": "third_party/deepseek-harness4BenchForge",
@@ -49,14 +49,17 @@
       "token_env": null,
       "timeout_seconds": 1800
     },
-    "IssacSim4A100": {
-      "mode": "grpc",
+    "IsaacSim4A100": {
       "grpc": {
         "host": null,
         "port": 50051,
         "timeout_seconds": 60
       },
-      "capture_timeout_seconds": 1800
+      "capture_timeout_seconds": 1800,
+      "max_concurrent_captures": 4,
+      "image_size": 768,
+      "samples_per_pixel": 32,
+      "asset_sources": {}
     }
   }
 }

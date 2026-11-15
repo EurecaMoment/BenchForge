@@ -12,7 +12,13 @@ from pipelines.benchmark.execution.repair import repair_plan as pipeline_repair_
 from capabilities.evaluation.benchmark.protocol_scores import evaluate as pipeline_evaluate
 from pipelines.benchmark.execution.stage_review import call as stage_review
 
+def isaac_sim(args, directory, config):
+    # Catalog-only/base installations do not need the optional gRPC dependencies.
+    from capabilities.isaac_sim.tool_api import execute
+    return execute(args, directory, config)
+
 OPERATIONS={
+ 'isaac_sim':isaac_sim,
  'stage_review':stage_review,
  'pipeline_catalog':pipeline_catalog,'pipeline_plan':pipeline_plan,
  'pipeline_run':pipeline_run,'pipeline_status':pipeline_status,

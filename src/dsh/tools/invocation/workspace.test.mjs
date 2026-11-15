@@ -18,9 +18,9 @@ async function files(t) {
 }
 
 test('known spellings resolve only to an admitted canonical tool', () => {
-  const visible = new Set(['benchforge_pipeline_catalog', 'benchforge_model_isaacsim_grpc']);
+  const visible = new Set(['benchforge_pipeline_catalog', 'benchforge_isaac_sim']);
   const tools = {executable: name => visible.has(name)};
-  for (const name of ['pipeline_catalog', 'benchmarkforge_pipeline_catalog', 'benchmarkforge_model_isaacsim_grpc'])
+  for (const name of ['pipeline_catalog', 'benchmarkforge_pipeline_catalog', 'benchmarkforge_isaac_sim'])
     assert.equal(resolveToolName(tools, {name}), canonicalToolName(name));
   for (const name of ['benchmarkforge_missing', 'benchforch_pipeline_catalog', 'run', 'bash'])
     assert.equal(resolveToolName(tools, {name}), name);

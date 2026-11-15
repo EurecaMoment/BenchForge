@@ -6,9 +6,10 @@
 	path = third_party/DSpark4A100
 	url = https://github.com/EurecaMoment/DSpark4A100.git
 	shallow = true
-[submodule "third_party/IssacSim4A100"]
-	path = third_party/IssacSim4A100
-	url = https://github.com/EurecaMoment/IssacSim4A100.git
+[submodule "third_party/IsaacSim4A100"]
+	path = third_party/IsaacSim4A100
+	url = https://github.com/EurecaMoment/IsaacSim4A100.git
+	branch = A100
 	shallow = true
 [submodule "third_party/FastSAM3"]
 	path = third_party/FastSAM3

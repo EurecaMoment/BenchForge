@@ -275,7 +275,7 @@ def main():
                 if task['state'] not in {'SUCCEEDED', 'FAILED_FINAL', 'CANCELED'}:
                     save(root/'progress.json', {'state':'capturing','current':record['name'],'run_id':record['run_id'],
                          'phase':task.get('unit',{}).get('phase'),'finished':completed,'targets':len(targets),'updated_at':time.time()})
-                    # Review uses the model pool, not the Isaac capture worker.
+                    # Review uses the model pool, not the Isaac Sim capture stage.
                     # Permit the next single capture while a previous one reviews.
                     if task.get('unit',{}).get('phase')=='review':continue
                     break

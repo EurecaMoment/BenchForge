@@ -47,7 +47,7 @@ flowchart TB
 本分支安装一个自定义 **BenchForge** 预设（`benchforge`）。
 “评测工作台”按钮展开、收起右侧工作台；切换显示保留同一会话、输入草稿和执行状态。
 
-基础安装不需要 GPU、模型密钥或 Isaac。模型问答、图像生成和仿真采集需要另外配置对应服务。
+基础安装不需要 GPU、模型密钥或 Isaac Sim。模型问答、图像生成和仿真采集需要另外配置对应服务。
 
 ## Current capabilities
 
@@ -61,7 +61,7 @@ The task/template catalog and the separate spatial-learning capability graph ser
 ## Third-party provider libraries
 
 [`third_party/`](third_party/README.md) includes pinned Git submodules for
-the DSH runtime, FastTrellis2, DSpark4A100, IssacSim4A100, FastSAM3, FastFLUX2Klein, FastDA3, and FastQwen.
+the DSH runtime, FastTrellis2, DSpark4A100, IsaacSim4A100, FastSAM3, FastFLUX2Klein, FastDA3, and FastQwen.
 After pulling this repository, download their sources with:
 
 ```bash
@@ -74,7 +74,7 @@ own README to install its environment, weights, and service.
 
 ## Configuration
 
-`config/benchforge.example.json` is the configuration template. `benchforge_app.py init` creates the private `config/benchforge.local.json`. Set ports, paths, models, the database, and worker connections in that file. `benchforge_app.py sync` generates the runtime files used by BenchForge, DSH, and Compose.
+`config/benchforge.example.json` is the configuration template. `benchforge_app.py init` creates the private `config/benchforge.local.json`. Set ports, paths, models, the database, and the Isaac Sim gRPC endpoint in that file. `benchforge_app.py sync` generates the runtime files used by BenchForge, DSH, and Compose.
 
 BenchForge uses one server configuration as the source for its execution mode and scene policy. In `production` mode, a valid scene policy is required. The client and DSH plugin read the resolved service URL and credentials without changing the server's environment.
 
@@ -216,10 +216,9 @@ ss -ltnp | grep -E ':(3092|3858|55548)\b' || true
 | `server` | 本机 BenchForge API 端口、对客户端公开的服务地址、产物目录、场景策略和认证环境变量名。 |
 | `database` | PostgreSQL 端口、Compose 项目名和密码环境变量名。复用外部数据库时设置 `url` 或 `url_env`。 |
 | `client` | DSH 和 CLI 连接的 BenchForge 后端。默认使用本机服务，亦可填 `service_config` 或 `service_url`。 |
-| `worker` | 采集进程的身份、运行目录和连接设置。 |
 | `providers` | 六个 `third_party/` 提供方。包括 OpenAI 对话模型、四个 HTTP 工具和 Isaac 采集。 |
 
-`init` 和 `sync` 生成 `config/generated/` 下的服务端、客户端、worker 和 Compose 配置。
+`init` 和 `sync` 生成 `config/generated/` 下的服务端、客户端和 Compose 配置。
 `dsh-setup` 生成 DSH 预设。配置中的相对路径以 `config/benchforge.local.json` 所在目录为基准。
 例如将 `web.default_workspace` 设为 `../workspaces/benchforge`，重启后 Web 在没有已选工作区时使用该目录。
 已有部署更新 DSH 子模块版本后，先运行 `python benchforge_app.py dsh-setup` 构建锁定的 DSH，再启动 Web。
@@ -349,38 +348,34 @@ docker ps --filter "label=com.docker.compose.project=$project" --filter 'label=c
 | `FastSAM3` | `benchforge_scene_sam3` 调用 Chat Completions，获取文本或框提示对应的分割掩码。 |
 | `FastDA3` | `benchforge_depth` 调用 Depth Estimations，保存预测深度、相机参数和预览。 |
 | `FastTrellis2` | `benchforge_trellis` 提交 3D 任务并下载 Y-up GLB。用 `benchforge_mesh_import` 注册选中的网格。 |
-| `IssacSim4A100` | `benchforge_capture` 提交 SceneProgram 给采集 worker。 |
+| `IsaacSim4A100` | 后端直接调用 A100 gRPC；`benchforge_isaac_sim` 提供同一原生协议入口。 |
 
 四个 HTTP 提供方各自配置以 `/v1` 结尾的 `url`、`model` 和 `timeout_seconds`。
 需要认证时，把密钥变量名填入该提供方的 `token_env`，值从启动环境或
 `config/dsh.env` 读取。可在 `request_defaults` 中设置提供方 API 参数，例如
 FLUX 的 `num_inference_steps` 或 DA3 的 `process_res`。
 
-Isaac 默认用 `mode: "grpc"`。填 `grpc.host`、`grpc.port` 和每次 RPC 的
-`grpc.timeout_seconds`，用 `capture_timeout_seconds` 限制采集时长。
-该端点需实现 [IsaacSim 采集契约](src/capabilities/isaac_sim/grpc/isaac_sim.proto)，
-包括资产上传、作业状态和工件回传。仅提供 NVIDIA 原生 ControlPlane RPC 的端点需要在
-Isaac 服务侧提供这套采集契约。每个生成资产通过 `<asset_id>.zip` 上传，采集服务按
-作业 ID 解包并把资产挂到 SceneProgram 的对应对象。
+Isaac Sim 使用 [A100 分支原生协议](src/capabilities/isaac_sim/grpc/simulator.proto)，服务名为
+`a100sim.v1.Simulator`。在 `providers.IsaacSim4A100.grpc` 填写 `host`、`port` 和
+`timeout_seconds`；可选 `token_env`、`tls_ca_file`。`capture_timeout_seconds` 是观察期限，
+超时保留远端作业；`max_concurrent_captures` 控制后端并发场景数，默认 4。
 
-需要在装有 Isaac 的机器上本地采集时，把 `mode` 改为 `"local"`，填
-`local.python`（Isaac 的 Python 启动器，例如 Windows 的 `python.bat`）和
-`local.asset_root`，可配置 `local.idle_seconds`。worker 在相同启动参数的采集间复用
-Isaac 进程，并通过 `worker.runs` 里的请求和回执接管本机作业。
+启动 A100 仓库的 `serve-grpc.sh` 后，运行 `python benchforge_app.py sync` 并重启后端及 DSH。
+无需额外采集进程。DSH 原生工具 `benchforge_isaac_sim` 通过公共工具注册和执行器提供
+capabilities、catalog、assets、upload、submit、invoke、status、wait、cancel、download。
+先读取在线 catalog，再按其 schema 提交；返回 job_id 表示受理，只有 SUCCEEDED 和真实产物才能证明执行完成。
+CancelJob 只能取消服务尚未执行的作业，不能把断开观察当作 GPU 已停止。
 
-保存配置后运行 `python benchforge_app.py sync`。在采集机启动
-`python benchforge_app.py worker --config <worker-config>`，默认为
-`config/generated/worker.local.json`。生成文件携带 worker 令牌或环境变量名。
-重启 BenchForge 服务以加载变更，重启 worker 以切换 Isaac 端点或模式。
+`benchforge_capture` 将已保存的 SceneProgram 转换为 USD，通过同一 gRPC 接口导入、物理步进、
+多相机采集和下载；每批最多 32 个相机，更多机位分批保留。RGB、深度、法向和语义/实例 ID
+来自 A100 CUDA 输出，保持原有场景与数据验收。原生资产必须显式配置 `asset_sources` 的
+asset_id/relative_path，不能自动以简化几何代替机器人。A100 没有 RTX：纹理、RTX 专属字段或
+尚未映射的 SceneProgram 交互会明确拒绝；机器人控制和并行采集通过原生 session/world 接口使用。
 
-在已安装后端包的 Python 环境中运行
-`python -m capabilities.isaac_sim.grpc.mock_server --port 50051`，可用本机
-`127.0.0.1:50051` 验证传输。模拟结果带 `mock` 标记。
-
-已有配置请按示例更新为 `config_version: 4`，把各服务端点填到对应提供方。保留现有
-`web`、`server`、`database`、`client` 和 `worker` 的部署值。移除顶层
-`inference`、提供方里的 `gateway_tool` 和本地模型部署参数，包括 `server.gpu_candidates`。
-本地 Isaac 的资产目录填写在 `providers.IssacSim4A100.local.asset_root`。
+版本 4 的本地配置由 `sync` 迁移到版本 5，先保存旧配置副本再统一提供方拼写，移除旧采集连接配置。
+数据库历史、会话和产物保留。旧的设备租约需运行一次
+`python -m storage.scene_jobs.migrate_capture --config config/generated/benchforge-server.local.json`，
+它保存迁移前快照并将未完成的旧采集记录标记为需要显式恢复，不推测旧作业是否完成。
 
 ### 9. 停止、重启和更新
 
@@ -416,8 +411,9 @@ npm ci --prefix src/dsh
 升级旧版实例前，按上一节更新 `config/benchforge.local.json` 并保留原数据库连接和工件路径。
 启动时会更新本实例预设里的旧插件源码路径。独立维护的 DSH profile 使用
 [`src/dsh/presets/hot_update.py`](src/dsh/presets/hot_update.py) 更新。
-如果外置 Isaac dispatcher 引用了旧仓库绝对路径，按
-[dispatcher 迁移说明](src/capabilities/isaac_sim/deploy/dispatcher/DISPATCHER_OVERLAY.md) 重新应用 overlay。
+旧采集部署切换到 A100 gRPC 时，按
+[Isaac Sim 接入与迁移说明](src/capabilities/isaac_sim/README.md) 备份配置并迁移队列。
+历史产物保留；旧协议下未完成的采集需显式重试，不会在升级时自动重新执行。
 
 ### 10. 常见失败及处理
 

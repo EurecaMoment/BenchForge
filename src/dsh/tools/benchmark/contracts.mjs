@@ -1,4 +1,5 @@
 export const definitions = {
+  "isaac_sim": "Use the configured Isaac Sim A100 a100sim.v1.Simulator gRPC service. Read capabilities/catalog for exact native operations and parameter schemas; catalog feature_id selects one feature. submit/invoke return a durable job, never completion. request holds the native SubmitTask payload without request_id, or the selected feature arguments. Reuse request_id and unchanged payload after a lost reply. status/wait observe; download retrieves only job-manifest artifacts into this workspace. Cancellation is confirmed only by the native service and may reject a running GPU job. No additional process is needed.",
   "catalog": "Discover callable production tools and exact request examples. See exact request examples and the V2 task template catalog.",
   "status": "Read persisted operation results and artifact paths. Does not retry operations.",
   "plan": "Save a benchmark brief. Planning and capability choices belong to you; no fixed stage sequence.",
@@ -33,6 +34,17 @@ export const definitions = {
 };
 
 export const schemas = {
+  "isaac_sim": {
+    "action":{"type":"string","enum":["capabilities","catalog","assets","upload","submit","invoke","status","wait","cancel","download"],"required":true},
+    "feature_id":{"type":"string"},
+    "request":{"type":"object","additionalProperties":true},
+    "request_id":{"type":"string","description":"Stable identity for this exact native submission. Omit to use the DSH session/tool-call identity."},
+    "job_id":{"type":"string"},
+    "source_path":{"type":"string","description":"Existing upload source file in this conversation workspace."},
+    "asset_id":{"type":"string"},
+    "relative_path":{"type":"string"},
+    "timeout_seconds":{"type":"number","description":"Bounded observation wait, up to 60 seconds."}
+  },
   "stage_review": {
     "action": {
       "type": "string",

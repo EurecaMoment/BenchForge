@@ -62,7 +62,7 @@ def _render(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
         else:
             gaps.append("depth/segmentation modality absent from receipt")
         return _item("observed", observations, gaps, suggestions, truth_scope="rendered_pixels_and_declared_modalities")
-    return _item("declared" if cameras else "missing", observations, ["no completed multi-view render receipt"], ["render overview, oblique and task-facing views in desktop Isaac"], truth_scope="camera_proposal_only" if cameras else "none")
+    return _item("declared" if cameras else "missing", observations, ["no completed multi-view render receipt"], ["render overview, oblique and task-facing views through Isaac Sim gRPC"], truth_scope="camera_proposal_only" if cameras else "none")
 
 
 def _physics(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
@@ -71,7 +71,7 @@ def _physics(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     gaps = ["stability does not establish real-world mass, friction, damping or restitution"]
     suggestions = ["calibrate material and inertial parameters against measured or asset-authoritative references"]
     if physics.get("stable") is True:
-        observations.append("Isaac/PhysX reports a stable rollout")
+        observations.append("Isaac Sim/PhysX reports a stable rollout")
         level, scope = "observed", "rollout_stability_only"
     elif physics:
         observations.append("physics receipt exists but stability is not confirmed")

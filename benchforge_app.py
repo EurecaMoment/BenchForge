@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install and run the bundled BenchForge service and desktop dispatcher."""
+"""Install and run the bundled BenchForge service with native Isaac Sim gRPC."""
 import argparse
 import json
 import os
@@ -12,7 +12,6 @@ import venv
 
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / 'src'
-ISAAC_SIM = SOURCE / 'capabilities/isaac_sim'
 # The launcher can resolve configuration before installing the service environment.
 sys.path.insert(0, str(SOURCE))
 sys.path.insert(0, str(ROOT))
@@ -73,7 +72,7 @@ def sync_configuration(*, overrides=None):
 
 def _ensure_runtime_configuration():
     config = settings.read_object(CONFIG / 'benchforge.local.json', optional=True)
-    projections = (SERVER, *(GENERATED / name for name in ('database.env', settings.CLIENT_CONFIG, 'worker.local.json')))
+    projections = (SERVER, *(GENERATED / name for name in ('database.env', settings.CLIENT_CONFIG)))
     if config.get('config_version') != settings.CONFIG_VERSION or not all(path.is_file() for path in projections):
         sync_configuration()
 
@@ -121,7 +120,7 @@ def _database_command(project, stop):
         # Compose expands its required service environment even for down. The
         # running containers and volumes do not use this interpolation value.
         environment.setdefault('POSTGRES_PASSWORD', 'unused-for-container-stop')
-    command = ['docker', 'compose', '-p', name, '-f', str(ISAAC_SIM / 'deploy/compose.yml')]
+    command = ['docker', 'compose', '-p', name, '-f', str(SOURCE / 'server/deploy/compose.yml')]
     command += ['down'] if stop else ['up', '-d', '--wait']
     subprocess.run(command, env=environment, check=True)
 
@@ -170,9 +169,6 @@ def main():
     start = sub.add_parser('dsh-start')
     start.add_argument('--port', type=int)
     start.add_argument('--no-open', action='store_true')
-    worker = sub.add_parser('worker')
-    worker.add_argument('--config', type=Path)
-    worker.add_argument('--once', action='store_true')
     capture = sub.add_parser('capture')
     capture.add_argument('--program', type=Path, required=True)
     capture.add_argument('--request-key', required=True, help='Reuse this key to resume the same request')
@@ -212,15 +208,6 @@ def main():
             if args.no_open:
                 command.append('--no-open')
         subprocess.run(command, check=True)
-    elif args.command == 'worker':
-        profile = args.config or GENERATED / 'worker.local.json'
-        if args.config is None:
-            _ensure_runtime_configuration()
-        command = [str(backend_python()), '-m', 'capabilities.isaac_sim.processes.worker',
-                   '--config', str(profile.resolve())]
-        if args.once:
-            command.append('--once')
-        subprocess.run(command, env=build_environment(database=False), check=True)
     elif args.command == 'sync':
         sync_configuration()
     elif args.command == 'setting':

@@ -111,7 +111,7 @@ def _apply_model_environment(config):
             os.environ.pop(variable, None)
 
 
-def load_service_config(path, *, required_tokens=('operator', 'worker')):
+def load_service_config(path, *, required_tokens=('operator',)):
     """Load server configuration, resolve paths, and set its runtime environment."""
     path = Path(path).expanduser().resolve()
     config = read_json(path)
@@ -153,7 +153,7 @@ def load_service_config(path, *, required_tokens=('operator', 'worker')):
             raise ValueError('port must be between 1 and 65535')
         config['service_url'] = f"http://127.0.0.1:{port}"
 
-    for name in ('operator', 'worker'):
+    for name in ('operator',):
         _token(config, name, name in required_tokens)
     if config.get('database_url_env'):
         env_name = expand_environment(str(config['database_url_env']))
@@ -207,42 +207,4 @@ def load_service_config(path, *, required_tokens=('operator', 'worker')):
         env_name = _PATH_ENVIRONMENT[key]
         if key in config:
             os.environ[env_name] = config[key]
-    return config
-
-
-def load_worker_config(path):
-    """Load a desktop worker view derived from the referenced service config."""
-    path = Path(path).expanduser().resolve()
-    config = read_json(path)
-    if not isinstance(config, dict):
-        raise ValueError('BenchForge worker configuration must be a JSON object')
-    service_path = config.get('service_config')
-    service = read_json(resolve_path(service_path, path)) if service_path else {}
-    if service and not isinstance(service, dict):
-        raise ValueError('BenchForge service configuration must be a JSON object')
-    server_port = int(service.get('port', 3841))
-    server_host = service.get('service_host', '127.0.0.1')
-    canonical_url = service.get('service_url') or f'http://{server_host}:{server_port}'
-    service_url = environment_value('BENCHFORGE_SERVICE_URL')
-    config['url'] = expand_environment(str(config.get('url') or service_url or canonical_url)).rstrip('/')
-    if config.get('worker_token_env'):
-        env_name = expand_environment(str(config['worker_token_env']))
-        config['worker_token'] = environment_value(env_name)
-        if not config['worker_token']:
-            raise ValueError(f'worker_token_env references unset environment variable {env_name}')
-    elif service.get('worker_token_env'):
-        env_name = expand_environment(str(service['worker_token_env']))
-        config['worker_token'] = environment_value(env_name)
-        if not config['worker_token']:
-            raise ValueError(f'worker_token_env references unset environment variable {env_name}')
-    else:
-        config['worker_token'] = (service.get('worker_token') or config.get('worker_token') or
-                                  environment_value('BENCHFORGE_WORKER_TOKEN'))
-    if not config['worker_token']:
-        raise ValueError('Configure worker_token in service_config or set BENCHFORGE_WORKER_TOKEN')
-    for key in ('runs', 'ssh_config', 'asset_cache'):
-        if config.get(key):
-            config[key] = str(resolve_path(config[key], path))
-    if not config.get('ssh_forward'):
-        config['ssh_forward'] = f'{server_port}:127.0.0.1:{server_port}'
     return config

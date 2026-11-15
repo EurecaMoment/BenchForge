@@ -56,10 +56,10 @@ test('real native pipeline handles the reported typo once and logs both identiti
 
 test('configured gRPC tools share correction without duplicate registrations', async t => {
   const {register, call, invocations, agent} = await runtime(t);
-  register('benchforge_model_isaacsim_grpc');
-  const result = await call('benchmarkforge_model_isaacsim_grpc', {section: 'tasks', workspace: '/typo/root'});
+  register('benchforge_isaac_sim');
+  const result = await call('benchmarkforge_isaac_sim', {section: 'tasks', workspace: '/typo/root'});
   assert.equal(result.results[0].result.isError, false);
-  assert.deepEqual(invocations, [{name: 'benchforge_model_isaacsim_grpc', args: {section: 'tasks', workspace: agent.session.header.cwd}}]);
+  assert.deepEqual(invocations, [{name: 'benchforge_isaac_sim', args: {section: 'tasks', workspace: agent.session.header.cwd}}]);
 });
 
 test('normal calls bind workspace without a repetitive correction notice', async t => {

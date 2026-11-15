@@ -9,23 +9,17 @@ import re
 import secrets
 import shlex
 import tempfile
+import base64
 from urllib.parse import quote, urlsplit
 
-from service_access.configuration import isaac_config, validate_providers
+from service_access.configuration import validate_providers
 from service_access.runtime_config import expand_environment, read_json
 
 
-SECTIONS = ('web', 'server', 'database', 'client', 'worker')
+SECTIONS = ('web', 'server', 'database', 'client')
 SERVER_PATHS = ('artifacts', 'harness', 'task_root', 'scene_policy_path')
 CLIENT_PATHS = (*SERVER_PATHS, 'models_config', 'service_config')
-WORKER_PATHS = ('runs', 'ssh_config', 'asset_cache')
-ISAAC_WORKER_KEYS = {
-    'mode': 'isaac_mode',
-    'grpc': 'isaac_grpc',
-    'local': 'isaac_local',
-    'capture_timeout_seconds': 'capture_timeout_seconds',
-}
-CONFIG_VERSION = 4
+CONFIG_VERSION = 5
 DEPLOYMENT_DEFAULTS = {
     'web': {'port': 3081, 'default_workspace': None},
     'server': {
@@ -35,7 +29,6 @@ DEPLOYMENT_DEFAULTS = {
     },
     'database': {'project': 'benchforge', 'port': 55432, 'user': 'benchforge', 'name': 'benchforge'},
     'client': {},
-    'worker': {'worker_id': 'desktop-isaac-main'},
 }
 SERVER_CONFIG = 'benchforge-server.local.json'
 CLIENT_CONFIG = 'benchforge-client.local.json'
@@ -51,7 +44,7 @@ DEFAULT_POLICY = {
     'excluded_scene_groups': [],
     'excluded_paths': [],
 }
-API_NAMES = ('operator', 'worker')
+API_NAMES = ('operator',)
 
 
 def read_object(path, *, optional=False):
@@ -160,8 +153,7 @@ def text_value(value, field):
 def _file_path(value, directory, environment):
     expanded = expand_environment(value, environment)
     if os.name != 'nt' and PureWindowsPath(expanded).is_absolute():
-        # The Windows worker is often configured from a Linux Web/DB host.
-        # A drive/UNC path in its profile belongs to the worker machine.
+        # Preserve explicitly configured paths belonging to a different host.
         return expanded
     path = Path(expanded).expanduser()
     return str((directory / path).resolve())
@@ -206,9 +198,9 @@ def _inherit_defaults(values, defaults):
 def read_configuration(config, *, overrides=None):
     template = read_object(config / 'benchforge.example.json')
     path = config / 'benchforge.local.json'
-    local = read_object(path, optional=True)
-    if path.is_file() and local.get('config_version') != CONFIG_VERSION:
-        raise ValueError(f'Update {path} to config_version {CONFIG_VERSION} using benchforge.example.json')
+    original = read_object(path, optional=True)
+    from service_access.config_migration import migrate_configuration
+    local = migrate_configuration(original)
     known = {'config_version', 'dsh', 'providers', 'collectors', 'cleaning', *SECTIONS}
     if unknown := local.keys() - known:
         raise ValueError(f'Unknown BenchForge configuration sections: {", ".join(sorted(unknown))}')
@@ -222,8 +214,6 @@ def read_configuration(config, *, overrides=None):
     providers = registry.setdefault('providers', {})
     if isinstance(providers, dict):
         _inherit_defaults(providers, template['providers'])
-    if any(key in registry['worker'] for key in ISAAC_WORKER_KEYS.values()):
-        raise ValueError('Configure the Isaac endpoint and capture timeout under providers.IssacSim4A100')
     for name in ('web', 'server', 'database'):
         settings[name]['port'] = port(settings[name]['port'], f'{name}.port')
     default_workspace = settings['web']['default_workspace']
@@ -236,7 +226,7 @@ def read_configuration(config, *, overrides=None):
     registry['config_version'] = CONFIG_VERSION
     registry['dsh'] = template['dsh']
     validate_providers(registry)
-    return registry, local, environment
+    return registry, original, environment
 
 
 def _secret(credentials, field, size):
@@ -303,38 +293,6 @@ def _database_projection(database, environment, credentials):
     return resolved, env
 
 
-def _worker_projection(config, server, environment, credentials, config_dir):
-    profile = dict(config['worker'])
-    isaac = isaac_config(config)
-    for key, projected in ISAAC_WORKER_KEYS.items():
-        if key in isaac:
-            profile.setdefault(projected, isaac[key])
-    if profile.get('isaac_mode') == 'local':
-        profile['isaac_local'] = dict(profile['isaac_local'])
-        _resolve_paths(profile['isaac_local'], ('asset_root',), config_dir, environment)
-        # Keep the local interpreter or launcher path exactly as selected, including venv symlinks.
-        python = Path(expand_environment(profile['isaac_local']['python'], environment)).expanduser()
-        profile['isaac_local']['python'] = os.path.abspath(config_dir / python)
-    _resolve_paths(profile, (*WORKER_PATHS, 'service_config'), config_dir, environment)
-    reference = profile.get('service_config')
-    if not reference:
-        profile.setdefault('url', server['service_url'])
-        profile.setdefault('ssh_forward', f"{server['port']}:127.0.0.1:{server['port']}")
-        if not profile.get('worker_token_env'):
-            if server.get('worker_token_env'):
-                profile['worker_token_env'] = server['worker_token_env']
-            else:
-                profile['worker_token'] = server['worker_token']
-    if (profile.get('worker_token_env') == 'BENCHFORGE_WORKER_OVERRIDE_TOKEN'
-            and credentials.get('worker_override_token')):
-        profile.pop('worker_token_env')
-        profile['worker_token'] = credentials['worker_override_token']
-    for key in ('operator_token', 'operator_token_env', 'database_url', 'database_url_env',
-                'database', 'models_config'):
-        profile.pop(key, None)
-    return profile
-
-
 def sync_configuration(config, generated, server_path, state, *, overrides=None):
     path = config / 'benchforge.local.json'
     credentials_path = state / 'credentials.local.json'
@@ -342,10 +300,23 @@ def sync_configuration(config, generated, server_path, state, *, overrides=None)
         value, previous_value, environment = read_configuration(config, overrides=overrides)
         stored_credentials = read_object(credentials_path, optional=True)
         credentials = dict(stored_credentials)
+        retired = [generated / 'worker.local.json', generated / 'benchforge-worker.local.json']
+        retired_keys = [key for key in credentials if 'worker' in key]
+        if previous_value.get('config_version') == 4 or any(file.exists() for file in retired) or retired_keys:
+            backup = state / 'configuration-before-v5.json'
+            if not backup.exists():
+                write(backup, previous_value)
+            for file in [credentials_path, *retired]:
+                if file.is_file():
+                    target = state / 'retired-capture-config' / (file.name + '.json')
+                    if not target.exists():
+                        write(target, {'original_path': str(file),
+                                       'content_base64': base64.b64encode(file.read_bytes()).decode('ascii')})
+            for key in retired_keys:
+                credentials.pop(key)
         for scope, fields in (
-            ('server', {'operator_token': 'operator_token', 'worker_token': 'worker_token'}),
+            ('server', {'operator_token': 'operator_token'}),
             ('client', {'operator_token': 'client_operator_token'}),
-            ('worker', {'worker_token': 'worker_override_token'}),
         ):
             for field, key in fields.items():
                 token = value[scope].pop(field, None)
@@ -376,7 +347,6 @@ def sync_configuration(config, generated, server_path, state, *, overrides=None)
             client.pop('operator_token_env')
             client['operator_token'] = credentials['client_operator_token']
 
-        worker = _worker_projection(value, server, environment, credentials, config)
         policy = server.get('scene_policy_path')
         default_policy = generated / 'scene-library/policy.json'
         if policy and Path(policy) == default_policy.resolve() and not default_policy.exists():
@@ -385,7 +355,6 @@ def sync_configuration(config, generated, server_path, state, *, overrides=None)
             write(credentials_path, credentials)
         write(server_path, server)
         write(generated / CLIENT_CONFIG, client)
-        write(generated / 'worker.local.json', worker)
         write_text(db_file, ''.join(f'{key}={item}\n' for key, item in database_env.items()))
         saved = {
             key: item for key, item in value.items() if key not in SECTIONS
@@ -399,7 +368,7 @@ def sync_configuration(config, generated, server_path, state, *, overrides=None)
                 or item != DEPLOYMENT_DEFAULTS[name].get(key)
             }
             if section and name == 'server':
-                for key in ('operator_token_env', 'worker_token_env'):
+                for key in ('operator_token_env',):
                     if section.get(key) is None:
                         section.pop(key, None)
             if section and name == 'database':
@@ -409,5 +378,11 @@ def sync_configuration(config, generated, server_path, state, *, overrides=None)
             if section:
                 saved[name] = section
         if saved != previous_value or not path.exists():
+            if path.exists() and previous_value.get('config_version') == 4:
+                backup = state / 'configuration-before-v5.json'
+                if not backup.exists():
+                    write(backup, previous_value)
             write(path, saved)
+        for file in retired:
+            file.unlink(missing_ok=True)
     return value

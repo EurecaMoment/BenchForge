@@ -4,26 +4,19 @@ import signal
 import hmac
 from http.server import BaseHTTPRequestHandler
 from http.server import ThreadingHTTPServer
-import io
 import html
 import json
 import logging
 from pathlib import Path
 import threading
-import zipfile
 from urllib.parse import quote
 from urllib.parse import urlparse
 from urllib.parse import unquote
 from storage.files import safe_path
 from storage.scene_jobs.store import Store
-from storage.scene_jobs.store import uid
 from pipelines.scene_production.engine import coordinate
 from capabilities.asset_generation.generation import GenerationTools
 from capabilities.scene_authoring.catalog.capabilities import scene_contract_capabilities
-from capabilities.capture.capture_transfer import CaptureTransfer
-from capabilities.capture.capture_transfer import CHUNK_BYTES
-from capabilities.capture.capture_transfer import validate_capture
-from capabilities.capture.capture_transfer import decode_chunk
 from capabilities.scene_authoring.program_submission import read_program_submission
 from capabilities.asset_generation.layout import start_design_request
 from capabilities.asset_generation.layout import require_prior_reference
@@ -104,12 +97,11 @@ def main():
     from service_access.runtime_config import load_service_config
     config=load_service_config(args.config)
     store=Store(config['artifacts'],config.get('harness'),config.get('database_url'))
-    transfer=CaptureTransfer(store)
+    from storage.scene_jobs.migrate_capture import migrate_capture
+    logging.getLogger(__name__).info('Capture protocol migration: %s', migrate_capture(store))
     stop=threading.Event()
-    # Recover only FIT stages; desktop stages require the same worker to reconcile.
-    for task in store.all_work():
-        if task['state']=='RUNNING' and task['unit']['phase'] in {'plan','review','asset','dataset','layout','generation'}:store.update(task['id'],state='PENDING')
-    thread=threading.Thread(target=coordinate,args=(store,stop),daemon=True);thread.start()
+    thread=threading.Thread(target=coordinate,args=(store,stop),kwargs={'config':config},daemon=True)
+    thread.start()
 
     class Handler(BaseHTTPRequestHandler):
         def fail(self, exc):
@@ -152,8 +144,7 @@ def main():
                 self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
             except Exception as exc:self.fail(exc)
         def do_POST(self):
-            role='worker' if self.path.startswith('/worker/') else 'operator'
-            if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+config[role+'_token']):self.reply({'error':'unauthorized'},401);return
+            if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+config['operator_token']):self.reply({'error':'unauthorized'},401);return
             if self.path == '/dataset':
                 self.reply({
                     'error':'Legacy dataset jobs are retired. Use data.capability or POST /start with target_items.',
@@ -161,29 +152,12 @@ def main():
                 return
             try:
                 length=int(self.headers.get('Content-Length','0'))
-                limit=CHUNK_BYTES if self.path=='/worker/upload-chunk' else 250*1024*1024 if self.path=='/worker/upload' else 2*1024*1024
+                limit=2*1024*1024
                 if self.path in WORKBENCH_QUERIES:
                     limit = 4096
                 if length<0 or length>limit:raise ValueError('request size exceeds endpoint limit')
                 raw=self.rfile.read(length)
                 if len(raw)!=length:raise ValueError('incomplete request body')
-                if self.path=='/worker/upload-chunk':
-                    job=json.loads(self._upload_header('Job'))
-                    self.request_task_id = job.get('task_id')
-                    chunk=decode_chunk(raw,self._upload_header('Encoding','identity'))
-                    self.reply(transfer.chunk(job,self._upload_header('File'),int(self._upload_header('Offset')),chunk));return
-                if self.path=='/worker/upload':
-                    job=json.loads(self._upload_header('Job'))
-                    self.request_task_id = job.get('task_id')
-                    directory=Path(config['artifacts'])/'staging'/uid('upload');directory.mkdir(parents=True)
-                    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-                        if len(archive.infolist())>100 or sum(x.file_size for x in archive.infolist())>500*1024*1024:raise ValueError('capture bundle too large')
-                        for member in archive.infolist():
-                            target=safe_path(directory,member.filename)
-                            if member.is_dir() or (member.external_attr>>16)&0o170000==0o120000:raise ValueError('unsupported archive member')
-                            target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(archive.read(member))
-                    validate_capture(directory,job,store)
-                    self.reply(store.commit_capture(job,directory));return
                 value=json.loads(raw or b'{}')
                 self.request_run_id = value.get('run_id') if isinstance(value, dict) else None
                 self.request_task_id = value.get('task_id') if isinstance(value, dict) else None
@@ -243,36 +217,14 @@ def main():
                 elif self.path=='/download':
                     task_id=value['task_id'];snap=store.snapshot(task_id.split('.')[0]);task=next(t for t in snap['tasks'] if t['id']==task_id)
                     directory=store.root/task_id/('revision_'+str(value.get('revision',task['unit']['revision'])));file=safe_path(directory,value['file'],must_exist=True)
-                    if file.suffix not in {'.zip','.json','.jsonl','.usda','.glb','.png','.jpg','.jpeg','.npy','.npz','.ply','.obj','.gltf','.bin','.mp4'}:raise ValueError('unsupported artifact download')
+                    if file.suffix not in {'.zip','.json','.jsonl','.usda','.usdc','.usdz','.glb','.png','.jpg','.jpeg','.npy','.npz','.ply','.obj','.gltf','.bin','.mp4'}:raise ValueError('unsupported artifact download')
                     self.binary(file.read_bytes(),'application/octet-stream')
-                elif self.path=='/worker/asset':
-                    from capabilities.scene_authoring.validation.program import ident
-                    asset_id=ident(value['asset_id']);folder=safe_path(store.root/'generated_assets',asset_id)
-                    if not folder.is_dir() or not (folder/'mesh.json').is_file():raise ValueError('registered asset directory unavailable')
-                    bundle=io.BytesIO()
-                    with zipfile.ZipFile(bundle,'w',zipfile.ZIP_DEFLATED) as archive:
-                        for path in folder.rglob('*'):
-                            if path.is_file() and path.suffix.lower() in {'.json','.glb','.png','.jpg','.jpeg','.exr','.bin','.npz'}:
-                                archive.write(path,path.relative_to(folder).as_posix())
-                    self.binary(bundle.getvalue())
                 elif self.path=='/inspect':
                     state=store.snapshot(value['run_id'])
                     self.reply({'run_id':value['run_id'],'state':state['state'],'gallery_url':gallery_path(value['run_id']),'tasks':[{**{k:t.get(k) for k in ('id','state','unit','result','failure')},'downloads':[p.relative_to(store.directory(t['id'],t['unit']['revision'])).as_posix() for p in store.directory(t['id'],t['unit']['revision']).glob('release/*.zip')]} for t in state['tasks']]})
                 elif self.path=='/cancel':store.cancel(value['run_id']);self.reply({'cancel_requested':True})
-                elif self.path=='/worker/claim':self.reply(store.claim_desktop(value['worker_id']))
-                elif self.path=='/worker/heartbeat':
-                    # Older dispatchers omitted revision; preserve their cancellation check during rollout.
-                    if 'revision' not in value:
-                        snap=store.snapshot(value['task_id'].split('.')[0]);self.reply({'cancel':snap['state']=='CANCELED'})
-                    else:self.reply(store.worker_update({**{k:value[k] for k in ('task_id','revision','token')},'transport_retry':value.get('transport_retry',0)},progress=value.get('progress')))
-                elif self.path=='/worker/finish':self.reply(store.worker_update(value['job'],outcome=value['outcome'],processes_stopped=value.get('processes_stopped'),error=value.get('error'),capture_complete=value.get('capture_complete'),capture_receipt=value.get('capture_receipt')))
-                elif self.path=='/worker/upload-begin':self.reply(transfer.begin(value['job'],value['files']))
-                elif self.path=='/worker/upload-commit':self.reply(transfer.commit(value['job']))
                 else:self.reply({'error':'unknown operation'},404)
             except Exception as exc:self.fail(exc)
-        def _upload_header(self, name, default=None):
-            return self.headers.get(f'X-BenchForge-{name}', self.headers.get(f'X-SpatialForge-{name}', default))
-
     server=ThreadingHTTPServer(('127.0.0.1',config.get('port',3841)),Handler)
     try:server.serve_forever()
     finally:stop.set();server.server_close()

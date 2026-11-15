@@ -8,8 +8,8 @@
       "path": "third_party/DSpark4A100",
       "usage": "Large-model inference and serving"
     },
-    "IssacSim4A100": {
-      "path": "third_party/IssacSim4A100",
+    "IsaacSim4A100": {
+      "path": "third_party/IsaacSim4A100",
       "usage": "Isaac Sim deployment and simulation support on A100"
     },
     "FastSAM3": {

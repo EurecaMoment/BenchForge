@@ -24,11 +24,11 @@
 | --- | --- |
 | `asset_generation/` | 资产生成、布局参考、网格处理和资产审查。 |
 | `benchmark_design/` | 评测设计契约、模板和校验。 |
-| `capture/` | 采集记录、工件传输、观测证据和恢复。 |
+| `capture/` | 采集范围、图像质量检查和通用观测证据。 |
 | `data_acquisition/` | 模拟器采集器、证据导入、清洗和测量。 |
 | `dataset_authoring/` | 题目契约、证据数据集、空间任务生成、打包和导出。 |
 | `evaluation/` | 评测协议评分、基线与报告，以及空间任务评分和评估。 |
-| `isaac_sim/` | Isaac 场景执行、相机、渲染、交互采集、gRPC、模拟端点和常驻进程接管。 |
+| `isaac_sim/` | Isaac Sim 原生 A100 gRPC、作业回执、场景编译、并发采集和证据适配。 |
 | `literature/` | 研究资料提取和整理。 |
 | `scene_authoring/` | SceneProgram 契约、原生资产目录、几何、机位、预检和验收。 |
 | `scene_library/` | 场景目录、源策略、会话选择、预览及修复上下文。 |
@@ -37,7 +37,7 @@
 
 `capabilities/`、`storage/` 和 `service_access/` 仅依赖底层模块，禁止反向导入 `pipelines/`、`server/`、`ui/` 和 `dsh/`。
 评测流程负责把活动评测计划的完成度投影到场景目录，场景目录的通用查询和文件索引在能力层完成。
-模型推理由配置的 HTTP/OpenAI 提供方执行，Isaac 连接和采集执行由 `capabilities/isaac_sim/` 管理。
+模型推理由配置的 HTTP/OpenAI 提供方执行，Isaac Sim 连接和采集执行由 `capabilities/isaac_sim/` 管理。
 
 DSH 只安装一个 `benchforge` 预设。工作台在同一会话的右侧栏展开、收起，保留草稿和执行状态。
 `dsh/remote/` 声明工作台契约，`ui/workbench/` 使用据此生成的客户端调用 Host。
@@ -66,11 +66,10 @@ src/
 │   │   └── contracts.py
 │   ├── capture/
 │   │   ├── __init__.py
-│   │   ├── capture_recovery.py
 │   │   ├── capture_scope.py
-│   │   ├── capture_transfer.py
 │   │   ├── observation.py
-│   │   └── operator_evidence.py
+│   │   ├── operator_evidence.py
+│   │   └── quality.py
 │   ├── data_acquisition/
 │   │   ├── collectors/
 │   │   │   ├── __init__.py
@@ -129,60 +128,13 @@ src/
 │   │   │   └── scoring.py
 │   │   └── __init__.py
 │   ├── isaac_sim/
-│   │   ├── appearance/
-│   │   │   ├── __init__.py
-│   │   │   ├── gaussian_visual.py
-│   │   │   ├── imported_appearance.py
-│   │   │   ├── material_controls.py
-│   │   │   └── native_appearance.py
-│   │   ├── capture/
-│   │   │   ├── __init__.py
-│   │   │   ├── camera_controls.py
-│   │   │   ├── capture_images.py
-│   │   │   ├── interaction_recording.py
-│   │   │   └── isaac_capture.py
-│   │   ├── capture_requests/
-│   │   │   ├── __init__.py
-│   │   │   ├── camera_trajectory.py
-│   │   │   ├── robot_contact.py
-│   │   │   └── trajectory.py
-│   │   ├── deploy/
-│   │   │   ├── dispatcher/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── deploy_dispatcher_overlay.py
-│   │   │   │   ├── dispatcher_overlay.example.json
-│   │   │   │   ├── DISPATCHER_OVERLAY.md
-│   │   │   │   ├── dispatcher_overlay.py
-│   │   │   │   ├── dsh_a800_worker-late-cancel.patch
-│   │   │   │   └── worker_cancellation.py
-│   │   │   ├── __init__.py
-│   │   │   ├── compose.yml
-│   │   │   └── requirements-preview.txt
-│   │   ├── grpc/
-│   │   │   ├── __init__.py
-│   │   │   ├── client.py
-│   │   │   ├── isaac_sim.proto
-│   │   │   ├── isaac_sim_pb2.py
-│   │   │   ├── isaac_sim_pb2_grpc.py
-│   │   │   └── mock_server.py
-│   │   ├── processes/
-│   │   │   ├── __init__.py
-│   │   │   ├── dispatcher_control.py
-│   │   │   ├── isaac_resident.py
-│   │   │   └── worker.py
-│   │   ├── rendering/
-│   │   │   ├── __init__.py
-│   │   │   ├── light_geometry.py
-│   │   │   ├── object_shadows.py
-│   │   │   └── render_quality.py
-│   │   ├── scene/
-│   │   │   ├── __init__.py
-│   │   │   ├── primitive_geometry.py
-│   │   │   ├── robot_contact.py
-│   │   │   ├── scene_export.py
-│   │   │   └── scene_runtime.py
-│   │   ├── __init__.py
-│   │   ├── LICENSE
+│   │   ├── grpc/                 # Upstream A100 protocol, transport and durable requests
+│   │   ├── capture_requests/     # Scene action validation/data contracts
+│   │   ├── authoring.py          # SceneProgram to portable USD
+│   │   ├── capture_stage.py      # Direct gRPC pipeline stage
+│   │   ├── evidence.py           # Native receipts and capture artifacts
+│   │   ├── recovery.py           # Resume/restart semantics
+│   │   ├── tool_api.py           # Public DSH operation adapter
 │   │   └── README.md
 │   ├── literature/
 │   │   ├── __init__.py
@@ -365,6 +317,8 @@ src/
 │   ├── __init__.py
 │   └── catalog.py
 ├── server/
+│   ├── deploy/
+│   │   └── compose.yml
 │   ├── __init__.py
 │   ├── cli.py
 │   ├── http_api.py
@@ -381,6 +335,7 @@ src/
 │   └── training_monitor.py
 ├── service_access/
 │   ├── __init__.py
+│   ├── config_migration.py
 │   ├── configuration.py
 │   ├── http_tools.py
 │   ├── model_inference.py
@@ -394,6 +349,7 @@ src/
 │   ├── scene_jobs/
 │   │   ├── __init__.py
 │   │   ├── metadata.py
+│   │   ├── migrate_capture.py
 │   │   ├── store.py
 │   │   └── workbench_queries.py
 │   ├── __init__.py

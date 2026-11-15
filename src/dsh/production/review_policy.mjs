@@ -13,7 +13,7 @@ const reads = new Set(['read', 'read_image', 'read_file', 'list_directory', 'lis
   'benchforge_scene_status', 'benchforge_scene_evidence', 'benchforge_wait', 'benchforge_scene_catalog']);
 const writes = new Set(['write', 'edit', 'str_replace_editor']);
 const inspections = new Set(['capabilities', 'health', 'healthz', 'status', 'catalog', 'api_catalog',
-  'get_job', 'watch_job', 'download_artifact']);
+  'get_job', 'watch_job', 'download_artifact', 'assets', 'wait', 'download']);
 
 function draftWrite(exec, workspace) {
   if (!writes.has(exec.name)) return false;
@@ -35,7 +35,7 @@ export function reviewDenial(exec, review, workspace) {
   if (exec.name === 'benchforge_pipeline_plan') return; // Validated drafts/revisions are domain-owned.
   if (exec.name === 'benchforge_stage_review' &&
       ['status', 'wait', 'pause', 'acknowledge', 'open'].includes(args.action || 'status')) return;
-  if (/^benchforge_model_isaacsim_(grpc|http)$/.test(exec.name) && inspections.has(args.action)) return;
+  if (exec.name === 'benchforge_isaac_sim' && (inspections.has(args.action) || args.action === 'cancel')) return;
   return {
     reason: `${review.stage} ${stageName(review.stage)} 的审核尚未结束（${review.state}）。先展示真实产物并用 benchforge_stage_review 等待或处理用户指令。可读取、检查和编辑 tasks/ 下的准备稿；依赖该阶段的生产、脚本执行和仿真提交须等审核放行。S2 选取或新建并验收场景；S3 采集轨迹、观测及标注。`,
     info: {name: 'ProductionReviewError', code: 'STAGE_REVIEW_PENDING'},

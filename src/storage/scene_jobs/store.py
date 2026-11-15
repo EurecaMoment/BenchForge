@@ -30,7 +30,6 @@ class Store:
         self.repo=Repository(resolve_database_url(harness,database_url))
         meta=MetaData()
         self.keys=Table('benchforge_request_keys',meta,Column('id',String,primary_key=True),Column('run_id',String))
-        self.device=Table('benchforge_devices',meta,Column('id',String,primary_key=True),Column('record',JSON))
         with self.repo.transaction() as conn:
             self.repo.lock_queue(conn)
             meta.create_all(conn)
@@ -133,6 +132,8 @@ class Store:
                 raise ValueError(f'task {tid} state changed before update')
             if expected_owner is not None and old['lease_owner'] != expected_owner:
                 raise ValueError(f'task {tid} stage lease ownership changed')
+            if expected_owner is not None and (old['lease_expires_at'] or 0) <= time.time():
+                raise ValueError(f'task {tid} stage lease expired')
             if run['state']=='CANCELED' and fields.get('state')!='CANCELED':return
             if fields.get('state')=='SUCCEEDED' and old['unit'].get('workflow','scene')=='scene':
                 from capabilities.scene_authoring.validation.acceptance import require_accepted
@@ -156,11 +157,11 @@ class Store:
             self.repo.event(c,old['run_id'],tid,'benchforge.transition',{'state':fields.get('state',old['state']),'phase':fields.get('unit',old['unit']).get('phase')})
 
     def claim_stage(self, tid, owner, lease_seconds=60):
-        """Atomically claim or recover one non-capture stage for a single owner."""
+        """Atomically claim or recover any pipeline stage for a single owner."""
         now = time.time()
         with self.repo.transaction() as c:
             task = c.execute(select(tasks).where(tasks.c.id == tid).with_for_update()).mappings().first()
-            if not task or task['unit'].get('phase') == 'capture':
+            if not task:
                 return None
             run = c.execute(select(runs).where(runs.c.id == task['run_id']).with_for_update()).mappings().one()
             if run['state'] == 'CANCELED' or (task.get('ready_at') or 0) > now:
@@ -215,6 +216,7 @@ class Store:
                     tasks.c.id == tid,
                     tasks.c.state == 'RUNNING',
                     tasks.c.lease_owner == owner,
+                    tasks.c.lease_expires_at > now,
                 )
                 .values(lease_expires_at=now + lease_seconds)
             )
@@ -222,8 +224,8 @@ class Store:
 
     def retry(self,tid,feedback=None,capture_mode='auto'):
         """Retain old attempts and retry the failed stage; never mutate successful products."""
-        if capture_mode not in {'auto','resume_upload','restart_capture'}:
-            raise ValueError('capture_mode must be auto, resume_upload or restart_capture')
+        if capture_mode not in {'auto','resume','restart'}:
+            raise ValueError('capture_mode must be auto, resume or restart')
         if feedback is not None and (not isinstance(feedback,str) or not 1<=len(feedback)<=12000):
             raise ValueError('retry feedback must be 1..12000 characters')
         with self.repo.transaction() as c:
@@ -263,23 +265,9 @@ class Store:
                 unit.update(review_transport_recovery_id=recovery_id,previous_review_transport_retries=unit.get('review_transport_retries',0),review_transport_retries=0)
             if policy_for(self.root) and phase=='review':unit['review_transport_retries']=unit.get('review_transport_retries',0)+1
             if phase=='capture' and (task.get('failure') or {}).get('stage') in {'capture_transport','capture_execution'}:
-                # A crash needs a fresh executor attempt. A completed capture only needs upload.
-                ended=unit.pop('worker_end',{})
-                receipt=ended.get('capture_receipt')
-                if receipt is not None:
-                    from capabilities.capture.capture_recovery import require_capture_receipt
-                    require_capture_receipt(receipt,self._job(task,ended['token']))
-                mode=capture_mode
-                if mode=='auto':mode='resume_upload' if receipt is not None else 'restart_capture'
-                unit.pop('resume_capture_token',None)
-                unit.pop('capture_resume_receipt',None)
-                if mode=='resume_upload':
-                    if receipt is None:raise ValueError('resume_upload needs a validated native capture receipt; restart_capture recovers unfinished execution')
-                    unit['resume_capture_token']=ended['token']
-                    unit['capture_resume_receipt']=receipt
-                unit['capture_recovery_mode']=mode
-                unit['capture_attempt_history']=[*unit.get('capture_attempt_history',[]),{**ended,'recovery_mode':mode}]
-                unit['transport_retry']=unit.get('transport_retry',0)+1
+                from capabilities.isaac_sim.recovery import prepare_retry
+                unit = prepare_retry(self.directory(tid, unit['revision']), unit, capture_mode,
+                    retired_protocol=(task.get('failure') or {}).get('code') == 'CAPTURE_PROTOCOL_MIGRATED')
             if feedback is not None:
                 if phase!='plan':raise ValueError('retry feedback requires a failed planning stage; use refine for captured scenes')
                 unit['operator_feedback']=feedback
@@ -323,129 +311,28 @@ class Store:
         directory.mkdir(parents=True,exist_ok=True)
         return directory
 
-    def claim_desktop(self,worker):
-        with self.repo.transaction() as c:
-            self.repo.lock_queue(c)
-            device=c.execute(select(self.device).where(self.device.c.id=='desktop-isaac')).mappings().first()
-            if device and device['record'].get('active'):
-                record=device['record']
-                if record['worker']!=worker: return {'waiting':'device_owned_by_other_worker'}
-                task=c.execute(select(tasks).where(tasks.c.id==record['task_id'])).mappings().one()
-                return self._job(task,record['token'])
-            for task in self.all_work(c):
-                if task['state']=='READY' and task['unit']['phase']=='capture':
-                    unit=dict(task['unit'])
-                    token=unit.pop('resume_capture_token',None) or uid('attempt')
-                    run=c.execute(select(runs).where(runs.c.id==task['run_id'])).mappings().one()
-                    base_context=RunContext.from_record(run['plan'].get('context')) or RunContext()
-                    if not base_context.run_id:
-                        base_context=base_context.for_run(run['id'])
-                    unit['run_context']=base_context.for_stage(task['id'],token).to_dict()
-                    record={'active':True,'worker':worker,'task_id':task['id'],'token':token,'time':time.time()}
-                    if device:c.execute(self.device.update().where(self.device.c.id=='desktop-isaac').values(record=record))
-                    else:c.execute(self.device.insert().values(id='desktop-isaac',record=record))
-                    claimed=c.execute(tasks.update().where(
-                        tasks.c.id==task['id'],tasks.c.state=='READY',tasks.c.lease_owner.is_(None)
-                    ).values(state='RUNNING',unit=unit,lease_owner=token,lease_expires_at=time.time()+1800))
-                    if claimed.rowcount != 1:
-                        raise ValueError('capture task ownership changed before claim')
-                    self.repo.event(c,task['run_id'],task['id'],'benchforge.desktop_claim',{'token':token})
-                    return self._job(task,token)
-            return {'waiting':'no_jobs'}
-
-    def _job(self,task,token):
-        directory=self.directory(task['id'],task['unit']['revision'])
-        program=normalize_native_asset_references(json.loads((directory/'program.json').read_text()))
-        assets=sorted({o['asset_id'] for o in program['objects'] if o['kind']=='mesh'})
-        return {'task_id':task['id'],'revision':task['unit']['revision'],'token':token,
-                'program':program,'assets':assets,'transport_retry':task['unit'].get('transport_retry',0),
-                'capture_options':task['unit']['intent'].get('capture_options',{}),
-                'capture':{'width':960,'height':720,'steps':180,'dt':1/60},
-                **{key:task['unit'][key] for key in ('capture_recovery_mode','capture_resume_receipt') if key in task['unit']}}
-
-    def desktop_state(self):
-        with self.repo.engine.connect() as c:
-            row=c.execute(select(self.device).where(self.device.c.id=='desktop-isaac')).mappings().first()
-            return row['record'] if row else {'active':False}
-
-    def worker_update(self,job,progress=None,outcome=None,processes_stopped=False,error=None,capture_complete=None,capture_receipt=None):
-        """A terminal acknowledgement releases only the matching device lease."""
-        from service_access.progress import record_progress
-        with self.repo.transaction() as c:
-            self.repo.lock_queue(c)
-            task=c.execute(select(tasks).where(tasks.c.id==job['task_id']).with_for_update()).mappings().one()
-            run=c.execute(select(runs).where(runs.c.id==task['run_id'])).mappings().one()
-            if job.get('transport_retry',0)!=task['unit'].get('transport_retry',0):raise ValueError('stale desktop retry generation')
-            if task['unit'].get('capture_token')==job['token']:
-                return {'committed':True,'duplicate':True}
-            ended=task['unit'].get('worker_end') or {}
-            if ended.get('token')==job['token']:
-                return {'finished':True,'duplicate':True,'state':task['state']}
-            row=c.execute(select(self.device).where(self.device.c.id=='desktop-isaac')).mappings().first()
-            device=row['record'] if row else {}
-            if task['lease_owner']!=job['token'] or task['unit']['revision']!=job['revision'] or not device.get('active') or device.get('task_id')!=job['task_id'] or device.get('token')!=job['token']:
-                raise ValueError('stale desktop attempt; device ownership unchanged')
-            canceled=run['state']=='CANCELED'
-            if outcome is not None:
-                if outcome not in {'canceled','failed'} or processes_stopped is not True:
-                    raise ValueError('terminal acknowledgement requires stopped owned processes')
-                if outcome=='canceled' and not canceled:raise ValueError('run has not requested cancellation')
-                state='CANCELED' if canceled else 'FAILED_FINAL'
-                end={'token':job['token'],'outcome':state,'time':time.time(),'local_capture_preserved':True}
-                if type(capture_complete) is bool:end['capture_complete']=capture_complete
-                if capture_receipt is not None:
-                    from capabilities.capture.capture_recovery import require_capture_receipt
-                    require_capture_receipt(capture_receipt,self._job(task,job['token']))
-                    end.update(capture_complete=True,capture_receipt=capture_receipt)
-                failure=None if canceled else {'stage':'capture_transport' if capture_receipt is not None else 'capture_execution',
-                    'error':str(error or 'desktop attempt failed')[:1000],'local_capture_preserved':True}
-                c.execute(tasks.update().where(tasks.c.id==task['id']).values(state=state,lease_owner=None,lease_expires_at=None,unit={**task['unit'],'worker_end':end},failure=failure))
-                c.execute(self.device.update().where(self.device.c.id=='desktop-isaac').values(record={'active':False,'last_end':end}))
-                self.repo.event(c,task['run_id'],task['id'],'benchforge.desktop_finished',{'end':end,'failure':failure})
-                record_progress(self.directory(task['id'],job['revision']),'canceled' if canceled else 'failed',worker=end,error=failure)
-                return {'finished':True,'state':state,'local_capture_preserved':True}
-            if task['state']!='RUNNING':raise ValueError('desktop task is not running')
-            if progress:
-                if progress.get('stage') not in {'capture','upload','upload_retry','capture_transport_failed'}:raise ValueError('invalid desktop progress stage')
-                record_progress(self.directory(task['id'],job['revision']),**progress)
-            c.execute(tasks.update().where(
-                tasks.c.id==task['id'],
-                tasks.c.state=='RUNNING',
-                tasks.c.lease_owner==job['token'],
-            ).values(lease_expires_at=time.time()+1800))
-            return {'cancel':canceled,'active':True}
-
-    def commit_capture(self,job,upload):
-        with self.repo.transaction() as c:
-            self.repo.lock_queue(c)
-            task=c.execute(select(tasks).where(tasks.c.id==job['task_id']).with_for_update()).mappings().one()
-            run=c.execute(select(runs).where(runs.c.id==task['run_id'])).mappings().one()
-            if job.get('transport_retry',0)!=task['unit'].get('transport_retry',0):raise ValueError('stale desktop retry generation')
-            if task['unit'].get('capture_token')==job['token']: return {'committed':True,'duplicate':True}
-            device=c.execute(select(self.device).where(self.device.c.id=='desktop-isaac')).mappings().one()['record']
-            if not device.get('active') or device.get('token')!=job['token'] or device.get('task_id')!=job['task_id']:raise ValueError('stale desktop device')
-            if run['state']=='CANCELED' and task['lease_owner']==job['token']:
-                c.execute(tasks.update().where(tasks.c.id==task['id']).values(state='CANCELED',lease_owner=None))
-                c.execute(self.device.update().where(self.device.c.id=='desktop-isaac').values(record={'active':False}))
-                return {'committed':False,'canceled':True,'partial_capture_preserved':str(upload)}
-            if task['lease_owner']!=job['token'] or task['unit']['revision']!=job['revision'] or task['state']!='RUNNING': raise ValueError('stale attempt')
-            directory=self.directory(task['id'],job['revision']);report=json.loads((upload/'report.json').read_text())
-            if report.get('token')!=job['token']: raise ValueError('foreign report')
-            dest=directory/'capture'
-            if dest.exists():
-                # Recover a crash after filesystem commit but before the DB transaction.
-                if json.loads((dest/'report.json').read_text()).get('token')!=job['token']:
-                    raise ValueError('immutable capture already exists')
-            else:upload.rename(dest)
-            unit={**task['unit'],'phase':'review','capture_token':job['token']}
-            c.execute(tasks.update().where(
-                tasks.c.id==task['id'],
-                tasks.c.state=='RUNNING',
-                tasks.c.lease_owner==job['token'],
-            ).values(state='READY',unit=unit,lease_owner=None,lease_expires_at=None))
-            c.execute(self.device.update().where(self.device.c.id=='desktop-isaac').values(record={'active':False}))
-            self.repo.event(c,task['run_id'],task['id'],'benchforge.capture_committed',{'report':report})
-            return {'committed':True}
+    def publish_capture(self, tid, token, incoming, *, expected_owner):
+        """Fence filesystem publication and stage transition with the task lease."""
+        with self.repo.transaction() as connection:
+            task = connection.execute(select(tasks).where(tasks.c.id == tid).with_for_update()).mappings().one()
+            run = connection.execute(select(runs).where(runs.c.id == task['run_id']).with_for_update()).mappings().one()
+            if (task['lease_owner'] != expected_owner or task['state'] != 'RUNNING'
+                    or (task['lease_expires_at'] or 0) <= time.time() or run['state'] == 'CANCELED'):
+                raise ValueError('Capture lease changed before publication; native receipts retained')
+            report = json.loads((incoming / 'report.json').read_text())
+            if report.get('token') != token or report.get('status') != 'captured':
+                raise ValueError('Capture publication needs matching successful native evidence')
+            destination = self.directory(tid, task['unit']['revision']) / 'capture'
+            if destination.exists():
+                if json.loads((destination / 'report.json').read_text()).get('token') != token:
+                    raise ValueError('An immutable capture already exists')
+            else:
+                incoming.rename(destination)
+            unit = {**task['unit'], 'phase': 'review', 'capture_token': token}
+            connection.execute(tasks.update().where(tasks.c.id == tid).values(
+                state='READY', unit=unit, lease_owner=None, lease_expires_at=None))
+            self.repo.event(connection, task['run_id'], tid, 'benchforge.capture_committed',
+                            {'report': report, 'protocol': 'a100sim.v1.Simulator'})
 
     def settle_runs(self):
         with self.repo.transaction() as c:
@@ -462,4 +349,6 @@ class Store:
         self.snapshot(rid)
         with self.repo.transaction() as c:
             c.execute(runs.update().where(runs.c.id==rid).values(state='CANCELED'))
+            c.execute(tasks.update().where(tasks.c.run_id == rid,
+                tasks.c.state.in_(['PENDING', 'READY'])).values(state='CANCELED', lease_owner=None, lease_expires_at=None))
             self.repo.event(c,rid,None,'benchforge.cancel_requested')

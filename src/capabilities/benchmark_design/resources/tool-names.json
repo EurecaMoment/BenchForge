@@ -6,5 +6,6 @@
   "pipeline_artifacts": "benchforge_pipeline_artifacts",
   "pipeline_repair_plan": "benchforge_pipeline_repair_plan",
   "pipeline_evaluate": "benchforge_pipeline_evaluate",
-  "stage_review": "benchforge_stage_review"
+  "stage_review": "benchforge_stage_review",
+  "isaac_sim": "benchforge_isaac_sim"
 }

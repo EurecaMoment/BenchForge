@@ -256,5 +256,5 @@ def plan_scene(store,task,stop):
         write_json(directory/'repair_changes.json',{'source_revision':repair_source.name,'target_revision':unit['revision'],
             'capture_status':'not_yet_captured','scene_changes':scene_changes(repair_baseline,comparison,repair_older)})
     if submission:write_json(directory/'program_handoff.json',handoff_receipt(submission,p,unit['revision']))
-    record_progress(directory,'desktop_capture_queued',geometry_preview='geometry_preview.json',geometry_warning_count=len(geometry['warnings']))
+    record_progress(directory,'isaac_sim_queued',geometry_preview='geometry_preview.json',geometry_warning_count=len(geometry['warnings']))
     store.update(task['id'],state='READY',unit={**unit,'phase':'capture'},attempt=task['attempt']+1)

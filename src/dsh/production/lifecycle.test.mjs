@@ -141,6 +141,28 @@ test('only an unload interruption is recoverable automatically',async()=>{
   assert.equal(h.sent.length,1);await runtime.dispose();
 });
 
+test('a committed review notice does not suppress recovery after a later disposal',async()=>{
+  const h=harness();h.plan();let runtime=h.create();await runtime.observe(h.agent);
+  h.agent.status='idle';h.setTime(401000);await runtime.resume(h.agent);await h.fire();
+  h.event('user/message',h.sent[0]);h.agent.inbox.nextTurn=[];
+  h.event('turn/end',{turn:1,reason:{kind:'aborted',reason:{kind:'disposed'}}});
+  await runtime.dispose();runtime=h.create();await runtime.resume(h.agent);await h.fire();
+  assert.equal(h.sent.length,2);assert.match(h.sent[1].source.noticeKey,/disposal:/);
+  h.event('user/message',h.sent[1]);h.agent.inbox.nextTurn=[];
+  await runtime.dispose();runtime=h.create();await runtime.resume(h.agent);await h.fire();
+  assert.equal(h.sent.length,2);await runtime.dispose();
+});
+
+test('a released review and committed notice never override user cancellation',async()=>{
+  const h=harness();h.plan();const runtime=h.create();await runtime.observe(h.agent);
+  h.setTime(401000);await runtime.resume(h.agent);await h.fire();
+  h.event('user/message',h.sent[0]);h.agent.inbox.nextStep=[];
+  h.setReview({id:1,state:'continued',deadline:400,stage:'S1'});
+  h.event('turn/end',{turn:1,reason:{kind:'aborted',reason:{kind:'user'}}});
+  assert.equal(await runtime.refresh(h.agent.id),false);
+  assert.equal(h.sent.length,1);await runtime.dispose();
+});
+
 test('startup restores only an expired active production session',async()=>{
   const h=harness();h.plan();let runtime=h.create();await runtime.observe(h.agent);await runtime.dispose();
   h.cold();h.agent.status='idle';h.setTime(401000);runtime=h.create();runtime.start();await h.fire();

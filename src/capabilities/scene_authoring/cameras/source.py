@@ -22,7 +22,7 @@ def source_camera_metadata(intrinsics, image_size):
 
 
 def record_source_camera(depth_model, record):
-    """Wrap the existing worker-local callable; return its exact output object."""
+    """Wrap the existing model callable; return its exact output object."""
     def infer(image):
         result = depth_model(image)
         record.clear()

@@ -9,7 +9,7 @@ BenchForge 的提交固定每个子模块的具体版本；仓库地址在根目
 | --- | --- | --- |
 | `FastTrellis2/` | [EurecaMoment/FastTrellis2](https://github.com/EurecaMoment/FastTrellis2) | TRELLIS.2 三维网格与 PBR 生成 |
 | `DSpark4A100/` | [EurecaMoment/DSpark4A100](https://github.com/EurecaMoment/DSpark4A100) | 大模型推理与服务 |
-| `IssacSim4A100/` | [EurecaMoment/IssacSim4A100](https://github.com/EurecaMoment/IssacSim4A100) | A100 上的 Isaac Sim 部署与仿真支持 |
+| `IsaacSim4A100/` | [EurecaMoment/IsaacSim4A100](https://github.com/EurecaMoment/IsaacSim4A100) | A100 上的 Isaac Sim 部署与仿真支持 |
 | `FastSAM3/` | [EurecaMoment/FastSAM3](https://github.com/EurecaMoment/FastSAM3) | SAM 3 分割与推理服务 |
 | `FastFLUX2Klein/` | [EurecaMoment/FastFLUX2Klein](https://github.com/EurecaMoment/FastFLUX2Klein) | FLUX.2 Klein 图像生成与编辑 |
 | `FastDA3/` | [EurecaMoment/FastDA3](https://github.com/EurecaMoment/FastDA3) | Depth Anything 3 米制深度、相机位姿和长视频几何推理 |

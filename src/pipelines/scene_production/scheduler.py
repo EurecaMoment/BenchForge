@@ -27,6 +27,9 @@ class _StageStore:
     def update(self, task_id, **fields):
         return self._store.update(task_id, expected_owner=self._owner, **fields)
 
+    def publish_capture(self, task_id, token, incoming):
+        return self._store.publish_capture(task_id, token, incoming, expected_owner=self._owner)
+
 
 def capture_handoff(unit):
     """CPU-only preparation/completion should not queue behind asset generation."""
@@ -56,6 +59,8 @@ def coordinate(
     generation_tools=GenerationTools,
     generated_asset_reviewer=None,
     resource_wait=ResourceWait,
+    capture_scene=None,
+    capture_concurrency=4,
 ):
     """Run work only after durable single-owner stage acquisition."""
 
@@ -66,7 +71,11 @@ def coordinate(
         if owner and callable(getattr(store, 'renew_stage', None)):
             def keep_lease():
                 while not lease_stop.wait(15):
-                    if not store.renew_stage(claimed_task['id'], owner, lease_seconds=60):
+                    try:
+                        renewed = store.renew_stage(claimed_task['id'], owner, lease_seconds=60)
+                    except Exception:
+                        renewed = False
+                    if not renewed:
                         lease_stop.set()
                         return
 
@@ -85,12 +94,16 @@ def coordinate(
                                 store.snapshot(claimed_task['run_id'])['state'] == 'CANCELED'
                             )
                             self.checked = time.monotonic()
-                        return stop.is_set() or self.canceled
+                        return stop.is_set() or lease_stop.is_set() or self.canceled
 
                 task_stop = TaskSignal()
                 task = claimed_task
                 phase = task['unit']['phase']
-                if phase == 'layout':
+                if phase == 'capture':
+                    if capture_scene is None:
+                        raise ValueError('Native Isaac Sim capture stage is not configured')
+                    capture_scene(stage_store, task, task_stop)
+                elif phase == 'layout':
                     from capabilities.asset_generation.layout import execute_design
 
                     execute_design(stage_store, task, task_stop)
@@ -223,7 +236,9 @@ def coordinate(
                     stage_store.update(
                         claimed_task['id'],
                         state='FAILED_FINAL',
-                        failure={'error': type(exc).__name__, 'detail': str(exc)[:1000]},
+                        failure={'error': type(exc).__name__, 'detail': str(exc)[:1000],
+                                 **({'stage': 'capture_execution', 'native_receipts_retained': True}
+                                    if claimed_task['unit'].get('phase') == 'capture' else {})},
                     )
         finally:
             lease_stop.set()
@@ -232,12 +247,15 @@ def coordinate(
 
     active = {}
     handoffs = {}
+    captures = {}
     with ThreadPoolExecutor(max_workers=3, thread_name_prefix='production') as pool, ThreadPoolExecutor(
         max_workers=1, thread_name_prefix='capture-handoff'
-    ) as capture_pool:
+    ) as capture_pool, ThreadPoolExecutor(max_workers=capture_concurrency,
+                                          thread_name_prefix='isaac-sim-rpc') as simulation_pool:
         while not stop.is_set():
             active = {key: future for key, future in active.items() if not future.done()}
             handoffs = {key: future for key, future in handoffs.items() if not future.done()}
+            captures = {key: future for key, future in captures.items() if not future.done()}
             try:
                 work = store.all_work()
             except (DatabaseTimeout, OperationalError):
@@ -247,10 +265,10 @@ def coordinate(
 
             now = time.time()
             for task in work:
-                if task['id'] in active or task['id'] in handoffs:
+                if task['id'] in active or task['id'] in handoffs or task['id'] in captures:
                     continue
                 phase = task['unit']['phase']
-                if phase not in {'plan', 'review', 'asset', 'dataset', 'layout', 'generation'}:
+                if phase not in {'plan', 'review', 'asset', 'dataset', 'layout', 'generation', 'capture'}:
                     continue
                 if task['state'] not in {'PENDING', 'READY', 'RUNNING'}:
                     continue
@@ -271,8 +289,9 @@ def coordinate(
                     strict_review = True
                 if phase == 'review' and strict_review:
                     lightweight = False
-                pending = handoffs if lightweight else active
-                if len(pending) >= (1 if lightweight else 3):
+                pending = captures if phase == 'capture' else handoffs if lightweight else active
+                capacity = capture_concurrency if phase == 'capture' else 1 if lightweight else 3
+                if len(pending) >= capacity:
                     continue
 
                 owner = uid('stage')
@@ -290,7 +309,8 @@ def coordinate(
                     task = {**task, 'state': 'RUNNING'}
                     owner = None
 
-                pending[task['id']] = (capture_pool if lightweight else pool).submit(
+                executor = simulation_pool if phase == 'capture' else capture_pool if lightweight else pool
+                pending[task['id']] = executor.submit(
                     execute, task, owner
                 )
             try:

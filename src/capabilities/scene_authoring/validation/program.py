@@ -1,4 +1,4 @@
-"""Model proposals are data; only these bounded operations reach Isaac."""
+"""Model proposals are data; only these bounded operations reach Isaac Sim."""
 from capabilities.scene_authoring.contracts.scene_program import SCENE_V2_MAX_OBJECTS
 from capabilities.scene_authoring.contracts.scene_program import SCENE_SCHEMAS
 from capabilities.scene_authoring.contracts.scene_program import SCENE_MAX_ROOMS

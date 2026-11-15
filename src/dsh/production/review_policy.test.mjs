@@ -12,7 +12,7 @@ const pending = {stage: 'S1', state: 'waiting_user'};
 test('pending reviews block shell, direct simulation, production and delegation routes', () => {
   for (const name of ['bash', 'run_code', 'shell_write', 'shell_start', 'benchforge_task_code',
     'benchforge_capture', 'benchforge_run', 'benchforge_pipeline_run', 'benchforge_prepare',
-    'subagent', 'benchforge_model_isaacsim_grpc']) {
+    'subagent', 'benchforge_isaac_sim']) {
     assert.equal(reviewDenial({name, arguments: {action: 'invoke'}}, pending, '/workspace')?.info.code, 'STAGE_REVIEW_PENDING', name);
   }
   assert.ok(reviewDenial({name: 'benchforge_stage_review', arguments: {action: 'continue'}}, pending, '/workspace'));
@@ -24,7 +24,7 @@ test('reads, status, previews, validated plans and bounded draft edits remain us
     'benchforge_scene_evidence', 'benchforge_wait', 'benchforge_pipeline_plan']) {
     assert.equal(reviewDenial({name}, pending, '/workspace'), undefined, name);
   }
-  assert.equal(reviewDenial({name: 'benchforge_model_isaacsim_grpc', arguments: {action: 'capabilities'}}, pending, '/workspace'), undefined);
+  assert.equal(reviewDenial({name: 'benchforge_isaac_sim', arguments: {action: 'capabilities'}}, pending, '/workspace'), undefined);
   assert.equal(reviewDenial({name: 'write', arguments: {file_path: 'tasks/scene/draft.py'}}, pending, '/workspace'), undefined);
   for (const file of ['stage-reviews.sqlite', 'operations/run/steps/collection/result.json', 'tasks/../../stage-reviews.sqlite']) {
     assert.ok(reviewDenial({name: 'write', arguments: {file_path: file}}, pending, '/workspace'));

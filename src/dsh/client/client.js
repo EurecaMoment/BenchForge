@@ -269,8 +269,8 @@ var benchforgeClient = (() => {
       sceneJobs: "\u672C\u4F1A\u8BDD\u573A\u666F\u4EFB\u52A1",
       completedTasks: "\u6267\u884C\u5B8C\u6210\u4EFB\u52A1",
       phase: "\u751F\u4EA7\u9636\u6BB5",
-      workerStage: "worker \u6700\u8FD1\u4E0A\u62A5",
-      workerAge: "\u8DDD worker \u4E0A\u62A5",
+      captureStage: "\u91C7\u96C6\u6700\u65B0\u8FDB\u5C55",
+      captureAge: "\u8DDD\u91C7\u96C6\u66F4\u65B0",
       transfer: "\u5DF2\u63A5\u6536\u4EA7\u7269",
       capturedViews: "\u5DF2\u8BB0\u5F55\u56FE\u50CF",
       actionTraces: "\u4EA4\u4E92\u8F68\u8FF9",
@@ -740,8 +740,8 @@ var benchforgeClient = (() => {
       sceneJobs: "Session scene jobs",
       completedTasks: "Completed tasks",
       phase: "Production phase",
-      workerStage: "Last worker report",
-      workerAge: "Since worker report",
+      captureStage: "Latest capture progress",
+      captureAge: "Since capture update",
       transfer: "Artifacts received",
       capturedViews: "Recorded images",
       actionTraces: "Action traces",
@@ -1098,7 +1098,8 @@ var benchforgeClient = (() => {
     pipeline_artifacts: "benchforge_pipeline_artifacts",
     pipeline_repair_plan: "benchforge_pipeline_repair_plan",
     pipeline_evaluate: "benchforge_pipeline_evaluate",
-    stage_review: "benchforge_stage_review"
+    stage_review: "benchforge_stage_review",
+    isaac_sim: "benchforge_isaac_sim"
   };
 
   // src/dsh/tools/benchmark/names.mjs

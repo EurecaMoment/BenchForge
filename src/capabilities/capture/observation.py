@@ -63,7 +63,6 @@ def capture_result(folder, result):
 
 def observe(store, run_id):
     snap=store.snapshot(run_id);rows=[]
-    device=store.desktop_state() if hasattr(store,'desktop_state') else {}
     for task in snap['tasks']:
         unit=task['unit'];folder=store.root/task['id']/('revision_'+str(unit['revision']))
         path=folder/'progress.json'
@@ -114,10 +113,10 @@ def observe(store, run_id):
                 row['quality']=quality
                 if quality['scene_quality_passed'] is False or quality['visual_realism']=='needs_improvement':
                     row['next_action']='inspect_quality_gaps'
-        if task['state']=='READY' and unit['phase']=='capture' and device.get('active'):
-            row['queue']={'reason':'desktop_device_in_use','blocking_task_id':device.get('task_id')}
+        if task['state']=='READY' and unit['phase']=='capture':
+            row['queue']={'reason':'isaac_sim_capacity', 'protocol':'a100sim.v1.Simulator'}
         if snap['state']=='CANCELED':
-            row['next_action']='wait_worker_ack' if task.get('lease_owner') else 'inspect_evidence'
+            row['next_action']='inspect_remote_cancellation' if task.get('lease_owner') else 'inspect_evidence'
         if complete:
             row['summary']={k:complete[k] for k in ('accepted','target_items','frames','split','shortfall','publication_status','scene_quality_passed','interaction_validated','scene_self_contained') if k in complete}
             row['downloads']=[p.relative_to(folder).as_posix() for p in (folder/'release').glob('*.zip')]

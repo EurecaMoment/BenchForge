@@ -117,6 +117,19 @@ test('nested task and watch receipts ignore input paths and prose', () => {
   ]);
 });
 
+test('native Isaac Sim downloads use the ordinary artifact projection without a UI protocol client', () => {
+  let state = call(artifactProjection.init({cwd: '/tmp/work'}), 'benchforge_isaac_sim', {action: 'download'});
+  state = result(state, {action: 'download', job: {job_id: 'native', state: 'SUCCEEDED'},
+    artifacts: [{path: '/tmp/work/artifacts/isaac_sim/native/image/render.png', title: 'Isaac Sim · render.png'},
+      {path: '/tmp/work/artifacts/isaac_sim/native/depth/depth.npy', title: 'Isaac Sim · depth.npy'}],
+    receipt_path: '/tmp/work/operations/download/job.json'});
+  assert.deepEqual(state.view.files.map(row => row.path), [
+    '/tmp/work/artifacts/isaac_sim/native/image/render.png',
+    '/tmp/work/artifacts/isaac_sim/native/depth/depth.npy',
+    '/tmp/work/operations/download/job.json']);
+  assert.deepEqual(state.view.captureIds, []);
+});
+
 test('failed pipeline calls do not authorize nested output references', () => {
   const state = call(artifactProjection.init({cwd: '/tmp/work'}), 'benchforge_pipeline_run', {workspace: '/tmp/work'});
   const receipt = {state: 'failed', steps: {questions: {result: {report: 'untrusted.json'}}}};

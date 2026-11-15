@@ -10,22 +10,22 @@ export const ProductionView = z.object({
   workspace:z.string(), plan:z.string(), run:z.string(), state:z.string(), stage:z.string(),
   error:z.string(), review:Review.nullable(), completed:z.number(), total:z.number(), delivered:z.boolean(),
 });
-const State = z.object({view:ProductionView, notices:z.array(z.string()), interruption:z.string(),
+const State = z.object({view:ProductionView, notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
   calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string()}))});
 const visible = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
 const parse = text => {try {return JSON.parse(text);} catch {return null;}};
-const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benchforge_depth','benchforge_trellis','benchforge_model_isaacsim_grpc']);
+const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benchforge_depth','benchforge_trellis','benchforge_isaac_sim']);
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:2, stateSchema:State,
-  init:header => ({calls:{},notices:[],interruption:'',view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
+  key:PRODUCTION_PROJECTION, stateVersion:3, stateSchema:State,
+  init:header => ({calls:{},notices:[],interruption:'',interruptionSeq:0,view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
   apply(state,event) {
     const {view} = state;
-    if(event.type === 'turn/start') return patch({...state,interruption:''},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
-    if(event.type === 'turn/end') return patch({...state,interruption:event.data.reason?.reason?.kind || ''},event,{running:false,
+    if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
+    if(event.type === 'turn/end') return patch({...state,interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
       ...(event.data.reason?.kind === 'aborted' ? {state:'interrupted'} : {})});
     if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/production-resume') {
       const key=event.data.source.noticeKey;

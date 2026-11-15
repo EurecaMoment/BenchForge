@@ -80,8 +80,10 @@ turn after changing a preset, in addition to loading existing conversations.
   DSH services. Client slots register the panel and switch; the conversation root remains native.
 - Capture associations record current scene calls. Current scene tools handle background
   waiting without retired-Agent interception.
-- Isaac gRPC, the local resident, process adoption and explicit mock transport remain
-  under `capabilities/isaac_sim/`.
+- Isaac Sim uses the upstream A100 gRPC protocol under `capabilities/isaac_sim/`.
+  `benchforge_isaac_sim` uses the ordinary Python tool executor; scene capture is a
+  leased backend stage. Native receipts and downloaded artifacts feed the existing
+  workbench projection.
 - Scene videos are saved under the configured artifacts directory's `scene-previews/`;
   browser playback reads the saved file.
 
