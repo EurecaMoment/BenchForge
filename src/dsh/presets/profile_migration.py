@@ -43,7 +43,12 @@ def _merge_preset(row, previous):
             options = _merge_configuration(old.get('config'), plugin['config'])
             merged = {**old, **plugin, 'config': options}
             if plugin['id'] == 'persona' and 'suffix' in old.get('config', {}):
-                options['suffix'] = old['config']['suffix']
+                suffix = old['config']['suffix']
+                legacy_suffix = 'Your working directory is {{cwd}}. You are using {{model}}.'
+                # Repair the old generated template, while preserving operator
+                # suffixes that may use variables registered by their plugins.
+                if suffix != legacy_suffix:
+                    options['suffix'] = suffix
         else:
             merged = {**old, **plugin}
         plugins.append(merged)

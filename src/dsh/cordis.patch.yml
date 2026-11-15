@@ -258,7 +258,7 @@
             preserve object markers needed to answer questions. Reference images must
             be real saved captures, clearly distinguished from unexecuted scene designs.
             Follow src/ui/workbench/DESIGN.md.'
-          suffix: Your working directory is {{cwd}}. You are using {{model}}.
+          suffix: You are using {{model}}.
       - id: agent-instructions
         name: '@deepseek-ai/dsh-agent-instructions'
         config:

@@ -63,6 +63,12 @@ the former `benchforge-ui` and `benchforge` declarations into `benchforge` while
 preserving user plugins. It does not rewrite saved conversation histories.
 `hot_update.py` updates deployment configuration through public DSH interfaces.
 
+For an existing deployment, generate the updated overlay to a separate file and
+merge it with `install_preset.py`; replacing the active profile drops local plugin
+and Host settings. The preset reads the current directory from DSH's native
+runtime context, not a `cwd` persona variable. Verify a new session's first model
+turn after changing a preset, in addition to loading existing conversations.
+
 ## Runtime boundaries
 
 - Scene tools call the configured HTTP service. FLUX, SAM3, DA3 and TRELLIS inference
