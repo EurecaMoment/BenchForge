@@ -140,12 +140,14 @@ export function createProgressComponents({React, helpers}) {
     const generation = stage.id === 'S4' ? currentGeneration(record.value?.generation) : null;
     scene = progressSceneForStage(stage.id, scene, record.value?.scenes?.runs || []);
     const tasks = (scene?.tasks || []).filter((row) => sceneStage(row) === stage.id);
+    const pipelineSteps = (pipeline?.steps || []).filter((row) => row.stage === stage.id);
+    const collected = stage.id === 'S3' ? pipelineSteps.findLast(row => row.collection)?.collection : null;
     const operations = !pipeline && !scene ? (record.value?.operations || []).filter((row) => row.stage === stage.id) : [];
     const savedSteps = collection ? collection.rows.map((row) => ({id: row.name, state: row.state,
-      label: collection.current ? t(row.phase) : row.phase, error: row.error, queue: row.task?.queue})) : stage.id === 'S1' && planReceipt ? [planReceipt] : scene ? tasks.map((row) => ({id: row.id,
+      label: collection.current ? t(row.phase) : row.phase, error: row.error, queue: row.task?.queue})) : stage.id === 'S1' && planReceipt ? [planReceipt] : tasks.length && !(stage.id === 'S3' && pipelineSteps.length) ? tasks.map((row) => ({id: row.id,
       state: scene.state === 'CANCELED' && row.state !== 'SUCCEEDED' ? 'canceled' : lifecycle(row.state),
       label: row.progress?.stage || row.phase, error: row.failure || row.progress?.error,
-      queue: row.queue, age: row.progress?.age_seconds, progress: row.progress})) : (pipeline?.steps || []).filter((row) => row.stage === stage.id)
+      queue: row.queue, age: row.progress?.age_seconds, progress: row.progress})) : pipelineSteps
       .map((row) => ({...row, label: row.uses})).concat(operations.map((row) => ({...row, label: row.tool})));
     const generationPhase = generation && t({selecting: 'generationSelecting', surface_oracle: 'generationOracle',
       writing: 'generationWriting', complete: 'generationComplete'}[generation.phase] || 'questionGeneration');
@@ -165,8 +167,6 @@ export function createProgressComponents({React, helpers}) {
       recordedState === 'completed' && currentChildren.length ? 'running' : recordedState;
     const parallelUnknown = !generation && currentChildren.length > 0 && !current;
     const products = stage.id === 'S3' && !steps.length ? annotationProducts(artifacts) : [];
-    const productTotal = products.length ? artifacts.filter((row) => row.stage === 'S2' && row.kind === 'image' &&
-      /^capture\/view_\d+\.png$/.test(row.file || '')).length : 0;
     const stale = record.error || (collection?.current ? collection.registrationStatus === 'unavailable' :
       generation ? false : ['partial', 'unavailable'].includes(record.value?.scenes?.status));
     // A list of recent operations is history, not a declared workload total.
@@ -186,12 +186,12 @@ export function createProgressComponents({React, helpers}) {
       : tasks.length > 1 ? null : reportedProgress(current.progress) : null;
     // A whole-task count cannot describe work still occurring within that task.
     const activeUnknown = state === 'running' && (parallelUnknown || current && !detail);
-    const total = collection ? collection.identityPending ? 0 : collection.total : detail?.total ||
-      (activeUnknown || operations.length && !(stage.id === 'S1' && planReceipt) ? 0 : steps.length || productTotal);
-    const done = collection ? collection.passed : detail?.done ?? (steps.length ? completed : products.length);
+    const total = state === 'previewable' ? 0 : collection ? collection.identityPending ? 0 : collection.total : detail?.total ||
+      (activeUnknown || operations.length && !(stage.id === 'S1' && planReceipt) ? 0 : steps.length);
+    const done = collection ? collection.passed : detail?.done ?? completed;
     const measured = total > 0;
     const percent = measured ? Math.min(100, Math.round(done / total * 100)) : null;
-    const moving = ['running', 'previewable'].includes(state);
+    const moving = state === 'running';
     const metric = measured ? (generation ? t(detail.label) + ' ' : '') + percent + '%' : t(state === 'completed' ? 'stageDone' : moving ? 'progressPending' :
       ['failed', 'canceled'].includes(state) ? 'progressPaused' : 'progressWaiting');
     const unit = t(collection ? 'scenePassed' : detail?.label || (products.length ? 'progressProducts' : scene ? 'progressTasks' : 'progressSteps'));
@@ -244,6 +244,12 @@ export function createProgressComponents({React, helpers}) {
           h('strong', {title: row.scene_id || row.run_id}, row.name),
           h('span', {className: 'bfw-pill ' + row.state}, t(row.statusLabel))))),
       collection?.identityPending && h('small', {className: 'bfw-hint'}, t(collection.notice || 'sceneIdentityPending')),
+      collected && h('div', {className: 'bfw-stats', 'data-collection-counts': true},
+        ['records', 'scenes', 'media', 'episodes', 'samples', 'annotations'].filter(key => collected[key] !== null).map(key =>
+          h('div', {className: 'bfw-stat', key}, t('collected_' + key), h('strong', null,
+            key === 'records' && collected.required !== null ? collected.records + ' / ' + collected.required : collected[key])))),
+      stage.id === 'S3' && products.length > 0 && h('small', {className: 'bfw-hint', 'data-collection-preview': true},
+        t('collectionPreviewOnly') + ' · ' + t('progressProducts') + ' ' + products.length),
       stale && h('p', {className: 'bfw-error'}, t('staleSnapshot')),
       !collection && current?.error && h('p', {className: 'bfw-error', role: 'alert'}, typeof current.error === 'string' ? current.error : JSON.stringify(current.error)),
       current?.queue && h('small', {className: 'bfw-hint'}, t('waiting') + ': ' + current.queue.reason),

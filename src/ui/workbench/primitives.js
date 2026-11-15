@@ -1,4 +1,5 @@
 import {toolName} from '../../dsh/tools/benchmark/names.mjs';
+import {stageName} from '../../dsh/production/stages.mjs';
 
 export function createPrimitives({React, PLAN_FIELDS, PLAN_SECTIONS}) {
   const h = React.createElement;
@@ -24,7 +25,7 @@ export function createPrimitives({React, PLAN_FIELDS, PLAN_SECTIONS}) {
   function planValue(value, edit, path = [], labels = {}) {
     const key = path[path.length - 1];
     if(key==='template_id') return labels[value] || '题型';
-    if(key==='stage') return {S1:'计划',S2:'场景',S3:'标注',S4:'题目',S5:'报告'}[value] || value;
+    if(key==='stage') return stageName(value);
     const fixed = ['schema','id','objective_id','template_id','stage','selection_path','selected_scenes','allow_new_scenes'].includes(key);
     const next = fixed ? null : edit;
     if (next && (typeof value === 'number' || (value === null && ['count','seed','target_items','target_scene_count'].includes(key)))) {

@@ -1,4 +1,5 @@
 import {captureObservationNames} from '../tool_names.mjs';
+import {canonicalToolName} from '../../invocation/identifiers.mjs';
 
 // A capture receipt closes a rendering job, not the user's scene request.
 // Review a new capture, or the latest one explicitly resumed in a later turn.
@@ -27,7 +28,7 @@ export function pendingCapture(events, turn) {
   if (start < 0) return;
   for (const [index, event] of events.entries()) {
     const data = event.data;
-    const name = data?.name;
+    const name = canonicalToolName(data?.name || '');
     if (event.type === 'tool/call' && captureTools.has(name)) {
       calls.set(data.callId, { ...data, name, index });
     }
@@ -37,6 +38,7 @@ export function pendingCapture(events, turn) {
     }
     if (event.type !== 'tool/result' || data.message.isError || !calls.has(data.message.toolCallId)) continue;
     const call = calls.get(data.message.toolCallId);
+    call.name = data.meta?.benchforgeInvocation?.resolved?.name || call.name;
     if (submissions.has(call.name)) {
       const value = JSON.parse(data.message.content.find(block => block.type === 'text').text);
       latest = { callId: data.message.toolCallId, runId: value.run_id, taskId: value.task_id ?? value.run_id + '.scene0' };

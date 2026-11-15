@@ -18,6 +18,37 @@ function result(state, receipt, {seq = 2, error = false, meta} = {}) {
   }, ...(meta ? {meta} : {})}});
 }
 
+test('custom collection step IDs retain S3 outputs by receipt schema', () => {
+  let state = artifactProjection.init({cwd: '/tmp/work'});
+  state = call(state, 'benchforge_pipeline_run', {});
+  state = result(state, {state: 'waiting_user', steps: {sensors: {state: 'completed', result: {
+    schema: 'benchforge.collection-stage/v1', collection_path: '/tmp/work/collection.json',
+    evidence: '/tmp/work/collected.jsonl', annotations: {items: 100},
+  }}}});
+  assert.deepEqual(state.view.files.map(row => [row.path, row.stage]), [
+    ['/tmp/work/collection.json', 'S3'], ['/tmp/work/collected.jsonl', 'S3'],
+  ]);
+});
+
+test('declared episode media are displayed in collection while delivery reports stay in S5', async t => {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-collection-'));
+  t.after(() => fs.rm(folder, {recursive: true, force: true}));
+  const names = ['episodes/one/rgb_0.png', 'trajectory.json', 'collection_report.json'];
+  for (const name of names) {
+    const file = path.join(folder, name);
+    await fs.mkdir(path.dirname(file), {recursive: true});
+    await fs.writeFile(file, '{}');
+  }
+  const products = await conversationProducts({sessionId: 'session', roots: [{path: folder, title: 'Workspace'}],
+    evidence: [{sessionId: 'session', revision: 1, files: names.map(name => ({path: path.join(folder, name),
+      stage: null, title: '', source: 'tool', seq: 1}))}]});
+  const byName = Object.fromEntries(products.items.map(row => [row.name, row]));
+  assert.equal(byName['rgb_0.png'].stage, 'S3');
+  assert.equal(byName['trajectory.json'].stage, 'S3');
+  assert.equal(byName['collection_report.json'].stage, 'S5');
+  assert.ok(products.items.every(row => row.url));
+});
+
 test('production receipts and capture ids are scoped to successful calls', () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchforge_pipeline_plan', {workspace: '/tmp/work'}, 1);

@@ -1,4 +1,4 @@
-"""Stage receipts for accepted scenes and validated annotations."""
+"""Receipts for scene selection/creation and collection including annotations."""
 from collections import Counter
 from pathlib import Path
 
@@ -37,7 +37,7 @@ def scene_acceptance(arguments, directory, environment, client):
         sources = [row.get('provenance', {}) for row in rows(evidence)]
     if not sources:
         return {'state': 'needs_evidence', 'stage': 'S2', 'next':
-                'Use benchforge_capture/run/refine for the planned scenes. Resume this same run with bindings.scene_sources=[{task_id,revision}]. Local scene labels are not acceptance.'}
+                'S2 selects permitted accepted scene revisions or creates and accepts the saved scene designs through benchforge_capture/run/refine. Resume this run with bindings.scene_sources=[{task_id,revision}]. Preview captures validate scenes; trajectory/sample counts cannot replace scene acceptance.'}
     unique = {(row.get('task_id'), row.get('revision')): row for row in sources}
     accepted = SceneReceipts(environment['inputs'].get('service_config'), client).require(list(unique.values()))
     assessment = environment.get('_assessment') or {}
@@ -46,22 +46,25 @@ def scene_acceptance(arguments, directory, environment, client):
     scene_plan = assessment.get('scenes', {})
     expected = (scene_plan.get('target_scene_count') or len(scene_plan.get('selected_scenes', []))
                 or len(scene_plan.get('designs', [])) or 1)
-    if len({row['scene_group_id'] for row in accepted}) < expected:
-        return {'state': 'needs_evidence', 'stage': 'S2', 'accepted': len(accepted), 'required': expected,
-                'next': 'Capture and accept the remaining planned scenes before annotation and question production.'}
+    scene_count = len({row['scene_group_id'] for row in accepted})
+    if scene_count < expected:
+        return {'state': 'needs_evidence', 'stage': 'S2', 'accepted': scene_count, 'required': expected,
+                'next': 'Select or create and accept the remaining planned scenes before S3 collection, including annotations.'}
     reference = [{'task_id': row['task_id'], 'revision': row['revision']} for row in accepted]
     receipt = {'schema': 'benchforge.scene-stage/v1', 'state': 'completed', 'stage': 'S2',
-               'scenes': accepted, 'scene_sources': reference}
+               'scenes': accepted, 'scene_sources': reference, 'scene_count': scene_count,
+               'required_scene_count': expected}
     path = Path(directory) / 'accepted-scenes.json'
     write(path, receipt)
     return {**receipt, 'artifacts': [{'path': str(path.resolve()), 'title': '场景验收回执', 'stage': 'S2'}]}
 
 
-def validate_evidence(arguments, directory, environment, client):
+def validate_collection(arguments, directory, environment, client, *, legacy=False):
+    """Validate actual collected sources; this operation does not acquire missing data."""
     source = arguments.get('evidence')
     if not source or not Path(source).is_file():
         return {'state': 'needs_evidence', 'stage': 'S3', 'next':
-                'Derive annotations from the accepted native captures and save protocol-bound evidence JSONL; resume the same run with bindings.evidence.'}
+                'S3 collects the planned trajectories, sensor observations and states in accepted S2 scenes, including derived annotations and alignment. Reused captures must satisfy the same contract. Save source-bound evidence JSONL and resume this run with bindings.evidence; scene previews alone do not complete collection.'}
     source = Path(source).resolve()
     records = rows(source)
     receipts = SceneReceipts(environment['inputs'].get('service_config'), client)
@@ -71,7 +74,7 @@ def validate_evidence(arguments, directory, environment, client):
     if not counts:
         raise ValueError('S3 requires explicit per-template item counts')
     templates = {row['id']: row for row in all_templates()}
-    totals, groups, versions, episodes = Counter(), {}, {}, set()
+    totals, groups, versions, episodes, media_files = Counter(), {}, {}, {}, set()
     for record in records:
         origin = record.get('provenance') or {}
         if (origin.get('task_id'), origin.get('revision')) not in allowed:
@@ -87,6 +90,7 @@ def validate_evidence(arguments, directory, environment, client):
             file = file.resolve() if file.is_absolute() else (source.parent / file).resolve()
             if not file.is_relative_to(capture_root) or file not in accepted_sources:
                 raise ValueError('S3 public observations must come from the accepted scene capture')
+            media_files.add(str(file))
         if receipt.get('split') and split != receipt['split']:
             raise ValueError('Evidence partition conflicts with its accepted scene')
         if group in groups and groups[group] != split:
@@ -101,16 +105,16 @@ def validate_evidence(arguments, directory, environment, client):
         interactive = template['protocol']['interaction_required']
         require_locomotion = (environment.get('_assessment') or {}).get('annotations', {}).get('require_robot_locomotion', False)
         try:
-            validate_native_episode(record, receipt, required=require_episode or interactive or require_locomotion,
-                                    interaction=interactive, robot_locomotion=require_locomotion)
+            episode = validate_native_episode(record, receipt, required=require_episode or interactive or require_locomotion,
+                                              interaction=interactive, robot_locomotion=require_locomotion)
         except ValueError as error:
             return {'state': 'needs_evidence', 'stage': 'S3', 'issue': str(error),
                     'next': 'The simulator service has no matching accepted native episode. Use an installed controller and capture endpoint that records synchronized robot states, or mark this capability unavailable in the assessment. Camera paths, keyframe animation and object-push trials cannot substitute for robot locomotion.'}
-        if require_locomotion:
-            episode_id = (record.get('provenance') or {}).get('native_episode_id')
-            if episode_id in episodes:
+        if episode:
+            episode_id = (receipt['task_id'], receipt['revision'], episode['id'])
+            if require_locomotion and episode_id in episodes:
                 raise ValueError('Robot locomotion evidence must contain a distinct accepted episode for each allocated item')
-            episodes.add(episode_id)
+            episodes[episode_id] = episode.get('samples', 0)
         presentation = validate_spec(sample.get('question_spec'), sample['parameters'], len(sample['media']))
         validate_answer(template, sample['oracle'])
         validate_choice(template, sample['oracle'], presentation)
@@ -120,14 +124,22 @@ def validate_evidence(arguments, directory, environment, client):
             versions[str(file)] = [file.stat().st_size, file.stat().st_mtime_ns]
         totals[template['id']] += 1
     shortfall = {key: count - totals[key] for key, count in counts.items() if totals[key] < count}
-    value = {'schema': 'benchforge.annotation-stage/v1', 'stage': 'S3',
+    value = {'schema': 'benchforge.annotation-stage/v1' if legacy else 'benchforge.collection-stage/v1', 'stage': 'S3',
              'state': 'needs_evidence' if shortfall else 'completed', 'evidence': str(source),
              'evidence_version': [source.stat().st_size, source.stat().st_mtime_ns],
              'source_versions': versions,
-             'items': len(records), 'per_template': dict(totals), 'shortfall': shortfall,
+             'items': len(records), 'required_items': sum(counts.values()), 'per_template': dict(totals), 'shortfall': shortfall,
+             'collection': {'records': len(records), 'scenes': len(groups), 'media_files': len(media_files),
+                            'native_episodes': len(episodes), 'native_samples': sum(episodes.values())},
+             'annotations': {'items': len(records), 'per_template': dict(totals)},
              'scene_sources': arguments['scene_sources'],
              'require_native_episode': bool((environment.get('_assessment') or {}).get('annotations', {}).get('require_native_episode')),
-             'validation_scope': 'native scene identity, source binding, answer schema, public media and partitions'}
-    path = Path(directory) / 'annotations.json'
+             'validation_scope': 'accepted scene revisions, collected observations and native episodes where required, annotation source binding, answer schema, public media, allocation and partitions'}
+    path = Path(directory) / ('annotations.json' if legacy else 'collection.json')
     write(path, value)
-    return {**value, 'annotations_path': str(path.resolve())}
+    return {**value, 'annotations_path' if legacy else 'collection_path': str(path.resolve())}
+
+
+def validate_evidence(arguments, directory, environment, client):
+    """Retain the operation and artifact location of already-saved S3 plans."""
+    return validate_collection(arguments, directory, environment, client, legacy=True)

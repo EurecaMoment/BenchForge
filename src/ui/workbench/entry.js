@@ -12,18 +12,15 @@ import {createWorkbenchViewStore} from './composer-store.js';
 import {createProductionInput} from './production-input.js';
 import {createProductsResource, productsResourceAddress} from './products-resource.js';
 import workbenchRemote from '../../dsh/remote/lib/typert.remote-client.js';
+import {STAGES} from '../../dsh/production/stages.mjs';
 
 const PRESET_ID = 'benchforge';
 const WORKBENCH_TAB = '@eurecamoment/benchforge-ui/workbench';
 const WORKBENCH_KIND = 'benchforge-workbench';
 const NS = 'benchforgeWorkbench';
-const STAGES = [
-  {id: 'S1', key: 'blueprint'}, {id: 'S2', key: 'collection'}, {id: 'S3', key: 'structure'},
-  {id: 'S4', key: 'synthesis'}, {id: 'S5', key: 'verification'},
-];
 const PLAN_SECTIONS = [
-  ['objectives', '评测目标与边界'], ['coverage', '能力、模板与题量分配'], ['scenes', '场景与采集设计'],
-  ['annotations', '标注与真值来源'], ['questions', '出题规则与公开样例'], ['dataset', '数据集规模与分区'],
+  ['objectives', '评测目标与边界'], ['coverage', '能力、模板与题量分配'], ['scenes', '场景选取与新建设计'],
+  ['annotations', '采集、标注与真值来源'], ['questions', '出题规则与公开样例'], ['dataset', '数据集规模与分区'],
   ['scoring', '评分方法与对照'], ['quality_gates', '质量检查与验收'], ['execution', '五阶段执行安排'],
   ['delivery', '交付物与验收入口'], ['risks', '风险与待解决事项'],
 ];

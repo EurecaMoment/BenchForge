@@ -20,13 +20,17 @@ const OUTPUT_FILES = new Map([
   ['image_path', ['S2', '场景图']], ['video_path', ['S2', '场景视频']], ['usd_path', ['S2', 'USD 场景']],
   ['annotations', ['S3', '标注数据']], ['annotation_path', ['S3', '标注数据']],
   ['annotations_path', ['S3', '标注数据']], ['questions', ['S4', '题目数据']],
+  ['collection_path', ['S3', '采集验收回执']], ['evidence', ['S3', '采集与标注证据']],
+  ['trajectory_path', ['S3', '采集轨迹']], ['sensor_manifest_path', ['S3', '传感器采集清单']],
+  ['episode_manifest_path', ['S3', '轨迹采集清单']], ['observations_path', ['S3', '采集观测']],
   ['questions_path', ['S4', '题目数据']], ['dataset_path', ['S4', '数据集']],
   ['report', ['S5', '评测报告']], ['report_path', ['S5', '评测报告']], ['quality_report', ['S5', '质量报告']],
   ['public_bundle', ['S5', '公开数据包']], ['authority_bundle', ['S5', '真值数据包']],
   ['result_path', [null, '执行结果']], ['output_path', [null, '生成文件']], ['output_file', [null, '生成文件']],
   ['receipt_path', [null, '执行回执']], ['manifest_path', [null, '产物清单']], ['authority_path', [null, '真值数据']],
 ]);
-const STEP_STAGES = {scene: 'S2', capture: 'S2', accepted_scenes:'S2', annotations: 'S3', questions: 'S4', package: 'S5'};
+const STEP_STAGES = {scene: 'S2', capture: 'S2', accepted_scenes:'S2', collection: 'S3', annotations: 'S3', questions: 'S4', package: 'S5'};
+const RECEIPT_STAGES = {'benchforge.scene-stage/v1': 'S2', 'benchforge.collection-stage/v1': 'S3', 'benchforge.annotation-stage/v1': 'S3'};
 const OUTPUT_CONTAINERS = new Set(['result', 'artifact', 'outputs', 'watch']);
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => typeof value === 'string' && value.trim() ? value : null;
@@ -68,6 +72,7 @@ function fileReferences(receipt) {
     if (depth > 5) return;
     if (Array.isArray(value)) { for (const child of value) visit(child, {stage, step}, depth + 1); return; }
     if (!object(value)) return;
+    stage = RECEIPT_STAGES[value.schema] || stage;
     for (const [key, child] of Object.entries(value)) {
       const field = OUTPUT_FILES.get(key);
       if (field) {
@@ -126,7 +131,7 @@ function publish(state, {files = [], workspace, captureId}, seq) {
 
 /** A framework-owned, replayable fold. Pending calls never enter the wire view. */
 export const artifactProjection = {
-  key: ARTIFACT_PROJECTION, stateVersion: 5, stateSchema: State,
+  key: ARTIFACT_PROJECTION, stateVersion: 6, stateSchema: State,
   init: (header) => ({cwd: header.cwd || '', calls: {}, view: {
     revision: 0, workspaces: [], primaryWorkspace: null, files: [], captureIds: [],
   }}),

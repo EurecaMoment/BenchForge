@@ -108,6 +108,44 @@ class PipelineStageTests(unittest.TestCase):
         self.assertTrue(Path(result['outputs']['package']['public_bundle']).is_file())
         self.assertTrue(all(value == 'test-client.json' for value in self.calls))
         self.assertNotIn('stage_review', result)
+        collection = result['outputs']['collection']
+        self.assertEqual(collection['schema'], 'benchforge.collection-stage/v1')
+        self.assertEqual(collection['collection']['records'], 1)
+        self.assertEqual(collection['annotations']['items'], 1)
+        self.assertTrue(Path(collection['collection_path']).is_file())
+
+    def test_saved_annotation_operation_keeps_its_identity_and_output_path(self):
+        plan = json.loads(self.plan.read_text(encoding='utf-8'))
+        step = plan['steps'][1]
+        step.update(id='annotations', uses='evidence.validate', artifact_type='scene.annotations')
+        plan['steps'][2]['arguments']['evidence'] = '$annotations.evidence'
+        write(self.plan, plan)
+        self.advance({'service_config': 'test-client.json'}); self.continue_review()
+        self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
+        result = self.advance({'evidence': str(self.evidence)})
+        receipt = result['steps']['annotations']['result']
+        self.assertEqual(receipt['schema'], 'benchforge.annotation-stage/v1')
+        self.assertTrue(Path(receipt['annotations_path']).is_file())
+        self.assertNotIn('collection', result['steps'])
+        for _ in range(3):
+            self.continue_review()
+            result = self.advance()
+        self.assertEqual(result['state'], 'completed')
+
+    def test_s1_and_s2_reviews_block_downstream_steps_even_with_all_bindings(self):
+        bindings = {'service_config': 'test-client.json', 'evidence': str(self.evidence),
+                    'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}
+        first = self.advance(bindings)
+        self.assertEqual(first['stage_review']['stage'], 'S1')
+        self.assertEqual(self.advance()['steps'], {})
+        self.continue_review()
+        second = self.advance()
+        self.assertEqual(second['stage_review']['stage'], 'S2')
+        self.assertNotIn('collection', self.advance()['steps'])
+        self.continue_review()
+        third = self.advance()
+        self.assertEqual(third['stage_review']['stage'], 'S3')
+        self.assertNotIn('questions', third['steps'])
 
     def test_changed_annotation_source_is_blocked_before_s4(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
@@ -127,7 +165,7 @@ class PipelineStageTests(unittest.TestCase):
         jsonl(self.evidence, [])
         result = self.advance({'evidence': str(self.evidence)})
         self.assertEqual(result['state'], 'needs_evidence')
-        self.assertEqual(result['steps']['annotations']['result']['shortfall'], {'C43-T01': 1})
+        self.assertEqual(result['steps']['collection']['result']['shortfall'], {'C43-T01': 1})
 
     def test_s3_rejects_a_fabricated_source_with_an_accepted_scene_id(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
@@ -167,7 +205,7 @@ class PipelineStageTests(unittest.TestCase):
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
         result = self.advance({'evidence': str(self.evidence)})
         self.assertEqual(result['state'], 'needs_evidence')
-        self.assertEqual(result['steps']['annotations']['result']['stage'], 'S3')
+        self.assertEqual(result['steps']['collection']['result']['stage'], 'S3')
         self.assertNotIn('questions', result['steps'])
         self.assertNotIn('package', result['steps'])
 

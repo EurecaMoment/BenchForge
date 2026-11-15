@@ -8,6 +8,7 @@ import {Context} from '@deepseek-ai/cordis';
 import Tools, {defineTool} from '@deepseek-ai/dsh-tools';
 import {BenchForgeExecutor} from './executor.mjs';
 import * as Invocation from './executor.mjs';
+import {reviewDenial} from '../../production/review_policy.mjs';
 
 // Resolve the services from the installed SDK's own dependency graph so these
 // tests exercise the same scoped registry and pipeline as the deployment.
@@ -87,6 +88,23 @@ test('canonical guards cannot be bypassed using the misspelled prefix', async t 
   const result = await call('benchmarkforge_pipeline_run');
   assert.equal(result.results[0].result.isError, true);
   assert.match(result.results[0].result.content[0].text, /Parent only/);
+  assert.equal(invocations.length, 0);
+});
+
+test('a plan and a dependent call in the same native batch cannot bypass the review', async t => {
+  const {ctx, agent, register, invocations} = await runtime(t);
+  let review = null;
+  ctx.tools.register(defineTool({name: 'benchforge_pipeline_plan', description: 'Open a review', parameters: {},
+    output: {schema: {type: 'object', additionalProperties: true}, render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]},
+    execute: async () => {review = {stage: 'S1', state: 'waiting_user'}; return {saved: true};}}));
+  register('benchforge_pipeline_run');
+  ctx.tools.guard(exec => reviewDenial(exec, review, '/workspace'));
+  const result = await ctx.tools.execute({calls: [
+    {type: 'tool-call', id: 'plan', name: 'benchforge_pipeline_plan', arguments: '{}'},
+    {type: 'tool-call', id: 'run', name: 'benchmarkforge_pipeline_run', arguments: '{"section":"tasks"}'},
+  ], agent, signal: new AbortController().signal, log: {turn: 1, step: 1}});
+  assert.equal(result.results[0].result.isError, false);
+  assert.equal(result.results[1].result.isError, true);
   assert.equal(invocations.length, 0);
 });
 

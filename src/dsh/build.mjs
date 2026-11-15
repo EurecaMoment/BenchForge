@@ -102,6 +102,7 @@ await build({
     'session-operations': 'dsh/host/session_operations.mjs',
     'subagent-policy': 'dsh/presets/subagent_policy.mjs',
     invocation: 'dsh/tools/invocation/executor.mjs',
+    'review-policy': 'dsh/production/review_policy.mjs',
   },
   outdir: path.join(dsh, 'dist'), outExtension: {'.js': '.mjs'},
   bundle: true, platform: 'node', format: 'esm', target: ['node24'],

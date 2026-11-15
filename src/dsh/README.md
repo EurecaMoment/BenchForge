@@ -85,7 +85,8 @@ turn after changing a preset, in addition to loading existing conversations.
 - Scene videos are saved under the configured artifacts directory's `scene-previews/`;
   browser playback reads the saved file.
 
-The workbench displays saved plans, captures, annotations, questions and reports.
+The workbench displays S1 plans, S2 selected or newly created scenes, S3 collection
+(including annotations), S4 questions, and S5 quality review and delivery.
 Stage reviews and production decisions belong to the owning services. See
 [client behavior](../ui/workbench/DESIGN.md).
 
@@ -96,7 +97,9 @@ same saved plan once, including after reload. Paused or canceled work stays stop
 The browser reads this projection and sends review actions through the existing
 Remote API. It owns no continuation timer or acceptance policy.
 
-The Python runner requires explicit S2 scene acceptance and S3 annotation checks
+Stage definitions live in `capabilities/benchmark_design/resources/production-stages.json`
+and are shared by the planner, runner, preset and client. The Python runner requires
+explicit S2 `scene.acceptance` and S3 `collection.validate`
 before S4 questions and S5 packaging. Acceptance comes from the production service's
 task record and captured file versions. Local `passed` files cannot approve a scene.
 Derived answer files use `benchforge.native-derivation/v1`: supported deterministic
@@ -105,6 +108,22 @@ versions remain frozen between stages. Unsupported derivations stay unverified.
 Missing native robot trajectories remain `needs_evidence`, and older incomplete
 plans return `needs_plan_revision`. Tool identifiers are shared by registration,
 prompts and UI through `capabilities/benchmark_design/resources/tool-names.json`.
+
+S2 counts accepted scene identities, including reuse or new scene designs. Its
+preview captures do not stand for production trajectories. After S2 review, S3
+collects observations, native episodes and annotations and validates their sources,
+alignment, allocations and partitions. `collection.validate` validates real inputs;
+it does not generate missing captures. Existing `evidence.validate` plans retain
+their operation IDs and `annotations.json` artifacts. New plans save `collection.json`.
+The UI can preview old files but never declares S3 complete from image/JSON pairing.
+
+The preset's `review-policy` module uses the public `ctx.tools.guard()` API to read
+the durable session review before dispatch. Pending reviews allow reads, inspection
+and task draft edits, and block new production submissions, shells and executable
+delegation. Child sessions use their parent review. The user's Remote controls can
+release a window early; the model tool cannot manufacture a user instruction or
+release it itself. This is a DSH dispatch policy, not an OS sandbox or a way to
+revoke jobs already submitted outside the dispatch path.
 
 The BenchForge preset selects a native executor through `ctx.tools.setExecutor`.
 It delegates scheduling, schema validation, guards, cancellation and result policy

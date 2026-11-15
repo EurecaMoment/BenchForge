@@ -13,7 +13,7 @@ from pipelines.benchmark.execution.runner import run
 from service_access.production_receipts import SceneReceipts
 from capabilities.scene_library.episodes import native_episodes
 from capabilities.dataset_authoring.trajectory_evidence import validate_native_episode
-from pipelines.benchmark.execution.production_stages import validate_planned_scenes
+from pipelines.benchmark.execution.production_stages import validate_planned_scenes, scene_acceptance
 from pipelines.benchmark.design.planner import plan
 
 
@@ -32,7 +32,27 @@ class ProductionContractTests(unittest.TestCase):
         validate_production_steps(steps)
         scope = review_scope({'steps': steps}, self.root, self.root / 'plan.json')
         self.assertEqual([len(scope['members'][key]) for key in ('S2', 'S3', 'S4', 'S5')], [1, 1, 1, 1])
-        self.assertEqual(steps[2]['arguments']['evidence'], '$annotations.evidence')
+        self.assertEqual(steps[2]['arguments']['evidence'], '$collection.evidence')
+        self.assertEqual(steps[1]['uses'], 'collection.validate')
+
+    def test_s2_counts_scenes_not_revisions_trajectories_or_items(self):
+        sources = [{'task_id': 'sf_scene.scene0', 'revision': index} for index in range(100)]
+        accepted = [{**row, 'scene_group_id': 'same-scene'} for row in sources]
+        environment = {'inputs': {}, '_assessment': {'scenes': {
+            'target_scene_count': 2, 'selected_scenes': sources, 'allow_new_scenes': False}}}
+        with patch.object(SceneReceipts, 'require', return_value=accepted):
+            result = scene_acceptance({'scene_sources': sources}, self.root, environment, None)
+        self.assertEqual(result['state'], 'needs_evidence')
+        self.assertEqual(result['accepted'], 1)
+        self.assertEqual(result['required'], 2)
+
+    def test_semantic_stage_wins_over_misleading_review_labels(self):
+        steps = complete_production_steps(self.recipe())
+        for step in steps:
+            step['review_stage'] = 'S2'
+        scope = review_scope({'steps': steps}, self.root, self.root / 'plan.json')
+        self.assertEqual(scope['members']['S3'][0]['uses'], 'collection.validate')
+        self.assertEqual(scope['members']['S4'][0]['uses'], 'templates.produce')
 
     def test_review_labels_cannot_hide_missing_dependencies(self):
         steps = self.recipe()

@@ -15,8 +15,8 @@ const FORMATS = {
 };
 const STAGES = [
   ['S1', /(?:^|[_.-])(plan|brief|blueprint)(?:[_.-]|$)/i],
-  ['S3', /annotat|depth|normal|semantic|instance|ground.?truth/i],
   ['S5', /report|quality|score|evaluat|validation/i],
+  ['S3', /annotat|depth|normal|semantic|instance|ground.?truth|trajectory|episode|sensor|observation|(?:^|[_.-])collection(?:[_.-]|$)/i],
   ['S4', /question|dataset|benchmark|synthesi/i],
 ];
 const identity = (owner, file) => createHash('sha256').update(JSON.stringify([owner, file])).digest('base64url');
@@ -59,6 +59,7 @@ export async function conversationProducts({sessionId, evidence, roots, maxArtif
     const name = path.basename(ref.path), format = path.extname(name).toLowerCase();
     const [kind, contentType] = FORMATS[format] || ['file', 'application/octet-stream'];
     const stage = ref.stage || STAGES.find(([, pattern]) => pattern.test(name))?.[0] ||
+      (/(?:^|[\\/])(?:episodes|trajectories|observations|sensors|collection)[\\/]/i.test(ref.path) ? 'S3' : null) ||
       (['image', 'video'].includes(kind) ? 'S2' : null);
     const base = {id: ref.id, name, title: ref.title || name, stage, kind, content_type: contentType,
       source: ref.source, session_id: ref.owner, status: 'available', bytes: null, updated_at: null, url: null};

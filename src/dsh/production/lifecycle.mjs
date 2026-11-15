@@ -1,3 +1,5 @@
+import {stageName, stageSummary} from './stages.mjs';
+
 /** Conversation policy; all facts come from the projection and domain receipts. */
 export function createProductionLifecycle({projection,table,agents,readReview,createMessage,restoreAgent=async()=>undefined,now=Date.now,
   schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{}}) {
@@ -62,7 +64,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,cr
       if(pendingNotice(agent,record.key))return true;
       if(state.notices.includes(record.key))return agent.status==='running';
       const message=notice('benchforge/production-resume',record.key,
-        `生产阶段通知（系统状态）：${review.stage} 的用户窗口已结束。读取 benchforge_stage_review 的当前状态，处理已有用户指令，然后使用 benchforge_pipeline_run 继续同一个任务。workspace=${record.workspace}；plan=${record.plan}；run=${record.run || '尚未创建'}。不要重建已完成阶段。先向用户简短说明当前阶段和下一步。`);
+        `生产阶段通知（系统状态）：${review.stage} ${stageName(review.stage)} 的用户窗口已结束。读取 benchforge_stage_review 的当前状态，处理已有用户指令，然后使用 benchforge_pipeline_run 继续同一个任务。阶段含义：${stageSummary()}，S3 包含标注。workspace=${record.workspace}；plan=${record.plan}；run=${record.run || '尚未创建'}。不要重建已完成阶段。先向用户简短说明当前阶段和下一步。`);
       if(agent.status==='running')agent.steer(message);else agent.followup(message);
       // A queued notice may be lost before its first step is committed. The inbox
       // and standard session events, not a prior enqueue, establish delivery.
@@ -83,7 +85,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,cr
       if((silent||stageChanged||failed)&&(!previous||now()-previous.at>=60000)) {
         reminders.set(agent.id,{...previous,at:now(),review:view.review?.review_id,error:view.error});
         const message=notice('benchforge/production-progress',`${agent.id}:${view.revision}`,
-          `进度沟通提醒（系统状态）：请在继续工具调用前，用用户的语言简短说明已完成的工作、当前阶段、实际阻塞和下一步。当前阶段=${view.stage||'计划'}，状态=${view.state}，本任务工具调用=${view.tools}，shell=${view.shells}。${view.error?'最近调用失败，请说明实际原因并修正入口。':''}${view.review?'展示真实阶段产物：'+view.review.artifact+'。':''}不要展示隐藏推理，不要把调用次数或文件数量当成完成比例。`);
+          `进度沟通提醒（系统状态）：请在继续工具调用前，用用户的语言简短说明已完成的工作、当前阶段、实际阻塞和下一步。当前阶段=${stageName(view.stage)||'计划'}，状态=${view.state}，本任务工具调用=${view.tools}，shell=${view.shells}。S2 是场景选取或新建，S3 是采集（包含标注）。${view.error?'最近调用失败，请说明实际原因并修正入口。':''}${view.review?'展示真实阶段产物：'+view.review.artifact+'；审核期间不启动依赖它的生产。':''}不要展示隐藏推理，不要把调用次数或文件数量当成完成比例。`);
         return {...decision,messages:[...decision.messages,message]};
       }
     }

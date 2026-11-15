@@ -19,6 +19,8 @@ import {readAssessmentTemplate, readTaskTemplates} from './resources.mjs';
 import {artifactProjection} from './artifacts/projection.mjs';
 import {createArtifactEvidenceReader, resolveArtifactRoots} from './artifacts/scope.mjs';
 import {conversationProducts, openConversationArtifact} from './artifacts/files.mjs';
+import {stageOfStep} from '../production/stages.mjs';
+import {collectionSummary} from '../production/collection.mjs';
 
 export const name = 'benchforge-ui';
 export const inject = ['connection', 'typert', 'workspaceRegistry', 'benchforgeCapture', 'benchforgeSessions',
@@ -38,12 +40,12 @@ const counts = () => Object.fromEntries(STATUSES.map((key) => [key, 0]));
 const execute = promisify(execFile);
 const STAGE_OPERATIONS = [
   ['S1', /^(plan|pipeline_plan|brief|design|literature)/],
-  ['S2', /^(acquire|collect|capture|scene|asset|reference|(?:benchforge|spatialforge)\.(start|capture|asset|refine))/],
-  ['S3', /^(annotat|normaliz|structur|evidence|trajectory|(?:benchforge|spatialforge)\.(observe|evidence|task_code))/],
+  ['S2', /^(capture|scene|asset|reference|(?:benchforge|spatialforge)\.(start|capture|asset|refine))/],
+  ['S3', /^(acquire|collect|annotat|normaliz|structur|evidence|trajectory|(?:benchforge|spatialforge)\.(evidence|task_code))/],
   ['S4', /^(build|synthesi|templates\.produce|dataset|produce)/],
   ['S5', /^(score|screen|evaluat|verif|quality|report|package|(?:templates|data)\.package)/],
 ];
-const stageOf = (operation) => STAGE_OPERATIONS.find(([, pattern]) => pattern.test(operation || ''))?.[0] || null;
+const stageOf = (operation) => stageOfStep({uses: operation}) || STAGE_OPERATIONS.find(([, pattern]) => pattern.test(operation || ''))?.[0] || null;
 function workbenchUrl(params, workspacePath) {
   const query = new URLSearchParams(params);
   if (workspacePath) query.set('workspace_path', workspacePath);
@@ -173,8 +175,9 @@ async function productionProgress(roots, config, url, signal) {
           const captureWait = ['benchforge.observe', 'spatialforge.observe'].includes(step.uses) && step.await_terminal && planned.some((producer) =>
             ['benchforge.capture', 'spatialforge.capture'].includes(producer.uses) && step.arguments?.run_id === '$' + producer.id + '.run_id');
           return {id: step.id, uses: step.uses,
-            stage: ['S1','S2','S3','S4','S5'].includes(step.review_stage) ? step.review_stage : captureWait ? 'S2' : stageOf(step.uses),
+            stage: stageOfStep(step) || (captureWait ? 'S2' : stageOf(step.uses)),
             state: actual?.state || 'unknown',
+            collection: collectionSummary(actual?.result),
             error: actual?.error || null};
         });
         const completed = steps.filter((step) => step.state === 'completed').length;

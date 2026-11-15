@@ -81,6 +81,9 @@ class DshPresetTests(unittest.TestCase):
             entries = [row for row in plugins(merged) if row['id'] == 'benchforge-invocation']
             self.assertEqual(len(entries), 1)
             self.assertTrue(entries[0]['name'].endswith('/invocation' if portable else '/invocation.mjs'))
+            reviews = [row for row in plugins(merged) if row['id'] == 'benchforge-review-policy']
+            self.assertEqual(len(reviews), 1)
+            self.assertIn('S2 场景选取或新建 → S3 采集', persona(merged)['prefix'])
 
     def test_assessment_guidance_uses_registered_tool_names(self):
         template = assessment_template()

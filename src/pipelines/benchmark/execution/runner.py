@@ -23,6 +23,7 @@ from pipelines.benchmark.execution.review_steps import completed_stage
 from service_access.scene_service import service_call
 from pipelines.benchmark.design.production_steps import validate_production_steps
 from service_access.tool_names import qualify
+from capabilities.benchmark_design.stages import COLLECTION_OPERATIONS
 
 SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture',
                   'benchforge.asset': '/asset', 'benchforge.refine': '/refine', 'benchforge.extend': '/extend',
@@ -32,9 +33,10 @@ SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture'
 
 def execute_step(step, arguments, directory, environment, client):
     operation = step['uses']
-    if operation in ('scene.acceptance', 'evidence.validate'):
-        from pipelines.benchmark.execution.production_stages import scene_acceptance, validate_evidence
-        handler = scene_acceptance if operation == 'scene.acceptance' else validate_evidence
+    if operation == 'scene.acceptance' or operation in COLLECTION_OPERATIONS:
+        from pipelines.benchmark.execution.production_stages import scene_acceptance, validate_collection, validate_evidence
+        handler = {'scene.acceptance': scene_acceptance, 'collection.validate': validate_collection,
+                   'evidence.validate': validate_evidence}[operation]
         return handler(arguments, directory, environment, client)
     if operation == 'pipeline':
         from pipelines.catalog import pipeline_files
@@ -196,14 +198,14 @@ def _run_locked(args, directory, config, client):
             arguments = bind(step.get('arguments', {}), environment)
             if read(run_root/'steps'/step['id']/'request.json') != arguments:
                 raise ValueError('Completed step inputs changed; create a new plan/run')
-            if step['uses'] == 'evidence.validate':
+            if step['uses'] in COLLECTION_OPERATIONS:
                 file = Path(prior['result']['evidence'])
                 if not file.is_file() or prior['result'].get('evidence_version') != [file.stat().st_size, file.stat().st_mtime_ns]:
-                    raise ValueError('Validated annotations changed; save a revised plan and validate S3 again')
+                    raise ValueError('Validated collection changed; save a revised plan and validate S3 again')
                 for name, version in prior['result'].get('source_versions', {}).items():
                     source = Path(name)
                     if not source.is_file() or version != [source.stat().st_size, source.stat().st_mtime_ns]:
-                        raise ValueError('Validated annotation source changed; validate S3 again: ' + name)
+                        raise ValueError('Validated collection or annotation source changed; validate S3 again: ' + name)
             environment[step['id']] = prior['result']
             prior_artifact = prior.get('artifact')
             if prior_artifact:

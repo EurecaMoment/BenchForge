@@ -6,6 +6,7 @@ const files = [
   ['capabilities/benchmark_design/resources/assessment_template.json', 'dist/resources/assessment_template.json'],
   ['capabilities/task_catalog/resources/benchmark_templates.json', 'dist/resources/task_templates.json'],
   ['capabilities/benchmark_design/resources/tool-names.json', 'dist/resources/tool-names.json'],
+  ['capabilities/benchmark_design/resources/production-stages.json', 'dist/resources/production-stages.json'],
 ];
 
 for (const [source, destination] of files) {

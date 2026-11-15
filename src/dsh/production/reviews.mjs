@@ -1,5 +1,17 @@
 import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
+import {existsSync} from 'node:fs';
+
+/** Missing storage means no production review, never create it from a reader. */
+export function readLatestStageReview(workspace, sessionId, now = Date.now()) {
+  const file = path.join(workspace, 'stage-reviews.sqlite');
+  if (!existsSync(file)) return null;
+  const db = new DatabaseSync(file, {readOnly: true});
+  try {
+    const row = db.prepare('SELECT id,session,key,stage,artifact,deadline,state,instruction FROM reviews WHERE session=? ORDER BY id DESC LIMIT 1').get(sessionId);
+    return row ? {...row, state: row.state === 'waiting_user' && row.deadline * 1000 <= now ? 'elapsed' : row.state} : null;
+  } finally {db.close();}
+}
 
 /** Read the domain's persisted window; UI and model waits use the same deadline. */
 export function readStageReview(workspace,sessionId,reviewId,now=Date.now()) {

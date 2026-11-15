@@ -5,17 +5,7 @@ from pathlib import Path
 from storage.artifacts import read_json as read
 from pipelines.benchmark.execution.stage_review import STAGES
 from pipelines.benchmark.execution.artifact_graph import binding_roots
-
-def stage_of(step):
-    required = {'scene.acceptance': 'S2', 'evidence.validate': 'S3',
-                'templates.produce': 'S4', 'data.package': 'S5'}
-    if step['uses'] in required:
-        return required[step['uses']]
-    if step.get('review_stage') in ('S1','S2','S3','S4','S5'):
-        return step['review_stage']
-    return {'benchforge.start':'S2','benchforge.capture':'S2','benchforge.observe':'S2',
-            'benchforge.refine':'S2','benchforge.extend':'S2','benchforge.asset':'S2','benchforge.evidence':'S3',
-            'templates.produce':'S4','data.package':'S5'}.get(step['uses'])
+from capabilities.benchmark_design.stages import stage_of
 
 def review_scope(plan, run_root, plan_path):
     """One review owner for the leaf artifacts of a composed production run."""

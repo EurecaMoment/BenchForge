@@ -1,4 +1,5 @@
 import {qualifyToolNames, toolName} from '../../dsh/tools/benchmark/names.mjs';
+import {stageSummary, COLLECTION_OPERATIONS} from '../../dsh/production/stages.mjs';
 
 export function createWorkbenchState({STAGES, sceneName}) {
   function initialState(sessionId) {
@@ -39,19 +40,19 @@ export function createWorkbenchState({STAGES, sceneName}) {
   function productionRequest(demand, selection) {
     if (demand.mode === 'append') return '请将以下要求应用于当前会话的生产任务，保留已有产物和失败证据，并继续实际执行至完成：\n' + demand.objective.trim() + sceneConstraint(selection);
     return [
-      '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段：评测计划、场景生成或复用与采集、标注、按能力模板出题、质量检查与打包交付；不要只写计划。',
+      '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段：' + stageSummary() + '。S3 采集包含标注；不要只写计划。',
       'execution_mode=' + (demand.executionMode || 'production') + '；quantity_contract=' + (demand.quantityContract || 'minimum') + '。',
       '生产需求：' + demand.objective.trim(),
       'target_items=' + Number(demand.count) + '。这是请求目标；按数量合同处理短缺，不得把执行完成表述为数量达标或质量验收通过。',
       demand.capability.trim() ? '能力与模板要求：' + demand.capability.trim() : '请根据上述需求从现有能力图谱和出题模板中拆解并选择适用模板。',
       demand.sceneCount ? '目标场景数：' + Number(demand.sceneCount) + ' 个。' : '',
       demand.storageBudget ? '存储预算上限：' + Number(demand.storageBudget) + ' GB。' : '',
-      '使用当前已接入工具。场景是出题前提，GT 仅来自官方、程序或仿真，公开题目不泄露答案。请将计划、场景、标注、题目表和最终报告关联到当前会话，使工作台实时展示实际回执和产物。',
+      '使用当前已接入工具。S2 先选取或新建并验收场景，预览不等于完成正式数据采集。S3 在已验收场景中采集轨迹、传感器数据与状态，包含标注、对齐与来源校验。GT 仅来自官方、程序或仿真，公开题目不泄露答案。将各阶段真实回执和产物关联到当前会话。',
     ].filter(Boolean).join('\n') + sceneConstraint(selection);
   }
   function productionContext(selection, template) {
     return sceneConstraint(selection) +
-      '\n每个阶段 S1 计划、S2 场景、S3 标注、S4 题目、S5 报告完成后，展示真实产物并等待用户 5 分钟。使用 '+toolName('stage_review')+' 打开及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。\n' +
+      '\n五阶段：' + stageSummary() + '。S3 采集包含标注。每阶段完成后展示真实产物并等待用户 5 分钟。由计划和执行器建立阶段回执，使用 '+toolName('stage_review')+' 读取及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。审核期间可读资料、看预览和编辑准备稿，不得提前采集依赖该阶段的正式数据或绕过审核另起脚本。\n' +
       '\n制定或修改评测计划时必须遵守以下完整模板；已有完整计划且本次只要求继续执行时，复用已有计划。\n' +
       qualifyToolNames(template.instructions) + '\n' + qualifyToolNames(template.scene_binding) + '\n各章节要求：\n' + JSON.stringify(template.sections, null, 2) +
       (template.native_episode_contract ? '\n连续运动与机器人轨迹验收合同：\n' + JSON.stringify(template.native_episode_contract, null, 2) : '') +
@@ -107,8 +108,9 @@ export function createWorkbenchState({STAGES, sceneName}) {
         value.generation.state, value.generation.written_count, value.generation.verified_count, value.generation.published_count] : null,
     ]);
   }
-  const sceneStage = (row) => row.workflow === 'scene' ? 'S2' : row.workflow === 'dataset' ? 'S4' :
-    ({review: 'S5', publish: 'S5', export: 'S5', dataset: 'S4', annotate: 'S3'}[row.phase] || 'S2');
+  const sceneStage = (row) => ['collect', 'collection', 'annotate'].includes(row.phase) ? 'S3' :
+    row.workflow === 'scene' ? 'S2' : row.workflow === 'dataset' ? 'S4' :
+    ({review: 'S5', publish: 'S5', export: 'S5', dataset: 'S4'}[row.phase] || 'S2');
   function pipelineForStage(id, pipelines) {
     const latest = (stage) => pipelines.filter((row) => row.steps?.some((step) => step.stage === stage))
       .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))[0];
@@ -259,6 +261,8 @@ export function createWorkbenchState({STAGES, sceneName}) {
   function recordedStageState(id, pipeline, scene, operations = [], planReceipt = null, artifacts = [], collection = null) {
     if (id === 'S1' && planReceipt) return 'completed';
     if (id === 'S2' && collection) return collection.state;
+    const steps = (pipeline?.steps || []).filter((row) => row.stage === id);
+    const collectionValidated = steps.some(row => COLLECTION_OPERATIONS.has(row.uses) && row.state === 'completed');
     const current = (scene?.tasks || []).filter((row) => sceneStage(row) === id);
     if (current.length) {
       if (scene.state === 'CANCELED' && current.some((row) => row.state !== 'SUCCEEDED')) return 'canceled';
@@ -267,27 +271,20 @@ export function createWorkbenchState({STAGES, sceneName}) {
       if (current.every((row) => row.state === 'SUCCEEDED')) {
         const parentSteps = (pipeline?.steps || []).filter((row) => row.stage === id);
         return parentSteps.some((row) => row.state !== 'completed')
-          ? stageState(id, pipeline, null, operations, planReceipt, artifacts) : 'completed';
+          ? stageState(id, pipeline, null, operations, planReceipt, artifacts) :
+          id === 'S3' && !collectionValidated ? 'previewable' : 'completed';
       }
       if (current.some((row) => row.state === 'RUNNING')) return 'running';
       return lifecycle(scene.state);
     }
-    const steps = (pipeline?.steps || []).filter((row) => row.stage === id);
     if (!steps.length) {
-      if (id === 'S3' && annotationProducts(artifacts).length) {
-        const capture = (pipeline?.steps || []).filter((row) => row.stage === 'S2');
-        const views = artifacts.filter((row) => row.stage === 'S2' && row.kind === 'image' && /^capture\/view_\d+\.png$/.test(row.file || ''));
-        const labels = annotationProducts(artifacts);
-        const paired = views.length && views.every((view) => labels.some((label) => label.task_id === view.task_id &&
-          label.revision === view.revision && label.file === view.file.replace(/\.png$/, '.json')));
-        const settled = scene?.state === 'SUCCEEDED' || capture.length && capture.every((row) => row.state === 'completed');
-        return paired && settled ? 'completed' : 'previewable';
-      }
+      if (id === 'S3' && artifacts.some(row => row.stage === 'S3')) return 'previewable';
       if (pipeline || scene) return 'unknown';
       const recorded = operations.filter((row) => row.stage === id);
-      return recorded.find((row) => row.state === 'running')?.state || recorded[0]?.state || 'unknown';
+      const state = recorded.find((row) => row.state === 'running')?.state || recorded[0]?.state || 'unknown';
+      return id === 'S3' && state === 'completed' ? 'previewable' : state;
     }
-    if (steps.every((row) => row.state === 'completed')) return 'completed';
+    if (steps.every((row) => row.state === 'completed')) return id === 'S3' && !collectionValidated ? 'previewable' : 'completed';
     return steps.find((row) => row.state !== 'completed' && row.state !== 'unknown')?.state ||
       (pipeline.current?.stage === id && pipeline.state !== 'completed' ? pipeline.state : 'unknown');
   }

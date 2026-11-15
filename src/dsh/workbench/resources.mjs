@@ -1,4 +1,6 @@
 import {readFile} from 'node:fs/promises';
+import {qualifyToolNames} from '../tools/benchmark/names.mjs';
+import {stageContract} from '../production/stages.mjs';
 
 async function readResource(name) {
   const contents = await readFile(new URL('./resources/' + name, import.meta.url), 'utf8');
@@ -10,5 +12,7 @@ export async function readTaskTemplates() {
 }
 
 export async function readAssessmentTemplate() {
-  return readResource('assessment_template.json');
+  const template = await readResource('assessment_template.json');
+  return {...template, stage_contract: stageContract,
+    instructions: qualifyToolNames(template.instructions), scene_binding: qualifyToolNames(template.scene_binding)};
 }

@@ -34,12 +34,78 @@ var benchforgeClient = (() => {
     default: () => createPlugin
   });
 
+  // src/capabilities/benchmark_design/resources/production-stages.json
+  var production_stages_default = {
+    schema: "benchforge.production-stages/v1",
+    stages: [
+      {
+        id: "S1",
+        key: "blueprint",
+        zh: { name: "\u8BA1\u5212", nav: "\u8BA1\u5212", heading: "\u8BC4\u6D4B\u8BA1\u5212", description: "\u5B9A\u4E49\u6D4B\u91CF\u76EE\u6807\u3001\u573A\u666F\u6765\u6E90\u3001\u91C7\u96C6\u4E0E\u6807\u6CE8\u65B9\u6848\u3001\u9898\u91CF\u548C\u9A8C\u6536\u6761\u4EF6\u3002", output: "\u9700\u6C42\u3001\u573A\u666F\u9009\u62E9\u3001\u91C7\u96C6\u65B9\u6848\u4E0E\u6570\u91CF\u5206\u914D" },
+        en: { name: "Plan", nav: "Plan", heading: "Evaluation plan", description: "Define the goal, scene sources, collection and annotation plan, quantities and acceptance criteria.", output: "Goal, scene selection, collection plan and allocation" }
+      },
+      {
+        id: "S2",
+        key: "scenes",
+        zh: { name: "\u573A\u666F\u9009\u53D6\u6216\u65B0\u5EFA", nav: "\u573A\u666F", heading: "\u573A\u666F\u9009\u53D6\u6216\u65B0\u5EFA", description: "\u9009\u53D6\u5141\u8BB8\u590D\u7528\u7684\u573A\u666F\u6216\u6309\u8BA1\u5212\u65B0\u5EFA\uFF0C\u67E5\u770B\u9884\u89C8\u5E76\u9A8C\u6536\u573A\u666F\u7248\u672C\u3002\u6B63\u5F0F\u8F68\u8FF9\u4E0E\u4F20\u611F\u5668\u6570\u636E\u5728 S3 \u91C7\u96C6\u3002", output: "\u9009\u5B9A\u6216\u65B0\u5EFA\u7684\u573A\u666F\u3001\u9884\u89C8\u4E0E\u573A\u666F\u9A8C\u6536\u56DE\u6267" },
+        en: { name: "Select or create scenes", nav: "Scenes", heading: "Select or create scenes", description: "Select permitted existing scenes or build planned scenes, inspect previews and accept scene revisions. Dataset trajectories and sensor recordings belong to S3.", output: "Selected or new scenes, previews and scene acceptance receipts" }
+      },
+      {
+        id: "S3",
+        key: "collection",
+        zh: { name: "\u91C7\u96C6", nav: "\u91C7\u96C6", heading: "\u91C7\u96C6", description: "\u5728\u5DF2\u9A8C\u6536\u573A\u666F\u4E2D\u91C7\u96C6\u8F68\u8FF9\u3001\u4F20\u611F\u5668\u89C2\u6D4B\u548C\u72B6\u6001\uFF0C\u5B8C\u6210\u6807\u6CE8\u3001\u5BF9\u9F50\u4E0E\u6765\u6E90\u6821\u9A8C\u3002\u9884\u89C8\u6837\u672C\u4E0D\u4EE3\u8868\u6574\u6279\u91C7\u96C6\u5B8C\u6210\u3002", output: "\u91C7\u96C6\u6570\u636E\u3001\u6807\u6CE8\u3001\u6807\u5B9A\u4E0E\u6765\u6E90\u6821\u9A8C\u56DE\u6267" },
+        en: { name: "Collection", nav: "Collection", heading: "Collection", description: "Collect trajectories, sensor observations and states in accepted scenes, including annotation, alignment and source validation. Preview samples do not establish batch completion.", output: "Collected data, annotations, calibration and validation receipts" }
+      },
+      {
+        id: "S4",
+        key: "synthesis",
+        zh: { name: "\u51FA\u9898", nav: "\u9898\u76EE", heading: "\u8BC4\u6D4B\u914D\u7F6E\u4E0E\u9898\u76EE\u8868", description: "\u4F9D\u636E\u5DF2\u9A8C\u6536\u7684\u91C7\u96C6\u6570\u636E\u4E0E\u6807\u6CE8\u6309\u6A21\u677F\u51FA\u9898\uFF0C\u67E5\u770B\u6570\u636E\u96C6\u5168\u96C6\u548C\u6837\u672C\u3002", output: "\u9898\u76EE\u3001\u516C\u5F00\u89C2\u6D4B\u4E0E\u6570\u636E\u96C6\u7248\u672C" },
+        en: { name: "Questions", nav: "Items", heading: "Evaluation config & questions", description: "Produce questions from validated collection data and annotations; inspect dataset versions and samples.", output: "Questions, public observations and dataset versions" }
+      },
+      {
+        id: "S5",
+        key: "verification",
+        zh: { name: "\u8D28\u68C0\u4E0E\u4EA4\u4ED8", nav: "\u62A5\u544A", heading: "\u8D28\u68C0\u4E0E\u4EA4\u4ED8", description: "\u5BA1\u67E5\u6709\u6548\u6027\u3001\u5206\u533A\u4E0E\u8986\u76D6\uFF0C\u751F\u6210\u62A5\u544A\u548C\u4EA4\u4ED8\u7248\u672C\u3002", output: "\u8D28\u91CF\u7ED3\u679C\u3001\u4FEE\u590D\u5EFA\u8BAE\u4E0E\u4EA4\u4ED8\u5305" },
+        en: { name: "Quality review and delivery", nav: "Report", heading: "Quality review and delivery", description: "Inspect validity, splits and coverage; prepare reports and releases.", output: "Quality results, repair proposals and packages" }
+      }
+    ],
+    required_operations: {
+      "scene.acceptance": "S2",
+      "collection.validate": "S3",
+      "evidence.validate": "S3",
+      "templates.produce": "S4",
+      "data.package": "S5"
+    },
+    default_operations: {
+      "benchforge.start": "S2",
+      "benchforge.capture": "S2",
+      "benchforge.observe": "S2",
+      "benchforge.refine": "S2",
+      "benchforge.extend": "S2",
+      "benchforge.asset": "S2",
+      "benchforge.evidence": "S3"
+    },
+    collection_operations: ["collection.validate", "evidence.validate"]
+  };
+
+  // src/dsh/production/stages.mjs
+  var STAGES = production_stages_default.stages;
+  var COLLECTION_OPERATIONS = new Set(production_stages_default.collection_operations);
+  var stageName = (id, language = "zh") => STAGES.find((row) => row.id === id)?.[language].name || id;
+  var stageSummary = (language = "zh") => STAGES.map((row) => row.id + " " + row[language].name).join(" \u2192 ");
+  var stageCopy = (language) => Object.fromEntries(STAGES.flatMap(({ key, [language]: text }) => [
+    [key + "Nav", text.nav],
+    [key, text.heading],
+    [key + "Desc", text.description],
+    [key + "Output", text.output]
+  ]));
+
   // src/ui/workbench/i18n.js
   var dictionaries = {
     zh: {
       productionSystemStatus: "\u7CFB\u7EDF\u72B6\u6001",
       productionPlanned: "\u8BA1\u5212\u5DF2\u4FDD\u5B58",
-      productionNeedsEvidence: "\u7B49\u5F85\u6709\u6548\u91C7\u96C6\u6216\u6807\u6CE8",
+      productionNeedsEvidence: "\u7B49\u5F85\u91C7\u96C6\u4E0E\u6807\u6CE8\u9A8C\u6536",
       productionNeedsInput: "\u7B49\u5F85\u8F93\u5165",
       productionNeedsRevision: "\u8BA1\u5212\u9700\u8981\u4FEE\u8BA2",
       productionInterrupted: "\u6267\u884C\u5DF2\u4E2D\u65AD",
@@ -57,11 +123,7 @@ var benchforgeClient = (() => {
       reviewFinished: "\u9636\u6BB5\u7B49\u5F85\u5DF2\u7ED3\u675F",
       executionProgress: "\u6267\u884C\u8FDB\u5C55",
       productionHint: "\u6BCF\u9636\u6BB5\u5B8C\u6210\u540E\u7B49\u5F85\u4F60\u7684\u6307\u4EE4 5 \u5206\u949F\u3002",
-      blueprintNav: "\u8BA1\u5212",
-      collectionNav: "\u573A\u666F",
-      structureNav: "\u6807\u6CE8",
-      synthesisNav: "\u9898\u76EE",
-      verificationNav: "\u62A5\u544A",
+      ...stageCopy("zh"),
       stageDone: "\u5DF2\u5B8C\u6210",
       previewable: "\u53EF\u9884\u89C8",
       savedStageProducts: "\u5DF2\u4FDD\u5B58\u4EA7\u7269",
@@ -143,7 +205,7 @@ var benchforgeClient = (() => {
       sceneCount: "\u76EE\u6807\u573A\u666F\u6570",
       targetQuantityNote: "\u8FD9\u91CC\u586B\u5199\u7684\u662F\u76EE\u6807\u9898\u91CF\uFF0C\u5B9E\u9645\u751F\u6210\u91CF\u4EE5\u751F\u4EA7\u56DE\u6267\u4E3A\u51C6\u3002",
       optionalAuto: "\u7559\u7A7A\u7531 DSH \u5B89\u6392",
-      fullWorkflowNote: "\u4E00\u6B21\u63D0\u4EA4\u540E\u6267\u884C\u5B8C\u6574\u4E94\u9636\u6BB5\uFF1A\u8BC4\u6D4B\u8BA1\u5212 \u2192 \u573A\u666F \u2192 \u6807\u6CE8 \u2192 \u51FA\u9898 \u2192 \u8D28\u91CF\u68C0\u67E5\u4E0E\u4EA4\u4ED8\u3002",
+      fullWorkflowNote: "\u4E00\u6B21\u63D0\u4EA4\u540E\u6267\u884C\u5B8C\u6574\u4E94\u9636\u6BB5\uFF1A" + stageSummary() + "\u3002\u91C7\u96C6\u5305\u542B\u6807\u6CE8\u3002",
       appendNote: "\u8FFD\u52A0\u8981\u6C42\u53D1\u9001\u5230\u5F53\u524D\u4F1A\u8BDD\uFF1B\u6267\u884C\u4E2D\u4F1A\u8FDB\u5165\u6D88\u606F\u961F\u5217\uFF0C\u4E0D\u4F1A\u53E6\u8D77\u4E00\u4E2A\u9690\u85CF\u4EFB\u52A1\u3002",
       preservedDraft: "\u5F53\u524D\u4F1A\u8BDD\u4FDD\u7559\u7684\u539F\u8F93\u5165\u8349\u7A3F",
       preservedAttachments: "\u5F53\u524D\u4F1A\u8BDD\u4FDD\u7559\u7684\u9644\u4EF6",
@@ -348,11 +410,6 @@ var benchforgeClient = (() => {
       runCount: "\u8FD0\u884C",
       datasetCount: "\u6570\u636E\u96C6\u7248\u672C",
       workflow: "\u4E94\u6B65\u5DE5\u4F5C\u6D41",
-      blueprint: "\u8BC4\u6D4B\u8BA1\u5212",
-      collection: "\u573A\u666F\u9884\u89C8",
-      structure: "\u6807\u6CE8\u9884\u89C8",
-      synthesis: "\u8BC4\u6D4B\u914D\u7F6E\u4E0E\u9898\u76EE\u8868",
-      verification: "\u6700\u7EC8\u62A5\u544A",
       productionProgress: "\u751F\u4EA7\u8FDB\u5EA6",
       progressUpload: "\u4EA7\u7269\u4E0A\u4F20",
       progressItems: "\u5DF2\u5B8C\u6210\u6570\u91CF",
@@ -416,8 +473,15 @@ var benchforgeClient = (() => {
       previewClose: "\u5173\u95ED\u9884\u89C8",
       selectArtifact: "\u9009\u62E9",
       sceneGallery: "\u53EF\u7528\u573A\u666F",
-      annotationGallery: "\u6807\u6CE8\u6570\u636E",
-      annotationNote: "\u70B9\u51FB\u9884\u89C8\u67E5\u770B\u516C\u5F00\u6807\u6CE8\u4E0E\u8BC1\u636E\uFF1B\u6A21\u578B\u5019\u9009\u6807\u6CE8\u4E0E\u4EFF\u771F\u771F\u503C\u4FDD\u7559\u5404\u81EA\u6765\u6E90\u3002",
+      annotationGallery: "\u91C7\u96C6\u6570\u636E\u4E0E\u6807\u6CE8",
+      annotationNote: "\u67E5\u770B\u91C7\u96C6\u7684\u8F68\u8FF9\u3001\u89C2\u6D4B\u4E0E\u6807\u6CE8\uFF1B\u6A21\u578B\u5019\u9009\u6807\u6CE8\u548C\u4EFF\u771F\u771F\u503C\u4FDD\u7559\u5404\u81EA\u6765\u6E90\uFF0C\u5B8C\u6574\u91C7\u96C6\u987B\u901A\u8FC7\u6765\u6E90\u3001\u5BF9\u9F50\u548C\u6570\u91CF\u9A8C\u6536\u3002",
+      collectionPreviewOnly: "\u5DF2\u6709\u6837\u672C\u53EF\u9884\u89C8\uFF0C\u5C1A\u4E0D\u80FD\u636E\u6B64\u5224\u5B9A\u6574\u6279\u91C7\u96C6\u5B8C\u6210",
+      collected_records: "\u6709\u6548\u91C7\u96C6\u8BB0\u5F55",
+      collected_scenes: "\u6765\u6E90\u573A\u666F",
+      collected_media: "\u89C2\u6D4B\u6587\u4EF6",
+      collected_episodes: "\u539F\u751F\u8F68\u8FF9",
+      collected_samples: "\u8F68\u8FF9\u91C7\u6837\u70B9",
+      collected_annotations: "\u542B\u6807\u6CE8\u8BB0\u5F55",
       evaluationConfig: "\u8BC4\u6D4B\u914D\u7F6E",
       questionTable: "\u9898\u76EE\u8868",
       finalReport: "\u6700\u7EC8\u62A5\u544A",
@@ -464,11 +528,6 @@ var benchforgeClient = (() => {
       noSendInterface: "\u5F53\u524D DSH \u672A\u63D0\u4F9B\u5BF9\u8BDD\u63D0\u4EA4\u63A5\u53E3\u3002",
       existingDraft: "\u5C06\u4E00\u540C\u53D1\u9001\u7684\u8F93\u5165\u6846\u6587\u5B57",
       existingAttachments: "\u5C06\u4E00\u540C\u53D1\u9001\u7684\u9644\u4EF6\u6570",
-      blueprintDesc: "\u5B9A\u4E49\u6D4B\u91CF\u76EE\u6807\uFF0C\u9009\u62E9\u80FD\u529B\u4E0E\u6A21\u677F\uFF0C\u660E\u786E\u4EA7\u91CF\u548C\u6765\u6E90\u3002",
-      collectionDesc: "\u4E00\u4E2A\u9879\u76EE\u5BF9\u5E94\u4E00\u4E2A\u573A\u666F\uFF0C\u6253\u5F00\u9879\u76EE\u64AD\u653E\u573A\u666F\u5DE1\u89C8\u89C6\u9891\u3002",
-      structureDesc: "\u6574\u7406\u516C\u5F00\u89C2\u6D4B\u3001\u6807\u5B9A\u548C\u5BF9\u8C61\u5173\u7CFB\uFF0C\u7ED1\u5B9A\u7A0B\u5E8F\u6216\u4EFF\u771F\u8BC1\u636E\u3002",
-      synthesisDesc: "\u6309\u6A21\u677F\u6279\u91CF\u51FA\u9898\uFF0C\u67E5\u770B\u6570\u636E\u96C6\u5168\u96C6\u548C\u6837\u672C\u3002",
-      verificationDesc: "\u5BA1\u67E5\u6709\u6548\u6027\u3001\u5206\u533A\u4E0E\u8986\u76D6\uFF0C\u751F\u6210\u62A5\u544A\u548C\u4EA4\u4ED8\u7248\u672C\u3002",
       objective: "\u8BC4\u6D4B\u76EE\u6807",
       objectivePlaceholder: "\u4F8B\u5982\uFF1A\u6D4B\u8BD5\u5BA4\u5185\u906E\u6321\u6761\u4EF6\u4E0B\u7684\u8DDD\u79BB\u4F30\u8BA1\u548C\u76F8\u5BF9\u4F4D\u7F6E\u63A8\u7406\uFF0C\u751F\u6210 300 \u9053\u8BC4\u6D4B\u9898\u3002",
       targetItems: "\u76EE\u6807\u9898\u91CF",
@@ -504,11 +563,6 @@ var benchforgeClient = (() => {
       openRun: "\u67E5\u770B\u5B8C\u6574\u8FD0\u884C",
       workflowNote: "\u4E94\u6B65\u7528\u4E8E\u7EC4\u7EC7\u64CD\u4F5C\u4E0E\u4EA7\u7269\uFF0C\u53EF\u6309\u9700\u7EC4\u5408\u6216\u8FD4\u56DE\u4FEE\u590D\u3002",
       chatNote: "\u6307\u4EE4\u8FDB\u5165\u73B0\u6709 DSH \u5BF9\u8BDD\uFF0C\u53D1\u9001\u540E\u7531\u5DE5\u5177\u6267\u884C\uFF1B\u9875\u9762\u4ECE\u6301\u4E45\u5316\u4EA7\u7269\u8BFB\u53D6\u7ED3\u679C\u3002",
-      blueprintOutput: "\u9700\u6C42\u3001\u6A21\u677F\u4E0E\u6570\u91CF\u5206\u914D",
-      collectionOutput: "\u53C2\u8003\u3001\u573A\u666F\u3001\u5A92\u4F53\u4E0E\u91C7\u96C6\u8BB0\u5F55",
-      structureOutput: "\u8BC1\u636E\u3001\u6807\u5B9A\u3001\u72B6\u6001\u4E0E\u6765\u6E90\u5173\u7CFB",
-      synthesisOutput: "\u9898\u76EE\u3001\u516C\u5F00\u89C2\u6D4B\u4E0E\u6570\u636E\u96C6\u7248\u672C",
-      verificationOutput: "\u8D28\u91CF\u7ED3\u679C\u3001\u4FEE\u590D\u5EFA\u8BAE\u4E0E\u4EA4\u4ED8\u5305",
       sceneFirst: "\u573A\u666F\u5148\u884C",
       sceneFirstNote: "\u590D\u7528\u6216\u751F\u6210\u573A\u666F \u2192 \u91C7\u96C6 RGB / \u6DF1\u5EA6 / \u5206\u5272 / \u8F68\u8FF9 \u2192 \u8FD4\u56DE\u53EF\u8FFD\u6EAF\u8BC1\u636E\u3002",
       evidencePolicy: "GT \u6765\u81EA\u5B98\u65B9\u3001\u7A0B\u5E8F\u6216\u4EFF\u771F\uFF1B\u6A21\u578B\u63A8\u65AD\u4FDD\u6301\u4E3A\u5019\u9009\u6807\u6CE8\u3002",
@@ -522,7 +576,7 @@ var benchforgeClient = (() => {
     en: {
       productionSystemStatus: "System status",
       productionPlanned: "Plan saved",
-      productionNeedsEvidence: "Awaiting valid captures or annotations",
+      productionNeedsEvidence: "Awaiting collection and annotation validation",
       productionNeedsInput: "Awaiting input",
       productionNeedsRevision: "Plan needs revision",
       productionInterrupted: "Execution interrupted",
@@ -540,11 +594,7 @@ var benchforgeClient = (() => {
       reviewFinished: "Stage review finished",
       executionProgress: "Execution",
       productionHint: "Runs all five stages; outputs update below.",
-      blueprintNav: "Plan",
-      collectionNav: "Scenes",
-      structureNav: "Labels",
-      synthesisNav: "Items",
-      verificationNav: "Report",
+      ...stageCopy("en"),
       stageDone: "Done",
       previewable: "Preview available",
       savedStageProducts: "Saved products",
@@ -626,7 +676,7 @@ var benchforgeClient = (() => {
       sceneCount: "Target scenes",
       targetQuantityNote: "This is the requested quantity. Actual output is reported by production receipts.",
       optionalAuto: "Leave blank for DSH to plan",
-      fullWorkflowNote: "One submission runs all five stages: plan \u2192 scenes \u2192 annotations \u2192 questions \u2192 quality review and delivery.",
+      fullWorkflowNote: "One submission runs all five stages: " + stageSummary("en") + ". Collection includes annotations.",
       appendNote: "Requirements go to this session. While running, they join its message queue.",
       preservedDraft: "Existing session composer draft",
       preservedAttachments: "Existing session attachments",
@@ -831,11 +881,6 @@ var benchforgeClient = (() => {
       runCount: "Runs",
       datasetCount: "Dataset versions",
       workflow: "Five-step workflow",
-      blueprint: "Evaluation plan",
-      collection: "Scene preview",
-      structure: "Annotation preview",
-      synthesis: "Evaluation config & questions",
-      verification: "Final report",
       productionProgress: "Production progress",
       progressUpload: "Artifact upload",
       progressItems: "Completed items",
@@ -899,8 +944,15 @@ var benchforgeClient = (() => {
       previewClose: "Close preview",
       selectArtifact: "Select",
       sceneGallery: "Available scenes",
-      annotationGallery: "Annotations",
-      annotationNote: "Open public annotations and evidence. Candidate model annotations retain their source separately from simulation truth.",
+      annotationGallery: "Collected data and annotations",
+      annotationNote: "Inspect collected trajectories, observations and annotations. Candidate model annotations retain their source separately from simulation truth. Completion requires source, alignment and allocation validation.",
+      collectionPreviewOnly: "Samples are available for preview; they do not establish collection completion",
+      collected_records: "Validated records",
+      collected_scenes: "Source scenes",
+      collected_media: "Observation files",
+      collected_episodes: "Native episodes",
+      collected_samples: "Trajectory samples",
+      collected_annotations: "Annotated records",
       evaluationConfig: "Evaluation configuration",
       questionTable: "Questions",
       finalReport: "Final report",
@@ -947,11 +999,6 @@ var benchforgeClient = (() => {
       noSendInterface: "This DSH session has no submission interface.",
       existingDraft: "Composer text included in this submission",
       existingAttachments: "Attachments included in this submission",
-      blueprintDesc: "Define the goal, capabilities, templates, quantity and sources.",
-      collectionDesc: "Each project represents one scene. Open it to play the recorded scene video.",
-      structureDesc: "Organize public observations, calibration and source evidence.",
-      synthesisDesc: "Produce questions and inspect dataset versions and samples.",
-      verificationDesc: "Inspect validity, splits and coverage; prepare reports and releases.",
       objective: "Evaluation goal",
       objectivePlaceholder: "For example: 300 indoor distance and relative-position questions with varied occlusion.",
       targetItems: "Target items",
@@ -987,11 +1034,6 @@ var benchforgeClient = (() => {
       openRun: "Open full run",
       workflowNote: "Five steps organize actions and artifacts. Compose or revisit them as needed.",
       chatNote: "Instructions use the existing DSH conversation and tools. Results come from persisted artifacts.",
-      blueprintOutput: "Goal, templates and allocation",
-      collectionOutput: "References, scenes, media and captures",
-      structureOutput: "Evidence, calibration, state and provenance",
-      synthesisOutput: "Questions, public observations and dataset versions",
-      verificationOutput: "Quality results, repair proposals and packages",
       sceneFirst: "Scenes first",
       sceneFirstNote: "Reuse or generate scenes \u2192 capture RGB / depth / masks / trajectories \u2192 retain traceable evidence.",
       evidencePolicy: "GT comes from official sources, programs or simulation. Model inference remains candidate annotation.",
@@ -1047,6 +1089,23 @@ var benchforgeClient = (() => {
 .bfw-question-section{margin-block:.75rem;font-size:.875rem;line-height:1.6}.bfw-question-section h3{margin:0 0 .25rem;font-size:.75rem;color:var(--dsw-alias-label-secondary);font-weight:500}.bfw-question-section ul{margin:0;padding-inline-start:1.2rem}.bfw-question-section[data-question-section=options] ul{display:flex;flex-wrap:wrap;gap:.4rem;list-style:none;padding:0}.bfw-question-section[data-question-section=options] li{padding:.2rem .65rem;border:1px solid var(--dsw-alias-border-l3);border-radius:.4rem}.bfw-original-image{margin-inline-start:.75rem;font-size:.75rem;color:inherit}.bfw-question-response{font-size:.75rem;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
 `;
 
+  // src/capabilities/benchmark_design/resources/tool-names.json
+  var tool_names_default = {
+    pipeline_catalog: "benchforge_pipeline_catalog",
+    pipeline_plan: "benchforge_pipeline_plan",
+    pipeline_run: "benchforge_pipeline_run",
+    pipeline_status: "benchforge_pipeline_status",
+    pipeline_artifacts: "benchforge_pipeline_artifacts",
+    pipeline_repair_plan: "benchforge_pipeline_repair_plan",
+    pipeline_evaluate: "benchforge_pipeline_evaluate",
+    stage_review: "benchforge_stage_review"
+  };
+
+  // src/dsh/tools/benchmark/names.mjs
+  var bareNames = new RegExp("\\b(" + Object.keys(tool_names_default).join("|") + ")\\b", "g");
+  var toolName = (key) => tool_names_default[key] || `benchforge_${key}`;
+  var qualifyToolNames = (text) => text.replace(bareNames, (key) => tool_names_default[key]);
+
   // src/ui/workbench/primitives.js
   function createPrimitives({ React, PLAN_FIELDS: PLAN_FIELDS2, PLAN_SECTIONS: PLAN_SECTIONS2 }) {
     const h = React.createElement;
@@ -1084,7 +1143,7 @@ var benchforgeClient = (() => {
     function planValue(value, edit, path = [], labels = {}) {
       const key = path[path.length - 1];
       if (key === "template_id") return labels[value] || "\u9898\u578B";
-      if (key === "stage") return { S1: "\u8BA1\u5212", S2: "\u573A\u666F", S3: "\u6807\u6CE8", S4: "\u9898\u76EE", S5: "\u62A5\u544A" }[value] || value;
+      if (key === "stage") return stageName(value);
       const fixed = ["schema", "id", "objective_id", "template_id", "stage", "selection_path", "selected_scenes", "allow_new_scenes"].includes(key);
       const next = fixed ? null : edit;
       if (next && (typeof value === "number" || value === null && ["count", "seed", "target_items", "target_scene_count"].includes(key))) {
@@ -1193,7 +1252,7 @@ var benchforgeClient = (() => {
       return h("div", { className: "bfw-plan-markdown-view", "data-plan-markdown-view": true }, blocks);
     }
     function planEditInstruction(path) {
-      return "\u7528\u6237\u5DF2\u7F16\u8F91\u8BA1\u5212 Markdown\uFF0C\u5DF2\u4FDD\u5B58\u7684\u65B0\u7248\u672C\uFF1A" + path + '\n\u5FC5\u987B\u8BFB\u53D6\u8BE5 Markdown \u6B63\u6587\u4E0E edit_revision.base_plan \u6307\u5411\u7684\u539F\u8BA1\u5212\uFF0C\u9010\u9879\u843D\u5B9E\u6539\u52A8\u3002edit_revision.markdown_normalization=false \u65F6\uFF0C\u7ED3\u6784\u6570\u636E\u5DF2\u7ECF\u968F\u663E\u5F0F YAML \u4FEE\u6539\u4FDD\u5B58\uFF1A\u4FDD\u7559\u8BE5\u7248\u672C\u7684 assessment\u3001selections\u3001inputs \u548C\u5B8C\u6574 user_markdown\uFF0C\u4E0D\u8981\u6C42\u91CD\u65B0\u751F\u6210 markdown_resolution\u3002\u53EA\u6709 markdown_normalization=true \u65F6\uFF0C\u624D\u5C06\u6B63\u6587\u6539\u52A8\u540C\u6B65\u5230\u7ED3\u6784\u6570\u636E\u5E76\u63D0\u4F9B markdown_resolution\uFF0C\u683C\u5F0F\u4E3A {path, before, after, instruction}\uFF1Bpath \u4E3A assessment \u76F8\u5BF9\u70B9\u8DEF\u5F84\uFF0Cbefore/after \u4E3A\u51C6\u786E\u65E7\u65B0\u503C\uFF0Cinstruction \u9010\u5B57\u5F15\u7528\u6B63\u6587\u4E2D\u65B0\u6539\u7684\u539F\u53E5\u6216\u5DF2\u5220\u9664\u7684\u65E7\u53E5\u3002split \u4E0E\u573A\u666F\u9009\u62E9\u4FDD\u6301\u9501\u5B9A\u3002\n\u628A\u53EF\u6267\u884C\u5E94\u7528\u8BF7\u6C42\u4FDD\u5B58\u4E3A JSON \u6587\u4EF6\uFF0Capplies_edit="' + path + '"\uFF0C\u4F7F\u7528 pipeline_plan(request_path=\u6587\u4EF6\u8DEF\u5F84)\u3002\u65E7\u4F1A\u8BDD\u6309\u9884\u8BBE\u4E2D\u7684\u8BA1\u5212\u5E94\u7528\u65B9\u5F0F\u63D0\u4EA4\uFF0C\u91CD\u590D\u5E94\u7528\u4E0D\u91CD\u5F00\u9636\u6BB5\u7A97\u53E3\u3002\u4E0D\u8981\u91CD\u65B0\u8F93\u51FA\u6574\u4EFD\u5927\u6587\u6863\u3002\u5236\u4F5C\u89C4\u5219\u7684\u5B9E\u8D28\u4FEE\u6539\u5FC5\u987B\u843D\u5B9E\u5230\u4EFB\u52A1\u4EE3\u7801\u3001\u6267\u884C\u6B65\u9AA4\u6216\u8BC1\u636E\u8F93\u5165\uFF1B\u5E94\u7528\u540E\u4F7F\u7528\u65B0\u7684 run\uFF0C\u5E76\u590D\u7528\u4ECD\u7B26\u5408\u5408\u540C\u7684\u4EA7\u7269\u548C\u5DF2\u63D0\u4EA4\u91C7\u96C6\u3002';
+      return "\u7528\u6237\u5DF2\u7F16\u8F91\u8BA1\u5212 Markdown\uFF0C\u5DF2\u4FDD\u5B58\u7684\u65B0\u7248\u672C\uFF1A" + path + '\n\u5FC5\u987B\u8BFB\u53D6\u8BE5 Markdown \u6B63\u6587\u4E0E edit_revision.base_plan \u6307\u5411\u7684\u539F\u8BA1\u5212\uFF0C\u9010\u9879\u843D\u5B9E\u6539\u52A8\u3002edit_revision.markdown_normalization=false \u65F6\uFF0C\u7ED3\u6784\u6570\u636E\u5DF2\u7ECF\u968F\u663E\u5F0F YAML \u4FEE\u6539\u4FDD\u5B58\uFF1A\u4FDD\u7559\u8BE5\u7248\u672C\u7684 assessment\u3001selections\u3001inputs \u548C\u5B8C\u6574 user_markdown\uFF0C\u4E0D\u8981\u6C42\u91CD\u65B0\u751F\u6210 markdown_resolution\u3002\u53EA\u6709 markdown_normalization=true \u65F6\uFF0C\u624D\u5C06\u6B63\u6587\u6539\u52A8\u540C\u6B65\u5230\u7ED3\u6784\u6570\u636E\u5E76\u63D0\u4F9B markdown_resolution\uFF0C\u683C\u5F0F\u4E3A {path, before, after, instruction}\uFF1Bpath \u4E3A assessment \u76F8\u5BF9\u70B9\u8DEF\u5F84\uFF0Cbefore/after \u4E3A\u51C6\u786E\u65E7\u65B0\u503C\uFF0Cinstruction \u9010\u5B57\u5F15\u7528\u6B63\u6587\u4E2D\u65B0\u6539\u7684\u539F\u53E5\u6216\u5DF2\u5220\u9664\u7684\u65E7\u53E5\u3002split \u4E0E\u573A\u666F\u9009\u62E9\u4FDD\u6301\u9501\u5B9A\u3002\n\u628A\u53EF\u6267\u884C\u5E94\u7528\u8BF7\u6C42\u4FDD\u5B58\u4E3A JSON \u6587\u4EF6\uFF0Capplies_edit="' + path + '"\uFF0C\u4F7F\u7528 ' + toolName("pipeline_plan") + "(request_path=\u6587\u4EF6\u8DEF\u5F84)\u3002\u65E7\u4F1A\u8BDD\u6309\u9884\u8BBE\u4E2D\u7684\u8BA1\u5212\u5E94\u7528\u65B9\u5F0F\u63D0\u4EA4\uFF0C\u91CD\u590D\u5E94\u7528\u4E0D\u91CD\u5F00\u9636\u6BB5\u7A97\u53E3\u3002\u4E0D\u8981\u91CD\u65B0\u8F93\u51FA\u6574\u4EFD\u5927\u6587\u6863\u3002\u5236\u4F5C\u89C4\u5219\u7684\u5B9E\u8D28\u4FEE\u6539\u5FC5\u987B\u843D\u5B9E\u5230\u4EFB\u52A1\u4EE3\u7801\u3001\u6267\u884C\u6B65\u9AA4\u6216\u8BC1\u636E\u8F93\u5165\uFF1B\u5E94\u7528\u540E\u4F7F\u7528\u65B0\u7684 run\uFF0C\u5E76\u590D\u7528\u4ECD\u7B26\u5408\u5408\u540C\u7684\u4EA7\u7269\u548C\u5DF2\u63D0\u4EA4\u91C7\u96C6\u3002";
     }
     function table(headers, rows) {
       return h("div", { className: "bfw-scroll" }, h(
@@ -1226,22 +1285,6 @@ var benchforgeClient = (() => {
       select
     };
   }
-
-  // src/capabilities/benchmark_design/resources/tool-names.json
-  var tool_names_default = {
-    pipeline_catalog: "benchforge_pipeline_catalog",
-    pipeline_plan: "benchforge_pipeline_plan",
-    pipeline_run: "benchforge_pipeline_run",
-    pipeline_status: "benchforge_pipeline_status",
-    pipeline_artifacts: "benchforge_pipeline_artifacts",
-    pipeline_repair_plan: "benchforge_pipeline_repair_plan",
-    pipeline_evaluate: "benchforge_pipeline_evaluate",
-    stage_review: "benchforge_stage_review"
-  };
-
-  // src/dsh/tools/benchmark/names.mjs
-  var bareNames = new RegExp("\\b(" + Object.keys(tool_names_default).join("|") + ")\\b", "g");
-  var qualifyToolNames = (text) => text.replace(bareNames, (key) => tool_names_default[key]);
 
   // src/ui/workbench/state.js
   function createWorkbenchState({ STAGES: STAGES2, sceneName }) {
@@ -1318,18 +1361,18 @@ var benchforgeClient = (() => {
     function productionRequest(demand, selection) {
       if (demand.mode === "append") return "\u8BF7\u5C06\u4EE5\u4E0B\u8981\u6C42\u5E94\u7528\u4E8E\u5F53\u524D\u4F1A\u8BDD\u7684\u751F\u4EA7\u4EFB\u52A1\uFF0C\u4FDD\u7559\u5DF2\u6709\u4EA7\u7269\u548C\u5931\u8D25\u8BC1\u636E\uFF0C\u5E76\u7EE7\u7EED\u5B9E\u9645\u6267\u884C\u81F3\u5B8C\u6210\uFF1A\n" + demand.objective.trim() + sceneConstraint(selection);
       return [
-        "\u8BF7\u5B9E\u9645\u6267\u884C\u4E00\u6B21 BenchForge \u8BC4\u6D4B\u6570\u636E\u96C6\u751F\u4EA7\u4EFB\u52A1\uFF0C\u5B8C\u6574\u5B8C\u6210\u4E94\u9636\u6BB5\uFF1A\u8BC4\u6D4B\u8BA1\u5212\u3001\u573A\u666F\u751F\u6210\u6216\u590D\u7528\u4E0E\u91C7\u96C6\u3001\u6807\u6CE8\u3001\u6309\u80FD\u529B\u6A21\u677F\u51FA\u9898\u3001\u8D28\u91CF\u68C0\u67E5\u4E0E\u6253\u5305\u4EA4\u4ED8\uFF1B\u4E0D\u8981\u53EA\u5199\u8BA1\u5212\u3002",
+        "\u8BF7\u5B9E\u9645\u6267\u884C\u4E00\u6B21 BenchForge \u8BC4\u6D4B\u6570\u636E\u96C6\u751F\u4EA7\u4EFB\u52A1\uFF0C\u5B8C\u6574\u5B8C\u6210\u4E94\u9636\u6BB5\uFF1A" + stageSummary() + "\u3002S3 \u91C7\u96C6\u5305\u542B\u6807\u6CE8\uFF1B\u4E0D\u8981\u53EA\u5199\u8BA1\u5212\u3002",
         "execution_mode=" + (demand.executionMode || "production") + "\uFF1Bquantity_contract=" + (demand.quantityContract || "minimum") + "\u3002",
         "\u751F\u4EA7\u9700\u6C42\uFF1A" + demand.objective.trim(),
         "target_items=" + Number(demand.count) + "\u3002\u8FD9\u662F\u8BF7\u6C42\u76EE\u6807\uFF1B\u6309\u6570\u91CF\u5408\u540C\u5904\u7406\u77ED\u7F3A\uFF0C\u4E0D\u5F97\u628A\u6267\u884C\u5B8C\u6210\u8868\u8FF0\u4E3A\u6570\u91CF\u8FBE\u6807\u6216\u8D28\u91CF\u9A8C\u6536\u901A\u8FC7\u3002",
         demand.capability.trim() ? "\u80FD\u529B\u4E0E\u6A21\u677F\u8981\u6C42\uFF1A" + demand.capability.trim() : "\u8BF7\u6839\u636E\u4E0A\u8FF0\u9700\u6C42\u4ECE\u73B0\u6709\u80FD\u529B\u56FE\u8C31\u548C\u51FA\u9898\u6A21\u677F\u4E2D\u62C6\u89E3\u5E76\u9009\u62E9\u9002\u7528\u6A21\u677F\u3002",
         demand.sceneCount ? "\u76EE\u6807\u573A\u666F\u6570\uFF1A" + Number(demand.sceneCount) + " \u4E2A\u3002" : "",
         demand.storageBudget ? "\u5B58\u50A8\u9884\u7B97\u4E0A\u9650\uFF1A" + Number(demand.storageBudget) + " GB\u3002" : "",
-        "\u4F7F\u7528\u5F53\u524D\u5DF2\u63A5\u5165\u5DE5\u5177\u3002\u573A\u666F\u662F\u51FA\u9898\u524D\u63D0\uFF0CGT \u4EC5\u6765\u81EA\u5B98\u65B9\u3001\u7A0B\u5E8F\u6216\u4EFF\u771F\uFF0C\u516C\u5F00\u9898\u76EE\u4E0D\u6CC4\u9732\u7B54\u6848\u3002\u8BF7\u5C06\u8BA1\u5212\u3001\u573A\u666F\u3001\u6807\u6CE8\u3001\u9898\u76EE\u8868\u548C\u6700\u7EC8\u62A5\u544A\u5173\u8054\u5230\u5F53\u524D\u4F1A\u8BDD\uFF0C\u4F7F\u5DE5\u4F5C\u53F0\u5B9E\u65F6\u5C55\u793A\u5B9E\u9645\u56DE\u6267\u548C\u4EA7\u7269\u3002"
+        "\u4F7F\u7528\u5F53\u524D\u5DF2\u63A5\u5165\u5DE5\u5177\u3002S2 \u5148\u9009\u53D6\u6216\u65B0\u5EFA\u5E76\u9A8C\u6536\u573A\u666F\uFF0C\u9884\u89C8\u4E0D\u7B49\u4E8E\u5B8C\u6210\u6B63\u5F0F\u6570\u636E\u91C7\u96C6\u3002S3 \u5728\u5DF2\u9A8C\u6536\u573A\u666F\u4E2D\u91C7\u96C6\u8F68\u8FF9\u3001\u4F20\u611F\u5668\u6570\u636E\u4E0E\u72B6\u6001\uFF0C\u5305\u542B\u6807\u6CE8\u3001\u5BF9\u9F50\u4E0E\u6765\u6E90\u6821\u9A8C\u3002GT \u4EC5\u6765\u81EA\u5B98\u65B9\u3001\u7A0B\u5E8F\u6216\u4EFF\u771F\uFF0C\u516C\u5F00\u9898\u76EE\u4E0D\u6CC4\u9732\u7B54\u6848\u3002\u5C06\u5404\u9636\u6BB5\u771F\u5B9E\u56DE\u6267\u548C\u4EA7\u7269\u5173\u8054\u5230\u5F53\u524D\u4F1A\u8BDD\u3002"
       ].filter(Boolean).join("\n") + sceneConstraint(selection);
     }
     function productionContext(selection, template) {
-      return qualifyToolNames(sceneConstraint(selection) + "\n\u6BCF\u4E2A\u9636\u6BB5 S1 \u8BA1\u5212\u3001S2 \u573A\u666F\u3001S3 \u6807\u6CE8\u3001S4 \u9898\u76EE\u3001S5 \u62A5\u544A\u5B8C\u6210\u540E\uFF0C\u5C55\u793A\u771F\u5B9E\u4EA7\u7269\u5E76\u7B49\u5F85\u7528\u6237 5 \u5206\u949F\u3002\u4F7F\u7528 stage_review \u6253\u5F00\u53CA\u7B49\u5F85\u6301\u4E45\u5173\u53E3\uFF1B\u65E0\u65B0\u6307\u4EE4\u5230\u671F\u7EE7\u7EED\uFF0C\u6709\u6307\u4EE4\u5148\u5904\u7406\uFF0C\u6682\u505C\u540E\u4E0D\u5F97\u81EA\u52A8\u7EE7\u7EED\u3002\n\n\u5236\u5B9A\u6216\u4FEE\u6539\u8BC4\u6D4B\u8BA1\u5212\u65F6\u5FC5\u987B\u9075\u5B88\u4EE5\u4E0B\u5B8C\u6574\u6A21\u677F\uFF1B\u5DF2\u6709\u5B8C\u6574\u8BA1\u5212\u4E14\u672C\u6B21\u53EA\u8981\u6C42\u7EE7\u7EED\u6267\u884C\u65F6\uFF0C\u590D\u7528\u5DF2\u6709\u8BA1\u5212\u3002\n" + template.instructions + "\n" + template.scene_binding + "\n\u5404\u7AE0\u8282\u8981\u6C42\uFF1A\n" + JSON.stringify(template.sections, null, 2) + (template.native_episode_contract ? "\n\u8FDE\u7EED\u8FD0\u52A8\u4E0E\u673A\u5668\u4EBA\u8F68\u8FF9\u9A8C\u6536\u5408\u540C\uFF1A\n" + JSON.stringify(template.native_episode_contract, null, 2) : "") + (template.annotation_source_contract ? "\n\u6807\u6CE8\u6765\u6E90\u4E0E\u590D\u7B97\u5408\u540C\uFF1A\n" + JSON.stringify(template.annotation_source_contract, null, 2) : "") + (template.scene_authoring ? "\n\u573A\u666F\u6807\u9898\u3001\u6458\u8981\u3001\u7A7A\u95F4\u5173\u7CFB\u4E0E\u53CC\u5411\u4FEE\u8BA2\u5408\u540C\uFF1A\n" + JSON.stringify(template.scene_authoring, null, 2) : "") + "\n\u4F20\u5165 pipeline_plan.assessment \u7684\u586B\u5199\u7ED3\u6784\uFF1A\n" + JSON.stringify(template.assessment, null, 2));
+      return sceneConstraint(selection) + "\n\u4E94\u9636\u6BB5\uFF1A" + stageSummary() + "\u3002S3 \u91C7\u96C6\u5305\u542B\u6807\u6CE8\u3002\u6BCF\u9636\u6BB5\u5B8C\u6210\u540E\u5C55\u793A\u771F\u5B9E\u4EA7\u7269\u5E76\u7B49\u5F85\u7528\u6237 5 \u5206\u949F\u3002\u7531\u8BA1\u5212\u548C\u6267\u884C\u5668\u5EFA\u7ACB\u9636\u6BB5\u56DE\u6267\uFF0C\u4F7F\u7528 " + toolName("stage_review") + " \u8BFB\u53D6\u53CA\u7B49\u5F85\u6301\u4E45\u5173\u53E3\uFF1B\u65E0\u65B0\u6307\u4EE4\u5230\u671F\u7EE7\u7EED\uFF0C\u6709\u6307\u4EE4\u5148\u5904\u7406\uFF0C\u6682\u505C\u540E\u4E0D\u5F97\u81EA\u52A8\u7EE7\u7EED\u3002\u5BA1\u6838\u671F\u95F4\u53EF\u8BFB\u8D44\u6599\u3001\u770B\u9884\u89C8\u548C\u7F16\u8F91\u51C6\u5907\u7A3F\uFF0C\u4E0D\u5F97\u63D0\u524D\u91C7\u96C6\u4F9D\u8D56\u8BE5\u9636\u6BB5\u7684\u6B63\u5F0F\u6570\u636E\u6216\u7ED5\u8FC7\u5BA1\u6838\u53E6\u8D77\u811A\u672C\u3002\n\n\u5236\u5B9A\u6216\u4FEE\u6539\u8BC4\u6D4B\u8BA1\u5212\u65F6\u5FC5\u987B\u9075\u5B88\u4EE5\u4E0B\u5B8C\u6574\u6A21\u677F\uFF1B\u5DF2\u6709\u5B8C\u6574\u8BA1\u5212\u4E14\u672C\u6B21\u53EA\u8981\u6C42\u7EE7\u7EED\u6267\u884C\u65F6\uFF0C\u590D\u7528\u5DF2\u6709\u8BA1\u5212\u3002\n" + qualifyToolNames(template.instructions) + "\n" + qualifyToolNames(template.scene_binding) + "\n\u5404\u7AE0\u8282\u8981\u6C42\uFF1A\n" + JSON.stringify(template.sections, null, 2) + (template.native_episode_contract ? "\n\u8FDE\u7EED\u8FD0\u52A8\u4E0E\u673A\u5668\u4EBA\u8F68\u8FF9\u9A8C\u6536\u5408\u540C\uFF1A\n" + JSON.stringify(template.native_episode_contract, null, 2) : "") + (template.annotation_source_contract ? "\n\u6807\u6CE8\u6765\u6E90\u4E0E\u590D\u7B97\u5408\u540C\uFF1A\n" + JSON.stringify(template.annotation_source_contract, null, 2) : "") + (template.scene_authoring ? "\n\u573A\u666F\u6807\u9898\u3001\u6458\u8981\u3001\u7A7A\u95F4\u5173\u7CFB\u4E0E\u53CC\u5411\u4FEE\u8BA2\u5408\u540C\uFF1A\n" + JSON.stringify(template.scene_authoring, null, 2) : "") + "\n\u4F20\u5165 " + toolName("pipeline_plan") + ".assessment \u7684\u586B\u5199\u7ED3\u6784\uFF1A\n" + JSON.stringify(template.assessment, null, 2);
     }
     function displayRef(value) {
       const parts = String(value || "").split(/[\\/]/).filter(Boolean);
@@ -1402,7 +1445,7 @@ var benchforgeClient = (() => {
         ] : null
       ]);
     }
-    const sceneStage = (row) => row.workflow === "scene" ? "S2" : row.workflow === "dataset" ? "S4" : { review: "S5", publish: "S5", export: "S5", dataset: "S4", annotate: "S3" }[row.phase] || "S2";
+    const sceneStage = (row) => ["collect", "collection", "annotate"].includes(row.phase) ? "S3" : row.workflow === "scene" ? "S2" : row.workflow === "dataset" ? "S4" : { review: "S5", publish: "S5", export: "S5", dataset: "S4" }[row.phase] || "S2";
     function pipelineForStage(id, pipelines) {
       const latest = (stage) => pipelines.filter((row) => row.steps?.some((step) => step.stage === stage)).sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0];
       return latest(id) || (id === "S3" ? latest("S2") : null);
@@ -1564,6 +1607,8 @@ var benchforgeClient = (() => {
     function recordedStageState(id, pipeline, scene, operations = [], planReceipt = null, artifacts = [], collection = null) {
       if (id === "S1" && planReceipt) return "completed";
       if (id === "S2" && collection) return collection.state;
+      const steps = (pipeline?.steps || []).filter((row) => row.stage === id);
+      const collectionValidated = steps.some((row) => COLLECTION_OPERATIONS.has(row.uses) && row.state === "completed");
       const current = (scene?.tasks || []).filter((row) => sceneStage(row) === id);
       if (current.length) {
         if (scene.state === "CANCELED" && current.some((row) => row.state !== "SUCCEEDED")) return "canceled";
@@ -1571,26 +1616,19 @@ var benchforgeClient = (() => {
         if (current.some((row) => row.queue) && !current.some((row) => row.state === "RUNNING" && !row.queue)) return "waiting";
         if (current.every((row) => row.state === "SUCCEEDED")) {
           const parentSteps = (pipeline?.steps || []).filter((row) => row.stage === id);
-          return parentSteps.some((row) => row.state !== "completed") ? stageState(id, pipeline, null, operations, planReceipt, artifacts) : "completed";
+          return parentSteps.some((row) => row.state !== "completed") ? stageState(id, pipeline, null, operations, planReceipt, artifacts) : id === "S3" && !collectionValidated ? "previewable" : "completed";
         }
         if (current.some((row) => row.state === "RUNNING")) return "running";
         return lifecycle(scene.state);
       }
-      const steps = (pipeline?.steps || []).filter((row) => row.stage === id);
       if (!steps.length) {
-        if (id === "S3" && annotationProducts(artifacts).length) {
-          const capture = (pipeline?.steps || []).filter((row) => row.stage === "S2");
-          const views = artifacts.filter((row) => row.stage === "S2" && row.kind === "image" && /^capture\/view_\d+\.png$/.test(row.file || ""));
-          const labels = annotationProducts(artifacts);
-          const paired = views.length && views.every((view) => labels.some((label) => label.task_id === view.task_id && label.revision === view.revision && label.file === view.file.replace(/\.png$/, ".json")));
-          const settled = scene?.state === "SUCCEEDED" || capture.length && capture.every((row) => row.state === "completed");
-          return paired && settled ? "completed" : "previewable";
-        }
+        if (id === "S3" && artifacts.some((row) => row.stage === "S3")) return "previewable";
         if (pipeline || scene) return "unknown";
         const recorded = operations.filter((row) => row.stage === id);
-        return recorded.find((row) => row.state === "running")?.state || recorded[0]?.state || "unknown";
+        const state = recorded.find((row) => row.state === "running")?.state || recorded[0]?.state || "unknown";
+        return id === "S3" && state === "completed" ? "previewable" : state;
       }
-      if (steps.every((row) => row.state === "completed")) return "completed";
+      if (steps.every((row) => row.state === "completed")) return id === "S3" && !collectionValidated ? "previewable" : "completed";
       return steps.find((row) => row.state !== "completed" && row.state !== "unknown")?.state || (pipeline.current?.stage === id && pipeline.state !== "completed" ? pipeline.state : "unknown");
     }
     return {
@@ -1954,6 +1992,8 @@ var benchforgeClient = (() => {
       const generation = stage.id === "S4" ? currentGeneration(record.value?.generation) : null;
       scene = progressSceneForStage(stage.id, scene, record.value?.scenes?.runs || []);
       const tasks = (scene?.tasks || []).filter((row) => sceneStage(row) === stage.id);
+      const pipelineSteps = (pipeline?.steps || []).filter((row) => row.stage === stage.id);
+      const collected = stage.id === "S3" ? pipelineSteps.findLast((row) => row.collection)?.collection : null;
       const operations = !pipeline && !scene ? (record.value?.operations || []).filter((row) => row.stage === stage.id) : [];
       const savedSteps = collection ? collection.rows.map((row) => ({
         id: row.name,
@@ -1961,7 +2001,7 @@ var benchforgeClient = (() => {
         label: collection.current ? t(row.phase) : row.phase,
         error: row.error,
         queue: row.task?.queue
-      })) : stage.id === "S1" && planReceipt ? [planReceipt] : scene ? tasks.map((row) => ({
+      })) : stage.id === "S1" && planReceipt ? [planReceipt] : tasks.length && !(stage.id === "S3" && pipelineSteps.length) ? tasks.map((row) => ({
         id: row.id,
         state: scene.state === "CANCELED" && row.state !== "SUCCEEDED" ? "canceled" : lifecycle(row.state),
         label: row.progress?.stage || row.phase,
@@ -1969,7 +2009,7 @@ var benchforgeClient = (() => {
         queue: row.queue,
         age: row.progress?.age_seconds,
         progress: row.progress
-      })) : (pipeline?.steps || []).filter((row) => row.stage === stage.id).map((row) => ({ ...row, label: row.uses })).concat(operations.map((row) => ({ ...row, label: row.tool })));
+      })) : pipelineSteps.map((row) => ({ ...row, label: row.uses })).concat(operations.map((row) => ({ ...row, label: row.tool })));
       const generationPhase = generation && t({
         selecting: "generationSelecting",
         surface_oracle: "generationOracle",
@@ -1989,7 +2029,6 @@ var benchforgeClient = (() => {
       const state = recordedState === "unknown" && (conversationRunning || currentChildren.length) || recordedState === "completed" && currentChildren.length ? "running" : recordedState;
       const parallelUnknown = !generation && currentChildren.length > 0 && !current;
       const products = stage.id === "S3" && !steps.length ? annotationProducts(artifacts) : [];
-      const productTotal = products.length ? artifacts.filter((row) => row.stage === "S2" && row.kind === "image" && /^capture\/view_\d+\.png$/.test(row.file || "")).length : 0;
       const stale = record.error || (collection?.current ? collection.registrationStatus === "unavailable" : generation ? false : ["partial", "unavailable"].includes(record.value?.scenes?.status));
       const readings = tasks.map((row) => reportedProgress(row.progress));
       const sharedMeasure = tasks.length > 1 && readings.every(Boolean) && readings.every((row) => row.label === readings[0].label && row.bytes === readings[0].bytes) && new Set(tasks.map((row) => row.progress?.stage || row.phase)).size === 1;
@@ -2002,11 +2041,11 @@ var benchforgeClient = (() => {
         label: generation.written_count === generation.target_items || generation.state === "incomplete" ? checkLabel : "generationWritten"
       } : !collection && current && !parallelUnknown && !["failed", "canceled"].includes(state) ? sharedMeasure ? { ...readings[0], done: readings.reduce((sum, row) => sum + row.done, 0), total: readings.reduce((sum, row) => sum + row.total, 0) } : tasks.length > 1 ? null : reportedProgress(current.progress) : null;
       const activeUnknown = state === "running" && (parallelUnknown || current && !detail);
-      const total = collection ? collection.identityPending ? 0 : collection.total : detail?.total || (activeUnknown || operations.length && !(stage.id === "S1" && planReceipt) ? 0 : steps.length || productTotal);
-      const done = collection ? collection.passed : detail?.done ?? (steps.length ? completed : products.length);
+      const total = state === "previewable" ? 0 : collection ? collection.identityPending ? 0 : collection.total : detail?.total || (activeUnknown || operations.length && !(stage.id === "S1" && planReceipt) ? 0 : steps.length);
+      const done = collection ? collection.passed : detail?.done ?? completed;
       const measured = total > 0;
       const percent = measured ? Math.min(100, Math.round(done / total * 100)) : null;
-      const moving = ["running", "previewable"].includes(state);
+      const moving = state === "running";
       const metric = measured ? (generation ? t(detail.label) + " " : "") + percent + "%" : t(state === "completed" ? "stageDone" : moving ? "progressPending" : ["failed", "canceled"].includes(state) ? "progressPaused" : "progressWaiting");
       const unit = t(collection ? "scenePassed" : detail?.label || (products.length ? "progressProducts" : scene ? "progressTasks" : "progressSteps"));
       const amount = detail?.bytes ? (done / 1048576).toFixed(1) + " / " + (total / 1048576).toFixed(1) + " MB" : done + " / " + total;
@@ -2102,6 +2141,20 @@ var benchforgeClient = (() => {
           h("span", { className: "bfw-pill " + row.state }, t(row.statusLabel))
         ))),
         collection?.identityPending && h("small", { className: "bfw-hint" }, t(collection.notice || "sceneIdentityPending")),
+        collected && h(
+          "div",
+          { className: "bfw-stats", "data-collection-counts": true },
+          ["records", "scenes", "media", "episodes", "samples", "annotations"].filter((key) => collected[key] !== null).map((key) => h("div", { className: "bfw-stat", key }, t("collected_" + key), h(
+            "strong",
+            null,
+            key === "records" && collected.required !== null ? collected.records + " / " + collected.required : collected[key]
+          )))
+        ),
+        stage.id === "S3" && products.length > 0 && h(
+          "small",
+          { className: "bfw-hint", "data-collection-preview": true },
+          t("collectionPreviewOnly") + " \xB7 " + t("progressProducts") + " " + products.length
+        ),
         stale && h("p", { className: "bfw-error" }, t("staleSnapshot")),
         !collection && current?.error && h("p", { className: "bfw-error", role: "alert" }, typeof current.error === "string" ? current.error : JSON.stringify(current.error)),
         current?.queue && h("small", { className: "bfw-hint" }, t("waiting") + ": " + current.queue.reason),
@@ -4013,7 +4066,7 @@ var benchforgeClient = (() => {
   // src/dsh/remote/lib/typert.remote-client.js
   var import_zod = __require("zod");
 
-  // src/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
+  // ../../../src/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
   function createTypertRemoteInfo(spec, zod) {
     return new RemoteInfo(spec, zod);
   }
@@ -4343,18 +4396,11 @@ var benchforgeClient = (() => {
   var WORKBENCH_TAB = "@eurecamoment/benchforge-ui/workbench";
   var WORKBENCH_KIND = "benchforge-workbench";
   var NS = "benchforgeWorkbench";
-  var STAGES = [
-    { id: "S1", key: "blueprint" },
-    { id: "S2", key: "collection" },
-    { id: "S3", key: "structure" },
-    { id: "S4", key: "synthesis" },
-    { id: "S5", key: "verification" }
-  ];
   var PLAN_SECTIONS = [
     ["objectives", "\u8BC4\u6D4B\u76EE\u6807\u4E0E\u8FB9\u754C"],
     ["coverage", "\u80FD\u529B\u3001\u6A21\u677F\u4E0E\u9898\u91CF\u5206\u914D"],
-    ["scenes", "\u573A\u666F\u4E0E\u91C7\u96C6\u8BBE\u8BA1"],
-    ["annotations", "\u6807\u6CE8\u4E0E\u771F\u503C\u6765\u6E90"],
+    ["scenes", "\u573A\u666F\u9009\u53D6\u4E0E\u65B0\u5EFA\u8BBE\u8BA1"],
+    ["annotations", "\u91C7\u96C6\u3001\u6807\u6CE8\u4E0E\u771F\u503C\u6765\u6E90"],
     ["questions", "\u51FA\u9898\u89C4\u5219\u4E0E\u516C\u5F00\u6837\u4F8B"],
     ["dataset", "\u6570\u636E\u96C6\u89C4\u6A21\u4E0E\u5206\u533A"],
     ["scoring", "\u8BC4\u5206\u65B9\u6CD5\u4E0E\u5BF9\u7167"],
