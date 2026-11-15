@@ -150,8 +150,8 @@ def plan(args, directory, config=None):
             previous = read(base_plan)
             value['stage_review_key'] = previous.get('stage_review_key', str(Path(base_plan).resolve()))
     write(target, value)
-    if session and (active or edit):
-        activate(workspace,session,str(target.resolve()),expected=edit['base_plan'] if edit else active['plan'],
+    if session:
+        activate(workspace,session,str(target.resolve()),expected=edit['base_plan'] if edit else active['plan'] if active else None,
                  pending=bool(edit),changes=edit['changes'] if edit else ())
     review = None
     # A saved edit still needs executable application. Its final applied plan
@@ -166,4 +166,4 @@ def plan(args, directory, config=None):
             'assessment_status': 'structured' if value.get('assessment') else 'legacy_summary',
             'selections': selections, 'evidence_required_for': unsupported,
             'next': qualify('Apply the saved user edit with pipeline_plan(applies_edit=plan) before pipeline_run. S1 review opens after the executable application is validated.'
-                     if edit else 'pipeline_run; S2 requires service-issued scene_sources, S3 requires native-source evidence JSONL. Use the configured capture and model tools, then resume this same production. Present each saved stage artifact.')}
+                     if edit else 'Wait for S1 review, then pipeline_run. S2 selects or creates scenes and requires service-issued scene_sources. After S2 review, S3 collects observations, trajectories and annotations, validated by collection.validate through native-source evidence JSONL. Resume this same production and present each saved stage artifact.')}

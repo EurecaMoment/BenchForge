@@ -15,6 +15,8 @@ from capabilities.scene_library.episodes import native_episodes
 from capabilities.dataset_authoring.trajectory_evidence import validate_native_episode
 from pipelines.benchmark.execution.production_stages import validate_planned_scenes, scene_acceptance
 from pipelines.benchmark.design.planner import plan
+from pipelines.benchmark.design.plan_versions import current
+from pipelines.benchmark.execution.stage_review import call as stage_review
 
 
 class ProductionContractTests(unittest.TestCase):
@@ -72,6 +74,7 @@ class ProductionContractTests(unittest.TestCase):
     def test_robot_trajectory_objective_cannot_disable_native_episode_requirements(self):
         directory = self.root / 'operations' / 'plan-test'
         args = {'objective': '生产100条机器狗在室内探索的轨迹数据',
+                '_dsh_context': {'session_id': 'test-first-plan'},
                 'selections': [{'template_ids': ['C43-T01'], 'count': 1, 'reason': 'controlled test'}],
                 'assessment': {'annotations': {'require_native_episode': False, 'require_robot_locomotion': False}}}
         with patch('pipelines.benchmark.design.planner.validate_assessment', side_effect=lambda value, *unused: value), \
@@ -81,6 +84,10 @@ class ProductionContractTests(unittest.TestCase):
         self.assertTrue(saved['assessment']['annotations']['require_native_episode'])
         self.assertTrue(saved['assessment']['annotations']['require_robot_locomotion'])
         validate_production_steps(saved['steps'])
+        self.assertEqual(current(self.root, 'test-first-plan')['plan'], result['plan'])
+        reopened = stage_review({'_dsh_context': args['_dsh_context'], 'action': 'open', 'stage': 'S1',
+                                 'key': saved['stage_review_key'], 'artifact': result['plan']}, directory)
+        self.assertEqual(reopened['review_id'], result['stage_review']['review_id'])
 
     def test_public_capture_file_changes_invalidate_service_acceptance(self):
         store, folder, task = self.service()
