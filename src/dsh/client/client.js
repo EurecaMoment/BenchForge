@@ -4013,7 +4013,7 @@ var benchforgeClient = (() => {
   // src/dsh/remote/lib/typert.remote-client.js
   var import_zod = __require("zod");
 
-  // ../../../src/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
+  // src/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/lib/types/remote-info.js
   function createTypertRemoteInfo(spec, zod) {
     return new RemoteInfo(spec, zod);
   }

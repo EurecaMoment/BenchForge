@@ -103,7 +103,7 @@ Run the focused regression checks from the repository root:
 
 ```bash
 python -m unittest discover -s tests -v
-node --test src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs
+node --test src/dsh/host/session_operations.test.mjs src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs
 npm run prepare --prefix src/dsh
 ```
 

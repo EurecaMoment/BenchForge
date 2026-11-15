@@ -9,7 +9,7 @@ import {createProductionLifecycle} from '../production/lifecycle.mjs';
 import {readStageReview} from '../production/reviews.mjs';
 
 export const name = 'benchforge-session-operations';
-export const inject = ['storageDomain', 'sessionProjections', 'sessionController', 'agents', 'logger'];
+export const inject = ['storageDomain', 'sessionProjections', 'sessionController', 'agents'];
 export const Config = Schema.object({
   revision: Schema.string().default('live-production-v1'),
 });
