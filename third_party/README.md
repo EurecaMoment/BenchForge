@@ -24,7 +24,7 @@ FastQwen 作为独立部署源码登记在 `optional_submodules`。
 首次下载主仓库和全部子模块，包括它们的嵌套依赖：
 
 ```bash
-git clone --branch simulator-access-integration --recurse-submodules --shallow-submodules https://github.com/EurecaMoment/BenchForgeV2.git benchforge
+git clone --branch main --recurse-submodules --shallow-submodules https://github.com/EurecaMoment/BenchForgeV2.git benchforge
 cd benchforge
 ```
 

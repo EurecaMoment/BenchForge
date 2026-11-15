@@ -161,18 +161,18 @@ docker info
 docker compose version
 ```
 
-### 1. 下载当前分支到新目录
+### 1. 下载 main 到新目录
 
 `benchforge-3092` 是示例部署的独立目录名；已有同名目录时换一个新名称。
 
 ```bash
 cd "$HOME"
-git -c http.version=HTTP/1.1 clone --branch simulator-access-integration --single-branch https://github.com/EurecaMoment/BenchForgeV2.git benchforge-3092
+git -c http.version=HTTP/1.1 clone --branch main --single-branch https://github.com/EurecaMoment/BenchForgeV2.git benchforge-3092
 cd benchforge-3092
 git branch --show-current
 ```
 
-最后一行应输出 `simulator-access-integration`。之后所有服务器命令都在这个目录执行。
+最后一行应输出 `main`。之后所有服务器命令都在这个目录执行。
 不要复制旧部署的 `config/`、`.benchforge/` 或 `.benchforge/backend/`。
 `-c http.version=HTTP/1.1` 仅对本次克隆生效，用于减少部分网络链路上的 GitHub
 连接中断，不修改全局 Git 配置。若下载仍失败，保留错误并检查网络；重试前确认目标
@@ -392,11 +392,11 @@ asset_id/relative_path，不能自动以简化几何代替机器人。A100 没�
 ./shutdown.sh
 ```
 
-更新 `simulator-access-integration` 时，先保留本地配置和数据，再停止应用、拉取代码和更新依赖。
+更新 `main` 时，先保留本地配置和数据，再停止应用、拉取代码和更新依赖。
 
 ```bash
 BENCHFORGE_WEB_PORT=3092 ./shutdown.sh --keep-db
-git pull --ff-only origin simulator-access-integration
+git pull --ff-only origin main
 .venv/bin/python -m pip install -e '.[dsh,production,research]'
 npm ci --prefix src/dsh
 .venv/bin/python benchforge_app.py setup
