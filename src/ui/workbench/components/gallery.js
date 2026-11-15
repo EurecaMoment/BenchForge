@@ -179,7 +179,7 @@ export function createGalleryComponents({React, helpers}) {
       return () => {dialog.close(); trigger?.focus();};
     }, []);
     React.useEffect(() => {
-      if (item.data || !item.url || ['image', 'video'].includes(item.kind)) return;
+      if (item.data || !item.url || ['image', 'video', 'file'].includes(item.kind)) return;
       const controller = new AbortController();
       fetch(item.url, {signal: controller.signal}).then(async (response) => {
         if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -191,7 +191,8 @@ export function createGalleryComponents({React, helpers}) {
     return h('dialog', {ref, className: 'bfw-preview-dialog', 'aria-label': t('preview') + ' · ' + item.title,
       onCancel: (event) => {event.preventDefault(); close();}, onClick: (event) => {if (event.target === ref.current) close();}},
       h('div', {className: 'bfw-preview-header'}, h('h2', null, item.title), button(t('previewClose'), close)),
-      item.kind === 'scene' ? h(SceneVideo, {project: item, t}) : item.kind === 'image' ? h('img', {src: item.url, alt: item.title}) : item.kind === 'video' ?
+      item.kind === 'file' ? h('a', {href: item.url, download: true}, t('downloadFile')) :
+        item.kind === 'scene' ? h(SceneVideo, {project: item, t}) : item.kind === 'image' ? h('img', {src: item.url, alt: item.title}) : item.kind === 'video' ?
         h('video', {src: item.url, controls: true, preload: 'metadata'}) : error ? h('p', {role: 'alert'}, t('artifactReadFailed') + ' ' + error) :
         data ? h(React.Fragment, null,
           item.image_url && h('div', {className: 'bfw-annotation-image'}, h('img', {src: item.image_url, alt: item.title}),

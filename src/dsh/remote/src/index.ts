@@ -1,7 +1,7 @@
 import {Service, type Context} from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-api-gateway';
 import {Remote, RemoteError, bindTypertRemote} from '@deepseek-ai/dsh-typert-protocol';
-import type {JsonValue, ReadQuery, WriteQuery} from './types.js';
+import type {ConversationProducts, JsonValue, ProductsQuery, ReadQuery, WriteQuery} from './types.js';
 
 type WorkbenchDispatch = (url: URL, input: {
   method: 'GET' | 'POST';
@@ -33,6 +33,11 @@ export class WorkbenchRemote {
   @Remote
   write(query: WriteQuery, body: JsonValue, signal: AbortSignal): Promise<JsonValue> {
     return this.call('POST', query, body, signal);
+  }
+
+  @Remote
+  async products(query: ProductsQuery, signal: AbortSignal): Promise<ConversationProducts> {
+    return await this.call('GET', {view: 'products', ...query}, undefined, signal) as unknown as ConversationProducts;
   }
 
   private async call(method: 'GET' | 'POST', query: Record<string, string>, body: JsonValue | undefined, signal: AbortSignal) {

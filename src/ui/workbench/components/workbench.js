@@ -1,23 +1,22 @@
 export function createWorkbenchComponent({React, helpers, components}) {
   const h = React.createElement;
   const {status, button, card, empty, json, sceneName, questionText, planValue, planMarkdown,
-  planMarkdownView, planEditInstruction, table, select, initialState, initialDemand, sceneConstraint,
-  productionRequest, displayRef, filteredPage, useRecord: useWorkbenchRecord, usePanelVisible, lifecycle, backgroundProductionState,
+  planMarkdownView, planEditInstruction, table, select, initialState, productsResourceAddress,
+  displayRef, filteredPage, useRecord: useWorkbenchRecord, usePanelVisible, lifecycle,
   productionProductsRevision, sceneStage, pipelineForStage, sceneForStage, progressSceneForStage,
   registeredCollectionProgress, currentGeneration, sceneCollectionProgress, annotationProducts,
   stageState, recordedStageState,
   STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries} = helpers;
   const {TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress,
     StageProgress, PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneGallery, SceneVideo,
-    SceneLibrary, PreviewDialog, ArtifactGallery, StageReviewPanel, DraftReview, DemandForm,
-    SendDialog, PlanProduct, ReportProduct, Quality} = components;
-  function Workbench({t, sessionId, useSessions, useSession, useInput, inputActions, canSubmit = false,
-    permissionError = '', requestPermission, requestingPermission = false, stopExecution, requestWorkbench}) {
+    SceneLibrary, PreviewDialog, ArtifactGallery, StageReviewPanel, PlanProduct, ReportProduct, Quality} = components;
+  function Workbench({t, sessionId, useResource, useSessions, useSession, useInput, inputActions, canSubmit = false,
+    stopExecution, requestWorkbench, useStore, actions, configureProduction}) {
     const useRecord = (params, revision, interval, active) =>
       useWorkbenchRecord(requestWorkbench, params, revision, interval, active);
     const panelRef = React.useRef(null);
     const visible = usePanelVisible(panelRef);
-    const [route, setRoute] = React.useState(() => initialState(sessionId));
+    const {route, demand} = useStore((value) => value);
     const [revision, setRevision] = React.useState(0);
     const [sample, setSample] = React.useState(null);
     const [search, setSearch] = React.useState(route.q);
@@ -26,10 +25,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const [catalogPage, setCatalogPage] = React.useState(1);
     const [capability, setCapability] = React.useState('');
     const [preview, setPreview] = React.useState(null);
-    const [sendPayload, setSendPayload] = React.useState(null);
     const [sending, setSending] = React.useState(false);
-    const [sendError, setSendError] = React.useState('');
-    const [demand, setDemand] = React.useState(() => initialDemand(sessionId));
     const [demandError, setDemandError] = React.useState('');
     const [sceneQuery, setSceneQuery] = React.useState('');
     const [sceneOrigin, setSceneOrigin] = React.useState('all');
@@ -40,33 +36,21 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const sceneSaveLock = React.useRef(false);
     const selectionSubmitLock = React.useRef(false);
     const lastSceneLibrary = React.useRef(null);
-    const [draftConsent, setDraftConsent] = React.useState('');
-    const [stopping, setStopping] = React.useState(false);
-    const [stopError, setStopError] = React.useState('');
     const submitLock = React.useRef(false);
     const pendingSubmission = React.useRef(null);
     const lastSubmitted = React.useRef('');
     const inputState = useInput((state) => state);
     const sessionState = useSession((state) => state);
-    const stop = async () => {
-      setStopping(true); setStopError('');
-      try {await stopExecution();} catch (error) {setStopError(error.message);} finally {setStopping(false);}
-    };
-    const update = (patch) => setRoute((old) => ({...old, ...patch}));
+    const update = actions.updateRoute;
     const workspacePath = useSessions((state) => state.byId[sessionId]?.cwd || '');
+    const productResource = useResource(productsResourceAddress(sessionId, workspacePath));
+    const conversationProductItems = (productResource.value?.items || []).filter((row) => row.status === 'available')
+      .map((row) => ({...row, file: row.name}));
+    const unassignedProductItems = conversationProductItems.filter((row) => !row.stage);
+    const unavailableProductCount = (productResource.value?.items || []).filter((row) => row.status !== 'available').length;
     const conversationRunning = sessionState.running;
     const attachments = inputState.attachmentIds || [];
-    const draftKey = JSON.stringify([inputState.draft || '', attachments]);
-    const includeDraft = draftConsent === draftKey;
     const hasComposerContent = Boolean(inputState.draft || attachments.length);
-    const allowDraft = (included) => setDraftConsent(included ? draftKey : '');
-    const changeDemand = (patch) => {setDemand((old) => ({...old, ...patch})); setDemandError(''); lastSubmitted.current = '';};
-    const queueCount = inputState.queue.length;
-    const sessionError = sessionState.openError || sessionState.promptError?.error || sessionState.lastAgentError;
-    const sessionStatus = sessionState.openState === 'error' ? 'failed' : conversationRunning ? 'running' :
-      ['adjudicating', 'submitting'].includes(inputState.phase) || sessionState.pendingSubmissions.length || sessionState.awaitingFirstTurn ? 'submitting' :
-      sessionError ? 'failed' : sessionState.openState === 'loading' ? 'loading' : 'idle';
-    const sessionStatusKey = {idle: 'sessionIdle', running: 'sessionRunning', submitting: 'sessionSubmitting', failed: 'sessionFailed', loading: 'sessionLoading'}[sessionStatus];
     const progress = useRecord(workspacePath ? {view: 'progress', workspace_path: workspacePath, session_id: sessionId} : null, revision, 3000, visible);
     const receiptsRevision = revision + ':' + productionProductsRevision(progress.value);
     const summary = useRecord(workspacePath ? {view: 'summary', workspace_path: workspacePath, session_id: sessionId} : null, receiptsRevision, 30000, visible);
@@ -125,8 +109,6 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const sampleId = sample?.row_index;
     const currentSample = sample ? dataset.value?.items.find((row) => row.row_index === sampleId &&
       (row.item_id || row.id) === (sample.item_id || sample.id)) : null;
-    React.useEffect(() => { localStorage.setItem('bfw:benchforge:' + sessionId, JSON.stringify(route)); }, [route, sessionId]);
-    React.useEffect(() => {localStorage.setItem('bfw:production-request:' + sessionId, JSON.stringify(demand));}, [demand, sessionId]);
     React.useEffect(() => { setSample(null); }, [route.dataset, route.page, route.size, route.template, route.split, route.q]);
     React.useEffect(() => {setPreview((current) => current?.library ? current : null);}, [selectedRunId, sourceScene?.run_id]);
     React.useEffect(() => {
@@ -151,7 +133,8 @@ export function createWorkbenchComponent({React, helpers, components}) {
       (row) => [row.workspace, row.version, row.run_id, row.state].join(' '));
     const stage = STAGES.find((step) => step.id === route.stage) || STAGES[0];
     const pipeline = pipelines.find((row) => row.id === selectedRunId);
-    const allStageFiles = [...(sourceScene ? [] : run.value?.stage_artifacts || []), ...(sceneArtifacts.value?.items || [])];
+    const allStageFiles = [...(sourceScene ? [] : run.value?.stage_artifacts || []), ...(sceneArtifacts.value?.items || []),
+      ...conversationProductItems];
     const stageFiles = allStageFiles.filter((row) => row.stage === stage.id).map((row) => ({...row,
       image_url: row.stage === 'S3' && row.kind === 'json' ? allStageFiles.find((image) => image.kind === 'image' &&
         image.task_id === row.task_id && image.revision === row.revision && image.file === row.file?.replace(/\.json$/, '.png'))?.url : undefined}));
@@ -162,9 +145,14 @@ export function createWorkbenchComponent({React, helpers, components}) {
       navigationPipeline(id) ? null : sceneForStage(id, sceneJobs);
     const prepare = (text = '') => {
       if (typeof inputActions?.submit !== 'function') {setNotice(t('noSendInterface')); return;}
-      setSendError('');
-      setDraftConsent('');
-      setSendPayload({text: typeof text === 'string' ? text : '', inserted: false});
+      if (typeof text === 'string' && text.trim()) {
+        const span = inputActions.captureInsertion();
+        if (!inputActions.insertText(text + '\n', {...span, end: span.start})) {setNotice(t('draftBusy')); return;}
+      }
+      try {configureProduction({...demand, mode: 'append'}, true);}
+      catch (error) {setNotice(error.message); return;}
+      actions.requestChange();
+      setNotice(t('continueInComposer'));
     };
     const submitRequest = (payload, setError) => {
       if (submitLock.current || payload.submitted || lastSubmitted.current === payload.text) return false;
@@ -175,8 +163,8 @@ export function createWorkbenchComponent({React, helpers, components}) {
       if (pendingSubmission.current?.inserted && pendingSubmission.current.text !== payload.text) {
         setError(t('previousUnsentRequest')); return false;
       }
-      if (hasComposerContent && !includeDraft && !pendingSubmission.current?.inserted) {
-        setError(t('draftConsentRequired')); return false;
+      if (hasComposerContent && !pendingSubmission.current?.inserted) {
+        prepare(); setError(t('continueInComposer')); return false;
       }
       payload = pendingSubmission.current?.inserted ? pendingSubmission.current : payload;
       submitLock.current = true; setSending(true); setError('');
@@ -193,7 +181,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         payload.submitted = true;
         lastSubmitted.current = payload.text;
         pendingSubmission.current = null;
-        setDraftConsent(''); setNotice(t('sent'));
+        setNotice(t('sent'));
         return true;
       } catch (error) {
         setError(t('sendFailed') + ' ' + error.message);
@@ -203,7 +191,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const submitWithScenes = async (payload, setError) => {
       if (selectionSubmitLock.current || submitLock.current || sceneSaveLock.current) return false;
       if (!canSubmit) {setError(t('permissionsPending')); return false;}
-      if (hasComposerContent && !includeDraft && !pendingSubmission.current?.inserted) {setError(t('draftConsentRequired')); return false;}
+      if (hasComposerContent && !pendingSubmission.current?.inserted) {prepare(); setError(t('continueInComposer')); return false;}
       selectionSubmitLock.current = true; setSending(true); setError('');
       let readError = 'sceneSelectionReadFailed';
       try {
@@ -223,12 +211,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         if (template.schema !== 'benchforge.assessment-template/v1' || !template.assessment) {
           setError(t('templateReadFailed')); return false;
         }
-        return submitRequest({...payload, text: payload.text + sceneConstraint(value) +
-          '\n每个阶段 S1 计划、S2 场景、S3 标注、S4 题目、S5 报告完成后，展示真实产物并等待用户 5 分钟。使用 stage_review 打开及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。\n' +
-          '\n制定或修改评测计划时必须遵守以下完整模板；已有完整计划且本次只要求继续执行时，复用已有计划。\n' +
-          template.instructions + '\n' + template.scene_binding + '\n各章节要求：\n' + JSON.stringify(template.sections, null, 2) +
-          (template.scene_authoring ? '\n场景标题、摘要、空间关系与双向修订合同：\n' + JSON.stringify(template.scene_authoring, null, 2) : '') +
-          '\n传入 pipeline_plan.assessment 的填写结构：\n' + JSON.stringify(template.assessment, null, 2)}, setError);
+        return submitRequest({...payload, text: payload.text + helpers.productionContext(value, template)}, setError);
       } catch (error) {setError(t(readError) + ' ' + error.message); return false;}
       finally {selectionSubmitLock.current = false; setSending(false);}
     };
@@ -243,20 +226,6 @@ export function createWorkbenchComponent({React, helpers, components}) {
       if(conversationRunning)await stopExecution();
       return submitWithScenes({text:planEditInstruction(path),
         inserted:false,reviewContinued:true},setError);
-    };
-    const confirmSend = async () => {
-      if (sendPayload && await submitWithScenes(sendPayload, setSendError)) setSendPayload(null);
-    };
-    const submitDemand = async () => {
-      if (!demand.objective.trim()) {setDemandError(t('requestRequired')); return;}
-      if (demand.mode !== 'append') {
-        if (!Number.isSafeInteger(Number(demand.count)) || Number(demand.count) <= 0) {setDemandError(t('positiveCount')); return;}
-        if (demand.sceneCount && (!Number.isSafeInteger(Number(demand.sceneCount)) || Number(demand.sceneCount) <= 0)) {setDemandError(t('positiveSceneCount')); return;}
-        if (demand.storageBudget && (!Number.isFinite(Number(demand.storageBudget)) || Number(demand.storageBudget) <= 0)) {setDemandError(t('positiveBudget')); return;}
-      }
-      if (await submitWithScenes({text: productionRequest(demand), inserted: false}, setDemandError)) {
-        setDemand((old) => ({...old, objective: '', mode: 'append'}));
-      }
     };
     const openRun = (id) => update({run: id});
     const changeDataset = (id) => { update({dataset: id, template: '', split: '', q: '', page: 1}); setSearch(''); };
@@ -385,13 +354,18 @@ export function createWorkbenchComponent({React, helpers, components}) {
           route.dataset ? datasetBrowser : empty(t('chooseDataset'))));
       else product = h(React.Fragment, null,
         select(t('chooseDataset'), route.dataset, changeDataset, versionOptions),
+        productResource.status === 'failed' && !productResource.value && h('p', {className: 'bfw-error', role: 'alert'},
+          t('artifactReadFailed') + ' ' + (productResource.failure?.message || '')),
+        unavailableProductCount > 0 && h('p', {className: 'bfw-muted'}, t('unavailableProducts', {count: unavailableProductCount})),
         dataset.error && h('p', {className: 'bfw-error'}, dataset.error),
         !finalReport && (dataset.value?.report || selectedDataset?.report) && h(Quality, {report: dataset.value?.report || selectedDataset?.report,templateName,t}),
         !finalReport && (sceneArtifacts.loading || run.loading) ? empty(t('loading')) :
           !finalReport && filesError ? h('p', {className: 'bfw-error'}, t('artifactReadFailed') + ' ' + filesError) :
             h(ReportProduct, {item: finalReport, observedAt: sourceScene ? sceneArtifacts.updatedAt : run.updatedAt, t}),
         productFiles.length > 0 && h('details', null, h('summary', null, t('artifactFiles')),
-          h(ArtifactGallery, {items: productFiles, selected: [], preview: setPreview, t})));
+          h(ArtifactGallery, {items: productFiles, selected: [], preview: setPreview, t})),
+        unassignedProductItems.length > 0 && h('details', null, h('summary', null, t('artifactFiles')),
+          h(ArtifactGallery, {items: unassignedProductItems, selected: [], preview: setPreview, t})));
     const body = h(React.Fragment, null,
 
         h('section', {className: 'bfw-product', 'data-stage-product': stage.id, 'aria-label': t('keyProduct') + ' · ' + t(stage.key)}, product),
@@ -419,36 +393,11 @@ export function createWorkbenchComponent({React, helpers, components}) {
           await submitWithScenes({text:'用户已点击立即继续。读取阶段等待状态并复用当前计划和产物继续生产。',inserted:false,reviewContinued:true},setDemandError);
         }} catch(error) {setNotice(error.message);}
       }}),
-      h('div', {className: 'bfw-command-deck'},
-        h('section', {className: 'bfw-context', 'data-current-session': sessionId, 'data-session-state': sessionStatus},
-          h('div', {className: 'bfw-context-heading'}, h('strong', null, t('executionProgress')),
-            h('span', {className: 'bfw-pill ' + sessionStatus}, t(sessionStatusKey)),
-            conversationRunning && button(t(stopping ? 'stopping' : 'stopExecution'), stop,
-              {disabled: stopping, title: t('stopNote'), 'data-stop-execution': true})),
-          h('div', {className: 'bfw-context-footer'},
-            h('span', {'data-full-permissions': String(canSubmit)}, t(canSubmit ? 'fullPermissions' : 'permissionsPending')),
-            !canSubmit && button(t(requestingPermission ? 'permissionRequesting' : 'permissionEnable'), requestPermission,
-              {disabled: requestingPermission, 'data-request-permission': true}),
-            h('span', {'data-assistant-turn': sessionStatus}, t(sessionStatusKey)),
-            h('span', {'data-background-production': backgroundProductionState(progress.value)},
-              t({running: 'backgroundProductionRunning', idle: 'backgroundProductionIdle', unknown: 'backgroundProductionUnknown'}[backgroundProductionState(progress.value)])),
-            ...(progress.value?.scenes?.runs || []).filter((run) => !run.terminal && !['SUCCEEDED', 'FAILED_FINAL', 'CANCELED'].includes(run.state))
-              .map((run) => h('code', {key: run.run_id, 'data-production-cancel-reference': run.run_id},
-                t('cancelProductionInConversation') + ': benchforge_cancel(run_id="' + run.run_id + '")')),
-            queueCount > 0 && h('span', {'data-queued-count': queueCount}, t('queuedMessages') + ': ' + queueCount)),
-          sessionStatus === 'failed' && sessionError && h('p', {className: 'bfw-error'},
-            typeof sessionError === 'string' ? sessionError : sessionError.message || JSON.stringify(sessionError))),
-        h(DemandForm, {demand, change: changeDemand, busy: sending || sceneSaving || inputState.phase !== 'plain' || !canSubmit, error: demandError, send: submitDemand,
-          draft: inputState.draft, attachments, included: includeDraft, onInclude: allowDraft,
-          sceneSelection: currentSceneSelection, openScenes: () => update({stage: 'S2'}), t})),
-      permissionError && h('div', {className: 'bfw-error', role: 'alert'}, t('permissionFailed') + ': ' + permissionError),
-      stopError && h('p', {className: 'bfw-error', role: 'alert'}, stopError),
+      demandError && h('p', {className: 'bfw-error', role: 'alert'}, demandError),
       notice && h('div', {className: 'bfw-notice', role: 'status'}, notice),
       [summary.error, run.error, dataset.error].filter(Boolean).map((error, i) => h('div', {className: 'bfw-error', role: 'alert', key: i}, error)),
       h('section', {id: 'bfw-content-' + sessionId, 'aria-label': t(stage.key)}, body),
-      preview && h(PreviewDialog, {key: preview.url || preview.title, item: preview, close: () => setPreview(null), t}),
-      sendPayload && h(SendDialog, {payload: sendPayload, change: (text) => setSendPayload((old) => ({...old, text})), draft: inputState.draft, attachments, included: includeDraft, onInclude: allowDraft,
-        sending, error: sendError, confirm: confirmSend, close: () => setSendPayload(null), t})));
+      preview && h(PreviewDialog, {key: preview.url || preview.title, item: preview, close: () => setPreview(null), t})));
   }
   return {Workbench};
 }

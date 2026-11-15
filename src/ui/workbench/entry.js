@@ -7,6 +7,10 @@ import {createProgressComponents} from './components/progress.js';
 import {createGalleryComponents} from './components/gallery.js';
 import {createProductComponents} from './components/products.js';
 import {createWorkbenchComponent} from './components/workbench.js';
+import {createComposerComponents} from './components/composer.js';
+import {createWorkbenchViewStore} from './composer-store.js';
+import {createProductionInput} from './production-input.js';
+import {createProductsResource, productsResourceAddress} from './products-resource.js';
 import workbenchRemote from '../../dsh/remote/lib/typert.remote-client.js';
 
 const PRESET_ID = 'benchforge';
@@ -44,18 +48,19 @@ const PLAN_FIELDS = {
   description: '具体说明', physical_assumptions: '物理假设与验证范围', revision_history: '设计修订依据', changes: '修改内容', type: '关系',
 };
 
-function createClient(React) {
+function createClient(React, defineStore, ui) {
   const h = React.createElement;
   const primitives = createPrimitives({React, PLAN_FIELDS, PLAN_SECTIONS});
   const state = createWorkbenchState({STAGES, sceneName: primitives.sceneName});
   const hooks = createApiHooks({React});
-  const helpers = {...primitives, ...state, ...hooks, STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries};
+  const helpers = {...primitives, ...state, ...hooks, productsResourceAddress, STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries};
   const progress = createProgressComponents({React, helpers});
   const gallery = createGalleryComponents({React, helpers});
   const components = {...progress, ...gallery, ...createProductComponents({React, helpers, components: {...progress, ...gallery}})};
+  const composer = createComposerComponents({React, helpers, ui});
   const {Workbench} = createWorkbenchComponent({React, helpers, components});
 
-  function ProductionEnvironment({t, sessions, ...props}) {
+  function ProductionEnvironment({t, enableProductionPermission, component: Component = Workbench, ...props}) {
     const permissions = props.useProjection('permissions');
     const openState = props.useSession((session) => session.openState);
     const ready = permissions?.currentValue === 'danger-full-access';
@@ -65,40 +70,68 @@ function createClient(React) {
       setRequestingPermission(true);
       setPermissionError('');
       try {
-        if (openState !== 'open') throw new Error('会话当前不可更改权限');
-        const result = await sessions.binding(props.sessionId).session.command('/permission danger-full-access');
-        if (!result.ok || !result.value.matched) throw new Error(result.error?.message || 'Permission command was not applied');
+        if (openState !== 'open') throw new Error(t('permissionUnavailable'));
+        await enableProductionPermission();
       } catch (error) {
         setPermissionError(error.message);
       } finally {
         setRequestingPermission(false);
       }
     };
-    return h(Workbench, {...props, t, canSubmit: ready, permissionError, requestPermission, requestingPermission,
-      stopExecution: async () => {
-        const result = await sessions.binding(props.sessionId).session.cancel();
-        if (!result.ok) throw new Error(result.error?.message || 'Unable to stop the current turn');
-      }});
+    return h(Component, {...props, t, canSubmit: ready, permissionError, requestPermission, requestingPermission});
   }
 
   async function apply(ctx) {
     await ctx.remote.$mount(workbenchRemote);
     ctx.effect(() => ctx.locale.register(NS, dictionaries));
     const t = ctx.locale.bind(NS);
-    ctx.inject(['remote.benchforgeWorkbench'], (workbenchCtx) => {
+    ctx.inject(['remote.benchforgeWorkbench', 'resources'], (workbenchCtx) => {
       const requestWorkbench = createWorkbenchRequest(workbenchCtx.remote);
+      workbenchCtx.effect(() => workbenchCtx.resources.register(createProductsResource(workbenchCtx.remote)),
+        'benchforge-workbench: conversation products resource');
       const sidebar = workbenchCtx.sidebarRight;
+      const store = createWorkbenchViewStore(defineStore);
+      const production = createProductionInput({ctx: workbenchCtx, requestWorkbench,
+        productionRequest: helpers.productionRequest, productionContext: helpers.productionContext, t});
+      workbenchCtx.effect(() => workbenchCtx.inputTriggers.registerSource(production.source));
+      const environment = (sessionId, actions) => {
+        actions.initialize(helpers.initialState(sessionId), helpers.initialDemand(sessionId));
+        return {
+          requestWorkbench,
+          configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
+          enableProductionPermission: async () => {
+            const result = await workbenchCtx.sessions.binding(sessionId).session.command('/permission danger-full-access');
+            if (!result.ok || !result.value.matched) throw new Error(result.error?.message || t('permissionFailed'));
+          },
+          stopExecution: async () => {
+            const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();
+            if (!result.ok) throw new Error(result.error?.message || t('stopFailed'));
+          },
+          openScenes: () => {actions.openScenes(); sidebar.openTab(WORKBENCH_KIND);},
+        };
+      };
       workbenchCtx.effect(() => workbenchCtx.sidebarRightTabs.register({
         id: WORKBENCH_TAB, kind: WORKBENCH_KIND, title: () => t('panel'), keepMounted: true,
       }));
       workbenchCtx.slots.inject('sidebar.right.pane.tab', () => workbenchCtx.slots.register({
-        name: 'sidebar.right.pane.tab', key: WORKBENCH_TAB, locale: NS,
+        name: 'sidebar.right.pane.tab', key: WORKBENCH_TAB, locale: NS, store, inject: environment,
       }, function WorkbenchPanel(props) {
         const preset = props.useProjection('agentPreset');
         if (preset !== PRESET_ID) return null;
-        return h(ProductionEnvironment, {...props, key: props.sessionId, t, requestWorkbench,
-          sessions: workbenchCtx.sessions});
+        return h(ProductionEnvironment, {...props, key: props.sessionId, t});
       }));
+      for (const slot of ['conversation.composer.dock', 'conversation.input.dock']) {
+        workbenchCtx.slots.inject(slot, () => workbenchCtx.slots.register({
+          name: slot, id: 'benchforge-production-settings', order: 10, locale: NS,
+          store, inject: environment,
+        }, function WorkbenchComposer(props) {
+          const preset = props.useProjection('agentPreset');
+          const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
+          const hero = slot === 'conversation.input.dock';
+          if (preset !== PRESET_ID || (hero && !blank)) return null;
+          return h(ProductionEnvironment, {...props, key: props.sessionId, t, hero, component: composer.ProductionComposer});
+        }));
+      }
       const toggle = () => {
         const active = sidebar.active();
         if (active?.kind === WORKBENCH_KIND && sidebar.isExpanded()) sidebar.hide(active.id);
@@ -123,15 +156,18 @@ function createClient(React) {
     });
   }
 
-  return {ProductionEnvironment, Workbench, dictionaries, apply, createWorkbenchRequest, ...helpers, ...components};
+  const {productionContext, ...publicHelpers} = helpers;
+  return {ProductionEnvironment, Workbench, dictionaries, apply, createWorkbenchRequest, ...publicHelpers, ...components};
 }
 
 export default function createPlugin(require) {
   const React = require('react');
-  const client = createClient(React);
+  const {defineStore} = require('@deepseek-ai/dsh-client-store');
+  const ui = require('@deepseek-ai/dsh-client-ui-primitives');
+  const client = createClient(React, defineStore, ui);
   const {Workbench, dictionaries, sceneCollectionProgress, stageState, StageProgress, executionStage, sceneStage, sceneProjects} = client;
   return {
-    inject: ['slots', 'locale', 'remote', 'sessions', 'sidebarRight', 'sidebarRightTabs'],
+    inject: ['slots', 'locale', 'remote', 'sessions', 'sidebarRight', 'sidebarRightTabs', 'conversation', 'inputTriggers'],
     apply: client.apply,
     Workbench, dictionaries, sceneCollectionProgress, stageState, StageProgress, executionStage, sceneStage, sceneProjects,
     ...client,

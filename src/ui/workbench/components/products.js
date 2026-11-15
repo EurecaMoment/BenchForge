@@ -29,70 +29,6 @@ export function createProductComponents({React, helpers, components}) {
         button(t('reviewChange'),change,{'data-review-instruction':true})),
       value.instruction && h('p',null,value.instruction));
   }
-  function DraftReview({draft, attachments, included, onInclude, t}) {
-    if (!draft && !attachments.length) return null;
-    return h('section', {className: 'bfw-draft-review', 'data-preserved-draft': true},
-      draft && h(React.Fragment, null, h('strong', null, t('preservedDraft')), h('pre', {className: 'bfw-json'}, draft)),
-      attachments.length > 0 && h('details', null, h('summary', null, t('preservedAttachments') + ': ' + attachments.length),
-        h('ul', null, attachments.map((id) => h('li', {key: id, className: 'bfw-code'}, String(id))))),
-      h('label', {className: 'bfw-consent'}, h('input', {type: 'checkbox', checked: included,
-        onChange: (event) => onInclude(event.target.checked)}), t('includeDraft')));
-  }
-  function DemandForm({demand, change, busy, error, send, draft, attachments, included, onInclude, sceneSelection, openScenes, t}) {
-    const append = demand.mode === 'append';
-    return h('section', {className: 'bfw-demand', 'data-production-request': true},
-      h('div', {className: 'bfw-demand-heading'}, h('h2', null, t('productionRequest')),
-        select(t('task'), demand.mode, (mode) => change({mode}), [['new', t('newProduction')], ['append', t('appendRequest')]])),
-      h('form', {onSubmit: (event) => {event.preventDefault(); send();}},
-        h('label', {className: 'bfw-label'}, t(append ? 'changeRequirements' : 'productionRequirements'),
-          h('textarea', {className: 'bfw-input bfw-textarea', rows: 3, 'data-production-objective': true,
-            value: demand.objective, placeholder: t(append ? 'requestPlaceholder' : 'productionPlaceholder'),
-            onChange: (event) => change({objective: event.target.value}), required: true})),
-        !append && h('div', {className: 'bfw-demand-fields'},
-          h('label', {className: 'bfw-label'}, t('targetItems'), h('input', {className: 'bfw-input', type: 'number', min: 1, step: 1,
-            value: demand.count, 'data-production-count': true, onChange: (event) => change({count: event.target.value}), required: true})),
-          select(t('executionMode'), demand.executionMode || 'production', (executionMode) => change({executionMode}),
-            [['production', t('productionMode')], ['exploration', t('explorationMode')]]),
-          select(t('quantityContract'), demand.quantityContract || 'minimum', (quantityContract) => change({quantityContract}),
-            [['exact', t('exactQuantity')], ['minimum', t('minimumQuantity')], ['best_effort', t('bestEffortQuantity')]]),
-          h('label', {className: 'bfw-label'}, t('capabilityRequest'), h('input', {className: 'bfw-input', value: demand.capability,
-            placeholder: t('capabilityPlaceholder'), onChange: (event) => change({capability: event.target.value})}))),
-        h(DraftReview, {draft, attachments, included, onInclude, t}),
-        sceneSelection && h('div', {className: 'bfw-demand-scene-summary'},
-          h('span', {className: 'bfw-muted'}, t('sceneSelected') + ': ' + sceneSelection.selected.length +
-            ' · ' + t('allowNewScenes') + ': ' + (sceneSelection.allow_new_scenes ? '✓' : '—')),
-          button(t('sceneLibrary'), openScenes)),
-        error && h('p', {className: 'bfw-error', role: 'alert'}, error),
-        h('div', {className: 'bfw-demand-footer'},
-          h('div', {className: 'bfw-demand-options'},
-            !append && h('details', null, h('summary', null, t('advancedOptions')), h('div', {className: 'bfw-form'},
-              h('label', {className: 'bfw-label'}, t('sceneCount'), h('input', {className: 'bfw-input', type: 'number', min: 1, step: 1,
-                value: demand.sceneCount, placeholder: t('optionalAuto'), onChange: (event) => change({sceneCount: event.target.value})})),
-              h('label', {className: 'bfw-label'}, t('storageBudget'), h('input', {className: 'bfw-input', type: 'number', min: 0, step: 'any',
-                value: demand.storageBudget, placeholder: t('optionalAuto'), onChange: (event) => change({storageBudget: event.target.value})}))),
-              h('p', null, t('targetQuantityNote')), h('p', null, t('fullWorkflowNote')), h('p', null, t('requestNote'))),
-            h('p', null, t(append ? 'appendNote' : 'productionHint'))),
-          h('button', {type: 'submit', className: 'bfw-button bfw-action', disabled: busy || !demand.objective.trim(),
-            'data-start-production': true}, t(busy ? 'sending' : append ? 'appendRequest' : 'startProduction')))));
-  }
-  function SendDialog({payload, change, draft, attachments, included, onInclude, sending, error, confirm, close, t}) {
-    const ref = React.useRef(null);
-    React.useEffect(() => {
-      const trigger = document.activeElement;
-      const dialog = ref.current;
-      dialog.showModal();
-      return () => {dialog.close(); trigger?.focus();};
-    }, []);
-    return h('dialog', {ref, className: 'bfw-preview-dialog', 'data-stage-confirm': true, 'aria-label': t('confirmTitle'),
-      onCancel: (event) => {event.preventDefault(); if (!sending) close();}},
-      h('h2', null, t('confirmTitle')), h('p', null, t('requestNote')), h('p', null, t('confirmSendNote')),
-      h(DraftReview, {draft, attachments, included, onInclude, t}),
-      h('textarea', {className: 'bfw-input bfw-textarea', 'data-request-text': true, 'aria-label': t('requestChange'), autoFocus: true,
-        placeholder: t('requestPlaceholder'), value: payload.text, disabled: sending || payload.inserted, onChange: (event) => change(event.target.value)}),
-      error && h('p', {className: 'bfw-error', role: 'alert'}, error),
-      h('div', {className: 'bfw-stage-actions'}, button(t('cancel'), close, {disabled: sending}),
-        button(t(sending ? 'sending' : 'confirmSend'), confirm, {className: 'bfw-button bfw-action', disabled: sending || !payload.text.trim()})));
-  }
   function PlanProduct({plan, source, artifacts, preview, request, save, applyEdit, scenes = [],template, t}) {
     const [draft,setDraft]=React.useState(null);
     const [busy,setBusy]=React.useState(false);
@@ -233,5 +169,5 @@ export function createProductComponents({React, helpers, components}) {
         h('div', null, h('dt', null, t('deliverySatisfaction')), h('dd', null, delivery))));
   }
 
-  return {StageReviewPanel, DraftReview, DemandForm, SendDialog, PlanProduct, ReportProduct, Quality, DeliveryReceipt};
+  return {StageReviewPanel, PlanProduct, ReportProduct, Quality, DeliveryReceipt};
 }

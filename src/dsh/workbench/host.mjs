@@ -16,9 +16,13 @@ import {createWorkbenchReadRoutes} from './projections/routes.mjs';
 import {WorkbenchRemote} from '../remote/lib/types/index.js';
 import {TYPERT} from '../remote/lib/typert.host.js';
 import {readAssessmentTemplate, readTaskTemplates} from './resources.mjs';
+import {artifactProjection} from './artifacts/projection.mjs';
+import {createArtifactEvidenceReader, resolveArtifactRoots} from './artifacts/scope.mjs';
+import {conversationProducts, openConversationArtifact} from './artifacts/files.mjs';
 
 export const name = 'benchforge-ui';
-export const inject = ['connection', 'typert', 'workspaceRegistry', 'benchforgeCapture', 'benchforgeSessions'];
+export const inject = ['connection', 'typert', 'workspaceRegistry', 'benchforgeCapture', 'benchforgeSessions',
+  'sessionProjections', 'sessionQuery'];
 export const Config = z.object({
   workspacePaths: z.array(z.string()).default([]),
   maxRuns: z.natural().min(1).max(200).default(60),
@@ -433,7 +437,7 @@ function pipelineSceneIds(state) {
   return [...ids];
 }
 
-function createWorkbenchDispatcher(config, registered, family, synthesisFactory, execution, associations) {
+function createWorkbenchDispatcher(config, registered, family, synthesisFactory, execution, associations, readEvidence) {
   const limits = {maxRuns: 60, maxArtifacts: 300, productionPython:process.env.PYTHON || (process.platform==='win32' ? 'python' : 'python3'), ...config};
   limits._previewJobs = new Map(); limits._previewQueue = Promise.resolve(); limits._previewMedia = new Map();
   limits._libraryCache = new Map(); limits._libraryQueue = new Map();
@@ -446,14 +450,30 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
     const view = url.searchParams.get('view') || 'summary';
     if (view === 'runtime') return {ui_revision: limits.uiRevision || '',
       preset_id: 'benchforge', preset_name: 'BenchForge'};
-    const roots = await workspaceRoots(limits, registered(), url.searchParams.get('workspace_path') || '');
     const parentScope = scopeOf(url);
     const related = !view.startsWith('execution_') && !parentScope.history && /^session-[a-zA-Z0-9-]+$/.test(parentScope.session_id)
       ? await family(parentScope.session_id, request.signal) : [];
+    const evidence = readEvidence && parentScope.session_id && !parentScope.history
+      ? await readEvidence(parentScope.session_id, related, request.signal) : [];
+    const roots = evidence.length
+      ? await resolveArtifactRoots(limits, registered(), url.searchParams.get('workspace_path') || '', evidence)
+      : await workspaceRoots(limits, registered(), url.searchParams.get('workspace_path') || '');
     const sessions = related.map((row) => row.id);
     const scope = scopeOf(url, sessions), scoped = {...limits, _sessionIds: sessions, _family: related};
-    if (view === 'progress' || view === 'stage_artifacts' || view === 'stage_media')
-      scoped._captureIds = await associatedCaptures(roots, scope, associations);
+    if (view === 'products') {
+      if (request.method !== 'GET') throw new ApiError('Conversation products require GET', 405);
+      if (!scope.session_id || scope.history || !evidence.length) throw new ApiError('Conversation products are unavailable', 403);
+      return conversationProducts({sessionId: scope.session_id, evidence, roots, maxArtifacts: limits.maxArtifacts, signal: request.signal});
+    }
+    if (view === 'conversation_artifact') {
+      if (request.method !== 'GET') throw new ApiError('Conversation artifacts require GET', 405);
+      if (!scope.session_id || scope.history || !evidence.length) throw new ApiError('Conversation artifacts are unavailable', 403);
+      return openConversationArtifact(url.searchParams.get('artifact') || '', {evidence, roots, request});
+    }
+    if (view === 'progress' || view === 'stage_artifacts' || view === 'stage_media') {
+      const saved = evidence.flatMap((owner) => owner.captureIds || []);
+      scoped._captureIds = [...new Set([...await associatedCaptures(roots, scope, associations), ...saved])];
+    }
     let value;
     if (view === 'execution_status' || view === 'execution_control') {
       if(roots.length !== 1 || !scope.session_id || scope.history || !execution)
@@ -577,11 +597,13 @@ export function createWorkbenchHandler(config, registered = () => [], family = a
   return fetchWorkbench(createWorkbenchDispatcher(config, registered, family, synthesisFactory, execution, associations));
 }
 
-export function apply(ctx, config) {
+export async function apply(ctx, config) {
   const {execution, preparation} = ctx.benchforgeSessions;
   const {associations} = ctx.benchforgeCapture;
+  const readEvidence = createArtifactEvidenceReader(ctx.get('sessionQuery'));
+  await ctx.sessionProjections.register(artifactProjection);
   const dispatch = createWorkbenchDispatcher(config, () => ctx.workspaceRegistry.list(), sessionFamilyReader(ctx),
-    preparation, execution, associations);
+    preparation, execution, associations, readEvidence);
   ctx.provide('benchforgeWorkbench', new WorkbenchRemote(dispatch));
   // Local file overlays do not have a bare package row for the Typert loader.
   ctx.effect(() => ctx.typert.register(TYPERT), 'benchforge-workbench: Remote API');

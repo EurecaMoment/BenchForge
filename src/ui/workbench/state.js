@@ -47,6 +47,14 @@ export function createWorkbenchState({STAGES, sceneName}) {
       '使用当前已接入工具。场景是出题前提，GT 仅来自官方、程序或仿真，公开题目不泄露答案。请将计划、场景、标注、题目表和最终报告关联到当前会话，使工作台实时展示实际回执和产物。',
     ].filter(Boolean).join('\n') + sceneConstraint(selection);
   }
+  function productionContext(selection, template) {
+    return sceneConstraint(selection) +
+      '\n每个阶段 S1 计划、S2 场景、S3 标注、S4 题目、S5 报告完成后，展示真实产物并等待用户 5 分钟。使用 stage_review 打开及等待持久关口；无新指令到期继续，有指令先处理，暂停后不得自动继续。\n' +
+      '\n制定或修改评测计划时必须遵守以下完整模板；已有完整计划且本次只要求继续执行时，复用已有计划。\n' +
+      template.instructions + '\n' + template.scene_binding + '\n各章节要求：\n' + JSON.stringify(template.sections, null, 2) +
+      (template.scene_authoring ? '\n场景标题、摘要、空间关系与双向修订合同：\n' + JSON.stringify(template.scene_authoring, null, 2) : '') +
+      '\n传入 pipeline_plan.assessment 的填写结构：\n' + JSON.stringify(template.assessment, null, 2);
+  }
   function displayRef(value) {
     const parts = String(value || '').split(/[\\/]/).filter(Boolean);
     if (parts[0] === 'operations' && parts[1]) return '运行 ' + parts[1].slice(0, 8);
@@ -279,7 +287,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
     return steps.find((row) => row.state !== 'completed' && row.state !== 'unknown')?.state ||
       (pipeline.current?.stage === id && pipeline.state !== 'completed' ? pipeline.state : 'unknown');
   }
-  return {initialState, initialDemand, sceneConstraint, productionRequest, displayRef, filteredPage,
+  return {initialState, initialDemand, sceneConstraint, productionRequest, productionContext, displayRef, filteredPage,
     lifecycle, backgroundProductionState, productionProductsRevision, sceneStage, pipelineForStage, sceneForStage, progressSceneForStage,
     registeredCollectionProgress, currentGeneration, sceneCollectionProgress, annotationProducts, stageState,
     recordedStageState};
