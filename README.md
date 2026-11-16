@@ -151,6 +151,15 @@ sudo apt-get update
 sudo apt-get install -y build-essential curl ca-certificates iproute2 util-linux bubblewrap
 ```
 
+`benchforge_task_code` 强制在 bubblewrap 中执行 Python；DSH 会话的
+`danger-full-access` 不会取消这层隔离。没有 sudo 时，可由管理员提供兼容的
+非 setuid `bwrap`，或按 [bubblewrap 上游说明](https://github.com/containers/bubblewrap)
+编译到用户目录。把其 `bin` 目录加入 **BenchForge 后端与 DSH 启动进程的 PATH**，
+再重启这两个服务。仅修改交互终端的 PATH 不会更新已经运行的服务。
+这种安装需要主机允许非特权 user namespaces；不能仅凭 `bwrap --version` 判断可用。
+应实际运行隔离命令，并通过 `benchforge_task_code` 验证任务文件可写、源码和资产只读、
+主机网络不可达。缺少沙箱时工具拒绝执行，不会自动降级为无隔离运行。
+
 Docker 尚未安装时，按 [Docker 官方 Linux 安装说明](https://docs.docker.com/engine/install/)
 选择系统，安装 Engine 和 Compose plugin。普通用户访问权限按
 [安装后配置](https://docs.docker.com/engine/install/linux-postinstall/) 设置；

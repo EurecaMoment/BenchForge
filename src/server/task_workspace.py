@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -14,6 +15,14 @@ def run_task_code(artifact_root,workspace_id,code,timeout_seconds=60):
     if not isinstance(workspace_id,str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}',workspace_id):raise ValueError('invalid workspace_id')
     if not isinstance(code,str) or not 1<=len(code)<=1024*1024:raise ValueError('code must be 1..1048576 characters')
     if type(timeout_seconds) is not int or not 1<=timeout_seconds<=300:raise ValueError('timeout_seconds must be 1..300')
+    # Resolve on the service PATH before stripping its environment from task code.
+    runner = shutil.which('bwrap')
+    if runner is None:
+        raise RuntimeError(
+            'Task-code sandbox requires bubblewrap (bwrap) on the backend service PATH. '
+            'Install it and restart the backend; unconfined execution is not supported.'
+        )
+    runner = str(Path(runner).absolute())
     root=Path(artifact_root).resolve();base=root/'operator_workspaces';base.mkdir(exist_ok=True)
     (root/'generated_assets').mkdir(exist_ok=True)
     workspace=base/workspace_id;workspace.mkdir(exist_ok=True)
@@ -21,7 +30,7 @@ def run_task_code(artifact_root,workspace_id,code,timeout_seconds=60):
     call_id='code_'+uuid.uuid4().hex[:12]
     script=workspace/(call_id+'.py');script.write_text(code,encoding='utf8')
     stdout=workspace/(call_id+'.stdout');stderr=workspace/(call_id+'.stderr')
-    cmd=['bwrap','--die-with-parent','--unshare-all','--new-session',
+    cmd=[runner,'--die-with-parent','--unshare-all','--new-session',
          '--ro-bind','/usr','/usr','--ro-bind','/lib','/lib','--ro-bind','/lib64','/lib64',
          '--symlink','usr/bin','/bin','--tmpfs','/tmp','--proc','/proc','--dev','/dev',
          '--ro-bind',sys.prefix,sys.prefix]
