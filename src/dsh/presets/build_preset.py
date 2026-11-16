@@ -107,7 +107,7 @@ def model_patches(config_path):
                            ('input', 'input'), ('reasoning_efforts', 'reasoningEfforts')):
         if source in model:
             descriptor[target] = model[source]
-    provider = {'displayName': 'DSpark4A100' if 'providers' in registry else 'BenchForge models',
+    provider = {'displayName': provider_config.llm_provider_name(registry),
                 'api': model.get('api', 'openai-completions'),
                 'baseURL': provider_config.llm_base_url(model['url']), 'models': [descriptor]}
     if model.get('token_env'):

@@ -10,7 +10,7 @@ from service_access import configuration as provider_config
 def annotation(args, config):
     config = provider_config.selected_model(config, 'annotation')
     if not config.get('url'):
-        raise ValueError('Configure the annotation model under providers.DSpark4A100')
+        raise ValueError('Configure the annotation model in the selected language model provider roles.annotation')
     base_url = provider_config.llm_base_url(config['url'])
     headers = {'Content-Type': 'application/json'}
     if token_env := config.get('token_env'):
@@ -21,7 +21,8 @@ def annotation(args, config):
     if args.get('action') == 'models':
         request = urllib.request.Request(base_url + '/models', headers=headers)
     else:
-        data = json.dumps({**args.get('payload', {}), 'model': config['model']}).encode('utf8')
+        defaults = {'reasoning_effort': config['reasoning_effort']} if config.get('reasoning_effort') else {}
+        data = json.dumps({**defaults, **args.get('payload', {}), 'model': config['model']}).encode('utf8')
         request = urllib.request.Request(base_url + '/chat/completions', data=data, headers=headers)
     local = urlsplit(base_url).hostname in ('localhost', '127.0.0.1', '::1')
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({})) if local else urllib.request.build_opener()

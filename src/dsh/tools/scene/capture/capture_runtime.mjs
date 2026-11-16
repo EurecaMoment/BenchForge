@@ -21,6 +21,7 @@ const captures = defineDomain({name:'benchforge_capture_continuation',version:1,
   observation:z.record(z.string(),z.unknown()).optional(),error:z.string().optional(),notice_key:z.string().optional(),
   finished_at:z.number().optional(),blocked_at:z.number().optional(),blocker:z.record(z.string(),z.unknown()).optional(),
   scene_id:z.string().optional(),task_seq:z.number().optional(),
+  continuation:z.object({progress:z.string(),attempts:z.number().int().nonnegative(),notice:z.string()}).optional(),
 }))}});
 
 export async function apply(ctx, config) {

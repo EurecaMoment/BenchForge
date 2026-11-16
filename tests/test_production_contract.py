@@ -17,9 +17,31 @@ from pipelines.benchmark.execution.production_stages import validate_planned_sce
 from pipelines.benchmark.design.planner import plan
 from pipelines.benchmark.design.plan_versions import current
 from pipelines.benchmark.execution.stage_review import call as stage_review
+from capabilities.scene_authoring.contracts.requirements import scene_requirements, validate_asset_requirements
 
 
 class ProductionContractTests(unittest.TestCase):
+    def test_scene_review_keeps_identity_but_defers_trajectory_evidence_to_collection(self):
+        design = {'hard_requirements':['Import a recognizable articulated robot','Record 100 trajectories','Deliver the archive'],
+                  'requirement_stages':['S2','S3','S5']}
+        self.assertEqual(scene_requirements(design),[{'index':0,'requirement':'Import a recognizable articulated robot'}])
+        with self.assertRaisesRegex(ValueError, 'each hard requirement'):
+            scene_requirements({**design,'requirement_stages':['S3']})
+        self.assertEqual(len(scene_requirements({'hard_requirements':['A furnished room']})),1)
+
+    def test_robot_measurement_requires_explicit_asset_identity_without_banning_geometry_experiments(self):
+        scenes = {'designs':[{'id':'room','object_roles':[{'object_id':'dog','role':'Robot'}]}]}
+        with self.assertRaisesRegex(ValueError, 'articulated_robot'):
+            validate_asset_requirements(scenes,robot_locomotion=True)
+        validate_asset_requirements(scenes)
+        scenes['designs'][0]['object_roles'][0]['representation']='articulated_robot'
+        validate_asset_requirements(scenes,robot_locomotion=True)
+        scenes['geometry_exceptions']=[{'scene_design_id':'room','object_ids':['sofa']}]
+        validate_asset_requirements(scenes,robot_locomotion=True)
+        scenes['geometry_exceptions'][0]['object_ids'].append('dog')
+        with self.assertRaisesRegex(ValueError, 'cannot replace required native assets'):
+            validate_asset_requirements(scenes,robot_locomotion=True)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)

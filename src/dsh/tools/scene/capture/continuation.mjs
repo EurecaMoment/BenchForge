@@ -3,6 +3,7 @@ import path from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {compactCaptureObservation, captureRunId} from './capture_watch.mjs';
 import {createCaptureHistory, captureFailure, failureIdentity, noticeDelivered, terminalCapture} from './continuation_state.mjs';
+import {captureNotice} from './notice.mjs';
 
 const keyOf = (owner, run) => `${owner}:${run}`;
 const suspendedReview = review => review && ['paused','needs_input','check_failed'].includes(review.state);
@@ -16,7 +17,7 @@ const text = record => {
     '本次采集验收失败，整个任务仍未完成。读取下面的实际缺项和保存的审查文件，保留原始硬要求及可辨识资产，定点修复完整程序并重新采集。不要通过删除部件、机器人资产或改变用途消除报错。' :
     record.error ? '后台查询失败，保留原作业，先用 benchforge_wait(background=true) 恢复跟踪。不要重复提交仍在运行的作业。' :
     '提交受理、采集完成和场景验收是不同状态。读取实际回执，验收通过后续跑原评测；单次采集结束不等于整项任务交付。'}
-${JSON.stringify(record.observation || {run_id:record.run_id,error:record.error})}
+${JSON.stringify(captureNotice({...record.observation,run_id:record.run_id},record.error))}
 如果真实外部条件阻止修复，使用 benchforge_scene_blocker 保存具体证据与缺失条件，然后向用户说明。可执行的下一步必须现在执行，不能只列计划就结束。`;
 };
 
@@ -24,7 +25,7 @@ ${JSON.stringify(record.observation || {run_id:record.run_id,error:record.error}
 export function createCaptureContinuation({table, artifacts, read, resolveAgent, createMessage,
   readReview = () => null, signal, onError = () => {}, now = Date.now,
   delay = (ms,signal) => sleep(ms,undefined,{signal,ref:false})}) {
-  const active = new Map(), registration = new Map(), agents = new Map(), stops = new Map();
+  const active = new Map(), registration = new Map(), agents = new Map();
   const history = createCaptureHistory();
   const lifecycle = new AbortController();
   const lifetime = signal ? AbortSignal.any([signal,lifecycle.signal]) : lifecycle.signal;
@@ -181,20 +182,27 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     // A saved failure still requires repair after a notification has been read.
     // Successful production captures require the pipeline's next stage receipt.
     if (!captureFailure(record.observation) && !record.error && (!context.production || context.workflowSeq > latest.seq)) return;
-    const key = `capture-stop:${agent.id}:${latest.run_id}:${record.generation}:${context.activitySeq}`;
+    // Count unsuccessful final responses, not tool calls. A diagnostic or shell
+    // command is allowed during repair, but cannot buy unlimited new retries.
+    const progress = `${record.generation}:${context.workflowSeq}`;
+    const count = record.continuation?.progress === progress ? record.continuation.attempts : 0;
+    const key = `capture-stop:${agent.id}:${latest.run_id}:${progress}:${count}`;
     if ([...(agent.inbox?.nextStep || []),...(agent.inbox?.nextTurn || [])].some(message=>message.source?.noticeKey===key)) return;
-    const count = stops.get(key) || 0;
-    stops.set(key,count+1);
+    // Do not count the same queued reminder twice before the model reads it.
+    if ([...(agent.inbox?.nextStep || []),...(agent.inbox?.nextTurn || [])].some(message=>message.source?.noticeKey===record.continuation?.notice)) return;
+    const continuation = {progress,attempts:count+1,notice:key};
+    await save({...record,continuation});
     if (count >= 2) {
-      const reason='执行未推进：连续三次收尾仍未调用修复、状态恢复或续跑工具。保留失败证据，停止重复模型消耗。';
-      await save({...record,state:'blocked',blocked_at:now(),blocker:{kind:'execution',reason,event_seq:context.activitySeq}});
+      const reason='执行未推进：连续三次收尾仍无新采集提交或后续阶段回执。保留失败证据，停止自动催促；任务尚未完成，可在修复后重新提交。';
+      await save({...record,continuation,state:'blocked',blocked_at:now(),blocker:{kind:'execution',reason,event_seq:context.activitySeq}});
       agent.steer(createMessage({source:{kind:'benchforge/capture-watch',noticeKey:key+':blocked',form:'notice',summary:reason,
         capture:{run_id:record.run_id,state:'blocked',failed:true,blocked:true}},content:[{type:'text',text:
         reason+' 请向用户明确说明任务未完成及真实缺项；不能宣称交付成功。'}]}));
       return;
     }
     agent.steer(createMessage({source:{kind:'benchforge/capture-continuation',noticeKey:key,form:'notice',summary:'采集或生产仍未完成，继续修复。'},content:[{type:'text',text:
-      text(record) + (count ? '\n仍存在未完成的采集义务。请执行修复/续跑工具，或用 benchforge_scene_blocker 提交具体阻塞证据。重复进度说明不能关闭任务。' : '')}]}));
+      `采集 ${record.run_id} 的结果没有变化。完整缺项见 benchforge_scene_status(run_id="${record.run_id}",detail=true)。`+
+      '继续必要的检查与修复，并提交新采集或推进已通过的阶段；不要降低硬要求。若确有阻塞，保存具体证据并说明。重复进度说明和空命令不算推进。'}]}));
   }
   async function block(agent, {run_id,reason,missing_condition,evidence,kind}) {
     const record = table.get(keyOf(agent.id,captureRunId(run_id)));

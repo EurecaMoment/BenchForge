@@ -28,6 +28,7 @@ def references_excluded_source(value, policy):
 
 
 def validate_geometry_declarations(scenes):
+    from capabilities.scene_authoring.contracts.requirements import validate_asset_requirements
     declarations = scenes.get('geometry_exceptions', [])
     if not isinstance(declarations, list):
         raise ValueError('scenes.geometry_exceptions must be an optional array')
@@ -53,6 +54,7 @@ def validate_geometry_declarations(scenes):
         if (not isinstance(ids, list) or not ids or
                 not all(isinstance(item, str) and item.strip() for item in ids) or len(set(ids)) != len(ids)):
             raise ValueError('Geometry exception must name the exact simplified objects in this scene')
+    validate_asset_requirements(scenes)
     return declarations
 
 
@@ -170,6 +172,7 @@ def validate_reference(design, object_ids=None):
 
 
 def validate_scene_brief(design, object_ids=None):
+    from capabilities.scene_authoring.contracts.requirements import requirement_stages
     if not isinstance(design.get('name'), str) or not design['name'].strip():
         raise ValueError('Scene brief needs a human-readable title')
     if not isinstance(design.get('summary'), str) or not design['summary'].strip():
@@ -178,6 +181,7 @@ def validate_scene_brief(design, object_ids=None):
         rows = design.get(key)
         if not isinstance(rows, list) or not rows or any(not isinstance(row, str) or not row.strip() for row in rows):
             raise ValueError('Scene brief needs concrete ' + key)
+    requirement_stages(design)
     roles = design.get('object_roles')
     if not isinstance(roles, list) or not roles:
         raise ValueError('Scene brief needs object roles')

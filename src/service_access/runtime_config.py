@@ -102,6 +102,7 @@ def _resolve_model_settings(config):
         ('url', 'model_url', 'BENCHFORGE_MODEL_URL'),
         ('model', 'model_id', 'BENCHFORGE_MODEL_ID'),
         ('token_env', 'model_api_key_env', 'BENCHFORGE_MODEL_API_KEY_ENV'),
+        ('reasoning_effort', 'model_reasoning_effort', 'BENCHFORGE_MODEL_REASONING_EFFORT'),
     ):
         if spec.get(source):
             config[target] = spec[source]
@@ -191,6 +192,7 @@ def load_service_config(path, *, required_tokens=('operator',)):
         ('model_url', 'BENCHFORGE_MODEL_URL'),
         ('model_id', 'BENCHFORGE_MODEL_ID'),
         ('model_api_key_env', 'BENCHFORGE_MODEL_API_KEY_ENV'),
+        ('model_reasoning_effort', 'BENCHFORGE_MODEL_REASONING_EFFORT'),
     )
     for key, env_name in environment_values:
         value = environment_value(env_name, config.get(key))
@@ -204,7 +206,8 @@ def apply_runtime_environment(config):
     """Install one service's legacy environment at its executable startup boundary."""
     mapping = {**_PATH_ENVIRONMENT, 'execution_mode': 'BENCHFORGE_EXECUTION_MODE',
                'model_url': 'BENCHFORGE_MODEL_URL', 'model_id': 'BENCHFORGE_MODEL_ID',
-               'model_api_key_env': 'BENCHFORGE_MODEL_API_KEY_ENV'}
+               'model_api_key_env': 'BENCHFORGE_MODEL_API_KEY_ENV',
+               'model_reasoning_effort': 'BENCHFORGE_MODEL_REASONING_EFFORT'}
     for key, variable in mapping.items():
         if key in config:
             os.environ[variable] = str(config[key])

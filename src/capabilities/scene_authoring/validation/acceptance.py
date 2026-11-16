@@ -84,6 +84,11 @@ def admit_program(root, program, *, allow_generated=False, execution_mode=None):
     by_id = {obj['id']: obj for obj in program['objects']}
     problems = []
     if brief:
+        for role in brief['object_roles']:
+            if role.get('representation') in {'native_asset', 'articulated_robot'}:
+                obj = by_id[role['object_id']]
+                if obj['kind'] not in ASSETS:
+                    problems.append(obj['id'] + ': requires a registered native asset; primitive geometry and metadata cannot substitute for asset identity')
         for relation in brief['relations']:
             obj = by_id[relation['source']]
             if relation['type'] == 'supported_by' and obj['support'] != relation['target']:
@@ -236,8 +241,11 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
     expected = {'view_' + str(i) + '.png' for i in range(len(program.get('cameras', [])))}
     if not expected or not expected <= frames:
         issues.append('Every planned camera must have an actual captured view for production acceptance')
+    visual_pending = bool(physical_issues) and review.get('visual_review_skipped') is True
     checks = review.get('life_review', {}).get('checks', [])
-    for name in sorted(VISUAL_CHECKS):
+    if visual_pending:
+        issues.append('Visual review not assessed: repair the physical precheck and capture again')
+    for name in ([] if visual_pending else sorted(VISUAL_CHECKS)):
         rows = [row for row in checks if isinstance(row,dict) and row.get('check') == name]
         if len(rows) != 1 or rows[0].get('passed') is not True:
             issues.append('Visual/life check failed or missing: ' + name);continue
@@ -290,7 +298,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
         frozen = json.loads(frozen_file.read_text(encoding='utf-8')).get('scene_brief')
         if not frozen or frozen.get('plan_version') != brief.get('plan_version'):
             issues.append('Scene brief changed during production; start a new capture for the revised brief')
-    if brief:
+    if brief and not visual_pending:
         alignment = review.get('brief_alignment', {})
         if alignment.get('passed') is not True or alignment.get('hard_requirements_preserved') is not True:
             issues.append('Captured scene does not satisfy the saved scene brief and protected requirements')
@@ -301,7 +309,8 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             issues.append('Scene brief alignment must account for every captured camera view')
         if alignment.get('unresolved') != []:
             issues.append('Scene brief has unresolved spatial or functional contradictions')
-        for key, expected_indices in (('requirement_checks', set(range(len(brief['hard_requirements'])))),
+        from capabilities.scene_authoring.contracts.requirements import scene_requirements
+        for key, expected_indices in (('requirement_checks', {row['index'] for row in scene_requirements(brief)}),
                                      ('relation_checks', {i for i,r in enumerate(brief['relations']) if r['type'] not in {'supported_by','mounted_to'}})):
             checks = alignment.get(key, [])
             # Physical relations are already measured above. Visual opinions
@@ -313,7 +322,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
                     any(row.get('passed') is not True or not captured_observation(row,frames) for row in relevant)):
                 issues.append('Scene brief needs complete captured evidence for ' + key)
     expected_status='matches_declared_geometry' if style=='simplified_geometry' else 'visually_plausible'
-    if review.get('acceptable') is not True or review.get('visual_realism', {}).get('status') != expected_status:
+    if not visual_pending and (review.get('acceptable') is not True or review.get('visual_realism', {}).get('status') != expected_status):
         issues.append('Captured views failed appearance/semantic acceptance')
     files = [Path(capture).parent/'program.json',Path(capture)/'report.json',Path(capture)/'evidence.json']
     for entity in entities.values():
@@ -346,7 +355,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
                 files.append(Path(capture) / name)
     versions = {file.relative_to(Path(capture).parent).as_posix():[file.stat().st_size,file.stat().st_mtime_ns] for file in files if file.is_file()}
     return {'schema':'benchforge.scene-acceptance/v1','enforced':True,'passed':not issues,'issues':issues,
-            'physical_issues':physical_issues,
+            'physical_issues':physical_issues,'visual_status':'not_assessed' if visual_pending else 'assessed',
             'native_relation_checks':native_relation_checks,
             'mesh_bound_checks':mesh_bound_checks,'mesh_versions':mesh_versions,
             'scene_id':program.get('scene_id'),'capture_token':report.get('token'),'evidence_versions':versions,

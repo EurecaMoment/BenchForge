@@ -4,7 +4,7 @@ import {defineTool} from '@deepseek-ai/dsh-tools';
 import Schema from '@deepseek-ai/schemastery';
 import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
 import {toolName, qualifyToolNames, qualifyDescriptions} from '../tools/benchmark/names.mjs';
-import {configuredProviders, providerEnvironment} from './tool_credentials.mjs';
+import {configuredProviders, modelRole, providerEnvironment} from './tool_credentials.mjs';
 import {presentOperationCatalog} from '../tools/benchmark/catalog.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
@@ -66,8 +66,7 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   const operationOutput = {...output,schema:{type:'object',properties:{operation_id:{type:'string',required:true},artifact_dir:{type:'string',required:true}},additionalProperties:true}};
   const statusOutput = {...output,schema:{type:'object',properties:{operations:{type:'array',required:true,items:{type:'object',properties:{id:{type:'string',required:true},tool:{type:'string',required:true},state:{type:'string',required:true}},additionalProperties:true}}},additionalProperties:true}};
   const providers = await configuredProviders(config.configPath);
-  const llm = providers.DSpark4A100;
-  const annotation = llm ? {...llm, ...llm.roles?.annotation} : undefined;
+  const annotation = modelRole(providers, 'annotation');
   const annotationEnvironment = providerEnvironment(environment, snapshot, annotation?.token_env);
   const isaacEnvironment = providerEnvironment(environment, snapshot, providers.IsaacSim4A100?.grpc?.token_env);
   for (const [tool, description] of Object.entries(definitions)) {

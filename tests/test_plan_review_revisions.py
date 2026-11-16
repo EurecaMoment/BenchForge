@@ -38,6 +38,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
                 'scenes': {'target_scene_count': 1, 'designs': [{'id': 'room', 'artifact': 'tasks/room/views',
                     'hard_requirements': ['Use the official robot', 'Record ten native trajectories'],
                     'object_roles': [{'object_id': 'sofa', 'role': 'Furniture obstacle'},
+                                     {'object_id': 'dog_go2', 'role': 'Robot', 'representation': 'articulated_robot'},
                                      {'object_id': 'floor', 'role': 'Support plane'}],
                     'relations': [{'source': 'sofa', 'type': 'supported_by', 'target': 'floor', 'description': 'On the floor'}]}],
                     'geometry_exceptions': [{'scene_design_id': 'room', 'scene_id': 'room',
@@ -108,15 +109,13 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(repaired['stage_review']['deadline'], second['deadline'])
         self.assertEqual(repaired['stage_review']['waits_completed'], 1)
         changed['assessment']['scenes']['designs'][0]['hard_requirements'] = ['A proxy is sufficient']
-        self.assertNotEqual(self.save(changed)['stage_review']['review_id'], first['stage_review']['review_id'])
+        with self.assertRaisesRegex(ValueError, 'preserve original hard requirements'):
+            self.save(changed)
 
     def test_contract_changes_require_a_new_review_and_report_changed_fields(self):
         cases = {
             'quantity': lambda args: args['assessment']['dataset'].update(target_items=5),
-            'requirements': lambda args: args['assessment']['scenes']['designs'][0].update(hard_requirements=['A box is enough']),
-            'native_collection': lambda args: args['assessment']['annotations'].update(require_robot_locomotion=False),
             'scoring': lambda args: args['assessment']['scoring'].update(rule='Approximate freely'),
-            'robot_exception': lambda args: args['assessment']['scenes']['geometry_exceptions'][0]['object_ids'].append('dog_go2'),
             'exception_scope': lambda args: args['assessment']['scenes']['geometry_exceptions'][0].update(reason='All assets may be boxes'),
             'relationship': lambda args: args['assessment']['scenes']['designs'][0]['relations'][0].update(type='near'),
         }
@@ -139,7 +138,24 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(self.save({'request_path': str(request)})['stage_review']['review_id'], first['stage_review']['review_id'])
         changed = deepcopy(self.args); changed['assessment']['annotations']['require_robot_locomotion'] = False
         write(request, changed)
-        self.assertFalse(self.save({'request_path': str(request)})['review_revision']['review_reused'])
+        with self.assertRaisesRegex(ValueError, 'preserve require_robot_locomotion'):
+            self.save({'request_path': str(request)})
+
+    def test_repair_cannot_turn_a_required_robot_into_a_geometry_exception(self):
+        self.save()
+        changed = deepcopy(self.args)
+        changed['assessment']['scenes']['geometry_exceptions'][0]['object_ids'].append('dog_go2')
+        with self.assertRaisesRegex(ValueError, 'cannot replace required native assets'):
+            self.save(changed)
+
+    def test_ordinary_layout_repairs_and_new_tasks_remain_available(self):
+        self.save()
+        changed = deepcopy(self.args)
+        changed['assessment']['scenes']['designs'][0]['summary'] = 'Moved the sofa away from the doorway'
+        self.assertTrue(self.save(changed)['review_revision']['review_reused'])
+        changed['new_task'] = True
+        changed['assessment']['scenes']['designs'][0]['hard_requirements'] = ['A new geometry experiment']
+        self.assertEqual(self.save(changed)['review_revision']['kind'], 'new_task')
 
     def test_new_request_and_explicit_new_task_do_not_reuse_review(self):
         first = self.save()
@@ -182,17 +198,21 @@ class PlanReviewRevisionTests(unittest.TestCase):
         review(self.root, self.session, 'pause')
         changed = deepcopy(self.args)
         changed['assessment']['dataset']['target_items'] = 5
+        changed['assessment']['scenes']['designs'][0]['hard_requirements'] = ['User explicitly requested a different robot experiment']
         changed['_plan_edit'] = {'base_plan': first['plan'], 'changes': ['dataset'], 'application_required': True}
         draft = self.save(changed)
         self.assertIsNone(draft['stage_review'])
         document = read(draft['plan'])
         args = {key: document[key] for key in ('objective', 'pipeline_id', 'assessment', 'inputs', 'steps', 'selections')}
+        args['inputs']['evidence'] = 'tasks/room/user-requested-experiment/evidence.jsonl'
         saved = self.save({**args, 'applies_edit': draft['plan']})
         self.assertEqual(saved['review_revision']['kind'], 'user_edit')
         self.assertEqual(saved['stage_review']['review_id'], first['stage_review']['review_id'])
         self.assertEqual(saved['stage_review']['state'], 'paused')
         self.assertFalse(current(self.root, self.session)['pending'])
         self.assertEqual(read(saved['plan'])['assessment']['dataset']['target_items'], 5)
+        self.assertEqual(read(saved['plan'])['assessment']['scenes']['designs'][0]['hard_requirements'],
+                         changed['assessment']['scenes']['designs'][0]['hard_requirements'])
 
     def test_repeated_plan_saves_are_atomic_per_conversation(self):
         self.save()

@@ -12,6 +12,7 @@ MODEL_PROVIDERS = {
     'trellis': 'FastTrellis2',
 }
 LLM_PROVIDER = 'DSpark4A100'
+LLM_PROVIDERS = (LLM_PROVIDER, 'FastQwen')
 ISAAC_PROVIDER = 'IsaacSim4A100'
 MODEL_FIELDS = {
     'url', 'model', 'token_env', 'name', 'api', 'context_window', 'max_tokens',
@@ -20,8 +21,16 @@ MODEL_FIELDS = {
 HTTP_FIELDS = {'url', 'model', 'token_env', 'timeout_seconds', 'request_defaults'}
 
 
+def llm_provider_name(config):
+    providers = config.get('providers', {})
+    active = [name for name in LLM_PROVIDERS if providers.get(name, {}).get('model')]
+    if len(active) > 1:
+        raise ValueError('Configure one primary language model provider: DSpark4A100 or FastQwen; keep other model overrides in roles')
+    return active[0] if active else LLM_PROVIDER
+
+
 def selected_model(config, role):
-    spec = dict(config.get('providers', {}).get(LLM_PROVIDER, {}))
+    spec = dict(config.get('providers', {}).get(llm_provider_name(config), {}))
     roles = spec.pop('roles', {})
     return {**spec, **roles.get(role, {})}
 
@@ -78,7 +87,7 @@ def validate_providers(config):
     providers = config['providers']
     if not isinstance(providers, dict):
         raise ValueError('providers must be a JSON object')
-    known = {LLM_PROVIDER, ISAAC_PROVIDER, *MODEL_PROVIDERS.values()}
+    known = {*LLM_PROVIDERS, ISAAC_PROVIDER, *MODEL_PROVIDERS.values()}
     if unknown := providers.keys() - known:
         raise ValueError(f'Unknown providers: {", ".join(sorted(unknown))}')
     for name, spec in providers.items():
@@ -98,12 +107,13 @@ def validate_providers(config):
             if (type(timeout) not in (int, float) or not 0 < timeout < float('inf')
                     or (name == 'FastTrellis2' and not .01 <= timeout <= 3600)):
                 raise ValueError(f'{field}.timeout_seconds is outside the supported range')
-    llm = providers.get(LLM_PROVIDER, {})
+    provider = llm_provider_name(config)
+    llm = providers.get(provider, {})
     roles = llm.get('roles', {})
     if not isinstance(roles, dict) or roles.keys() - {'dsh', 'scene', 'annotation'}:
-        raise ValueError(f'providers.{LLM_PROVIDER}.roles must contain DSH, scene or annotation settings')
+        raise ValueError(f'providers.{provider}.roles must contain DSH, scene or annotation settings')
     for role, spec in (('', llm), *roles.items()):
-        field = f'providers.{LLM_PROVIDER}' + (f'.roles.{role}' if role else '')
+        field = f'providers.{provider}' + (f'.roles.{role}' if role else '')
         if not isinstance(spec, dict):
             raise ValueError(f'{field} must be a JSON object')
         _validate_token(spec, field)

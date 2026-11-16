@@ -81,7 +81,24 @@ def _changes(before, after, prefix=''):
     return [prefix]
 
 
-def revision_review(plan, target, previous=None, base_plan=None, *, new_task=False, applied_edit=False):
+def _preserve_requirements(before, after):
+    old, new = before.get('assessment', {}), after.get('assessment', {})
+    for flag in ('require_native_episode', 'require_robot_locomotion'):
+        if old.get('annotations', {}).get(flag) is True and new.get('annotations', {}).get(flag) is not True:
+            raise ValueError('Execution repairs must preserve ' + flag + '; apply an explicit user plan edit to change the task')
+    designs = {row['id']: row for row in new.get('scenes', {}).get('designs', [])}
+    for previous in old.get('scenes', {}).get('designs', []):
+        current = designs.get(previous['id'], {})
+        if not set(previous.get('hard_requirements', [])) <= set(current.get('hard_requirements', [])):
+            raise ValueError('Execution repairs must preserve original hard requirements; revise soft descriptions or apply an explicit user plan edit')
+        roles = {row['object_id']: row for row in current.get('object_roles', [])}
+        for role in previous.get('object_roles', []):
+            if role.get('representation') in {'native_asset', 'articulated_robot'}:
+                if roles.get(role['object_id'], {}).get('representation') != role['representation']:
+                    raise ValueError('Execution repairs cannot remove required asset identity: ' + role['object_id'])
+
+
+def revision_review(plan, target, previous=None, base_plan=None, *, new_task=False, applied_edit=False, draft_edit=False):
     """Return domain-owned lineage and review identity; never accept a caller key."""
     key = str(Path(target).resolve())
     if previous is None:
@@ -93,6 +110,8 @@ def revision_review(plan, target, previous=None, base_plan=None, *, new_task=Fal
                             or value.get('authoring_sources', {}).get('assessment_path'))
     different_source = bool(source(previous) and source(plan) and source(previous) != source(plan))
     new_task = new_task or (different_source and not applied_edit)
+    if not new_task and not applied_edit and not draft_edit:
+        _preserve_requirements(before, after)
     # applies_edit is trusted only after verification against the active pending
     # workbench edit. It must retain any paused state and saved user instruction.
     reuse = not new_task and (not changed or applied_edit)

@@ -109,6 +109,9 @@ def _plan(args, directory, config=None):
                 value['assessment'].setdefault('annotations', {})['require_native_episode'] = True
                 if objective_names_robot:
                     value['assessment']['annotations']['require_robot_locomotion'] = True
+            from capabilities.scene_authoring.contracts.requirements import validate_asset_requirements
+            validate_asset_requirements(value['assessment'].get('scenes', {}),
+                robot_locomotion=value['assessment'].get('annotations', {}).get('require_robot_locomotion', False))
             inputs.setdefault('scene_sources', [])
             inputs.setdefault('selections', selections)
             if recipe == 'data.capability' and not args.get('steps'):
@@ -166,7 +169,8 @@ def _plan(args, directory, config=None):
     base_plan = value.get('edit_revision', {}).get('base_plan') if applied_edit else active['plan'] if active else None
     previous = read(base_plan) if base_plan else None
     value['stage_review_key'], value['review_revision'] = revision_review(
-        value, target, previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit)
+        value, target, previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit,
+        draft_edit=bool(edit))
     if session and not edit:
         pending = review_status(workspace, session)
         if (pending['state'] in ('paused', 'needs_input')

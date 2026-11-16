@@ -136,12 +136,13 @@ def _completion_once(
     model_url=environment_value('BENCHFORGE_MODEL_URL')
     if not model_url:
         raise ValueError('BENCHFORGE_MODEL_URL is required for model-assisted scene review or planning')
+    effort=environment_value('BENCHFORGE_MODEL_REASONING_EFFORT')
     body={'model':model_id,'messages':[{'role':'user','content':content}],
-          'reasoning_effort':'xhigh','max_tokens':max(4096,max_tokens+thinking_budget),'thinking_token_budget':thinking_budget,'temperature':.7,'top_p':.9,
+          'reasoning_effort':effort or 'xhigh','max_tokens':max(4096,max_tokens+thinking_budget),'thinking_token_budget':thinking_budget,'temperature':.7,'top_p':.9,
           'chat_template_kwargs':{'enable_thinking':True,'preserve_thinking':True},'stream':True,'stream_options':{'include_usage':True}}
-    if bounded_review:
+    if effort == 'none' or bounded_review and not effort:
         # Structured observation already has an explicit checklist. Bound latency
-        # without changing its acceptance criteria or the running model service.
+        # without overriding an explicit provider/role reasoning preference.
         body.update(reasoning_effort='none', max_tokens=max_tokens, temperature=.2,
                     chat_template_kwargs={'enable_thinking':False})
         body.pop('thinking_token_budget',None)

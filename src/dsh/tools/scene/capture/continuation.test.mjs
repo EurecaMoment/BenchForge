@@ -6,6 +6,7 @@ import os from 'node:os';
 import {createCaptureContinuation} from './continuation.mjs';
 import {captureContinuations,createCaptureHistory} from './continuation_state.mjs';
 import {trackCaptureSubmission} from './submission.mjs';
+import {captureNotice} from './notice.mjs';
 
 const failure = (run='sf_scene', issue='dog_go2 has no recognizable asset', scene='apartment') => ({
   run_id:run,state:'FAILED_FINAL',terminal:true,tasks:[{id:run+'.scene0',state:'FAILED_FINAL',unit:{revision:0},
@@ -121,6 +122,34 @@ test('pipeline completion releases capture obligations; unrelated follow-up is n
   h.call('benchforge_pipeline_run',{state:'completed'});await h.stop();assert.equal(h.sent.length,1);
   h.append('turn/start',{turn:2});h.append('assistant/message',{message:{content:[{type:'text',text:'解释工作流程。'}]}});
   await h.stop();assert.equal(h.sent.length,1);await h.dispose();
+});
+
+test('shell activity cannot reset repeated final responses, including after host reload',async()=>{
+  const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
+  await h.stop();h.consume();h.call('bash',{output:'go'});await h.stop();h.consume();await h.dispose();
+  const next=harness({data:h.data,events:h.events});
+  next.call('bash',{output:'true'});await next.stop();
+  assert.equal(next.runtime.records(next.agent.id)[0].state,'blocked');
+  assert.ok(next.sent.every(message=>message.content[0].text.length<1000));
+  await next.dispose();
+});
+
+test('a newly submitted repair gets its own budget; active captures are never stopped',async()=>{
+  const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
+  await h.stop();h.consume();await h.stop();h.consume();
+  h.capture('sf_repaired');await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
+  await h.stop();assert.notEqual(h.runtime.records(h.agent.id).at(-1).state,'blocked');
+  await h.dispose();
+});
+
+test('capture notices deduplicate and bound diagnostics while retaining evidence references',()=>{
+  const issues=Array.from({length:30},(_,i)=>`object_${i}: wrong support `+'x'.repeat(800));
+  const records={scene_review_path:'/artifacts/review.json'};
+  const value=captureNotice({run_id:'sf_scene',state:'FAILED_FINAL',tasks:[{id:'sf_scene.scene0',records,
+    failure:{scene_review:{issues}},quality:{feedback:{issues}},diagnostics:[{issues}]}]});
+  assert.equal(value.issue_count,30);assert.equal(value.issues.length,12);
+  assert.ok(JSON.stringify(value).length<8000);assert.deepEqual(value.tasks[0].records,records);
+  assert.deepEqual(value.detail,{tool:'benchforge_scene_status',run_id:'sf_scene',detail:true});
 });
 
 test('retrying a settled service task tracks its new attempt and receives one new result',async()=>{

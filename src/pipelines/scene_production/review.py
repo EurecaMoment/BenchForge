@@ -9,6 +9,7 @@ from capabilities.scene_authoring.validation.acceptance import admit_program
 from capabilities.scene_authoring.validation.acceptance import capture_acceptance
 from capabilities.scene_authoring.validation.review_reference import review_spatial_context
 from capabilities.scene_authoring.validation.review_reference import GUIDANCE as REFERENCE_GUIDANCE
+from capabilities.scene_authoring.contracts.requirements import scene_requirements
 
 
 
@@ -45,7 +46,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
             admission = admit_program(store.root, program,execution_mode=execution_mode)
             if admission.get('scene_brief'):
                 brief=admission['scene_brief']
-                context={k:brief[k] for k in ('name','summary','hard_requirements','object_roles','physical_assumptions')}
+                context={k:brief[k] for k in ('name','summary','object_roles','physical_assumptions')}
+                context['scene_requirements']=scene_requirements(brief)
                 if brief.get('spatial_reference'):context['spatial_reference']=brief['spatial_reference']
                 spatial_context=review_spatial_context(brief,evidence,physical_precheck.get('native_relation_checks',[]))
                 write_json(directory/'scene_spatial_context.json',spatial_context)
@@ -59,7 +61,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                            '摘要有遗漏或自身矛盾时提出具体修订，保留用户硬要求；不能通过改写摘要为已有缺陷开脱。'
                            '修订建议只是待执行设计，未重新采集验收不得把它当成修复证据。')
                 prompt += ('\nbrief_alignment 另须完整返回 requirement_checks 与 relation_checks 数组：'
-                           '分别按 hard_requirements 的0起始索引和 visual_relations 的原始index逐项检查，每条 {index:整数,passed:boolean,view:"view_0.png",observation:"具体可见依据"}。'
+                           '分别按 scene_requirements 和 visual_relations 的显式index逐项检查，每条 {index:整数,passed:boolean,view:"view_0.png",observation:"具体可见依据"}。'
+                           '当前只验收S2场景。摘要或任务中提到的S3轨迹数量、逐帧关节读数、标注及S4题目、S5打包，留给对应阶段验证；不得因为尚未采集而判场景失败。机器人资产身份、布局和可执行条件仍必须在S2检查。'
                            '不得遗漏、重复或仅笼统声称全部通过。实际图无法确认的要求应失败并留在unresolved。')
                 prompt += '\n支撑和固定安装已按原生回执逐项校验并单独留证；不重复输出物理relation_checks。仍须检查图中可见的悬空、穿插和姿态缺陷，不能根据物体名字认为合格。'
                 prompt += '\nbrief_alignment.observations 须逐一覆盖本次全部 view_N.png，每个视角写具体观察，不能只挑最好的一张。'
@@ -159,7 +162,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
             write_json(directory/'scene_brief_alignment.json', {'brief': acceptance['scene_brief'],
                        'observation': review.get('brief_alignment', {}), 'passed': acceptance['passed'],
                        'iteration_required': not acceptance['passed'], 'hard_requirements_may_be_relaxed': False})
-        review.setdefault('issues',[]).extend(acceptance['issues'])
+        review['issues']=list(dict.fromkeys([*review.get('issues',[]),*acceptance['issues']]))
     acceptance_passed = acceptance.get('passed') is not False
     passed=review.get('acceptable') is True and review['physical_stable'] and review['renderable'] and interaction_passed is not False and acceptance_passed
     review['passed']=passed

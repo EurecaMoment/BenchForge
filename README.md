@@ -343,7 +343,7 @@ docker ps --filter "label=com.docker.compose.project=$project" --filter 'label=c
 | --- | --- |
 | `providers` 条目 | 接口和 DSH 工具 |
 | --- | --- |
-| `DSpark4A100` | 填 OpenAI 兼容的 base URL 和部署模型 ID，供 DSH Host、场景规划和标注使用。FastQwen 也可通过这组 OpenAI 字段接入。 |
+| `DSpark4A100` / `FastQwen` | 二选一配置主模型，填 OpenAI 兼容的 base URL 和部署模型 ID，供 DSH Host、场景规划和标注使用。各角色可在 `roles` 中覆盖；显式 `reasoning_effort` 也用于后台审图，不会被延迟优化关闭。上下文与推理档位应按实际服务配置。 |
 | `FastFLUX2Klein` | `benchforge_diffusion` 调用 Images API 生成或编辑图像。 |
 | `FastSAM3` | `benchforge_scene_sam3` 调用 Chat Completions，获取文本或框提示对应的分割掩码。 |
 | `FastDA3` | `benchforge_depth` 调用 Depth Estimations，保存预测深度、相机参数和预览。 |

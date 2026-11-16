@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {providerEnvironment} from './tool_credentials.mjs';
+import {modelRole, providerEnvironment} from './tool_credentials.mjs';
+
+test('FastQwen annotation selects its own role credential without losing model tools', () => {
+  const providers = {FastQwen:{url:'http://local/v1',model:'qwen',token_env:'MAIN_TOKEN',
+    roles:{annotation:{token_env:'VISION_TOKEN'}}}};
+  const model = modelRole(providers,'annotation');
+  const snapshot = new Map([['VISION_TOKEN',{value:'vision'}],['MAIN_TOKEN',{value:'main'}]]);
+  assert.equal(model.model,'qwen');
+  assert.deepEqual(providerEnvironment({},snapshot,model.token_env),{VISION_TOKEN:'vision'});
+  assert.throws(()=>modelRole({...providers,DSpark4A100:{model:'deepseek'}},'annotation'),/one primary/);
+});
 
 test('provider credentials are scoped and preserve explicit tool configuration', () => {
   const snapshot = new Map([['ISAAC_TOKEN', {value:'isaac'}], ['MODEL_TOKEN', {value:'model'}]]);

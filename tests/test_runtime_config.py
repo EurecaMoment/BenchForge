@@ -6,9 +6,20 @@ import unittest
 from unittest.mock import patch
 
 from service_access.runtime_config import load_service_config
+from service_access.configuration import selected_model, validate_providers
 
 
 class RuntimeConfigTests(unittest.TestCase):
+    def test_fastqwen_uses_the_shared_model_roles_without_a_fake_dspark_identity(self):
+        config = {'providers': {'FastQwen': {'url':'http://127.0.0.1:8000/v1', 'model':'qwen-flash-next',
+            'roles':{'scene':{'reasoning_effort':'high'}}}}}
+        validate_providers(config)
+        self.assertEqual(selected_model(config,'dsh')['model'],'qwen-flash-next')
+        self.assertEqual(selected_model(config,'scene')['reasoning_effort'],'high')
+        config['providers']['DSpark4A100']={'url':'http://127.0.0.1:9000/v1','model':'deepseek'}
+        with self.assertRaisesRegex(ValueError,'one primary'):
+            validate_providers(config)
+
     def setUp(self):
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
