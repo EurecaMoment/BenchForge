@@ -1,39 +1,7 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export function captureRunId(value) {
   return typeof value==='string' ? (/^(sf_[A-Za-z0-9_-]+)\.scene\d+$/.exec(value)?.[1] || value) : value;
-}
-
-// Machine notices share a boundary batch while production is running. A newer
-// result replaces its still-pending notice, so stale failures cannot queue turns
-// after the same capture has already succeeded. Human input is untouched.
-export function deliverCaptureNotice(agent, record, createMessage) {
-  const message = createMessage({source: {kind: 'benchforge/capture-watch'}, content: [{type: 'text', text:
-    '采集终态通知（不是用户指令）：' + JSON.stringify(record.observation ? {...record, observation:compactCaptureObservation(record.observation)} : record) + '\n继续原任务；失败仍未完成，按真实失败阶段处理。'}]});
-  const pending = [...(agent.inbox?.nextTurn || []), ...(agent.inbox?.nextStep || [])];
-  const matches = [];
-  for (const old of pending) {
-    if (!['benchforge/capture-watch', 'spatialforge/capture-watch'].includes(old.source?.kind)) continue;
-    try {
-      const text = old.content.filter(row => row.type === 'text').map(row => row.text).join('\n');
-      const value = JSON.parse(text.slice(text.indexOf('{')).split('\n')[0]);
-      if (value.run_id === record.run_id) {
-        if (value.started_at > record.started_at) return;
-        matches.push(old);
-      }
-    } catch {}
-  }
-  if (matches.length && typeof agent.inbox?.replace === 'function') {
-    for (const old of matches.slice(1)) agent.inbox.remove(old.id);
-    if (agent.inbox.replace(matches[0].id, message)) return;
-  }
-  if (agent.status === 'running' && typeof agent.inbox?.append === 'function') {
-    agent.inbox.append('next-step', message);
-  } else {
-    if (typeof agent.followup !== 'function') throw new Error('Native parent followup is unavailable; read the saved watch receipt');
-    agent.followup(message);
-  }
 }
 
 function fields(value, names) {
@@ -129,68 +97,4 @@ export function compactCaptureObservation(value, {artifacts} = {}) {
     return row;
   });
   return summary;
-}
-
-
-// Waiting belongs to the tool runtime. Only a terminal result (or an actual
-// observer failure) needs another model decision.
-export function createCaptureWatcher({artifacts, read, notify, signal, budgetMs = 1800000}) {
-  const pending = new Map();
-  async function save(file, record) {
-    await fs.mkdir(path.dirname(file), {recursive: true});
-    const temporary = file + '.tmp';
-    await fs.writeFile(temporary, JSON.stringify(record, null, 2), 'utf8');
-    await fs.rename(temporary, file);
-  }
-  function brief(value) {
-    return compactCaptureObservation(value, {artifacts});
-  }
-  const watch = async (args, exec) => {
-    args={...args,run_id:captureRunId(args.run_id)};
-    exec.signal?.throwIfAborted();
-    const agent = exec.agent, owner = agent?.id || agent?.session?.id;
-    if (!owner || !/^[A-Za-z0-9_-]+$/.test(owner) || !/^sf_[A-Za-z0-9_-]+$/.test(args.run_id))
-      throw new Error('Background capture waiting requires the current session and a native run_id');
-    const key = owner + ':' + args.run_id;
-    if (pending.has(key)) return pending.get(key).receipt;
-    const current = await read('/observe', {run_id: args.run_id}, exec.signal);
-    if (current.terminal) return brief(current);
-    exec.signal?.throwIfAborted();
-    const file = path.join(artifacts, 'capture-watches', owner, args.run_id + '.json');
-    const record = {schema: 'benchforge.capture-watch/v1', owner, run_id: args.run_id,
-      state: 'watching', started_at: Date.now(), receipt_path:file, observation: brief(current)};
-    await save(file, record);
-    const receipt = {...brief(current), watch: {background: true, accepted: true, receipt_path: file,
-      instruction: 'Continue independent work or finish this turn. A terminal result wakes this session once; do not poll.'}};
-    const entry = {receipt};
-    pending.set(key, entry);
-    entry.done = (async () => {
-      let value = current;
-      try {
-        while (!value.terminal && Date.now() - record.started_at < budgetMs) {
-          signal?.throwIfAborted();
-          value = await read('/wait', {run_id: args.run_id, timeout_seconds: 60}, signal);
-        }
-        signal?.throwIfAborted();
-        record.state = value.terminal ? 'terminal' : 'timeout';
-        record.observation = brief(value);
-      } catch (error) {
-        record.state = signal?.aborted ? 'interrupted' : 'observer_failed';
-        record.error = error.message || String(error);
-      }
-      record.finished_at = Date.now();
-      await save(file, record);
-      if (record.state !== 'interrupted') {
-        await notify(agent, record);
-        record.notified_at = Date.now();
-        await save(file, record);
-      }
-    })().catch(async error => {
-      record.state = 'notification_failed'; record.error = error.message || String(error);
-      await save(file, record).catch(() => {});
-    }).finally(() => pending.delete(key));
-    return receipt;
-  };
-  watch.whenSettled = () => Promise.all([...pending.values()].map(entry => entry.done));
-  return watch;
 }

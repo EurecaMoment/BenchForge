@@ -30,6 +30,7 @@ export async function apply(ctx, config) {
   const reviews=createStageReviewClient(ctx.subprocess,config);
   const production=createProductionLifecycle({projection,table:domain.table('sessions'),agents:ctx.agents,
     readReview:readStageReview,advanceReview:reviews.advance,createMessage:createUserMessage,onError:error=>logger.error(error),
+    reconcileCaptures:agent=>ctx.get('benchforgeCapture')?.continuation.reconcile(agent),
     restoreAgent:async id=>{
       const result=await ctx.sessionController.resolveAgent(id);
       if(result.error)throw result.error;

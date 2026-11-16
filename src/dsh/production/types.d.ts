@@ -26,6 +26,9 @@ export interface ProductionView {
 }
 
 type ProductionNotice<K extends string> = {kind: K; form: 'notice'; summary: string; noticeKey: string};
+type CaptureNotice = ProductionNotice<'benchforge/capture-watch'> & {
+  capture: {run_id: string; state: string; failed: boolean; blocked?: boolean};
+};
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
@@ -38,5 +41,8 @@ declare module '@deepseek-ai/dsh-llm' {
     'benchforge/production-progress': ProductionNotice<'benchforge/production-progress'>;
     'benchforge/production-resume': ProductionNotice<'benchforge/production-resume'>;
     'benchforge/production-delivery': ProductionNotice<'benchforge/production-delivery'>;
+    'benchforge/production-check-failed': ProductionNotice<'benchforge/production-check-failed'>;
+    'benchforge/capture-watch': CaptureNotice;
+    'benchforge/capture-continuation': ProductionNotice<'benchforge/capture-continuation'>;
   }
 }

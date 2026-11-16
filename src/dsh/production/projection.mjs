@@ -18,11 +18,17 @@ const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benc
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:4, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:5, stateSchema:State,
   init:header => ({calls:{},notices:[],interruption:'',interruptionSeq:0,view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
   apply(state,event) {
+    if (event.type === 'tool/ptc-dispatch') {
+      const data=event.data;
+      const called=productionProjection.apply(state,{...event,type:'tool/call',data:{callId:data.subCallId,name:data.name,arguments:JSON.stringify(data.arguments)}});
+      return productionProjection.apply(called,{...event,type:'tool/result',data:{meta:data.meta,
+        message:{toolCallId:data.subCallId,isError:data.isError,content:data.content}}});
+    }
     const {view} = state;
     if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
     if(event.type === 'turn/end') return patch({...state,interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
@@ -31,6 +37,12 @@ export const productionProjection = {
       const key=event.data.source.noticeKey;
       return typeof key==='string'&&!state.notices.includes(key)
         ? {...state,notices:[...state.notices.slice(-63),key]} : state;
+    }
+    if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/capture-watch' && view.active) {
+      const capture = event.data.source.capture;
+      if(capture) return patch(state,event,{workflowTurn:view.turn,state:capture.blocked?'blocked':capture.failed?'needs_repair':
+        capture.state==='SUCCEEDED'?'scene_ready':'capture_error',error:capture.blocked?(event.data.source.summary || '执行受阻，任务未完成。'):
+          capture.failed?'采集或场景验收失败；读取实际报告并修复。':capture.state==='observer_failed'?'后台跟踪暂时失败，等待恢复。':''});
     }
     if(event.type === 'assistant/message' && visible(event.data.message))
       return patch(state,event,{lastTextAt:event.time,lastTextSeq:event.seq});
@@ -60,7 +72,13 @@ export const productionProjection = {
     const current = Object.values(receipt.steps || {}).find(row=>row.state!=='completed');
     const changes = {workspace:call.workspace,active:activated || view.active};
     const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review';
-    if(!workflow)return patch(next,event,changes);
+    if(!workflow) {
+      if(view.active && ['benchforge_capture','benchforge_refine','benchforge_run','benchforge_extend','benchforge_retry'].includes(call.name) && receipt.run_id)
+        Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,error:'',review:null});
+      if(view.active && call.name==='benchforge_scene_blocker' && receipt.state==='blocked')
+        Object.assign(changes,{workflowTurn:view.turn,state:'blocked',error:receipt.reason});
+      return patch(next,event,changes);
+    }
     changes.workflowTurn=view.turn;
     changes.error=receipt.error || '';
     if(!view.plan&&call.plan)changes.plan=call.plan;

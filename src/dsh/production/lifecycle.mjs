@@ -1,7 +1,7 @@
 import {stageName, stageSummary} from './stages.mjs';
 
 /** Conversation policy; all facts come from the projection and domain receipts. */
-export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,now=Date.now,
+export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
   schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{}}) {
   const timers=new Map(), queues=new Map(), reminders=new Map();
   let disposed=false;
@@ -86,6 +86,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       }
       if(!['elapsed','continued'].includes(review.state))return false;
       if(['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state))return false;
+      await reconcileCaptures(agent);
       const recovered=state.notices.includes(record.key)&&view.state==='interrupted'&&state.interruption==='disposed';
       const key=recovered ? `${record.key}:disposal:${state.interruptionSeq}` : record.key;
       if(pendingNotice(agent,key))return true;

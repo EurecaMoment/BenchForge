@@ -127,6 +127,8 @@ export function createProgressComponents({React, helpers}) {
     if(!value?.active)return null;
     const phase={planned:'productionPlanned',waiting_user:'reviewWaiting',needs_evidence:'productionNeedsEvidence',
       needs_input:'productionNeedsInput',needs_plan_revision:'productionNeedsRevision',paused:'reviewPaused',
+      waiting_capture:'productionWaitingCapture',needs_repair:'productionNeedsRepair',scene_ready:'productionSceneReady',
+      capture_error:'productionCaptureError',blocked:'productionBlocked',
       interrupted:'productionInterrupted',completed:'productionCompleted',failed:'sessionFailed',running:'sessionRunning'}[value.state]||'sessionRunning';
     const silent=current&&clock-value.lastTextAt>=60000;
     return h('div',{className:'bfw-muted','data-production-activity':value.state,role:'status','aria-live':'polite'},

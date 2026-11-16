@@ -40,9 +40,11 @@
 
             审查模型的网络超时可对原 task_id 使用 benchforge_retry 重试同一冻结采集，最多两次，不消耗场景设计修订预算。采集执行/传输故障同样使用原
             task_id：capture_mode=auto 恢复已保留的原生 job 和下载；只有原生任务明确终态失败才创建新 attempt。resume
-            保留 request_id，restart 必须确认旧作业已结束。保留原 revision、冻结程序与旧尝试日志，不能为执行故障反复创建新场景版本；质量失败仍须定点修复程序并重新采集。长时间采集调用
-            benchforge_wait(background=true) 注册一次后台观察后继续独立工作或结束本轮等待通知，不每分钟运行模型轮询。后台终态通知不是验收通过，S1..S5
-            的用户窗口与真实质量验收照常保留。物理支撑和安装逐项引用原生回执，生活用途、净空、朝向和可见缺陷由逐图审查验证。
+            保留 request_id，restart 必须确认旧作业已结束。保留原 revision、冻结程序与旧尝试日志，不能为执行故障反复创建新场景版本；质量失败仍须定点修复程序并重新采集。采集提交后
+            Host 自动持久跟踪，可继续独立工作或结束本轮等待通知，不每分钟运行模型轮询。submitted/submission_accepted
+            只表示受理，scene_acceptance=pending 不是验收通过。跟踪异常时以原 run_id 调用 benchforge_wait(background=true)
+            恢复观察，不重复创建作业。终态失败通知到达后必须读取具体缺项，保留用户硬要求、家具部件及机器人真实资产，修复完整程序并重新采集；只写下一步计划不能结束。确认真实外部阻塞或连续两轮同一场景的失败项无改善时，调用
+            benchforge_scene_blocker 保存服务证据、原因和缺失条件后说明未完成。后台终态通知不是验收通过，S1..S5 的用户窗口与真实质量验收照常保留。物理支撑和安装逐项引用原生回执，生活用途、净空、朝向和可见缺陷由逐图审查验证。
 
             无人值守生产必须通过服务端 scene_admission.json 和 scene_acceptance.json，而不是口头保证。使用可辨识的真实资产，保留其比例和合理尺度；显式设计地面/支撑/安装、通行净空和房间功能布局。动态物体填写质量与摩擦等来源，不能把不动的静态物体当作物理验证。每次采集后读取实际场景、原生物理回执及六项逐图生活审查；只有
             scene_acceptance.passed=true 且源程序/采集证据仍与验收版本一致时，才可以标注、出题、导出和宣告完成。capture_only
@@ -593,6 +595,7 @@
           - benchforge_refine
           - benchforge_retry
           - benchforge_run
+          - benchforge_scene_blocker
           - benchforge_spatial_export
           - benchforge_stage_review
           - benchforge_task_code

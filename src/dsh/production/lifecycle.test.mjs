@@ -52,6 +52,30 @@ function harness() {
     cold:()=>live=false,restores:()=>restored};
 }
 
+test('capture submissions and terminal notices project distinct production states without approving scenes',()=>{
+  const h=harness();h.plan();
+  h.receipt('benchforge_capture',{run_id:'sf_capture',state:'submitted',scene_acceptance:'pending'});
+  assert.equal(h.view().state,'waiting_capture');assert.equal(h.view().stage,'S2');assert.equal(h.view().review,null);
+  h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_capture',state:'FAILED_FINAL',failed:true}}});
+  assert.equal(h.view().state,'needs_repair');assert.equal(h.view().completed,0);
+  h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_capture',state:'SUCCEEDED',failed:false}}});
+  assert.equal(h.view().state,'scene_ready');assert.equal(h.view().completed,0);
+  h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_capture',state:'observer_failed',failed:false}}});
+  assert.equal(h.view().state,'capture_error');
+  h.receipt('benchforge_scene_blocker',{run_id:'sf_capture',state:'blocked',reason:'Required asset is unavailable.'});
+  assert.equal(h.view().state,'blocked');
+});
+
+test('PTC capture dispatches use the same production projection as native tools',()=>{
+  const {apply,init,stateSchema}=productionProjection;
+  let state=init({cwd:'/workspace'});
+  state=apply(state,{type:'tool/ptc-dispatch',seq:1,time:1,data:{subCallId:'plan',name:'benchforge_pipeline_plan',arguments:{workspace:'/workspace'},
+    content:[{type:'text',text:JSON.stringify({production_contract:'benchforge.production-stages/v1',state:'planned',stage:'S1'})}]}});
+  state=apply(state,{type:'tool/ptc-dispatch',seq:2,time:2,data:{subCallId:'capture',name:'benchforge_capture',arguments:{},
+    content:[{type:'text',text:JSON.stringify({run_id:'sf_capture',state:'submitted'})}]}});
+  stateSchema.parse(state);assert.equal(state.view.state,'waiting_capture');assert.equal(state.view.stage,'S2');
+});
+
 test('tool-only work is visible and prompts a concise update after one minute',async()=>{
   const h=harness(),runtime=h.create();h.plan();
   h.setTime(161000);h.event('tool/call',{name:'bash',callId:'shell',arguments:'{}'});

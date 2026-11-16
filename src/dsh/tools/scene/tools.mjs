@@ -9,13 +9,14 @@ import {executeHandoff, handoffParameters} from '../../host/subagent_handoff.mjs
 import {objectOutput, runOutput, taskRunOutput, observationOutput, taskOutput, cancellationOutput} from './contracts.mjs';
 import {createDeliveryReview, createCaptureReviewStep, productionReviewApplies} from './capture/quality_review.mjs';
 import {createDeliveryVisuals} from './capture/review_images.mjs';
-import {createCaptureWatcher, deliverCaptureNotice, compactCaptureObservation, captureRunId} from './capture/capture_watch.mjs';
+import {compactCaptureObservation, captureRunId} from './capture/capture_watch.mjs';
 import {requestKeyFor} from './request_identity.mjs';
+import {trackCaptureSubmission} from './capture/submission.mjs';
 export const name='benchforge-scene-tools';
 // Delivery visual feedback resolves the active model route and stores image
 // attachments while the turn-stopping hook is running. Declare both services
 // so the hook remains valid after a normal final response/present boundary.
-export const inject=['tools','llm','attachments'];
+export const inject=['tools','llm','attachments','benchforgeCapture'];
 export const Config=z.object({
   serviceConfig:z.string().required().description('Path to the BenchForge service JSON configuration.'),
 });
@@ -41,12 +42,7 @@ async function api(path,args,signal){
   }
   return post(path, contextual, signal);
 }
-const watchController=new AbortController();
-ctx.effect(() => () => watchController.abort(), 'benchforge scene tool watcher');
-const watchCapture=createCaptureWatcher({artifacts:cfg.artifacts,read:api,signal:watchController.signal,
-  notify:async(agent,record)=>{
-    deliverCaptureNotice(agent,record,createUserMessage);
-  }});
+const tracking=ctx.benchforgeCapture.continuation;
 async function observation(path,args,signal){
   const {cursor:ignored,...request}=args;
   request.run_id=captureRunId(request.run_id);
@@ -55,7 +51,8 @@ async function observation(path,args,signal){
 }
 async function submit(path,args,exec){
   const request_key=requestKeyFor(args,exec);
-  return api(path,{...args,request_key},exec.signal);
+  const receipt=await api(path,{...args,request_key},exec.signal);
+  return trackCaptureSubmission(receipt,path,args,exec,tracking);
 }
 const requestKey={type:'string',description:'Optional key to reuse the same request across separate tool calls. Omit to use this session and tool-call identity.'};
 const layoutInput={type:'object',additionalProperties:false,properties:{mode:{type:'string',enum:['generate','edit','reference'],required:true},prompt:{type:'string',description:'Visual description for generate/edit.'},source_image:{type:'string'},source_view:{type:'integer'},seed:{type:'integer'},design_task_id:{type:'string',description:'For mode=reference only: completed benchforge_layout task ID. Preserves diffusion provenance and avoids regeneration; no other source fields.'}}};
@@ -120,13 +117,20 @@ const programInput={type:'string',description:'Complete SceneProgram JSON in the
   ctx.tools.register(defineTool({name:'benchforge_run',description:"Produce a scene and dataset from natural-language requirements or scene_program_path. The pipeline prepares a diffusion reference unless one is supplied, then builds, captures, reviews and exports through Isaac Sim A100. Returns a durable run ID.",parameters:{request_key:requestKey,intents:{type:'array',required:true,items:{type:'object',additionalProperties:false,properties:{name:{type:'string',required:true},description:{type:'string',required:true},split:{type:'string',enum:['train','dev'],required:true},target_items:{type:'integer',description:'Number of dataset questions to export; this is not the scene entity count.'},layout:layoutInput,scene_program_path:programInput}}}},output:runOutput,execute:(args,exec)=>submit('/start',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_asset',description:"Generate with diffusion, SAM3 and the configured reconstruction tool, reconstruct source_image, import source_mesh, or reuse a catalog asset_id. Inputs use registered source paths. Returns a durable run ID.",parameters:{request_key:requestKey,intent:{type:'object',required:true,additionalProperties:false,properties:{name:{type:'string',required:true},description:{type:'string',required:true},label:{type:'string',description:'Semantic subject for SAM3 segmentation and asset registration; defaults to name.'},source_image:{type:'string'},source_mask:{type:'string'},source_mesh:{type:'string'},source_gaussian:{type:'string'},asset_id:{type:'string'},seed:{type:'integer'},source_up_axis:{type:'string',enum:['Y','Z']},size_hint_m:{type:'array',items:{type:'number'}},subject_box:{type:'array',items:{type:'number'},description:'Pixel xyxy box selecting the subject.'},edit_reference:{type:'boolean'}}}},output:runOutput,execute:(args,exec)=>submit('/asset',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_extend',description:"Add objects to an accepted captured scene while retaining its existing entities and train/dev family. With strict scene policy, provide a complete scene_program_path that preserves all parent objects unchanged and includes the saved scene brief.",parameters:{request_key:requestKey,parent_task_id:{type:'string',required:true},name:{type:'string',required:true},description:{type:'string',required:true},target_items:{type:'integer',description:'Number of dataset questions to export; this is not the scene entity count.'},layout:layoutInput,scene_program_path:programInput},output:runOutput,execute:(args,exec)=>submit('/extend',args,exec)}));
-  ctx.tools.register(defineTool({name:'benchforge_retry',description:"Recover a failed stage without a new scene version. Reuse retained native requests and downloads after interruption; only confirmed terminal failures start a new attempt. Quality failures still require refine/capture.",parameters:{task_id:{type:'string',required:true},feedback:{type:'string',description:'Optional concrete scene repair guidance for a failed planning stage, up to 12000 characters.'},capture_mode:{type:'string',enum:['auto','resume','restart'],description:'auto resumes retained native jobs unless they failed terminally. resume preserves request IDs and partial downloads. restart creates a new attempt only after prior jobs are confirmed terminal.'}},output:taskOutput,execute:(args,exec)=>api('/retry',args,exec.signal)}));
+  ctx.tools.register(defineTool({name:'benchforge_retry',description:"Recover a failed stage without a new scene version. Reuse retained native requests and downloads after interruption; only confirmed terminal failures start a new attempt. Quality failures still require refine/capture.",parameters:{task_id:{type:'string',required:true},feedback:{type:'string',description:'Optional concrete scene repair guidance for a failed planning stage, up to 12000 characters.'},capture_mode:{type:'string',enum:['auto','resume','restart'],description:'auto resumes retained native jobs unless they failed terminally. resume preserves request IDs and partial downloads. restart creates a new attempt only after prior jobs are confirmed terminal.'}},output:taskOutput,execute:(args,exec)=>submit('/retry',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_scene_status',description:"Read a concise current stage, real failures, quality outcomes and evidence/receipt paths. run_id excludes .sceneN. Use detail=true when the full saved SceneProgram or task reports are needed; ordinary progress checks use the default summary. Lifecycle completion and scene quality are separate fields.",parameters:{run_id:{type:'string',required:true},detail:{type:'boolean'}},output:observationOutput,execute:(args,exec)=>observation(args.detail?'/inspect':'/observe',args,exec.signal)}));
-  ctx.tools.register(defineTool({name:'benchforge_wait',description:"Wait for capture progress. Prefer background=true: returns immediately, waits without model polling and wakes this session once on terminal state or observer failure. Continue independent work or finish the turn after registration. Synchronous waits remain bounded at 1..60 seconds and return a concise observation. Read benchforge_scene_status with detail=true for full saved task reports.",parameters:{run_id:{type:'string',required:true},background:{type:'boolean',description:'Register one background observer for this session/run; no repeated wait calls are needed.'},timeout_seconds:{type:'integer',description:'Synchronous wait only, 1..60 seconds.'}},output:observationOutput,execute:async(args,exec)=>{
+  ctx.tools.register(defineTool({name:'benchforge_wait',description:"Wait for capture progress. Scene submissions are tracked automatically by the host. Use background=true to recover tracking or attach an existing run: returns immediately and wakes this session on terminal state or observer failure, without model polling. Continue independent work or finish this turn while waiting. Synchronous waits remain bounded at 1..60 seconds. Read benchforge_scene_status with detail=true for full saved reports.",parameters:{run_id:{type:'string',required:true},background:{type:'boolean',description:'Register or recover one background observer for this session/run; no repeated wait calls are needed.'},timeout_seconds:{type:'integer',description:'Synchronous wait only, 1..60 seconds.'}},output:observationOutput,execute:async(args,exec)=>{
     const {background,...request}=args;
-    if(background){const {cursor,...value}=await watchCapture(request,exec);return value;}
+    if(background){
+      await tracking.register(exec.agent,request,{resume:true});
+      return {...await observation('/observe',request,exec.signal),watch:{background:true,accepted:true}};
+    }
     return observation('/wait',request,exec.signal);
   }}));
+  ctx.tools.register(defineTool({name:'benchforge_scene_blocker',description:'Record a concrete external blocker or two consecutive captures with the same unresolved failure. Requires a settled task owned by this session, saved service evidence, the specific reason and the missing condition. This never approves failed scenes. Ordinary quality defects must first be repaired; a pending capture already has automatic tracking.',
+    parameters:{run_id:{type:'string',required:true},kind:{type:'string',enum:['external','no_progress'],required:true},
+      reason:{type:'string',required:true},missing_condition:{type:'string',required:true},evidence:{type:'array',items:{type:'string'},required:true}},
+    output,execute:(args,exec)=>tracking.block(exec.agent,args)}));
   ctx.tools.register(defineTool({name:'benchforge_task_code',description:"Run Python task code in a persistent writable /workspace. Read-only modules are under /harness and reusable assets under /assets. Use it for calculations, image/mesh processing, diagnostics and complete SceneProgram JSON. Submit returned source_path through production tools. Timeout 1..300 seconds, default 60; code up to 1 MiB.",parameters:{workspace_id:{type:'string',required:true},code:{type:'string',required:true},timeout_seconds:{type:'integer'}},output,execute:(args,exec)=>api('/task-code',args,exec.signal)}));
   ctx.tools.register(defineTool({name:'benchforge_refine',description:"Revise a captured scene from feedback or a complete SceneProgram. Can change layout, objects, materials, lights, cameras and actions. A capture-only parent stays capture-only unless target_items is explicitly supplied; otherwise the parent data target is inherited. source_revision optionally selects an earlier capture; preserves the source and train/dev family.",parameters:{request_key:requestKey,parent_task_id:{type:'string',required:true},source_revision:{type:'integer',description:'Optional captured revision to refine; use evidence to choose an earlier capture when the latest planning attempt failed.'},name:{type:'string',required:true},description:{type:'string',required:true},target_items:{type:'integer',description:'Number of dataset questions to export; this is not the scene entity count.'},layout:layoutInput,scene_program_path:programInput},output:taskRunOutput,execute:(args,exec)=>submit('/refine',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_cancel',description:"Cancel this run, preserving its artifacts and shared services.",parameters:{run_id:{type:'string',required:true}},output:cancellationOutput,execute:(args,exec)=>api('/cancel',args,exec.signal)}));

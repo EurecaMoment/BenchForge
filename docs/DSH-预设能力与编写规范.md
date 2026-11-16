@@ -1222,7 +1222,8 @@ export default class SessionRuns extends Service {
 | --- | --- |
 | `src/dsh/production/projection.mjs` | 从标准工具、正文、轮次和交付事件回放生产状态；向 Client 公开会话投影。 |
 | `src/dsh/production/lifecycle.mjs` | 消费投影，在正式 `agent/pre-step`、`agent/turn-stopping` 接口提供有界进度和交付提醒；用户窗口到期后按持久回执续行。 |
-| `src/dsh/host/session_operations.mjs` | Host 唯一注册投影与 `storageDomain`；管理续行记录和插件资源释放。 |
+| `src/dsh/host/session_operations.mjs` | Host 唯一注册生产投影及生产审核的 `storageDomain`；管理审核续行记录和插件资源释放。 |
+| `src/dsh/tools/scene/capture/` | Host 持有采集续行的独立 `storageDomain`，自动跟踪已受理作业并恢复终态通知；按会话与运行身份保留修复义务，工具只提交和查询，Client 只消费投影。 |
 | `src/pipelines/benchmark/` | 将评测编译为 S1–S5 的显式依赖，保存阶段回执和原运行的续行状态。 |
 | `src/capabilities/scene_library/`、`src/service_access/production_receipts.py` | 由生产服务任务记录确认场景版本与采集证据，批量读取验收回执；本地手写通过文件不建立验收。 |
 | `src/ui/workbench/` | 读取投影、调用 Remote、展示真实状态与产物；不持有续行定时器或判断业务验收。 |
