@@ -164,7 +164,7 @@ test('workspace resolution accepts registered roots and rejects unrelated paths'
   const roots = await resolveArtifactRoots({}, [{id: 'registered', path: registered}], unrelated, [{
     sessionId: 'session-parent', cwd: unrelated, primaryWorkspace: production, workspaces: [production], captureIds: [],
   }]);
-  assert.deepEqual(roots.map((root) => root.path), [registered]);
+  assert.deepEqual(roots.map((root) => root.path), [await fs.realpath(registered)]);
 });
 
 test('artifact reads expose only declared files contained by authorized workspaces', async (t) => {
@@ -174,15 +174,18 @@ test('artifact reads expose only declared files contained by authorized workspac
   await fs.mkdir(rootPath);
   const output = path.join(rootPath, 'questions.json');
   await fs.writeFile(output, '{"items":[]}');
+  const privateFile = path.join(directory, 'private.txt');
+  await fs.writeFile(privateFile, 'private');
   const roots = [{id: 'workspace', path: rootPath, title: 'workspace'}];
   const evidence = [{sessionId: 'session-parent', revision: 8, files: [
     {path: output, title: '题目数据', stage: 'S4', source: 'tool', seq: 5},
-    {path: path.join(directory, 'private.txt'), title: '越界文件', stage: null, source: 'present', seq: 6},
+    {path: privateFile, title: '越界文件', stage: null, source: 'present', seq: 6},
   ]}];
   const products = await conversationProducts({sessionId: 'session-parent', evidence, roots});
   assert.equal(products.total, 2);
   assert.equal(products.items[0].status, 'unavailable');
   assert.equal(products.items[1].status, 'available');
+  assert.ok(products.items[1].url);
   const request = new Request('http://host/api/artifact');
   const response = await openConversationArtifact(products.items[1].id, {evidence, roots, request});
   assert.equal(response.status, 200);

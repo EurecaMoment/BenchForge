@@ -26,9 +26,10 @@ const contains = (root, file) => {
 };
 
 async function locate(ref, roots) {
-  const root = roots.filter((row) => contains(row, ref.path)).sort((a, b) => b.path.length - a.path.length)[0];
+  const file = await fs.realpath(ref.path);
+  const root = roots.filter((row) => contains(row, file)).sort((a, b) => b.path.length - a.path.length)[0];
   if (!root) throw new ApiError('This artifact is outside the conversation workspaces', 403);
-  const file = await inside(root, ref.path);
+  await inside(root, file);
   // Explicit deliveries obey the same removal policy as indexed pipeline products.
   for (const candidate of roots.filter((row) => contains(row, file))) {
     const policy = await readJson(path.join(candidate.path, 'scene-library', 'policy.json'));
