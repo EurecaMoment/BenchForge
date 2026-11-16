@@ -70,9 +70,10 @@
             same task, including after reload. You may end the turn after presenting
             artifacts and the current round; the host timer keeps advancing without
             an open browser or model polling. Ordinary execution, reference and soft-description
-            repairs retain this window and completed rounds; changed hard requirements
-            require a new review. The plan and runner aggregate independent scenes/shards;
-            preparation tasks and subagents do not open extra windows. benchforge_stage_review(action=open)
+            repairs retain this window and completed rounds; automatic repairs preserve
+            hard requirements; changes require an explicit user edit or a new task.
+            The plan and runner aggregate independent scenes/shards; preparation tasks
+            and subagents do not open extra windows. benchforge_stage_review(action=open)
             requires the actual current plan or completed runner receipt, never a
             handwritten summary. If check_failed, explain and repair the actual failed
             artifact check, then call retry; failed checks and explicit user pauses
