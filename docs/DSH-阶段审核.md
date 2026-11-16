@@ -31,7 +31,7 @@ S1–S5 各自保留一个后端审核记录。每轮重新检查真实保存的
 
 采集提交工具返回 `submitted`、`submission_accepted=true` 和 `scene_acceptance=pending`，只表示请求已受理。Host 自动登记按会话和运行编号持久化的后台观察；不再依赖模型记得调用 `benchforge_wait(background=true)`。工具返回之后才到达的成功或失败结果，通过标准用户消息及公开 `steer` / `followup` 唤醒原会话。登记失败仍返回已提交作业的身份，恢复跟踪时不得重复提交采集。
 
-`src/dsh/tools/scene/capture/capture_runtime.mjs` 持有 `storageDomain`、服务客户端及插件生命周期；`continuation.mjs` 负责观察、重试交接、结果去重与续行；`continuation_state.mjs` 从标准 Native/PTC 工具事件恢复归属。重载恢复未完成观察，已消费的通知不重放；用户暂停、取消、新任务和已完成流水线不会被旧采集通知重新驱动。多个运行独立观察，同一运行的重试切换代次并终止旧的状态查询，不取消实际服务作业。
+`src/dsh/tools/scene/capture/capture_runtime.mjs` 持有 `storageDomain`、服务客户端及插件生命周期；`continuation.mjs` 负责观察、重试交接、结果去重与续行；`continuation_state.mjs` 从标准 Native/PTC 工具事件恢复归属。重载恢复未完成观察，已消费的通知不重放；修复中因服务卸载而中断时，按该次中断编号另发一次恢复通知。用户暂停、取消、新任务和已完成流水线不会被旧采集通知重新驱动。多个运行独立观察，同一运行的重试切换代次并终止旧的状态查询，不取消实际服务作业。
 
 采集验收失败必须读取实际缺项，保留硬要求及可辨识资产，修复完整程序并重新采集。只写“下一步修复”不能结束生产义务。采集成功后仍须继续实际流水线或进入对应阶段审核。确有外部阻塞，或同一场景连续两轮失败项没有改善时，使用 `benchforge_scene_blocker` 保存所属服务作业的证据、具体原因和缺失条件；这不会将失败场景改为通过。连续三次尝试收尾且没有新增工具活动时，Host 记录执行受阻，停止空转并要求明确报告未完成。
 

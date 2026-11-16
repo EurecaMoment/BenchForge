@@ -8,6 +8,8 @@ const keyOf = (owner, run) => `${owner}:${run}`;
 const suspendedReview = review => review && ['paused','needs_input','check_failed'].includes(review.state);
 const observable = record => ['watching','terminal','observer_failed','delivered'].includes(record?.state);
 const outcome = record => record.error ? 'observer_failed' : record.observation?.state || record.state;
+const noticeKey = (record,context) => `capture:${record.owner}:${record.run_id}:${record.generation}:${outcome(record)}` +
+  (context.activeTurn && context.disposalSeq ? `:disposal:${context.disposalSeq}` : '');
 const text = record => {
   const state = outcome(record);
   return `采集结果通知：${state}。${captureFailure(record.observation) ?
@@ -54,7 +56,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     const latest = table.get(keyOf(record.owner,record.run_id));
     if (closed || latest?.generation !== record.generation || record.error && latest.error !== record.error ||
         ['blocked','paused','settled'].includes(latest?.state)) return latest;
-    const key = `capture:${record.owner}:${record.run_id}:${record.generation}:${outcome(record)}`;
+    const key = noticeKey(record,context);
     if (!noticeDelivered(agent,key)) {
       const message = createMessage({source:{kind:'benchforge/capture-watch',noticeKey:key,form:'notice',summary:`采集状态：${outcome(record)}`,
         capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation)}},
@@ -86,7 +88,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
         await save({...current,state:'settled'});return;
       }
       if (current.state === 'delivered') {
-        if (agent && noticeDelivered(agent,current.notice_key)) return;
+        if (agent && noticeDelivered(agent,noticeKey(current,context))) return;
       }
       if (!await allowed(agent)) {await save({...current,state:'paused'});return;}
       if (current.error || terminalCapture(current.observation)) {await deliver(current);return;}
@@ -145,7 +147,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
         const {error,notice_key,...retained} = record;
         record = await save({...retained,state:'watching'}, {replace:true});
       }
-      if (record.state === 'delivered' && record.notice_key && !noticeDelivered(agent,record.notice_key)) {
+      if (record.state === 'delivered' && !noticeDelivered(agent,noticeKey(record,history(agent.session)))) {
         record = await save({...record,state:'terminal'});
       }
       if (['watching','terminal','observer_failed'].includes(record.state)) start(record,{restart:resume});
@@ -222,8 +224,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
   async function resume(agent) {
     agents.set(agent.id,agent);
     for (const record of records(agent.id)) {
-      if (record.state === 'delivered' && record.notice_key && !noticeDelivered(agent,record.notice_key)) start({...record,state:'terminal'});
-      else if (['watching','terminal','observer_failed'].includes(record.state)) start(record);
+      if (observable(record)) start(record);
     }
   }
   async function settled() {

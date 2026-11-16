@@ -84,6 +84,16 @@ test('a notice lost before log commit is redelivered after restart',async()=>{
   assert.equal(next.sent.length,1);await next.dispose();
 });
 
+test('reload during an unfinished repair resumes once after the original notice was consumed',async()=>{
+  const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
+  h.append('turn/end',{turn:1,reason:{kind:'aborted',reason:{kind:'disposed'}}});await h.dispose();
+  const next=harness({data:h.data,events:h.events});next.runtime.restore();await next.runtime.settled();
+  assert.equal(next.sent.length,1);assert.match(next.sent[0].source.noticeKey,/:disposal:/);
+  assert.equal(next.requests.length,0);next.consume();await next.dispose();
+  const again=harness({data:next.data,events:next.events});again.runtime.restore();await again.runtime.settled();
+  assert.equal(again.sent.length,0);await again.dispose();
+});
+
 test('explicit cancellation and a paused review park results until authorized continuation',async()=>{
   let state='paused';
   const h=harness({review:()=>({state})});h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();

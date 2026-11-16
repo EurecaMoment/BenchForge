@@ -5,16 +5,19 @@ const body = message => (message?.content || []).filter(block => block.type === 
 const json = text => {try {return JSON.parse(text);} catch {return null;}};
 
 const initial = () => ({calls:new Map(),captures:new Map(),turn:0,production:false,completed:false,
-  interrupted:false,workflowSeq:0,activitySeq:0,activeTurn:false,taskSeq:0,taskKey:'',seq:-1});
+  interrupted:false,disposalSeq:0,workflowSeq:0,activitySeq:0,activeTurn:false,taskSeq:0,taskKey:'',seq:-1});
 function consume(state, events) {
   const {calls,captures} = state;
   for (const event of events) {
     if (event.seq != null && event.seq <= state.seq) continue;
     state.seq = event.seq ?? state.seq;
     const data = event.data;
-    if (event.type === 'turn/start') {state.turn = data.turn; state.interrupted = false; state.activeTurn = false;}
+    if (event.type === 'turn/start') {state.turn = data.turn; state.interrupted = false; state.disposalSeq = 0; state.activeTurn = false;}
     if (event.type === 'user/message' && ['benchforge/capture-watch','benchforge/capture-continuation','benchforge/production-resume'].includes(data.source?.kind)) state.activeTurn = true;
-    if (event.type === 'turn/end' && data.reason?.kind === 'aborted') state.interrupted = data.reason.reason?.kind !== 'disposed';
+    if (event.type === 'turn/end' && data.reason?.kind === 'aborted') {
+      state.interrupted = data.reason.reason?.kind !== 'disposed';
+      if (!state.interrupted) state.disposalSeq = event.seq;
+    }
     if (event.type === 'tool/call') {calls.set(data.callId, {...data,turn:state.turn}); state.activitySeq = event.seq;}
     if (event.type !== 'tool/result' && event.type !== 'tool/ptc-dispatch') continue;
     const ptc = event.type === 'tool/ptc-dispatch';
