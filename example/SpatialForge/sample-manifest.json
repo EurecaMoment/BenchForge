@@ -2,7 +2,7 @@
   "schema": "benchforge.example-assets/v1",
   "workspace": "BenchForgeV2 repository root",
   "conversation": "example/SpatialForge/session-13742859-5f94-4ca8-ab53-2ffc86ae2e12/session.v4.jsonl.zstd",
-  "scene_program_count": 5,
+  "scene_program_count": 3,
   "unique_scene_count": 3,
   "scenes": [
     {
@@ -19,16 +19,6 @@
       "scene_id": "sf_study_pantry_corner",
       "version": "current accepted",
       "path": "example/SpatialForge/bench-office100/scenes/sf_study_pantry_corner.scene_program.json"
-    },
-    {
-      "scene_id": "sf_office_work_area",
-      "version": "2026-11-05 historical snapshot",
-      "path": "example/SpatialForge/bench-office100-20261105/scenes/sf_office_work_area.scene_program.json"
-    },
-    {
-      "scene_id": "sf_lounge_meeting_corner",
-      "version": "2026-11-05 historical snapshot",
-      "path": "example/SpatialForge/bench-office100-20261105/scenes/sf_lounge_meeting_corner.scene_program.json"
     }
   ],
   "collection_record_count": 10,
