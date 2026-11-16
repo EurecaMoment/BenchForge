@@ -1,0 +1,343 @@
+{
+  "section": "capabilities",
+  "items": [
+    {
+      "id": "N01",
+      "name": "距离感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "C10",
+        "C43",
+        "C44",
+        "C55",
+        "C60",
+        "C64"
+      ]
+    },
+    {
+      "id": "N02",
+      "name": "尺寸感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C07",
+        "C08",
+        "C09",
+        "C10",
+        "C43",
+        "C61",
+        "P001"
+      ]
+    },
+    {
+      "id": "N03",
+      "name": "形状感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C34",
+        "C35",
+        "C36",
+        "C37",
+        "C39",
+        "C40",
+        "C42",
+        "C65"
+      ]
+    },
+    {
+      "id": "N04",
+      "name": "自运动感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "motion",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C15",
+        "C16",
+        "C33",
+        "C57"
+      ]
+    },
+    {
+      "id": "N05",
+      "name": "外部运动感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "motion",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C16",
+        "C33",
+        "C47",
+        "C48"
+      ]
+    },
+    {
+      "id": "N06",
+      "name": "重力方向感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C17",
+        "C18"
+      ]
+    },
+    {
+      "id": "N07",
+      "name": "物体朝向感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C11",
+        "C19",
+        "C22",
+        "C25",
+        "C62"
+      ]
+    },
+    {
+      "id": "N08",
+      "name": "拓扑关系感知",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C68",
+        "C69"
+      ]
+    },
+    {
+      "id": "N09",
+      "name": "跨视角对应",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C09",
+        "C11",
+        "C15",
+        "C20",
+        "C21",
+        "C22",
+        "C23",
+        "C24",
+        "C26",
+        "C27",
+        "C28",
+        "C29",
+        "C48"
+      ]
+    },
+    {
+      "id": "N10",
+      "name": "目标检测",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C05",
+        "C11",
+        "C12",
+        "C13",
+        "C28",
+        "C66",
+        "C67",
+        "P002"
+      ]
+    },
+    {
+      "id": "N11",
+      "name": "空间定位",
+      "level": "L1",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C01",
+        "C03",
+        "C04",
+        "C07",
+        "C12",
+        "C13",
+        "C14",
+        "C19",
+        "C24",
+        "C27",
+        "C29",
+        "C30",
+        "C60"
+      ]
+    },
+    {
+      "id": "N12",
+      "name": "空间描述",
+      "level": "L2",
+      "source": {
+        "document": "空间能力知识图谱_周报汇报.pptx",
+        "pages": [
+          3,
+          4
+        ]
+      },
+      "family": "geometry",
+      "measurement_scope": "controlled synthetic scenes and explicit input conditions",
+      "training_status": "unmeasured",
+      "candidate_dependencies_are_not_locks": true,
+      "linked_tasks": [
+        "C32",
+        "C33",
+        "C67",
+        "P003"
+      ]
+    }
+  ],
+  "total": 27,
+  "next_offset": 12,
+  "source": "89tasks-267templates-v1.0-design",
+  "capability_policy": "Catalog links select candidates; task operation and measurement variant define measured scope.",
+  "question_authoring": {
+    "schema": "benchforge.question-writing/v1",
+    "instructions": "每题提交 question_spec：简短自然题干 stem、公开已知条件 context、必要作答规则 conditions、候选 options、作答说明 response、逐项媒体标题 media_labels，以及与 parameters 完全一致的 parameter_bindings。题干先说看什么和问什么；采集说明、坐标定义、单位和容差分别放在条件中，必要条件不能藏在技术详情。对象称呼必须对应公开图片中的真实名称或编号；禁止凭空命名物体。禁止把内部运行号、路径、相机代码、原始字典或列表拼进题干。中心、采样点、参照轴等若用于作答，必须在公开媒体中提供对应标记或可用条件。保留准确模板的目标、参照系、单位、容差、候选和输出合同；改表达不能改变问题。无需模型判断题目质量。程序检查字段与绑定，并逐模板实际看图检查代表题。",
+    "evidence_field": "question_spec",
+    "required_fields": [
+      "stem",
+      "context",
+      "conditions",
+      "options",
+      "response",
+      "media_labels",
+      "parameter_bindings"
+    ],
+    "example": {
+      "schema": "benchforge.question-writing/v1",
+      "stem": "看图1，标记A的物体在标记B的哪一侧？",
+      "context": [
+        "图中编号用于识别物体。"
+      ],
+      "conditions": [
+        "以画面为参照，按图中中心标记判断方向。"
+      ],
+      "options": [
+        "左侧",
+        "右侧",
+        "上方",
+        "下方"
+      ],
+      "response": "按当前模板的输出合同提交一个方向。",
+      "media_labels": [
+        "图1：场景与物体中心标记"
+      ],
+      "parameter_bindings": "copy the exact evidence parameters object"
+    },
+    "validation_scope": "writing structure and exact source bindings; human answerability requires real media review"
+  }
+}

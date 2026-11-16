@@ -1,0 +1,83 @@
+{
+  "schema": "spatialforge.review-spatial-context/v1",
+  "authority": "native coordinate/support context only; actual images still determine visual/life acceptance",
+  "resolved_frames": [],
+  "directional_facts": [],
+  "unresolved_reference": [],
+  "native_support_checks": [
+    {
+      "index": 3,
+      "type": "supported_by",
+      "source": "coffee_table_b",
+      "target": "rug_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 4,
+      "type": "supported_by",
+      "source": "mug_b1",
+      "target": "coffee_table_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 5,
+      "type": "supported_by",
+      "source": "mug_b2",
+      "target": "coffee_table_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 6,
+      "type": "supported_by",
+      "source": "book_b1",
+      "target": "coffee_table_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 7,
+      "type": "supported_by",
+      "source": "book_b2",
+      "target": "sidecab_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 8,
+      "type": "supported_by",
+      "source": "lamp_b",
+      "target": "sidecab_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 11,
+      "type": "supported_by",
+      "source": "rug_b",
+      "target": "floor_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 14,
+      "type": "mounted_to",
+      "source": "window_s_b",
+      "target": "wall_s_b",
+      "passed": false,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    }
+  ],
+  "reference_declaration": null,
+  "reference_scope": "text-only reference; do not infer numerical axes from camera framing"
+}

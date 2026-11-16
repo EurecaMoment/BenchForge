@@ -1,0 +1,146 @@
+{
+  "state": "planned",
+  "plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/2af3311daa404eba/plan.json",
+  "pipeline_id": "data.capability",
+  "production_contract": "benchforge.production-stages/v1",
+  "total_steps": 4,
+  "stage_review": {
+    "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "key": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/2af3311daa404eba/plan.json",
+    "stage": "S1",
+    "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/2af3311daa404eba/plan.json",
+    "started": 1794829451.8088562,
+    "deadline": 1794829511.8282974,
+    "state": "waiting_user",
+    "instruction": "",
+    "policy_version": 1,
+    "revision": 2,
+    "rounds_required": 3,
+    "round_number": 1,
+    "checks_completed": 1,
+    "waits_completed": 0,
+    "wait_seconds": 60,
+    "rounds": [
+      {
+        "number": 1,
+        "check": {
+          "passed": true,
+          "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/2af3311daa404eba/plan.json",
+          "digest": "783503ac155ac049e0c1a0b81805616db6617588cc7184edb852be224583b0aa",
+          "checks": [
+            "current_plan_and_stage_identity",
+            "assessment_and_production_contract",
+            "saved_executable_plan"
+          ],
+          "checked_at": 1794829451.8282974
+        },
+        "wait_started_at": 1794829451.8282974,
+        "deadline": 1794829511.8282974
+      }
+    ],
+    "check_pending": false,
+    "last_check": {
+      "passed": true,
+      "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/2af3311daa404eba/plan.json",
+      "digest": "783503ac155ac049e0c1a0b81805616db6617588cc7184edb852be224583b0aa",
+      "checks": [
+        "current_plan_and_stage_identity",
+        "assessment_and_production_contract",
+        "saved_executable_plan"
+      ],
+      "checked_at": 1794829451.8282974
+    },
+    "check_failure": null,
+    "remaining_seconds": 60,
+    "review_id": 1,
+    "server_time": 1794829451.8282974,
+    "can_continue": false,
+    "next": "Present this artifact. Self-check round 1/3; 0/3 waits completed. Use benchforge_stage_review(action=wait) or let the host timer advance it. Repairs retain this review."
+  },
+  "review_revision": {
+    "kind": "new_task",
+    "review_reused": false,
+    "changed_fields": []
+  },
+  "assessment_status": "structured",
+  "selections": [
+    {
+      "template_ids": [
+        "C01-T01"
+      ],
+      "count": 10,
+      "reason": "三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题"
+    },
+    {
+      "template_ids": [
+        "C01-T02"
+      ],
+      "count": 10,
+      "reason": "表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C01-T03"
+      ],
+      "count": 10,
+      "reason": "考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出"
+    },
+    {
+      "template_ids": [
+        "C03-T01"
+      ],
+      "count": 10,
+      "reason": "相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据"
+    },
+    {
+      "template_ids": [
+        "C04-T01"
+      ],
+      "count": 10,
+      "reason": "锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C04-T02"
+      ],
+      "count": 10,
+      "reason": "全排序比二选一更能区分排序捷径；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C05-T01"
+      ],
+      "count": 10,
+      "reason": "光轴深度与欧氏距离的口径分离是协议要求的主测切片"
+    },
+    {
+      "template_ids": [
+        "C07-T02"
+      ],
+      "count": 10,
+      "reason": "尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径"
+    },
+    {
+      "template_ids": [
+        "C09-T01"
+      ],
+      "count": 10,
+      "reason": "透视干扰是 N02 协议的关键难度轴，室内场景易构造"
+    },
+    {
+      "template_ids": [
+        "C11-T01"
+      ],
+      "count": 10,
+      "reason": "条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰"
+    }
+  ],
+  "evidence_required_for": [
+    "C03-T01",
+    "C05-T01",
+    "C07-T02",
+    "C09-T01",
+    "C11-T01"
+  ],
+  "next": "Continue with benchforge_pipeline_run. S2 selects or creates scenes and requires service-issued scene_sources. After S2 review, S3 collects observations, trajectories and annotations, validated by collection.validate through native-source evidence JSONL. Resume this production and present each saved stage artifact. Execution repairs reuse S1; changed requirements are listed in review_revision.changed_fields."
+}

@@ -1,0 +1,8 @@
+{
+  "state": "validated",
+  "authoring_sources": {
+    "assessment_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/plan/sections/assessment_s1.json"
+  },
+  "target_items": 100,
+  "next": "Submit the same file path with validate_only=false to save the plan and open S1 review."
+}

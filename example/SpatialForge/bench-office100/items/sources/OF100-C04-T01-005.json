@@ -1,0 +1,66 @@
+{
+  "id": "OF100-C04-T01-005",
+  "question": "在图1（起居会客角实拍）中，候选对象里哪一个的中心到锚点B01（双人沙发）的中心最近？",
+  "unit": null,
+  "parameters": {
+    "media": "图1：起居会客角 实拍（对象编号见同机位附件）",
+    "anchor": "B01（双人沙发）",
+    "objects": "B05、B07、B06、B02、B04"
+  },
+  "question_spec": {
+    "stem": "观察原始采集图及对应标注附件，从公开候选中选出几何中心距离B01（双人沙发）最近的对象。",
+    "context": [
+      "图1起为未加标记的原始采集图；同机位带框图片、编号、黄十字标记点和相机尺度卡均在公开附件中，按机位名称一一对应。",
+      "候选对象及编号：见图中绿框编号。",
+      "公开相机标定卡见附件；完整数值与深度读取说明见同名附件。",
+      "同源米制光轴深度、有效像素掩码及完整K/相对位姿：见公开附件。",
+      "对象本体局部轴方向见公开附件；没有公开其尺寸或世界坐标。",
+      "绿框及编号只标识对象；三维中心、局部轴和尺寸仍须由公开可见证据确定。"
+    ],
+    "conditions": [
+      "候选集合为：B05（马克杯1）、B07（茶几书）、B06（马克杯2）、B02（西侧扶手椅）、B04（茶几）。",
+      "以对象几何中心的三维欧氏距离比较；全部候选均在该图中可见。"
+    ],
+    "options": [
+      "B05：马克杯1",
+      "B07：茶几书",
+      "B06：马克杯2",
+      "B02：西侧扶手椅",
+      "B04：茶几"
+    ],
+    "response": "提交 JSON 对象，choice_id 为所选对象的公开编号。",
+    "media_labels": [
+      "图1：view_1 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图2：view_0 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图3：view_2 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图4：view_3 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图5：view_4 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图6：view_5 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图7：view_6 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图8：view_7 原始RGB观测（对象编号与点标记见同机位标注附件）"
+    ],
+    "parameter_bindings": {
+      "media": "图1：起居会客角 实拍（对象编号见同机位附件）",
+      "anchor": "B01（双人沙发）",
+      "objects": "B05、B07、B06、B02、B04"
+    },
+    "schema": "benchforge.question-writing/v1"
+  },
+  "split": "dev",
+  "scene_group_id": "scene-v1:sf_lounge_meeting_corner",
+  "reference_frame": "Scene 世界坐标(米,Z-up)；相机坐标按 T_world_camera_usd 约定；像素原点左上",
+  "output_kind": null,
+  "measurement_variant": "唯一最近且与第二名差>0.15m",
+  "non_production": false,
+  "production_eligible": true,
+  "admission": {
+    "protocol_id": "D89-C04-v1",
+    "template_id": "C04-T01",
+    "task_id": "C04",
+    "protocol_version": "1.0.0-design",
+    "information_sufficient": true,
+    "media_consistent": true,
+    "no_answer_leakage": true,
+    "input_conditions": "同源RGB-D、公开K/相对位姿、编号标识与独立公开测量校验；未完整校验的项目保留为草稿。"
+  }
+}

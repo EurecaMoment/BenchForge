@@ -1,0 +1,216 @@
+{
+  "enforced": true,
+  "passed": true,
+  "stage": "before_capture",
+  "scene_style": "realistic_assets",
+  "geometry_exception": null,
+  "scene_brief": {
+    "id": "design-office-work",
+    "name": "办公室工作区（sf_office_work_area）",
+    "purpose": "承担办公场景下的距离、尺寸、相机参照系与计数测量；一项目一场景，供 C01/C03/C04/C05/C07/C09/C11 的 train 分区题目。",
+    "layout": "6.0×5.0×2.8 m 矩形房间，实体墙面四片+地板+吊顶，南墙内嵌 3 m 模块化窗提供天光方向感；办公桌靠北墙居中，办公椅面向桌面留出腿部空间；书柜贴西墙，文件柜靠东墙，饮水机置于东南角，盆栽立于窗侧墙角，垃圾桶在桌侧可取用处。动线：从东侧通行带到桌前通道 ≥0.9 m。",
+    "objects": "office_desk、office_chair、office_monitor、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_water_cooler、office_book×3、mug×2、bin，加 authored 墙体/地板/天花 composite 与 office_window；小物件（马克杯、书本、笔筒类 bin）置于桌面/柜顶支撑面上，动态质量与摩擦按合成先验声明。",
+    "cameras": "view_0 全景对角机位（覆盖 ≥12 个对象）、view_1 侧向机位（与 view_0 形成基线，供多视图尺度恢复）、view_2 桌面特写（monitor/mug/books 近景）、view_3 书柜-文件柜侧近景；均为标定相机，水平视角由 focal/aperture 记录于采集回执。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。",
+    "variation": "与其余两场景变化维度：家具品类组合（办公类）、对象数 16、锚点候选（桌、柜、机位）；对象间距与角度按 15 度以上 yaw 散布以避免轴向捷径。",
+    "artifact": "scenes/sf_office_work_area.scene_program.json → captures/sf_office_work_area/（实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出）",
+    "summary": "这是一间供单人日常办公的仿真房间，用于测量模型在办公环境中的距离、尺寸与计数能力。房间 6.0×5.0 米、高 2.8 米，木地板（wood_laminate 纹理）、四片实体墙与吊顶围合成封闭室内，南墙内嵌 3 米模块窗给出一侧天光方向，配合顶部面光使全部家具在实拍中可辨识。办公桌贴北墙居中摆放，桌面上依次放显示器（居中朝椅）与两只马克杯（左侧、前缘），显示器由桌面真实支撑；官方笔记本资产在实拍中呈 1.9cm 薄板不可辨识，已从软设计移除（非用户硬要求）；办公椅在桌前就坐区，正面朝向显示器屏幕并保留腿部空间；屏幕朝向对应办公椅，功能朝向按已校准的原生资产正面和目标位置计算。西墙立书柜（柜格留空以如实反映可验证支撑面），三件书类分别竖放在办公桌左角、桌面前缘与文件柜顶；东墙放文件柜，柜顶居中竖放书组；台灯移至办公桌右端桌面作为读写照明；东南角饮水机靠墙，取其不遮窗；窗前角落放盆栽；桌旁地面放收纳 bin。从东侧通行带到桌前形成连续通路，净宽不小于 0.9 米，柜门开启方向不与椅位冲突。所有大件静态、小件带质量与摩擦先验，沉降后中心由仿真回执提供，作为公开媒体标记与真值的双重来源。",
+    "hard_requirements": [
+      "室内场景，真实可辨识资产，禁止立方体/几何盒替代家具（scene-library policy.json 删除清单）",
+      "目标题量 100 条，本场景承担 train 分区约 34 题",
+      "GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真采集回执；模型预测不得充当 GT",
+      "公开题目不泄露答案；单张无尺度 RGB 不出绝对距离题"
+    ],
+    "object_roles": [
+      {
+        "object_id": "floor_a",
+        "role": "房间地面，支撑全部家具，world Z=0 起算面"
+      },
+      {
+        "object_id": "wall_n_a",
+        "role": "北墙，办公桌贴靠的边界"
+      },
+      {
+        "object_id": "wall_s_a",
+        "role": "南墙，内嵌模块窗，界定天光方向"
+      },
+      {
+        "object_id": "wall_w_a",
+        "role": "西墙，书柜贴靠"
+      },
+      {
+        "object_id": "wall_e_a",
+        "role": "东墙，文件柜贴靠，留出入口通道"
+      },
+      {
+        "object_id": "ceiling_a",
+        "role": "吊顶，封闭室内体积"
+      },
+      {
+        "object_id": "window_s_a",
+        "role": "南窗，真实窗资产，提供尺度与方向线索"
+      },
+      {
+        "object_id": "desk_a",
+        "role": "办公桌主体，北墙居中，桌面高约 0.76 m，承载显示器/书组/两只马克杯"
+      },
+      {
+        "object_id": "chair_a",
+        "role": "桌前就坐区的办公椅，正面朝向显示器并留出腿部空间，功能朝向由新采集核对。"
+      },
+      {
+        "object_id": "monitor_a",
+        "role": "显示器，桌面居中朝椅"
+      },
+      {
+        "object_id": "mug_a1",
+        "role": "马克杯，桌面左侧可取用处"
+      },
+      {
+        "object_id": "mug_a2",
+        "role": "马克杯，桌面前缘靠通道侧"
+      },
+      {
+        "object_id": "bookcase_a",
+        "role": "书柜，贴西墙，格内放书"
+      },
+      {
+        "object_id": "books_a1",
+        "role": "书组，办公桌左角竖放"
+      },
+      {
+        "object_id": "books_a2",
+        "role": "书组，文件柜顶竖放居中"
+      },
+      {
+        "object_id": "books_a3",
+        "role": "单本书，桌面前缘竖放，验证厚度方向"
+      },
+      {
+        "object_id": "filecab_a",
+        "role": "文件柜，靠东墙，柜顶放书组"
+      },
+      {
+        "object_id": "lamp_a",
+        "role": "台灯，办公桌右端桌面，读写照明"
+      },
+      {
+        "object_id": "cooler_a",
+        "role": "饮水机，东南角不遮窗"
+      },
+      {
+        "object_id": "plant_a",
+        "role": "盆栽，窗侧墙角，界定软分区"
+      },
+      {
+        "object_id": "bin_a",
+        "role": "收纳 bin，桌旁地面，可取用位置"
+      }
+    ],
+    "relations": [
+      {
+        "source": "desk_a",
+        "type": "supported_by",
+        "target": "floor_a",
+        "description": "四脚落地贴北墙，工作主面"
+      },
+      {
+        "source": "chair_a",
+        "type": "facing",
+        "target": "desk_a",
+        "description": "在对应桌前就坐，正面朝向显示器并保留腿部净空，由新采集核对可正常使用。"
+      },
+      {
+        "source": "monitor_a",
+        "type": "supported_by",
+        "target": "desk_a",
+        "description": "底座落在桌面，朝向椅位"
+      },
+      {
+        "source": "mug_a1",
+        "type": "supported_by",
+        "target": "desk_a",
+        "description": "动态小件，沉降由仿真回执确认接触"
+      },
+      {
+        "source": "mug_a2",
+        "type": "supported_by",
+        "target": "desk_a",
+        "description": "同上，位置与 mug_a1 拉开便于计数与排序"
+      },
+      {
+        "source": "books_a3",
+        "type": "supported_by",
+        "target": "desk_a",
+        "description": "平放叠置，验证厚度方向"
+      },
+      {
+        "source": "bookcase_a",
+        "type": "supported_by",
+        "target": "floor_a",
+        "description": "贴西墙落地，柜格真实层板"
+      },
+      {
+        "source": "books_a1",
+        "type": "supported_by",
+        "target": "desk_a",
+        "description": "书组竖放于办公桌左角，由桌面真实支撑"
+      },
+      {
+        "source": "books_a2",
+        "type": "supported_by",
+        "target": "filecab_a",
+        "description": "书组竖放文件柜顶面中央，比例与柜体协调"
+      },
+      {
+        "source": "lamp_a",
+        "type": "supported_by",
+        "target": "desk_a",
+        "description": "台灯底座落在办公桌右端桌面，高度与显示器齐平"
+      },
+      {
+        "source": "filecab_a",
+        "type": "near",
+        "target": "wall_e_a",
+        "description": "靠东墙，开门方向避开椅位"
+      },
+      {
+        "source": "cooler_a",
+        "type": "near",
+        "target": "wall_e_a",
+        "description": "东南角取用点，不遮挡窗"
+      },
+      {
+        "source": "plant_a",
+        "type": "supported_by",
+        "target": "floor_a",
+        "description": "窗侧墙角，界定动线"
+      },
+      {
+        "source": "bin_a",
+        "type": "near",
+        "target": "desk_a",
+        "description": "桌旁 0.5 m 地面，取用方便"
+      },
+      {
+        "source": "window_s_a",
+        "type": "mounted_to",
+        "target": "wall_s_a",
+        "description": "内嵌于南墙开口平面"
+      }
+    ],
+    "physical_assumptions": [
+      "家具静态件 mass_kg=0（static），其位置即 authored 位姿，碰撞体由原生 USD 几何提供",
+      "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+      "台灯为办公桌右端桌面静态摆件，底座由桌面支撑；不测倾覆动力学。",
+      "墙体/地板/天花为显式 authored 几何，support=ground 仅相对 Z=0 定位，地面由 floor_a 实体提供"
+    ],
+    "plan_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/6f6bc50bb9da4c29/plan.json",
+    "plan_version": [
+      245446,
+      1793965339082078167
+    ],
+    "authority": "versioned scene design, not captured physical truth",
+    "iteration_rule": "repair scene to brief; revise omissions from actual evidence; preserve user hard requirements and failed evidence"
+  },
+  "scope": "assets or declared simplification, scale, support and camera sanity; capture validation still required"
+}

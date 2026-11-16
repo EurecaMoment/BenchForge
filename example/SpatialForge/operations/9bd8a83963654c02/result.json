@@ -1,0 +1,105 @@
+{
+  "common_protocol": {
+    "status": "设计稿：模板与测量协议已编写；新样本生成器/验证器尚未部署，不宣称测量效度或训练增益已验证。",
+    "information_firewall": {
+      "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+      "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+      "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+    },
+    "generation_order": [
+      "选择task_id和template_id，固定测量切片与版本",
+      "先生成/选定场景和真值，检查信息足够和规则可满足",
+      "执行任务oracle与模板变体oracle，产生一个答案或合法答案集合",
+      "渲染媒体并验证标记、尺度、单位、参照系、可见性与文字一致",
+      "构造干扰项或接口；检查唯一性/多解政策、难度和浅线索",
+      "检查来源权限、重复场景及数据分区，冻结协议和版本后入库"
+    ],
+    "rejection_rules": [
+      "关键变量、轴/单位/时间/规则缺失",
+      "输入证据不足且模板未允许unknown/多解",
+      "正解或隐藏状态泄漏到题干、文件名、候选顺序或媒体水印",
+      "oracle不确定、仿真不稳定、候选无合法项或错误多解",
+      "媒体缺失、标记不对应、尺度与真值冲突",
+      "同源场景/轨迹或其派生模板跨分区，测试题被用于调试后仍冒充封存"
+    ],
+    "split_policy": "按底层场景/几何结构/轨迹/规则族分组划分train、dev、test、sealed。同场景视角、问题改写和反事实配对同分区；时间相邻帧同组。seed不是独立场景证据。先冻结，再答题。",
+    "scoring_policy": "选择题按合法ID集合；多解按验证器约束；数值同时报告连续误差及冻结阈值正确率；格式错误保留原答并记0，失败/拒答/超预算单列。不直接平均不同物理量、题型或27能力。",
+    "proposed_thresholds": {
+      "status": "建议初值，须经oracle/测量分辨率校准并在模型测试前冻结；不沿用为既有来源官方阈值",
+      "metric_distance": "tau=max(0.02m,0.05*|gt|)，近零只看绝对误差",
+      "dimension_length": "tau=max(0.005m,0.05*|gt|)，细厚度另按传感器分辨率校准",
+      "area_volume": "相对误差5%；近零设置明确绝对误差，面积/体积单位不混用",
+      "time": "tau=max(0.02s,0.05*|gt|)",
+      "angle": "周期误差≤5度；SO(3)用测地角；对称姿态采用等价集合",
+      "2d_box": "报告IoU与IoU≥0.50命中；像素边界为半开xyxy，完整/可见框单列",
+      "3d_box": "新设计可报IoU@0.25/0.50，来源原评测另报且不覆盖；OBB与AABB分开",
+      "point": "有效掩码命中为主；允许半径按对象尺度和图像分辨率冻结",
+      "relation": "分类边界epsilon由场景单位和渲染分辨率设定，边界±epsilon排除带或专用边界类",
+      "ties": "不靠任意精确浮点相等；排序严格间隔，等距用预定量化分箱，避免相等非传递",
+      "episode": "horizon、目标距离/角/关节阈值、保持时长和非法动作预算必须绑定环境版本；无通用SR阈值"
+    },
+    "interactive_contract": {
+      "loop": "只给当前观测与允许历史→模型动作→格式/范围验证→环境真实执行→新观测与反馈→目标判定→继续或结束。静态动作选择题不是闭环回合。",
+      "required_freeze_fields": [
+        "environment_version",
+        "asset_hash",
+        "initial_state_id",
+        "controller_version",
+        "action_schema",
+        "coordinate_frame",
+        "control_frequency",
+        "max_decisions",
+        "max_control_steps",
+        "action_chunk_limit",
+        "success_predicates",
+        "stop_semantics",
+        "invalid_action_cost",
+        "timeout_policy",
+        "history_access_policy",
+        "perturbation_rule"
+      ],
+      "invalid_action_policy": "解析失败或越界不执行、不自动改成合法动作，保留原答；占一次决定并按冻结规则消耗控制步。恢复尝试不得超预算。",
+      "preflight": "同接口同预算的可行参考控制/求解器必须能完成；零动作/随机/重复目标负对照保留；可解性预检不看被测模型成绩。",
+      "logging": "episode_id、每步实际提示、媒体hash、原答、解析动作、状态/反馈、预算、停止原因和终态。",
+      "P005_compatibility": "默认保留7×5六区域、4提议/24步、固定执行器、objects/exits、关闭/更新事件口径；它不测自由开放目标或导航控制。",
+      "C81_C83_compatibility": "若复用现有N24 OSC受限协议，沿用7维归一化动作或至多8步小段、64次决定/512控制步，并使用原成功谓词；新环境另冻结，不套用为所有机器人通用预算。"
+    },
+    "history_contract": {
+      "access_modes": [
+        "full_context:查询时可见原历史，测上下文利用",
+        "streamed_no_replay:按时给历史，查询不回看",
+        "external_memory:固定读写接口和容量"
+      ],
+      "requirement": "每个实例只能选一种访问模式并冻结；查询答案不能由当前图直接恢复；真值历史不是模型记忆。未观察状态不当事实。"
+    },
+    "item_record_fields": [
+      "item_id",
+      "task_id",
+      "template_id",
+      "protocol_id",
+      "protocol_version",
+      "measurement_variant",
+      "primary_operation",
+      "catalog_capability_links",
+      "provided_information",
+      "hidden_information_manifest",
+      "public_parameters",
+      "private_scene_parameters",
+      "media_hashes",
+      "scene_group_id",
+      "seed",
+      "split",
+      "reference_frame",
+      "unit",
+      "output_schema",
+      "ground_truth_or_valid_set",
+      "oracle_version",
+      "oracle_trace_hash",
+      "tolerance_config",
+      "admission_checks",
+      "provenance"
+    ],
+    "authorization_note": "本交付只新增本地设计与浏览器，不修改远程题库/已有协议，不执行模型训练。"
+  },
+  "source_status": "基于现有任务契约与目录关联的新设计；既有协议单独存档，不能声称新模板已完成验证。"
+}

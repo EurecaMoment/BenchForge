@@ -1,0 +1,25 @@
+{
+  "tool": "pipeline_catalog",
+  "arguments": {
+    "section": "templates",
+    "template_ids": [
+      "C07-T01",
+      "C07-T02",
+      "C07-T03",
+      "C08-T01",
+      "C09-T01",
+      "C09-T02",
+      "C10-T01",
+      "C11-T02",
+      "C11-T03",
+      "C06-T01",
+      "C05-T01",
+      "C12-T01"
+    ]
+  },
+  "time": "2026-11-05T05:29:00.277339+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "chatcmpl-tool-8382c9c4fb529b6d"
+  }
+}

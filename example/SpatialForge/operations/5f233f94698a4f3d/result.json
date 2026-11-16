@@ -1,0 +1,6 @@
+{
+  "state": "needs_template_selection",
+  "objective": "",
+  "candidates": [],
+  "next": "DSH interprets the objective, reads exact template contracts and calls pipeline_plan again with selections=[{template_ids,count,reason}]. Retrieval scores do not define capability or authorize a measurement substitute."
+}

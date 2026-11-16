@@ -1,0 +1,270 @@
+{
+  "frame_id": "view_3",
+  "image": "view_3.png",
+  "step_id": 180,
+  "timestamp_sim": 3.0,
+  "image_size": {
+    "width": 960,
+    "height": 720
+  },
+  "objects": [
+    {
+      "object_id": "wall_n_c",
+      "label": "北墙",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          0,
+          50,
+          514
+        ]
+      },
+      "mask": {
+        "area_px": 15243
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 2.5235648155212402
+    },
+    {
+      "object_id": "wall_e_c",
+      "label": "东墙",
+      "bbox_2d": {
+        "xyxy": [
+          10,
+          0,
+          886,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 57448
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 1.6955904960632324
+    },
+    {
+      "object_id": "desk_c2",
+      "label": "办公桌2",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          505,
+          114,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 21884
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 1.8181309700012207
+    },
+    {
+      "object_id": "bookcase_c1",
+      "label": "书柜1",
+      "bbox_2d": {
+        "xyxy": [
+          837,
+          0,
+          960,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 71046
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 1.293959140777588
+    },
+    {
+      "object_id": "bookcase_c2",
+      "label": "书柜2",
+      "bbox_2d": {
+        "xyxy": [
+          61,
+          0,
+          837,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 525579
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 1.659752607345581
+    }
+  ],
+  "camera": {
+    "position": [
+      0.9,
+      -0.2,
+      1.35
+    ],
+    "target": [
+      2.42,
+      0.4,
+      1.15
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "T_world_camera_usd": [
+      [
+        0.36716653473604866,
+        -0.930155221331323,
+        -6.938893903907231e-18,
+        0.0
+      ],
+      [
+        0.1129974725565162,
+        0.04460426548283534,
+        0.9925935878780281,
+        0.0
+      ],
+      [
+        -0.9232661084247389,
+        -0.364447148062397,
+        0.12148238268746578,
+        0.0
+      ],
+      [
+        0.9000000000000004,
+        -0.2000000000000001,
+        1.3500000000000003,
+        1.0000000000000002
+      ]
+    ],
+    "convention": "USD camera -Z forward +Y up",
+    "matrix_layout": "usd_row_vectors",
+    "projection": "perspective",
+    "focal_length_mm": 26.0,
+    "horizontal_aperture_mm": 36.0,
+    "vertical_aperture_mm": 15.290800094604492,
+    "horizontal_aperture_offset_mm": 0.0,
+    "vertical_aperture_offset_mm": 0.0,
+    "schema": "benchforge.native-camera-readout/v1",
+    "pixel_aspect_ratio": 1.0,
+    "aspect_ratio_conform_policy": "expandAperture",
+    "render_product_resolution": {
+      "width": 960,
+      "height": 720
+    },
+    "meters_per_scene_unit": 1.0,
+    "calibration_source": "same live UsdGeomCamera and UsdRenderProduct",
+    "camera_path": "/World/CaptureCamera",
+    "render_product_path": "/Render/OmniverseKit/HydraTextures/Replicator",
+    "pixel_coordinates": "upper-left pixel boundary is (0,0); pixel centers are (u+0.5,v+0.5)",
+    "pixel_center_offset_px": [
+      0.5,
+      0.5
+    ],
+    "K": [
+      [
+        693.3333333333334,
+        0,
+        480.0
+      ],
+      [
+        0,
+        693.3333333333334,
+        360.0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "K_basis": "captured_optics_and_readout"
+  },
+  "semantic_info": {
+    "idToLabels": {
+      "0": {
+        "class": "BACKGROUND"
+      },
+      "1": {
+        "class": "UNLABELLED"
+      },
+      "2": {
+        "class": "desk_c2"
+      },
+      "3": {
+        "class": "bookcase_c1"
+      },
+      "10": {
+        "class": "bookcase_c2"
+      },
+      "13": {
+        "class": "wall_n_c"
+      },
+      "14": {
+        "class": "wall_e_c"
+      }
+    }
+  },
+  "instance_info": {
+    "idToLabels": {
+      "0": "BACKGROUND",
+      "1": "UNLABELLED",
+      "2": "/World/Objects/desk_c2",
+      "3": "/World/Objects/bookcase_c1",
+      "10": "/World/Objects/bookcase_c2",
+      "13": "/World/Objects/wall_n_c",
+      "14": "/World/Objects/wall_e_c"
+    },
+    "idToSemantics": {
+      "0": {
+        "class": "BACKGROUND"
+      },
+      "1": {
+        "class": "UNLABELLED"
+      },
+      "2": {
+        "class": "desk_c2"
+      },
+      "3": {
+        "class": "bookcase_c1"
+      },
+      "10": {
+        "class": "bookcase_c2"
+      },
+      "13": {
+        "class": "wall_n_c"
+      },
+      "14": {
+        "class": "wall_e_c"
+      }
+    }
+  },
+  "depth_kind": "optical_axis_z_m",
+  "rgb_std": 55.936400223785846,
+  "quality": {
+    "passed": true,
+    "rgb_std": 55.936400223785846,
+    "finite_depth_fraction": 1.0,
+    "visible_entity_count": 5,
+    "reasons": [],
+    "thresholds": {
+      "rgb_std_min": 5.0,
+      "finite_depth_fraction_min": 0.05,
+      "visible_entity_count_min": 1
+    }
+  }
+}

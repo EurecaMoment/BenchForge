@@ -1,0 +1,16 @@
+{
+  "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+  "key": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final:stage:S4",
+  "stage": "S4",
+  "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/reviews/S4.json",
+  "started": 1793994855.9224591,
+  "deadline": 1793995155.9224591,
+  "state": "elapsed",
+  "instruction": "",
+  "review_id": 55,
+  "remaining_seconds": 0,
+  "server_time": 1793995157.2162051,
+  "wait_seconds": 300,
+  "can_continue": true,
+  "next": "Use stage_review(action=wait), then resume the existing production when can_continue is true."
+}

@@ -1,0 +1,594 @@
+{
+  "frame_id": "view_5",
+  "image": "view_5.png",
+  "step_id": 180,
+  "timestamp_sim": 3.0,
+  "image_size": {
+    "width": 960,
+    "height": 720
+  },
+  "objects": [
+    {
+      "object_id": "floor_a",
+      "label": "房间地面",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          239,
+          960,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 287080
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 2.293949604034424
+    },
+    {
+      "object_id": "wall_n_a",
+      "label": "北墙",
+      "bbox_2d": {
+        "xyxy": [
+          199,
+          0,
+          960,
+          311
+        ]
+      },
+      "mask": {
+        "area_px": 121480
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.289978981018066
+    },
+    {
+      "object_id": "wall_w_a",
+      "label": "西墙",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          0,
+          234,
+          278
+        ]
+      },
+      "mask": {
+        "area_px": 22002
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 5.331687927246094
+    },
+    {
+      "object_id": "wall_sk_a_n",
+      "label": "北墙踢脚线",
+      "bbox_2d": {
+        "xyxy": [
+          234,
+          229,
+          805,
+          325
+        ]
+      },
+      "mask": {
+        "area_px": 3504
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.59334135055542
+    },
+    {
+      "object_id": "wall_sk_a_w",
+      "label": "西墙踢脚线",
+      "bbox_2d": {
+        "xyxy": [
+          34,
+          230,
+          235,
+          290
+        ]
+      },
+      "mask": {
+        "area_px": 1793
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 5.600612163543701
+    },
+    {
+      "object_id": "desk_a",
+      "label": "办公桌",
+      "bbox_2d": {
+        "xyxy": [
+          266,
+          178,
+          568,
+          332
+        ]
+      },
+      "mask": {
+        "area_px": 4426
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.484707832336426
+    },
+    {
+      "object_id": "chair_a",
+      "label": "办公椅",
+      "bbox_2d": {
+        "xyxy": [
+          270,
+          143,
+          368,
+          345
+        ]
+      },
+      "mask": {
+        "area_px": 4388
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 3.6324644088745117
+    },
+    {
+      "object_id": "monitor_a",
+      "label": "显示器",
+      "bbox_2d": {
+        "xyxy": [
+          361,
+          110,
+          422,
+          189
+        ]
+      },
+      "mask": {
+        "area_px": 987
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.561354160308838
+    },
+    {
+      "object_id": "mug_a1",
+      "label": "马克杯1",
+      "bbox_2d": {
+        "xyxy": [
+          332,
+          174,
+          341,
+          183
+        ]
+      },
+      "mask": {
+        "area_px": 33
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.732894420623779
+    },
+    {
+      "object_id": "bookcase_a",
+      "label": "书柜",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          177,
+          41,
+          315
+        ]
+      },
+      "mask": {
+        "area_px": 3057
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.380624771118164
+    },
+    {
+      "object_id": "books_a1",
+      "label": "书组1",
+      "bbox_2d": {
+        "xyxy": [
+          330,
+          147,
+          363,
+          186
+        ]
+      },
+      "mask": {
+        "area_px": 428
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.841609001159668
+    },
+    {
+      "object_id": "filecab_a",
+      "label": "文件柜",
+      "bbox_2d": {
+        "xyxy": [
+          768,
+          126,
+          960,
+          533
+        ]
+      },
+      "mask": {
+        "area_px": 59545
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 2.204679012298584
+    },
+    {
+      "object_id": "books_a2",
+      "label": "书组2",
+      "bbox_2d": {
+        "xyxy": [
+          915,
+          46,
+          960,
+          136
+        ]
+      },
+      "mask": {
+        "area_px": 3130
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 1.9174914360046387
+    },
+    {
+      "object_id": "books_a3",
+      "label": "单本书",
+      "bbox_2d": {
+        "xyxy": [
+          537,
+          164,
+          544,
+          176
+        ]
+      },
+      "mask": {
+        "area_px": 42
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.27773380279541
+    },
+    {
+      "object_id": "lamp_a",
+      "label": "台灯",
+      "bbox_2d": {
+        "xyxy": [
+          483,
+          120,
+          508,
+          162
+        ]
+      },
+      "mask": {
+        "area_px": 95
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 3.8377106189727783
+    },
+    {
+      "object_id": "plant_a",
+      "label": "盆栽",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          0,
+          695,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 177854
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 1.1609625816345215
+    },
+    {
+      "object_id": "bin_a",
+      "label": "收纳箱",
+      "bbox_2d": {
+        "xyxy": [
+          541,
+          299,
+          586,
+          338
+        ]
+      },
+      "mask": {
+        "area_px": 1356
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 4.09439754486084
+    }
+  ],
+  "camera": {
+    "position": [
+      2.3,
+      -2.05,
+      1.5
+    ],
+    "target": [
+      1.6,
+      -0.75,
+      0.85
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "T_world_camera_usd": [
+      [
+        0.8804710999221753,
+        0.4740998230350173,
+        -2.7755575615628907e-17,
+        0.0
+      ],
+      [
+        -0.19102393222353642,
+        0.35475873127228214,
+        0.9152355434006801,
+        -0.0
+      ],
+      [
+        0.4339130091616204,
+        -0.8058384455858667,
+        0.40291922279293346,
+        0.0
+      ],
+      [
+        2.3000000000000003,
+        -2.05,
+        1.5000000000000002,
+        1.0
+      ]
+    ],
+    "convention": "USD camera -Z forward +Y up",
+    "matrix_layout": "usd_row_vectors",
+    "projection": "perspective",
+    "focal_length_mm": 24.0,
+    "horizontal_aperture_mm": 36.0,
+    "vertical_aperture_mm": 15.290800094604492,
+    "horizontal_aperture_offset_mm": 0.0,
+    "vertical_aperture_offset_mm": 0.0,
+    "schema": "benchforge.native-camera-readout/v1",
+    "pixel_aspect_ratio": 1.0,
+    "aspect_ratio_conform_policy": "expandAperture",
+    "render_product_resolution": {
+      "width": 960,
+      "height": 720
+    },
+    "meters_per_scene_unit": 1.0,
+    "calibration_source": "same live UsdGeomCamera and UsdRenderProduct",
+    "camera_path": "/World/CaptureCamera",
+    "render_product_path": "/Render/OmniverseKit/HydraTextures/Replicator",
+    "pixel_coordinates": "upper-left pixel boundary is (0,0); pixel centers are (u+0.5,v+0.5)",
+    "pixel_center_offset_px": [
+      0.5,
+      0.5
+    ],
+    "K": [
+      [
+        640.0,
+        0,
+        480.0
+      ],
+      [
+        0,
+        640.0,
+        360.0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "K_basis": "captured_optics_and_readout"
+  },
+  "semantic_info": {
+    "idToLabels": {
+      "0": {
+        "class": "BACKGROUND"
+      },
+      "1": {
+        "class": "UNLABELLED"
+      },
+      "2": {
+        "class": "floor_a"
+      },
+      "3": {
+        "class": "desk_a"
+      },
+      "6": {
+        "class": "wall_n_a"
+      },
+      "7": {
+        "class": "filecab_a"
+      },
+      "8": {
+        "class": "wall_w_a"
+      },
+      "9": {
+        "class": "chair_a"
+      },
+      "10": {
+        "class": "bookcase_a"
+      },
+      "11": {
+        "class": "monitor_a"
+      },
+      "13": {
+        "class": "lamp_a"
+      },
+      "15": {
+        "class": "plant_a"
+      },
+      "18": {
+        "class": "wall_sk_a_w"
+      },
+      "19": {
+        "class": "wall_sk_a_n"
+      },
+      "24": {
+        "class": "books_a3"
+      },
+      "25": {
+        "class": "mug_a1"
+      },
+      "26": {
+        "class": "books_a2"
+      },
+      "27": {
+        "class": "books_a1"
+      },
+      "29": {
+        "class": "bin_a"
+      }
+    }
+  },
+  "instance_info": {
+    "idToLabels": {
+      "0": "BACKGROUND",
+      "1": "UNLABELLED",
+      "2": "/World/Objects/floor_a",
+      "3": "/World/Objects/desk_a",
+      "6": "/World/Objects/wall_n_a",
+      "7": "/World/Objects/filecab_a",
+      "8": "/World/Objects/wall_w_a",
+      "9": "/World/Objects/chair_a",
+      "10": "/World/Objects/bookcase_a",
+      "11": "/World/Objects/monitor_a",
+      "13": "/World/Objects/lamp_a",
+      "15": "/World/Objects/plant_a",
+      "18": "/World/Objects/wall_sk_a_w",
+      "19": "/World/Objects/wall_sk_a_n",
+      "24": "/World/Objects/books_a3",
+      "25": "/World/Objects/mug_a1",
+      "26": "/World/Objects/books_a2",
+      "27": "/World/Objects/books_a1",
+      "29": "/World/Objects/bin_a"
+    },
+    "idToSemantics": {
+      "0": {
+        "class": "BACKGROUND"
+      },
+      "1": {
+        "class": "UNLABELLED"
+      },
+      "2": {
+        "class": "floor_a"
+      },
+      "3": {
+        "class": "desk_a"
+      },
+      "6": {
+        "class": "wall_n_a"
+      },
+      "7": {
+        "class": "filecab_a"
+      },
+      "8": {
+        "class": "wall_w_a"
+      },
+      "9": {
+        "class": "chair_a"
+      },
+      "10": {
+        "class": "bookcase_a"
+      },
+      "11": {
+        "class": "monitor_a"
+      },
+      "13": {
+        "class": "lamp_a"
+      },
+      "15": {
+        "class": "plant_a"
+      },
+      "18": {
+        "class": "wall_sk_a_w"
+      },
+      "19": {
+        "class": "wall_sk_a_n"
+      },
+      "24": {
+        "class": "books_a3"
+      },
+      "25": {
+        "class": "mug_a1"
+      },
+      "26": {
+        "class": "books_a2"
+      },
+      "27": {
+        "class": "books_a1"
+      },
+      "29": {
+        "class": "bin_a"
+      }
+    }
+  },
+  "depth_kind": "optical_axis_z_m",
+  "rgb_std": 46.57799164016724,
+  "quality": {
+    "passed": true,
+    "rgb_std": 46.57799164016724,
+    "finite_depth_fraction": 1.0,
+    "visible_entity_count": 17,
+    "reasons": [],
+    "thresholds": {
+      "rgb_std_min": 5.0,
+      "finite_depth_fraction_min": 0.05,
+      "visible_entity_count_min": 1
+    }
+  }
+}

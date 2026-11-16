@@ -1,0 +1,606 @@
+{
+  "schema": "public-camera-scale/v1",
+  "title": "公开相机标定与米制深度",
+  "reference": "图1相机光心；相对位姿不包含目标世界坐标",
+  "camera_convention": "column vectors; x right, y down, z forward; metres",
+  "pixel_convention": "u right, v down; upper-left pixel boundary (0,0); use recorded pixel-center offset and K",
+  "frames": [
+    {
+      "image_label": "图1",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          640.0,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          640.0,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_1_3de24909a840_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          1.0,
+          -2.2579718447143174e-19,
+          5.800437132962013e-17,
+          0.0
+        ],
+        [
+          -2.2579718447143174e-19,
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          5.800437132962013e-17,
+          0.0,
+          1.0000000000000002,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_1_64f3d2b37cda_depth_mm.png",
+        "valid_mask": "sensor_view_1_64f3d2b37cda_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_1_8a6bfa758002_B01_mask.png",
+        "B07": "sensor_view_1_8a5592486d17_B07_mask.png",
+        "B06": "sensor_view_1_cfd5042add81_B06_mask.png",
+        "B04": "sensor_view_1_827a9a0d295f_B04_mask.png",
+        "B05": "sensor_view_1_732ecb9f2fd7_B05_mask.png",
+        "B02": "sensor_view_1_a06b5a8eafbd_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图2",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          640.0,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          640.0,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_0_2f9fba33a6be_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.7734784404655207,
+          -0.19178149572983857,
+          0.6041117115489916,
+          -0.8545862491532241
+        ],
+        [
+          0.11386968112416503,
+          0.8955702738043161,
+          0.43010182561661325,
+          -0.9159867878505491
+        ],
+        [
+          -0.6235100623532126,
+          0.4014644972767687,
+          -0.6708662009451698,
+          4.180687807914082
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_0_206af58fc22e_depth_mm.png",
+        "valid_mask": "sensor_view_0_206af58fc22e_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_0_57a52cf82d28_B01_mask.png",
+        "B07": "sensor_view_0_b9b8fc396322_B07_mask.png",
+        "B06": "sensor_view_0_4ba71986dd81_B06_mask.png",
+        "B04": "sensor_view_0_e6584d7525cc_B04_mask.png",
+        "B05": "sensor_view_0_3718ad229b06_B05_mask.png",
+        "B02": "sensor_view_0_e30f2bf9bf8a_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图3",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          933.3333333333334,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          933.3333333333334,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_2_5f0d834dc5d2_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.7734784404655207,
+          -0.32260396145013825,
+          0.5455802289230278,
+          0.19122105889286511
+        ],
+        [
+          0.11386968112416503,
+          0.7760444167206783,
+          0.6203134360928699,
+          -0.1948386308527339
+        ],
+        [
+          -0.6235100623532126,
+          0.5419241158440357,
+          -0.5635188149573652,
+          3.015041030328331
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_2_71e5826e43c9_depth_mm.png",
+        "valid_mask": "sensor_view_2_71e5826e43c9_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_2_25dbc182f791_B01_mask.png",
+        "B07": "sensor_view_2_add48e4d95de_B07_mask.png",
+        "B06": "sensor_view_2_8560f1e7d85c_B06_mask.png",
+        "B04": "sensor_view_2_89a7cc1a9a1f_B04_mask.png",
+        "B05": "sensor_view_2_38aff79fe4f5_B05_mask.png",
+        "B02": "sensor_view_2_17816c9d79a0_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图4",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          853.3333333333334,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          853.3333333333334,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_3_43302fe7c641_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.9733315175803559,
+          0.04214732324677625,
+          -0.22549802666066399,
+          1.6645900604185062
+        ],
+        [
+          -0.041213505308868775,
+          0.9348569072593639,
+          0.35262446019754956,
+          -0.697982545399225
+        ],
+        [
+          0.22567056490574383,
+          0.3525140650989534,
+          -0.908188653332849,
+          3.8219053228820226
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_3_7550cb726c53_depth_mm.png",
+        "valid_mask": "sensor_view_3_7550cb726c53_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_3_1d70b4e6ee2c_B01_mask.png",
+        "B07": "sensor_view_3_9bb11cbc8c83_B07_mask.png",
+        "B06": "sensor_view_3_868a031a4986_B06_mask.png",
+        "B04": "sensor_view_3_0239ae4708f1_B04_mask.png",
+        "B05": "sensor_view_3_5026776942a6_B05_mask.png",
+        "B02": "sensor_view_3_4efc929d7b0e_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图5",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          640.0,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          640.0,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_4_5bd2f2b874ea_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.1875458223106659,
+          0.28707887613222305,
+          -0.9393680234138673,
+          3.2733177890256138
+        ],
+        [
+          -0.17646760947398699,
+          0.9309299556439407,
+          0.31973207610639787,
+          -0.4586632155789461
+        ],
+        [
+          0.9662741574420548,
+          0.22573244464062026,
+          -0.12393190104334253,
+          2.5114773952244236
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_4_c80592d13e8b_depth_mm.png",
+        "valid_mask": "sensor_view_4_c80592d13e8b_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_4_e4415ae93368_B01_mask.png",
+        "B07": "sensor_view_4_2e8a1e60f652_B07_mask.png",
+        "B06": "sensor_view_4_ab66dbbd61ec_B06_mask.png",
+        "B04": "sensor_view_4_c671a15c92e0_B04_mask.png",
+        "B05": "sensor_view_4_23f77461ba5a_B05_mask.png",
+        "B02": "sensor_view_4_64e26b8790d2_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图6",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          640.0,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          640.0,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_5_7daf86027fc4_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.22747010485694535,
+          -0.2776147322171685,
+          0.9333742078353998,
+          -2.4858737656072427
+        ],
+        [
+          0.1749457858375106,
+          0.9312555683932097,
+          0.31962014697815255,
+          -0.6150325129831024
+        ],
+        [
+          -0.957941189955869,
+          0.2359939126177406,
+          -0.16326527430321494,
+          2.811079264168721
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_5_0e740d134ba7_depth_mm.png",
+        "valid_mask": "sensor_view_5_0e740d134ba7_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_5_2aea0a7f2068_B01_mask.png",
+        "B07": "sensor_view_5_997b87809f40_B07_mask.png",
+        "B06": "sensor_view_5_1be46d19abcd_B06_mask.png",
+        "B04": "sensor_view_5_4fa8b1babce5_B04_mask.png",
+        "B05": "sensor_view_5_4426b8f2a860_B05_mask.png",
+        "B02": "sensor_view_5_46f8a7f80ec1_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图7",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          640.0,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          640.0,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_6_75f975d87710_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.9989467935351057,
+          -0.012842422862714545,
+          0.0440496976260435,
+          0.7310445538010932
+        ],
+        [
+          0.008243236343431215,
+          0.8941805028414611,
+          0.4476307377658262,
+          -1.1494196341550873
+        ],
+        [
+          -0.045137043994007586,
+          0.4475224022473141,
+          -0.8931328830282065,
+          5.458883435738168
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_6_b2ecff4efb8a_depth_mm.png",
+        "valid_mask": "sensor_view_6_b2ecff4efb8a_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_6_e1ba49824fef_B01_mask.png",
+        "B07": "sensor_view_6_e8f362a9283e_B07_mask.png",
+        "B06": "sensor_view_6_715a55ace1d4_B06_mask.png",
+        "B04": "sensor_view_6_4221101f7cbf_B04_mask.png",
+        "B05": "sensor_view_6_58c5af2c236f_B05_mask.png",
+        "B02": "sensor_view_6_abaaa7b6e9d1_B02_mask.png"
+      }
+    },
+    {
+      "image_label": "图8",
+      "image_size": {
+        "width": 960,
+        "height": 720
+      },
+      "K": [
+        [
+          640.0,
+          0.0,
+          480.0
+        ],
+        [
+          0.0,
+          640.0,
+          360.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "calibration_basis": "captured_intrinsic_matrix",
+      "sensor_asset": "sensor_view_7_22d80b762e18_calibration.json",
+      "T_reference_camera_optical": [
+        [
+          -0.7734784404655207,
+          -0.6336143564181982,
+          0.01624652195944097,
+          0.8884259309235912
+        ],
+        [
+          0.11386968112416503,
+          -0.11369840495332326,
+          0.9869682712386207,
+          -1.3700180164007154
+        ],
+        [
+          -0.6235100623532126,
+          0.7652486655014976,
+          0.160092729667747,
+          1.9355231850845913
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "pose_translation_unit": "m",
+      "pixel_center_offset_px": [
+        0.5,
+        0.5
+      ],
+      "depth": {
+        "asset": "sensor_view_7_a284750488ae_depth_mm.png",
+        "valid_mask": "sensor_view_7_a284750488ae_depth_valid.png",
+        "unit_scale_to_m": 0.001,
+        "invalid_value": 0,
+        "kind": "optical_axis_z",
+        "quantization_error_m": 0.0005
+      },
+      "object_masks": {
+        "B01": "sensor_view_7_f50924624b32_B01_mask.png",
+        "B07": "sensor_view_7_16271db2f321_B07_mask.png",
+        "B06": "sensor_view_7_0491c3bef4dc_B06_mask.png",
+        "B04": "sensor_view_7_c486e512176f_B04_mask.png",
+        "B05": "sensor_view_7_55eae0b6c5d0_B05_mask.png",
+        "B02": "sensor_view_7_fa526c8c6e75_B02_mask.png"
+      }
+    }
+  ],
+  "baselines_m": [
+    4.364344166080397,
+    3.0273751006441207,
+    4.226700841081612,
+    4.1512046444375645,
+    3.8026306683663087,
+    5.626277632680421,
+    2.5322914524201203
+  ],
+  "metric_input_ready": true,
+  "problems": [],
+  "marker_observations": [],
+  "local_axes_asset": "OF100-C04-T01-005_local_axes.json"
+}

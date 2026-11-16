@@ -1,0 +1,102 @@
+{
+  "state": "planned",
+  "plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/47803d26fc3e49d7/plan.json",
+  "pipeline_id": "data.capability",
+  "stage_review": {
+    "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "key": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/47803d26fc3e49d7/plan.json",
+    "stage": "S1",
+    "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/47803d26fc3e49d7/plan.json",
+    "started": 1793958232.0712564,
+    "deadline": 1793958532.0712564,
+    "state": "waiting_user",
+    "instruction": "",
+    "review_id": 51,
+    "remaining_seconds": 300,
+    "server_time": 1793958232.0712564,
+    "wait_seconds": 300,
+    "can_continue": false,
+    "next": "Use stage_review(action=wait), then resume the existing production when can_continue is true."
+  },
+  "assessment_status": "structured",
+  "selections": [
+    {
+      "template_ids": [
+        "C01-T01"
+      ],
+      "count": 10,
+      "reason": "三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题"
+    },
+    {
+      "template_ids": [
+        "C01-T02"
+      ],
+      "count": 10,
+      "reason": "表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C01-T03"
+      ],
+      "count": 10,
+      "reason": "考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出"
+    },
+    {
+      "template_ids": [
+        "C03-T01"
+      ],
+      "count": 10,
+      "reason": "相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据"
+    },
+    {
+      "template_ids": [
+        "C04-T01"
+      ],
+      "count": 10,
+      "reason": "锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C04-T02"
+      ],
+      "count": 10,
+      "reason": "全排序比二选一更能区分排序捷径；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C05-T01"
+      ],
+      "count": 10,
+      "reason": "光轴深度与欧氏距离的口径分离是协议要求的主测切片"
+    },
+    {
+      "template_ids": [
+        "C07-T02"
+      ],
+      "count": 10,
+      "reason": "尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径"
+    },
+    {
+      "template_ids": [
+        "C09-T01"
+      ],
+      "count": 10,
+      "reason": "透视干扰是 N02 协议的关键难度轴，室内场景易构造"
+    },
+    {
+      "template_ids": [
+        "C11-T01"
+      ],
+      "count": 10,
+      "reason": "条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰"
+    }
+  ],
+  "evidence_required_for": [
+    "C03-T01",
+    "C05-T01",
+    "C07-T02",
+    "C09-T01",
+    "C11-T01"
+  ],
+  "next": "pipeline_run; when evidence is required, use exact template protocol with task code or existing collectors, then supply evidence. No legacy 3240-template substitution."
+}

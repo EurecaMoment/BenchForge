@@ -1,0 +1,12 @@
+{
+  "tool": "stage_review",
+  "arguments": {
+    "action": "status",
+    "review_id": 45
+  },
+  "time": "2026-11-05T09:07:14.720946+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "chatcmpl-tool-9b3b0da2da408340"
+  }
+}

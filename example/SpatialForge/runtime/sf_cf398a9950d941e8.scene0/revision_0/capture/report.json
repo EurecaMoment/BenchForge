@@ -1,0 +1,2144 @@
+{
+  "schema": "benchforge.capture/v1",
+  "token": "attempt_373bbdd8ce1b49c0",
+  "task_id": "sf_cf398a9950d941e8.scene0",
+  "revision": 0,
+  "status": "captured",
+  "errors": [],
+  "capture_scope": {
+    "view_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "program_camera_count": 8,
+    "scene_export_requested": true,
+    "full_scene_capture": true
+  },
+  "scene_preflight": {
+    "schema": "benchforge.scene-preflight/v1",
+    "passed": true,
+    "blocking": false,
+    "errors": [],
+    "cameras": [
+      {
+        "camera_index": 0,
+        "camera_id": "view_0",
+        "position": [
+          0.15,
+          -2.05,
+          1.62
+        ],
+        "target": [
+          -0.35,
+          0.9,
+          0.55
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 1,
+        "camera_id": "view_1",
+        "position": [
+          -2.42,
+          2.12,
+          1.52
+        ],
+        "target": [
+          1.3,
+          -1.6,
+          0.55
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 2,
+        "camera_id": "view_2",
+        "position": [
+          0.62,
+          0.62,
+          1.28
+        ],
+        "target": [
+          -0.3,
+          1.95,
+          0.8
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 3,
+        "camera_id": "view_3",
+        "position": [
+          -0.7,
+          -1.35,
+          1.42
+        ],
+        "target": [
+          -2.72,
+          -0.6,
+          1.15
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 4,
+        "camera_id": "view_4",
+        "position": [
+          2.42,
+          2.12,
+          1.62
+        ],
+        "target": [
+          -0.3,
+          1.45,
+          0.72
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 5,
+        "camera_id": "view_5",
+        "position": [
+          2.3,
+          -2.05,
+          1.5
+        ],
+        "target": [
+          1.6,
+          -0.75,
+          0.85
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 6,
+        "camera_id": "view_6",
+        "position": [
+          -2.42,
+          -2.05,
+          1.6
+        ],
+        "target": [
+          -0.2,
+          1.55,
+          0.75
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      },
+      {
+        "camera_index": 7,
+        "camera_id": "view_7",
+        "position": [
+          0.0,
+          1.25,
+          2.5
+        ],
+        "target": [
+          -0.3,
+          1.85,
+          0.82
+        ],
+        "status": "not_applicable",
+        "reason": "target_not_inside_declared_room"
+      }
+    ],
+    "limits": [
+      "declared room bounds only",
+      "does not infer walls or occlusion",
+      "external cameras are allowed"
+    ]
+  },
+  "native_asset_cache": {
+    "source_root": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/",
+    "files": [
+      {
+        "file": "Isaac/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        "bytes": 18429221,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/KLT_Bin/small_KLT_visual_collision.usd",
+        "bytes": 226995,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/KLT_Bin/small_KLT_visual.usd",
+        "bytes": 179929,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/KLT_Bin/Materials/Textures/FOF_Map_Labels_D.png",
+        "bytes": 6674448,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/KLT_Bin/Materials/Textures/FOF_Mesh_Labels_D.png",
+        "bytes": 6674448,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/KLT_Bin/Materials/Textures/FOF_Map_Magenta_Box_D.png",
+        "bytes": 8461312,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_Plant01.usd",
+        "bytes": 75846,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Palm_ao_r_m.png",
+        "bytes": 1052680,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Palm_bc.png",
+        "bytes": 1179073,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Palm_n.png",
+        "bytes": 1626852,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/MI_TrashCan.mdl",
+        "bytes": 2206,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Bookcase_ao_r_m.png",
+        "bytes": 3249687,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Bookcase_bc.png",
+        "bytes": 2620114,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Bookcase_n.png",
+        "bytes": 117178,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/OmniUe4Base.mdl",
+        "bytes": 8281,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/OmniUe4Function.mdl",
+        "bytes": 46073,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_WaterCooler.usd",
+        "bytes": 63319,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Cooler_ao_r_m.png",
+        "bytes": 2198077,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Cooler_bc.png",
+        "bytes": 244623,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Cooler_n.png",
+        "bytes": 775734,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/MI_Props.mdl",
+        "bytes": 2222,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_Lamp.usd",
+        "bytes": 27697,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_LampA_bc.png",
+        "bytes": 317508,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_LampA_ao_r_m_e.png",
+        "bytes": 592467,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_LampA_n.png",
+        "bytes": 901067,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/MI_Clock.mdl",
+        "bytes": 2342,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_FileCabinet_01.usd",
+        "bytes": 17461,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_FileCabinet_ao_r_m.png",
+        "bytes": 2679967,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_FileCabinet_bc.png",
+        "bytes": 153061,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_FileCabinet_n.png",
+        "bytes": 3344751,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_Book_01.usd",
+        "bytes": 4157,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_BooksA_ao_r_m.png",
+        "bytes": 6490885,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_BooksA_bc.png",
+        "bytes": 12718911,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_BooksA_n.png",
+        "bytes": 11425219,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_BooksSet_01.usd",
+        "bytes": 56301,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_BookcaseA.usd",
+        "bytes": 17426,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Cupboard_ao_r_m.png",
+        "bytes": 2392502,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Cupboard_bc.png",
+        "bytes": 1928504,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Cupboard_n.png",
+        "bytes": 125359,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/Mugs/SM_Mug_A2.usd",
+        "bytes": 314998,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/Mugs/texture/T_Mug_A2_ORM.png",
+        "bytes": 4150897,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/Mugs/texture/T_Mug_A2_Normal.png",
+        "bytes": 1899700,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Props/Mugs/texture/T_Mug_A2_Albedo.png",
+        "bytes": 2439128,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_MonitorPC.usd",
+        "bytes": 19115,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PC1_bc.png",
+        "bytes": 2633022,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PC1_ao_r_m_e.png",
+        "bytes": 4017769,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PC1_n.png",
+        "bytes": 1719787,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_ChairOffice.usd",
+        "bytes": 119603,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_ChairOffice_ao_r_m.png",
+        "bytes": 3823704,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_ChairOffice_bc.png",
+        "bytes": 3025458,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_ChairOffice_n.png",
+        "bytes": 5086911,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_TableD.usd",
+        "bytes": 14440,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_TableD_ao_r_m.png",
+        "bytes": 272366,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_TableD_mask.png",
+        "bytes": 82421,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_TableD_bc.png",
+        "bytes": 2404094,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_TableD_n.png",
+        "bytes": 2865386,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/MI_DoorA.mdl",
+        "bytes": 2989,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PanicDoor_ao_r_m_e.png",
+        "bytes": 2562016,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PanicDoor_mask.png",
+        "bytes": 84004,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PanicDoor_bc.png",
+        "bytes": 1141275,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_PanicDoor_n.png",
+        "bytes": 973113,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png",
+        "bytes": 10649737,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "bytes": 7029110,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Materials/Textures/Patterns/nv_concrete_sidewalk_new.jpg",
+        "bytes": 1937606,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Props/SM_Window_3m_A.usd",
+        "bytes": 6416,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Window_ao_r_m.png",
+        "bytes": 1875202,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Window_bc.png",
+        "bytes": 1667463,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/Textures/T_Window_n.png",
+        "bytes": 108190,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/MI_DoorEntrance_glass.mdl",
+        "bytes": 2560,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Environments/Office/Materials/OmniUe4Translucent.mdl",
+        "bytes": 7818,
+        "downloaded": false
+      },
+      {
+        "file": "Isaac/Materials/Textures/Patterns/nv_wood_laminate_tile_light.jpg",
+        "bytes": 1608646,
+        "downloaded": false
+      }
+    ],
+    "file_count": 71,
+    "bytes": 161648847
+  },
+  "render_settings": {
+    "renderer": "PathTracing",
+    "samples_per_pixel": 96,
+    "exposure": 0.6,
+    "exposure_implementation": "camera exposure:iso=100*2^EV plus renderer filmIso",
+    "pathtracing_spp": 96,
+    "film_iso": 151.5716566510398,
+    "product_lifecycle": "one persistent product, camera and annotators; camera pose and optics change across views"
+  },
+  "light_receipts": [
+    {
+      "id": "env_sky",
+      "source_kind": "environment",
+      "usd_type": "DomeLight",
+      "intensity": 470.0,
+      "authority": "authored USD light inputs; not calibrated illumination"
+    },
+    {
+      "id": "area_a",
+      "source_kind": "area",
+      "usd_type": "RectLight",
+      "intensity": 2600.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "width_m": 1.2999999523162842,
+      "height_m": 0.699999988079071,
+      "extent_source": "explicit size"
+    },
+    {
+      "id": "area_b",
+      "source_kind": "area",
+      "usd_type": "RectLight",
+      "intensity": 2800.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "width_m": 1.2999999523162842,
+      "height_m": 0.699999988079071,
+      "extent_source": "explicit size"
+    },
+    {
+      "id": "area_c",
+      "source_kind": "area",
+      "usd_type": "RectLight",
+      "intensity": 2400.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "width_m": 1.2999999523162842,
+      "height_m": 0.699999988079071,
+      "extent_source": "explicit size"
+    },
+    {
+      "id": "area_d",
+      "source_kind": "area",
+      "usd_type": "RectLight",
+      "intensity": 2400.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "width_m": 1.2999999523162842,
+      "height_m": 0.699999988079071,
+      "extent_source": "explicit size"
+    },
+    {
+      "id": "wash_w",
+      "source_kind": "point",
+      "usd_type": "SphereLight",
+      "intensity": 95.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "radius_m": 0.0,
+      "treat_as_point": true,
+      "extent_source": "unsized point/spot; zero radius"
+    },
+    {
+      "id": "wash_e",
+      "source_kind": "point",
+      "usd_type": "SphereLight",
+      "intensity": 95.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "radius_m": 0.0,
+      "treat_as_point": true,
+      "extent_source": "unsized point/spot; zero radius"
+    },
+    {
+      "id": "sun_ext",
+      "source_kind": "sun",
+      "usd_type": "DistantLight",
+      "intensity": 450.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "angle_degrees": 3.0,
+      "extent_source": "explicit angular diameter"
+    },
+    {
+      "id": "shelf_0",
+      "source_kind": "point",
+      "usd_type": "SphereLight",
+      "intensity": 260.0,
+      "authority": "authored USD light inputs; not calibrated illumination",
+      "radius_m": 0.0,
+      "treat_as_point": true,
+      "extent_source": "unsized point/spot; zero radius"
+    }
+  ],
+  "phase_seconds": {
+    "scene_construction": 0.4645,
+    "physics_initialization": 0.429,
+    "physics_settling": 0.1877,
+    "interactions_and_bounds": 0.0875,
+    "capture_views": 96.3909,
+    "scene_export": 0.2494,
+    "evidence_and_cleanup": 0.4727
+  },
+  "physics_execution": {
+    "gpu_dynamics": true,
+    "broadphase": "GPU",
+    "tensor_backend": "numpy-compatible observations",
+    "requested_gpu_uuid": "GPU-84eb5081-4cc6-2547-74cc-704cc136e5e1"
+  },
+  "physics": {
+    "steps": 180,
+    "dt": 0.016666666666666666,
+    "dynamic_entities": [
+      "mug_a1",
+      "mug_a2",
+      "books_a1",
+      "books_a2",
+      "books_a3",
+      "bin_a"
+    ],
+    "before": {
+      "floor_a": [
+        0.0,
+        0.0,
+        -0.03
+      ],
+      "wall_n_a": [
+        0.0,
+        2.56,
+        1.4
+      ],
+      "wall_w_a": [
+        -3.06,
+        0.0,
+        1.4
+      ],
+      "wall_e_a": [
+        3.06,
+        0.0,
+        1.4
+      ],
+      "ceiling_a": [
+        0.0,
+        0.0,
+        2.84
+      ],
+      "wall_s_a": [
+        0.0,
+        -2.56,
+        1.4
+      ],
+      "window_s_a": [
+        0.0,
+        -2.56,
+        1.4
+      ],
+      "ground_ext_a": [
+        0.0,
+        -7.22,
+        -0.02
+      ],
+      "wall_ext_a": [
+        0.0,
+        -3.8200000000000003,
+        2.35
+      ],
+      "wall_sk_a_n": [
+        0.0,
+        2.4875,
+        0.045
+      ],
+      "wall_sk_a_w": [
+        -2.9875,
+        0.0,
+        0.045
+      ],
+      "wall_sk_a_e": [
+        2.9875,
+        0.0,
+        0.045
+      ],
+      "wall_sk_a_s1": [
+        2.31,
+        -2.4875,
+        0.045
+      ],
+      "wall_sk_a_s2": [
+        -2.31,
+        -2.4875,
+        0.045
+      ],
+      "desk_a": [
+        -0.3,
+        1.8,
+        0.37993
+      ],
+      "chair_a": [
+        -0.3,
+        0.86,
+        0.5885
+      ],
+      "monitor_a": [
+        -0.55,
+        1.92,
+        1.02481
+      ],
+      "mug_a1": [
+        -0.9499999284744263,
+        1.7200000286102295,
+        0.8053603172302246
+      ],
+      "mug_a2": [
+        0.020000016316771507,
+        1.6200000047683716,
+        0.8053602576255798
+      ],
+      "bookcase_a": [
+        -2.75,
+        -0.6,
+        1.11
+      ],
+      "books_a1": [
+        -1.0201605558395386,
+        1.9800866842269897,
+        0.8831009268760681
+      ],
+      "filecab_a": [
+        2.62,
+        0.6,
+        0.670345
+      ],
+      "books_a2": [
+        2.5999958515167236,
+        0.6000052094459534,
+        1.4639312028884888
+      ],
+      "books_a3": [
+        0.5499635338783264,
+        2.0999999046325684,
+        0.8623573780059814
+      ],
+      "lamp_a": [
+        0.42,
+        1.62,
+        1.013855
+      ],
+      "cooler_a": [
+        2.55,
+        -2.12,
+        0.55
+      ],
+      "plant_a": [
+        1.55,
+        -1.15,
+        0.87748
+      ],
+      "bin_a": [
+        0.920000433921814,
+        1.6599997282028198,
+        0.07319997251033783
+      ]
+    },
+    "after": {
+      "floor_a": [
+        0.0,
+        0.0,
+        -0.03
+      ],
+      "wall_n_a": [
+        0.0,
+        2.56,
+        1.4
+      ],
+      "wall_w_a": [
+        -3.06,
+        0.0,
+        1.4
+      ],
+      "wall_e_a": [
+        3.06,
+        0.0,
+        1.4
+      ],
+      "ceiling_a": [
+        0.0,
+        0.0,
+        2.84
+      ],
+      "wall_s_a": [
+        0.0,
+        -2.56,
+        1.4
+      ],
+      "window_s_a": [
+        0.0,
+        -2.56,
+        1.4
+      ],
+      "ground_ext_a": [
+        0.0,
+        -7.22,
+        -0.02
+      ],
+      "wall_ext_a": [
+        0.0,
+        -3.8200000000000003,
+        2.35
+      ],
+      "wall_sk_a_n": [
+        0.0,
+        2.4875,
+        0.045
+      ],
+      "wall_sk_a_w": [
+        -2.9875,
+        0.0,
+        0.045
+      ],
+      "wall_sk_a_e": [
+        2.9875,
+        0.0,
+        0.045
+      ],
+      "wall_sk_a_s1": [
+        2.31,
+        -2.4875,
+        0.045
+      ],
+      "wall_sk_a_s2": [
+        -2.31,
+        -2.4875,
+        0.045
+      ],
+      "desk_a": [
+        -0.3,
+        1.8,
+        0.37993
+      ],
+      "chair_a": [
+        -0.3,
+        0.86,
+        0.5885
+      ],
+      "monitor_a": [
+        -0.55,
+        1.92,
+        1.02481
+      ],
+      "mug_a1": [
+        -0.949999988079071,
+        1.7200000286102295,
+        0.8053603172302246
+      ],
+      "mug_a2": [
+        0.019999995827674866,
+        1.6200000047683716,
+        0.8053603172302246
+      ],
+      "bookcase_a": [
+        -2.75,
+        -0.6,
+        1.11
+      ],
+      "books_a1": [
+        -1.0201395750045776,
+        1.980076551437378,
+        0.8831011652946472
+      ],
+      "filecab_a": [
+        2.62,
+        0.6,
+        0.670345
+      ],
+      "books_a2": [
+        2.5999958515167236,
+        0.6000053286552429,
+        1.4639310836791992
+      ],
+      "books_a3": [
+        0.5500724911689758,
+        2.1000001430511475,
+        0.862366795539856
+      ],
+      "lamp_a": [
+        0.42,
+        1.62,
+        1.013855
+      ],
+      "cooler_a": [
+        2.55,
+        -2.12,
+        0.55
+      ],
+      "plant_a": [
+        1.55,
+        -1.15,
+        0.87748
+      ],
+      "bin_a": [
+        0.9199987053871155,
+        1.6600004434585571,
+        0.07319993525743484
+      ]
+    },
+    "translation_m": {
+      "mug_a1": 5.960464477539063e-08,
+      "mug_a2": 6.302790461364624e-08,
+      "books_a1": 2.33007661761216e-05,
+      "books_a2": 1.6858739404357614e-07,
+      "books_a3": 0.00010936378730346407,
+      "bin_a": 1.871045363533251e-06
+    },
+    "stable": true,
+    "test_kind": "dynamic_settling",
+    "limitations": [
+      "settling check is separate from per-action interaction evidence",
+      "mass and contact material values are synthetic priors, not measured properties",
+      "convex decomposition can alter cavities and thin geometry; contact behavior requires task-specific calibration"
+    ],
+    "total_steps": 180
+  },
+  "interaction": {
+    "validated": false,
+    "test_kind": "external_force_response",
+    "action_results": [],
+    "evidence_source": "Isaac physics states and rendered before/after images",
+    "limitations": [
+      "external force response; no robot, grasp or contact-manipulation success is claimed",
+      "synthetic contact parameters are uncalibrated; sim2real gap is not measured"
+    ],
+    "reason": "no executable interaction requested"
+  },
+  "image_diagnostics": {
+    "view_0.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 216,
+          "rgb_std": 39.780764393745
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 5,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_1.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 248,
+          "rgb_std": 47.4927696638587
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_2.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 231,
+          "rgb_std": 57.22729221830055
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_3.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 168,
+          "rgb_std": 39.54466911501473
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_4.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 215,
+          "rgb_std": 47.58089627478686
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_5.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 217,
+          "rgb_std": 46.57799164016724
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_6.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 216,
+          "rgb_std": 44.31609205450055
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    },
+    "view_7.png": {
+      "valid_rgb": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "shape": [
+            720,
+            960,
+            4
+          ],
+          "nonzero_rgb": true,
+          "reason": null,
+          "rgb_min": 0,
+          "rgb_max": 249,
+          "rgb_std": 45.67784931783651
+        }
+      ],
+      "simulation_advanced": false,
+      "final_camera_changed": false,
+      "render_reinitialized": false,
+      "max_attempts": 3,
+      "render_steps_per_attempt": 1,
+      "rt_subframes": 4,
+      "material_priming_steps": 0,
+      "final_spp_per_frame": 64,
+      "final_total_spp": 64,
+      "temporary_camera_offset_m": 0.0
+    }
+  },
+  "scene_file": "scene.usda",
+  "scene_payload": "scene.usdc",
+  "scene_format": "usdc",
+  "scene_resources": [
+    {
+      "file": "scene_resource_000.hdr",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr"
+    },
+    {
+      "file": "scene_resource_001.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+    },
+    {
+      "file": "scene_resource_002.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png"
+    },
+    {
+      "file": "scene_resource_003.jpg",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Patterns/nv_concrete_sidewalk_new.jpg"
+    },
+    {
+      "file": "scene_resource_004.jpg",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Patterns/nv_wood_laminate_tile_light.jpg"
+    },
+    {
+      "file": "scene_resource_005.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/venv/lib/python3.12/site-packages/isaacsim/kit/mdl/core/Base/OmniPBR.mdl"
+    },
+    {
+      "file": "scene_resource_006.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/KLT_Bin/Materials/Textures/FOF_Map_Magenta_Box_D.png"
+    },
+    {
+      "file": "scene_resource_007.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/KLT_Bin/Materials/Textures/FOF_Mesh_Labels_D.png"
+    },
+    {
+      "file": "scene_resource_008.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/KLT_Bin/Materials/Textures/FOF_Map_Labels_D.png"
+    },
+    {
+      "file": "scene_resource_009.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/MI_TrashCan.mdl"
+    },
+    {
+      "file": "scene_resource_010.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/OmniUe4Function.mdl"
+    },
+    {
+      "file": "scene_resource_011.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/OmniUe4Base.mdl"
+    },
+    {
+      "file": "scene_resource_012.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Bookcase_n.png"
+    },
+    {
+      "file": "scene_resource_013.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Bookcase_bc.png"
+    },
+    {
+      "file": "scene_resource_014.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Bookcase_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_015.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Palm_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_016.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Palm_bc.png"
+    },
+    {
+      "file": "scene_resource_017.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Palm_n.png"
+    },
+    {
+      "file": "scene_resource_018.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/MI_Props.mdl"
+    },
+    {
+      "file": "scene_resource_019.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Cooler_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_020.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Cooler_bc.png"
+    },
+    {
+      "file": "scene_resource_021.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Cooler_n.png"
+    },
+    {
+      "file": "scene_resource_022.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/MI_Clock.mdl"
+    },
+    {
+      "file": "scene_resource_023.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_LampA_ao_r_m_e.png"
+    },
+    {
+      "file": "scene_resource_024.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_LampA_bc.png"
+    },
+    {
+      "file": "scene_resource_025.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_LampA_n.png"
+    },
+    {
+      "file": "scene_resource_026.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_BooksA_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_027.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_BooksA_bc.png"
+    },
+    {
+      "file": "scene_resource_028.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_BooksA_n.png"
+    },
+    {
+      "file": "scene_resource_029.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_FileCabinet_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_030.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_FileCabinet_bc.png"
+    },
+    {
+      "file": "scene_resource_031.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_FileCabinet_n.png"
+    },
+    {
+      "file": "scene_resource_032.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Cupboard_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_033.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Cupboard_bc.png"
+    },
+    {
+      "file": "scene_resource_034.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Cupboard_n.png"
+    },
+    {
+      "file": "scene_resource_035.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/Mugs/texture/T_Mug_A2_Albedo.png"
+    },
+    {
+      "file": "scene_resource_036.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/Mugs/texture/T_Mug_A2_Normal.png"
+    },
+    {
+      "file": "scene_resource_037.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/Mugs/texture/T_Mug_A2_ORM.png"
+    },
+    {
+      "file": "scene_resource_038.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PC1_ao_r_m_e.png"
+    },
+    {
+      "file": "scene_resource_039.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PC1_bc.png"
+    },
+    {
+      "file": "scene_resource_040.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PC1_n.png"
+    },
+    {
+      "file": "scene_resource_041.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_ChairOffice_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_042.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_ChairOffice_bc.png"
+    },
+    {
+      "file": "scene_resource_043.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_ChairOffice_n.png"
+    },
+    {
+      "file": "scene_resource_044.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/MI_DoorA.mdl"
+    },
+    {
+      "file": "scene_resource_045.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PanicDoor_n.png"
+    },
+    {
+      "file": "scene_resource_046.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PanicDoor_bc.png"
+    },
+    {
+      "file": "scene_resource_047.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PanicDoor_mask.png"
+    },
+    {
+      "file": "scene_resource_048.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_PanicDoor_ao_r_m_e.png"
+    },
+    {
+      "file": "scene_resource_049.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_TableD_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_050.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_TableD_bc.png"
+    },
+    {
+      "file": "scene_resource_051.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_TableD_mask.png"
+    },
+    {
+      "file": "scene_resource_052.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_TableD_n.png"
+    },
+    {
+      "file": "scene_resource_053.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/MI_DoorEntrance_glass.mdl"
+    },
+    {
+      "file": "scene_resource_054.mdl",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/OmniUe4Translucent.mdl"
+    },
+    {
+      "file": "scene_resource_055.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Window_ao_r_m.png"
+    },
+    {
+      "file": "scene_resource_056.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Window_bc.png"
+    },
+    {
+      "file": "scene_resource_057.png",
+      "source": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_Window_n.png"
+    }
+  ],
+  "scene_resources_unresolved": [],
+  "scene_resource_scope": "composed USD; images and local MDL using-imports/texture_2d defaults",
+  "scene_runtime_requirements": [
+    "MDL renderer and standard modules",
+    "Isaac/PhysX for simulation"
+  ],
+  "frames": 8,
+  "visible_counts": [
+    15,
+    21,
+    9,
+    4,
+    21,
+    17,
+    18,
+    14
+  ],
+  "renderable": true,
+  "render_qa": {
+    "passed": true,
+    "failed_views": [],
+    "assessed": true
+  },
+  "source_fidelity": "not_applicable_programmatic_composition",
+  "asset_dependencies": [
+    {
+      "entity_id": "window_s_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_window",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_Window_3m_A.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.9999965255580575,
+        0.9999996710341362,
+        0.9333332576194968
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": [
+        {
+          "source_material": "/World/Objects/window_s_a/AssetNormalization/Source/Looks/MI_Window",
+          "override_material": null,
+          "applied": [],
+          "skipped": [
+            {
+              "field": "native_opacity_multiplier",
+              "reason": "unsupported native shader parameter; original preserved"
+            }
+          ],
+          "textures_and_shader_graph": "preserved",
+          "scope": "per_object_stage_layer",
+          "calibration": "appearance prior only"
+        },
+        {
+          "source_material": "/World/Objects/window_s_a/AssetNormalization/Source/Looks/MI_Window_glass",
+          "override_material": "/World/Objects/window_s_a/GlossOverrides/Material_1",
+          "applied": [
+            {
+              "field": "native_opacity_multiplier",
+              "input": "Opacity_Multiply",
+              "value": 0.62,
+              "meaning": "native_alpha_multiplier_not_calibrated_transmittance",
+              "shader": "/World/Objects/window_s_a/GlossOverrides/Material_1/MI_DoorEntrance_glass"
+            }
+          ],
+          "skipped": [],
+          "textures_and_shader_graph": "preserved",
+          "scope": "per_object_stage_layer",
+          "calibration": "appearance prior only"
+        }
+      ]
+    },
+    {
+      "entity_id": "desk_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_desk",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_TableD.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.9999998104241561,
+        1.000000022351742,
+        0.9999998553350342
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "chair_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_chair",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_ChairOffice.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.6844520257018664,
+        0.6977862591462629,
+        1.0000026330116727
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "monitor_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_monitor",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_MonitorPC.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.46304633409239093,
+        0.8531072291366678,
+        1.0000001744488491
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "mug_a1",
+      "kind": "registered_usd",
+      "asset_kind": "mug",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/Mugs/SM_Mug_A2.usd",
+      "native_colliders_preserved": false,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.000910995320105,
+        1.0005988803914123,
+        1.0003415333947445
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "mug_a2",
+      "kind": "registered_usd",
+      "asset_kind": "mug",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/Mugs/SM_Mug_A2.usd",
+      "native_colliders_preserved": false,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.0009109953201047,
+        1.0005988803914123,
+        1.0003415333947445
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "bookcase_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_bookcase",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_BookcaseA.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.9999957057391626,
+        1.0000000223517422,
+        1.0000002303416755
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "books_a1",
+      "kind": "registered_usd",
+      "asset_kind": "office_books",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_BooksSet_01.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.000007810477695,
+        0.9999883132551094,
+        0.9999959775457533
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "filecab_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_file_cabinet",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_FileCabinet_01.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.9999999789412479,
+        0.9999993646792826,
+        1.0000036406358064
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "books_a2",
+      "kind": "registered_usd",
+      "asset_kind": "office_books",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_BooksSet_01.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.000007810477695,
+        0.9999883132551094,
+        0.9999959775457533
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "books_a3",
+      "kind": "registered_usd",
+      "asset_kind": "office_book",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_Book_01.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.9999974593585287,
+        1.0000016008496895,
+        0.9999977850986849
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "lamp_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_lamp",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_Lamp.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.0000000677648082,
+        1.0000000223517422,
+        0.999998061236196
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "cooler_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_water_cooler",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_WaterCooler.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        0.9999997418593688,
+        1.0000012176583621,
+        1.0000000088409482
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "plant_a",
+      "kind": "registered_usd",
+      "asset_kind": "office_plant",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Props/SM_Plant01.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.000001216470489,
+        1.0000014373656692,
+        1.0000003543067304
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    },
+    {
+      "entity_id": "bin_a",
+      "kind": "registered_usd",
+      "asset_kind": "bin",
+      "path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Props/KLT_Bin/small_KLT_visual_collision.usd",
+      "native_colliders_preserved": true,
+      "source_up_axis": "Z",
+      "normalization_scale_xyz": [
+        1.000794671039805,
+        1.0012315025420824,
+        1.000273839427255
+      ],
+      "normalization": "centered and independently scaled to declared meter dimensions",
+      "portability": "SceneProgram rebuild requires the Isaac asset tree; exported USD contains composed geometry, with resource copies and unresolved paths recorded in report.scene_resources and report.scene_resources_unresolved",
+      "appearance_overrides": []
+    }
+  ],
+  "material_dependencies": [
+    {
+      "prim_path": "/World/Objects/floor_a/Geometry",
+      "texture_id": "wood_laminate",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Patterns/nv_wood_laminate_tile_light.jpg"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        1.6,
+        0.8
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": null,
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/floor_a/Geometry/Collision",
+      "texture_id": "wood_laminate",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Patterns/nv_wood_laminate_tile_light.jpg"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        1.6,
+        0.8
+      ],
+      "uv_mapping": null,
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": null,
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_n_a/Geometry",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_n_a/Geometry/Collision",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": null,
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_w_a/Geometry",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_w_a/Geometry/Collision",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": null,
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_e_a/Geometry",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_e_a/Geometry/Collision",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": null,
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_s_a/part0",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_s_a/part1",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_s_a/part2",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_s_a/part3",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "entity_id": "window_s_a",
+      "kind": "native_gloss_override",
+      "source_material": "/World/Objects/window_s_a/AssetNormalization/Source/Looks/MI_Window",
+      "override_material": null,
+      "applied": [],
+      "skipped": [
+        {
+          "field": "native_opacity_multiplier",
+          "reason": "unsupported native shader parameter; original preserved"
+        }
+      ],
+      "textures_and_shader_graph": "preserved",
+      "scope": "per_object_stage_layer",
+      "calibration": "appearance prior only"
+    },
+    {
+      "entity_id": "window_s_a",
+      "kind": "native_gloss_override",
+      "source_material": "/World/Objects/window_s_a/AssetNormalization/Source/Looks/MI_Window_glass",
+      "override_material": "/World/Objects/window_s_a/GlossOverrides/Material_1",
+      "applied": [
+        {
+          "field": "native_opacity_multiplier",
+          "input": "Opacity_Multiply",
+          "value": 0.62,
+          "meaning": "native_alpha_multiplier_not_calibrated_transmittance",
+          "shader": "/World/Objects/window_s_a/GlossOverrides/Material_1/MI_DoorEntrance_glass"
+        }
+      ],
+      "skipped": [],
+      "textures_and_shader_graph": "preserved",
+      "scope": "per_object_stage_layer",
+      "calibration": "appearance prior only"
+    },
+    {
+      "prim_path": "/World/Objects/ground_ext_a/Geometry",
+      "texture_id": "sidewalk_concrete",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Patterns/nv_concrete_sidewalk_new.jpg"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        1.6,
+        1.6
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": null,
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/ground_ext_a/Geometry/Collision",
+      "texture_id": "sidewalk_concrete",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Patterns/nv_concrete_sidewalk_new.jpg"
+      },
+      "texture_tint": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "uv_scale_m": [
+        1.6,
+        1.6
+      ],
+      "uv_mapping": null,
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": null,
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_ext_a/Geometry",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        0.62,
+        0.62,
+        0.66
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": "six planar faces; meters per texture repeat",
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    },
+    {
+      "prim_path": "/World/Objects/wall_ext_a/Geometry/Collision",
+      "texture_id": "office_wall",
+      "paths": {
+        "base_color": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_bc.png",
+        "normal": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Environments/Office/Materials/Textures/T_WallOffice_n.png"
+      },
+      "texture_tint": [
+        0.62,
+        0.62,
+        0.66
+      ],
+      "uv_scale_m": [
+        2.0,
+        2.0
+      ],
+      "uv_mapping": null,
+      "source": "installed NVIDIA Isaac asset library",
+      "calibration": "appearance prior; physical reflectance is not measured",
+      "normal_convention": "source tangent-space encoding; no axis flips applied",
+      "portability": "SceneProgram rebuild requires the Isaac texture library; exported USD resource copies and unresolved paths are recorded in report.scene_resources and report.scene_resources_unresolved"
+    }
+  ],
+  "environment_dependencies": [
+    {
+      "light_path": "/World/Lights/env_sky",
+      "environment_id": "clear_day_sky",
+      "texture_path": "/local_data/jiangbaoyang/isaac-a800-20261016/native-assets/Isaac/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+      "texture_format": "latlong",
+      "orientation": "explicit_world_nadir",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "direction_meaning": "world direction of the HDR lower pole; does not specify a sun light direction",
+      "source": "Poly Haven sky supplied in the installed NVIDIA Isaac asset library",
+      "calibration": "appearance and lighting prior; no site-specific illumination calibration"
+    }
+  ],
+  "realism": {
+    "mass_and_contact_properties": "uncalibrated synthetic priors",
+    "appearance": "native texture appearance priors, native materials or generated colors; reflectance is not measured",
+    "sim2real_gap": "not measured"
+  },
+  "cleanup_complete": true,
+  "execution": {
+    "pid": 1378033,
+    "app_reused": true,
+    "startup_seconds": 0.0,
+    "capture_seconds": 98.284
+  },
+  "engine_runtime": {
+    "pid": 1378033,
+    "app_identity": 140184813467504,
+    "executor_generation": "camera-scale-v1",
+    "executor_source_version": "gpu-hot-v21-gaussian-cuda",
+    "gpu_uuid": "GPU-84eb5081-4cc6-2547-74cc-704cc136e5e1",
+    "prestarted": true
+  }
+}

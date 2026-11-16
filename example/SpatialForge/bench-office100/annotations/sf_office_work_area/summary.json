@@ -1,0 +1,12 @@
+{
+ "scene_id": "sf_office_work_area",
+ "objects": 28,
+ "props": 14,
+ "views": 8,
+ "acceptance": true,
+ "non_production": false,
+ "production_eligible": true,
+ "max_deviation_m": 0.0002,
+ "media_pairing_problems": 0,
+ "objects_unobserved_in_views": 0
+}

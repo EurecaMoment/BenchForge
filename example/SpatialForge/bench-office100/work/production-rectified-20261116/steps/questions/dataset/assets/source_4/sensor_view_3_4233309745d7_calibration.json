@@ -1,0 +1,38 @@
+{
+  "schema": "public-camera-sensor/v1",
+  "image_size": {
+    "width": 960,
+    "height": 720
+  },
+  "K": [
+    [
+      853.3333333333334,
+      0.0,
+      480.0
+    ],
+    [
+      0.0,
+      853.3333333333334,
+      360.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "calibration_basis": "captured_intrinsic_matrix",
+  "pixel_center_offset_px": [
+    0.5,
+    0.5
+  ],
+  "depth": {
+    "asset": "sensor_view_3_9e2aa1aa8e90_depth_mm.png",
+    "valid_mask": "sensor_view_3_9e2aa1aa8e90_depth_valid.png",
+    "unit_scale_to_m": 0.001,
+    "invalid_value": 0,
+    "kind": "optical_axis_z",
+    "quantization_error_m": 0.0005
+  },
+  "definition": "Same captured sensor; no target pose, size or answer."
+}

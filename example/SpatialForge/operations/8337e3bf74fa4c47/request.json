@@ -1,0 +1,12 @@
+{
+  "tool": "pipeline_run",
+  "arguments": {
+    "plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/84bb9cf33e8746fe/plan.json",
+    "run": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107"
+  },
+  "time": "2026-11-06T19:41:34.988415+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "formal-pipeline-runtime"
+  }
+}

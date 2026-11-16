@@ -1,0 +1,15 @@
+{
+  "tool": "pipeline_plan",
+  "arguments": {
+    "assessment_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/plan/sections/assessment_s1.json",
+    "objective": "室内场景空间理解评测集生产（目标100题）：按 C01-T01/T02/T03、C03-T01、C04-T01/T02、C05-T01、C07-T02、C09-T01、C11-T01 十个精确模板各10题，在新建的三个室内仿真场景（办公室工作区、起居会客角、阅览茶水角）上完成 S1计划→S2场景采集与验收→S3标注与真值→S4按模板出题→S5质检打包 五阶段；场景选择为空且允许新建，GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真回执，公开题目不泄露答案。本版仅同步软设计：移除实拍不可辨识的官方笔记本资产引用（非用户硬要求），配额/seed/split/评分/硬要求不变。",
+    "pipeline_id": "data.capability",
+    "seed": 20261105,
+    "validate_only": "true"
+  },
+  "time": "2026-11-06T01:50:13.026828+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "chatcmpl-tool-888211fa77060768"
+  }
+}

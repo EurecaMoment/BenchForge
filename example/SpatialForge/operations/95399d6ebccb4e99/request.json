@@ -1,0 +1,12 @@
+{
+  "tool": "pipeline_plan",
+  "arguments": {
+    "request_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/partition-preservation-20261107/application-request.json",
+    "validate_only": true
+  },
+  "time": "2026-11-06T17:13:41.955265+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "partition-preservation-application-20261107"
+  }
+}

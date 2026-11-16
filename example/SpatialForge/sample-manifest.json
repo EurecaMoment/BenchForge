@@ -1,0 +1,87 @@
+{
+  "schema": "benchforge.example-assets/v1",
+  "workspace": "BenchForgeV2 repository root",
+  "conversation": "example/SpatialForge/session-13742859-5f94-4ca8-ab53-2ffc86ae2e12/session.v4.jsonl.zstd",
+  "scene_program_count": 5,
+  "unique_scene_count": 3,
+  "scenes": [
+    {
+      "scene_id": "sf_office_work_area",
+      "version": "current accepted",
+      "path": "example/SpatialForge/bench-office100/scenes/sf_office_work_area.scene_program.json"
+    },
+    {
+      "scene_id": "sf_lounge_meeting_corner",
+      "version": "current accepted",
+      "path": "example/SpatialForge/bench-office100/scenes/sf_lounge_meeting_corner.scene_program.json"
+    },
+    {
+      "scene_id": "sf_study_pantry_corner",
+      "version": "current accepted",
+      "path": "example/SpatialForge/bench-office100/scenes/sf_study_pantry_corner.scene_program.json"
+    },
+    {
+      "scene_id": "sf_office_work_area",
+      "version": "2026-11-05 historical snapshot",
+      "path": "example/SpatialForge/bench-office100-20261105/scenes/sf_office_work_area.scene_program.json"
+    },
+    {
+      "scene_id": "sf_lounge_meeting_corner",
+      "version": "2026-11-05 historical snapshot",
+      "path": "example/SpatialForge/bench-office100-20261105/scenes/sf_lounge_meeting_corner.scene_program.json"
+    }
+  ],
+  "collection_record_count": 10,
+  "collection_split": {
+    "train": 4,
+    "dev": 3,
+    "test": 3
+  },
+  "collection_ids": [
+    "OF100-C01-T01-001",
+    "OF100-C01-T02-001",
+    "OF100-C01-T03-001",
+    "OF100-C03-T01-001",
+    "OF100-C04-T01-005",
+    "OF100-C04-T02-005",
+    "OF100-C05-T01-005",
+    "OF100-C07-T02-008",
+    "OF100-C09-T01-008",
+    "OF100-C11-T01-008"
+  ],
+  "question_count": 25,
+  "question_split": {
+    "train": 10,
+    "dev": 7,
+    "test": 8
+  },
+  "question_template_count": 10,
+  "question_item_ids": [
+    "item_00000000",
+    "item_00000004",
+    "item_00000007",
+    "item_00000010",
+    "item_00000014",
+    "item_00000017",
+    "item_00000020",
+    "item_00000024",
+    "item_00000027",
+    "item_00000030",
+    "item_00000034",
+    "item_00000037",
+    "item_00000040",
+    "item_00000044",
+    "item_00000047",
+    "item_00000050",
+    "item_00000054",
+    "item_00000060",
+    "item_00000064",
+    "item_00000070",
+    "item_00000077",
+    "item_00000080",
+    "item_00000087",
+    "item_00000090",
+    "item_00000097"
+  ],
+  "answer_library_included": false
+}

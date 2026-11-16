@@ -1,0 +1,28 @@
+{
+  "schema": "public-object-local-axes/v1",
+  "source": "same captured runtime USD",
+  "reference": "图1相机坐标：右、下、前",
+  "objects": [
+    {
+      "object_label": "B07",
+      "local_axes_in_reference_camera": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -0.508981465607878,
+          0.8607774786015583
+        ],
+        [
+          0.0,
+          -0.8607774786015583,
+          -0.508981465607878
+        ]
+      ]
+    }
+  ],
+  "definition": "每项依次为本体局部X/Y/Z单位方向；不含平移、尺寸、目标坐标或答案。"
+}

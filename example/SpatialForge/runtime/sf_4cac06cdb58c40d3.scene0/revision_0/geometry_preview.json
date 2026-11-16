@@ -1,0 +1,1740 @@
+{
+  "schema": "spatialforge.geometry_preview/v1",
+  "authority": "program/source geometry advice; not simulation GT",
+  "scene_id": "sf_study_pantry_corner",
+  "objects": [
+    {
+      "object_id": "floor_c",
+      "path": "/objects/0",
+      "kind": "box",
+      "support": "ground",
+      "base_z": -0.06,
+      "requested_size_m": [
+        5.640000000000001,
+        4.84,
+        0.06
+      ],
+      "actual_size_m": [
+        5.640000000000001,
+        4.84,
+        0.06
+      ],
+      "initial_bottom_z_m": -0.06,
+      "initial_center_m": [
+        0,
+        0,
+        -0.03
+      ],
+      "whole_object_top_z_m": 0.0,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": -0.06,
+      "geometry_bottom_gap_above_support_envelope_m": -0.06,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "top_z_m": 0.0,
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.8200000000000003,
+              -2.42
+            ],
+            [
+              2.8200000000000003,
+              -2.42
+            ],
+            [
+              2.8200000000000003,
+              2.42
+            ],
+            [
+              -2.8200000000000003,
+              2.42
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_n_c",
+      "path": "/objects/1",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        5.640000000000001,
+        0.12,
+        2.8
+      ],
+      "actual_size_m": [
+        5.640000000000001,
+        0.12,
+        2.8
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        0,
+        2.36,
+        1.4
+      ],
+      "whole_object_top_z_m": 2.8,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            0.0,
+            2.36
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            5.640000000000001,
+            0.12
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.8200000000000003,
+              2.3
+            ],
+            [
+              2.8200000000000003,
+              2.3
+            ],
+            [
+              2.8200000000000003,
+              2.42
+            ],
+            [
+              -2.8200000000000003,
+              2.42
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_w_c",
+      "path": "/objects/2",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.12,
+        4.6,
+        2.8
+      ],
+      "actual_size_m": [
+        0.12,
+        4.6,
+        2.8
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -2.7600000000000002,
+        0,
+        1.4
+      ],
+      "whole_object_top_z_m": 2.8,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            -2.7600000000000002,
+            0.0
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            0.12,
+            4.6
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.8200000000000003,
+              -2.3
+            ],
+            [
+              -2.7,
+              -2.3
+            ],
+            [
+              -2.7,
+              2.3
+            ],
+            [
+              -2.8200000000000003,
+              2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_e_c",
+      "path": "/objects/3",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.12,
+        4.6,
+        2.8
+      ],
+      "actual_size_m": [
+        0.12,
+        4.6,
+        2.8
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        2.7600000000000002,
+        0,
+        1.4
+      ],
+      "whole_object_top_z_m": 2.8,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            2.7600000000000002,
+            0.0
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            0.12,
+            4.6
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              2.7,
+              -2.3
+            ],
+            [
+              2.8200000000000003,
+              -2.3
+            ],
+            [
+              2.8200000000000003,
+              2.3
+            ],
+            [
+              2.7,
+              2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "ceiling_c",
+      "path": "/objects/4",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 2.8,
+      "requested_size_m": [
+        5.640000000000001,
+        4.84,
+        0.08
+      ],
+      "actual_size_m": [
+        5.640000000000001,
+        4.84,
+        0.08
+      ],
+      "initial_bottom_z_m": 2.8,
+      "initial_center_m": [
+        0,
+        0,
+        2.84
+      ],
+      "whole_object_top_z_m": 2.88,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 2.8,
+      "geometry_bottom_gap_above_support_envelope_m": 2.8,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "top_z_m": 2.88,
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.8200000000000003,
+              -2.42
+            ],
+            [
+              2.8200000000000003,
+              -2.42
+            ],
+            [
+              2.8200000000000003,
+              2.42
+            ],
+            [
+              -2.8200000000000003,
+              2.42
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_s_c",
+      "path": "/objects/5",
+      "kind": "composite",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        5.640000000000001,
+        0.12,
+        2.8
+      ],
+      "actual_size_m": [
+        5.640000000000001,
+        0.12,
+        2.8
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        0,
+        -2.36,
+        1.4
+      ],
+      "whole_object_top_z_m": 2.8,
+      "placement_size_basis": "declared_envelope",
+      "composite_geometry": {
+        "local_min_m": [
+          -2.7,
+          -0.06,
+          -1.4
+        ],
+        "local_max_m": [
+          2.7,
+          0.06,
+          1.4
+        ],
+        "size_m": [
+          5.4,
+          0.12,
+          2.8
+        ],
+        "bottom_z_m": 0.0,
+        "top_z_m": 2.8,
+        "bottom_inset_from_envelope_m": 0.0,
+        "top_inset_from_envelope_m": 0.0,
+        "scope": "analytic initial part extents, not physical contact; executor still places by declared envelope"
+      },
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": 0,
+          "world_xy": [
+            2.1,
+            -2.36
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            1.2000000000000002,
+            0.12
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              1.5,
+              -2.42
+            ],
+            [
+              2.7,
+              -2.42
+            ],
+            [
+              2.7,
+              -2.3
+            ],
+            [
+              1.5,
+              -2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        },
+        {
+          "part_index": 1,
+          "world_xy": [
+            -2.1,
+            -2.36
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            1.2000000000000002,
+            0.12
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.7,
+              -2.42
+            ],
+            [
+              -1.5,
+              -2.42
+            ],
+            [
+              -1.5,
+              -2.3
+            ],
+            [
+              -2.7,
+              -2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        },
+        {
+          "part_index": 2,
+          "world_xy": [
+            1.56,
+            -2.36
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            0.12,
+            0.12
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              1.5,
+              -2.42
+            ],
+            [
+              1.62,
+              -2.42
+            ],
+            [
+              1.62,
+              -2.3
+            ],
+            [
+              1.5,
+              -2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        },
+        {
+          "part_index": 3,
+          "world_xy": [
+            -1.56,
+            -2.36
+          ],
+          "top_z_m": 2.8,
+          "size_xy_m": [
+            0.12,
+            0.12
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -1.62,
+              -2.42
+            ],
+            [
+              -1.5,
+              -2.42
+            ],
+            [
+              -1.5,
+              -2.3
+            ],
+            [
+              -1.62,
+              -2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "window_s_c",
+      "path": "/objects/6",
+      "kind": "office_window",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.12,
+        3.0,
+        2.8
+      ],
+      "actual_size_m": [
+        0.12,
+        3.0,
+        2.8
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        0,
+        -2.36,
+        1.4
+      ],
+      "whole_object_top_z_m": 2.8,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "ground_ext_c",
+      "path": "/objects/7",
+      "kind": "box",
+      "support": "ground",
+      "base_z": -0.04,
+      "requested_size_m": [
+        16.0,
+        10.0,
+        0.04
+      ],
+      "actual_size_m": [
+        16.0,
+        10.0,
+        0.04
+      ],
+      "initial_bottom_z_m": -0.04,
+      "initial_center_m": [
+        0,
+        -7.02,
+        -0.02
+      ],
+      "whole_object_top_z_m": 0.0,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": -0.04,
+      "geometry_bottom_gap_above_support_envelope_m": -0.04,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            0.0,
+            -7.02
+          ],
+          "top_z_m": 0.0,
+          "size_xy_m": [
+            16.0,
+            10.0
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -8.0,
+              -12.02
+            ],
+            [
+              8.0,
+              -12.02
+            ],
+            [
+              8.0,
+              -2.0199999999999996
+            ],
+            [
+              -8.0,
+              -2.0199999999999996
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_ext_c",
+      "path": "/objects/8",
+      "kind": "box",
+      "support": "ground",
+      "base_z": -0.15,
+      "requested_size_m": [
+        14.0,
+        0.15,
+        5.0
+      ],
+      "actual_size_m": [
+        14.0,
+        0.15,
+        5.0
+      ],
+      "initial_bottom_z_m": -0.15,
+      "initial_center_m": [
+        0,
+        -3.62,
+        2.35
+      ],
+      "whole_object_top_z_m": 4.85,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": -0.15,
+      "geometry_bottom_gap_above_support_envelope_m": -0.15,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            0.0,
+            -3.62
+          ],
+          "top_z_m": 4.85,
+          "size_xy_m": [
+            14.0,
+            0.15
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -7.0,
+              -3.6950000000000003
+            ],
+            [
+              7.0,
+              -3.6950000000000003
+            ],
+            [
+              7.0,
+              -3.545
+            ],
+            [
+              -7.0,
+              -3.545
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_sk_c_n",
+      "path": "/objects/9",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        5.36,
+        0.025,
+        0.09
+      ],
+      "actual_size_m": [
+        5.36,
+        0.025,
+        0.09
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        0,
+        2.2874999999999996,
+        0.045
+      ],
+      "whole_object_top_z_m": 0.09,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            0.0,
+            2.2874999999999996
+          ],
+          "top_z_m": 0.09,
+          "size_xy_m": [
+            5.36,
+            0.025
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.68,
+              2.2749999999999995
+            ],
+            [
+              2.68,
+              2.2749999999999995
+            ],
+            [
+              2.68,
+              2.3
+            ],
+            [
+              -2.68,
+              2.3
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_sk_c_w",
+      "path": "/objects/10",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.025,
+        4.56,
+        0.09
+      ],
+      "actual_size_m": [
+        0.025,
+        4.56,
+        0.09
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -2.6875,
+        0,
+        0.045
+      ],
+      "whole_object_top_z_m": 0.09,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            -2.6875,
+            0.0
+          ],
+          "top_z_m": 0.09,
+          "size_xy_m": [
+            0.025,
+            4.56
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.7,
+              -2.28
+            ],
+            [
+              -2.675,
+              -2.28
+            ],
+            [
+              -2.675,
+              2.28
+            ],
+            [
+              -2.7,
+              2.28
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_sk_c_e",
+      "path": "/objects/11",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.025,
+        4.56,
+        0.09
+      ],
+      "actual_size_m": [
+        0.025,
+        4.56,
+        0.09
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        2.6875,
+        0,
+        0.045
+      ],
+      "whole_object_top_z_m": 0.09,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            2.6875,
+            0.0
+          ],
+          "top_z_m": 0.09,
+          "size_xy_m": [
+            0.025,
+            4.56
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              2.675,
+              -2.28
+            ],
+            [
+              2.7,
+              -2.28
+            ],
+            [
+              2.7,
+              2.28
+            ],
+            [
+              2.675,
+              2.28
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_sk_c_s1",
+      "path": "/objects/12",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        1.08,
+        0.025,
+        0.09
+      ],
+      "actual_size_m": [
+        1.08,
+        0.025,
+        0.09
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        2.16,
+        -2.2874999999999996,
+        0.045
+      ],
+      "whole_object_top_z_m": 0.09,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            2.16,
+            -2.2874999999999996
+          ],
+          "top_z_m": 0.09,
+          "size_xy_m": [
+            1.08,
+            0.025
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              1.62,
+              -2.3
+            ],
+            [
+              2.7,
+              -2.3
+            ],
+            [
+              2.7,
+              -2.2749999999999995
+            ],
+            [
+              1.62,
+              -2.2749999999999995
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "wall_sk_c_s2",
+      "path": "/objects/13",
+      "kind": "box",
+      "support": "ground",
+      "base_z": 0.0,
+      "requested_size_m": [
+        1.08,
+        0.025,
+        0.09
+      ],
+      "actual_size_m": [
+        1.08,
+        0.025,
+        0.09
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -2.16,
+        -2.2874999999999996,
+        0.045
+      ],
+      "whole_object_top_z_m": 0.09,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [
+        {
+          "part_index": null,
+          "world_xy": [
+            -2.16,
+            -2.2874999999999996
+          ],
+          "top_z_m": 0.09,
+          "size_xy_m": [
+            1.08,
+            0.025
+          ],
+          "yaw_deg": 0.0,
+          "world_corners_xy": [
+            [
+              -2.7,
+              -2.3
+            ],
+            [
+              -1.62,
+              -2.3
+            ],
+            [
+              -1.62,
+              -2.2749999999999995
+            ],
+            [
+              -2.7,
+              -2.2749999999999995
+            ]
+          ],
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "parent_dynamic": false,
+          "physical_support_validated": false
+        }
+      ]
+    },
+    {
+      "object_id": "desk_c1",
+      "path": "/objects/14",
+      "kind": "office_desk",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.9,
+        2.0,
+        0.75986
+      ],
+      "actual_size_m": [
+        0.9,
+        2.0,
+        0.75986
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -1.15,
+        1.8,
+        0.37993
+      ],
+      "whole_object_top_z_m": 0.75986,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "desk_c2",
+      "path": "/objects/15",
+      "kind": "office_desk",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.9,
+        2.0,
+        0.75986
+      ],
+      "actual_size_m": [
+        0.9,
+        2.0,
+        0.75986
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        1.15,
+        1.8,
+        0.37993
+      ],
+      "whole_object_top_z_m": 0.75986,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "chair_c1",
+      "path": "/objects/16",
+      "kind": "office_chair",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.63123,
+        0.65126,
+        1.177
+      ],
+      "actual_size_m": [
+        0.63123,
+        0.65126,
+        1.177
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -1.15,
+        0.82,
+        0.5885
+      ],
+      "whole_object_top_z_m": 1.177,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "chair_c2",
+      "path": "/objects/17",
+      "kind": "office_chair",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.63123,
+        0.65126,
+        1.177
+      ],
+      "actual_size_m": [
+        0.63123,
+        0.65126,
+        1.177
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        1.15,
+        0.88,
+        0.5885
+      ],
+      "whole_object_top_z_m": 1.177,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "monitor_c",
+      "path": "/objects/18",
+      "kind": "office_monitor",
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.205,
+        0.532,
+        0.5299
+      ],
+      "actual_size_m": [
+        0.205,
+        0.532,
+        0.5299
+      ],
+      "initial_bottom_z_m": 0.75986,
+      "initial_center_m": [
+        -1.4,
+        1.86,
+        1.02481
+      ],
+      "whole_object_top_z_m": 1.28976,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.75986,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "mug_c1",
+      "path": "/objects/19",
+      "kind": "mug",
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.0924,
+        0.1272,
+        0.091
+      ],
+      "actual_size_m": [
+        0.0924,
+        0.1272,
+        0.091
+      ],
+      "initial_bottom_z_m": 0.75986,
+      "initial_center_m": [
+        -0.72,
+        1.82,
+        0.80536
+      ],
+      "whole_object_top_z_m": 0.85086,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.75986,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "mug_c2",
+      "path": "/objects/20",
+      "kind": "mug",
+      "support": "desk_c2",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.0924,
+        0.1272,
+        0.091
+      ],
+      "actual_size_m": [
+        0.0924,
+        0.1272,
+        0.091
+      ],
+      "initial_bottom_z_m": 0.75986,
+      "initial_center_m": [
+        1.62,
+        1.98,
+        0.80536
+      ],
+      "whole_object_top_z_m": 0.85086,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.75986,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "books_c1",
+      "path": "/objects/21",
+      "kind": "office_books",
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.18014,
+        0.36323,
+        0.2465
+      ],
+      "actual_size_m": [
+        0.18014,
+        0.36323,
+        0.2465
+      ],
+      "initial_bottom_z_m": 0.75986,
+      "initial_center_m": [
+        -1.92,
+        1.98,
+        0.88311
+      ],
+      "whole_object_top_z_m": 1.00636,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.75986,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "books_c2",
+      "path": "/objects/22",
+      "kind": "office_books",
+      "support": "desk_c2",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.18014,
+        0.36323,
+        0.2465
+      ],
+      "actual_size_m": [
+        0.18014,
+        0.36323,
+        0.2465
+      ],
+      "initial_bottom_z_m": 0.75986,
+      "initial_center_m": [
+        0.45,
+        2.02,
+        0.88311
+      ],
+      "whole_object_top_z_m": 1.00636,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.75986,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "bookcase_c1",
+      "path": "/objects/23",
+      "kind": "office_bookcase",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.418,
+        1.84,
+        2.22
+      ],
+      "actual_size_m": [
+        0.418,
+        1.84,
+        2.22
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        2.45,
+        -1.35,
+        1.11
+      ],
+      "whole_object_top_z_m": 2.22,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "bookcase_c2",
+      "path": "/objects/24",
+      "kind": "office_bookcase",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.418,
+        1.84,
+        2.22
+      ],
+      "actual_size_m": [
+        0.418,
+        1.84,
+        2.22
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        2.45,
+        0.6,
+        1.11
+      ],
+      "whole_object_top_z_m": 2.22,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "sidecab_c",
+      "path": "/objects/25",
+      "kind": "office_file_cabinet",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.703,
+        0.3921,
+        1.34069
+      ],
+      "actual_size_m": [
+        0.703,
+        0.3921,
+        1.34069
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -2.3,
+        0.05,
+        0.670345
+      ],
+      "whole_object_top_z_m": 1.34069,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "bin_c",
+      "path": "/objects/26",
+      "kind": "bin",
+      "support": "sidecab_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.198,
+        0.297,
+        0.1464
+      ],
+      "actual_size_m": [
+        0.198,
+        0.297,
+        0.1464
+      ],
+      "initial_bottom_z_m": 1.34069,
+      "initial_center_m": [
+        -2.3,
+        0.07,
+        1.4138899999999999
+      ],
+      "whole_object_top_z_m": 1.48709,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 1.34069,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "lamp_c",
+      "path": "/objects/27",
+      "kind": "office_lamp",
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.21,
+        0.21,
+        0.50799
+      ],
+      "actual_size_m": [
+        0.21,
+        0.21,
+        0.50799
+      ],
+      "initial_bottom_z_m": 0.75986,
+      "initial_center_m": [
+        -0.65,
+        1.65,
+        1.013855
+      ],
+      "whole_object_top_z_m": 1.2678500000000001,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.75986,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": []
+    },
+    {
+      "object_id": "cooler_c",
+      "path": "/objects/28",
+      "kind": "office_water_cooler",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.34,
+        0.41935,
+        1.1
+      ],
+      "actual_size_m": [
+        0.34,
+        0.41935,
+        1.1
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -2.45,
+        1.3,
+        0.55
+      ],
+      "whole_object_top_z_m": 1.1,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "armchair_c",
+      "path": "/objects/29",
+      "kind": "office_armchair",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        0.82,
+        1.04,
+        0.79
+      ],
+      "actual_size_m": [
+        0.82,
+        1.04,
+        0.79
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -1.3,
+        -1.55,
+        0.395
+      ],
+      "whole_object_top_z_m": 0.79,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    },
+    {
+      "object_id": "plant_c",
+      "path": "/objects/30",
+      "kind": "office_plant",
+      "support": "floor_c",
+      "base_z": 0.0,
+      "requested_size_m": [
+        1.044,
+        1.233,
+        1.404
+      ],
+      "actual_size_m": [
+        1.044,
+        1.233,
+        1.404
+      ],
+      "initial_bottom_z_m": 0.0,
+      "initial_center_m": [
+        -0.1,
+        -1.55,
+        0.702
+      ],
+      "whole_object_top_z_m": 1.404,
+      "placement_size_basis": "normalized_geometry",
+      "initial_geometry_bottom_z_m": 0.0,
+      "geometry_bottom_gap_above_support_envelope_m": 0.0,
+      "base_z_for_geometry_bottom_at_support_envelope": 0.0,
+      "box_top_faces": [],
+      "support_face_options": [
+        {
+          "part_index": null,
+          "top_z_m": 0.0,
+          "world_xy": [
+            0.0,
+            0.0
+          ],
+          "size_xy_m": [
+            5.640000000000001,
+            4.84
+          ],
+          "yaw_deg": 0.0,
+          "base_z_for_contact": 0.0,
+          "base_z_allowed_by_schema": true,
+          "current_bottom_gap_m": 0.0,
+          "footprint_within_face": true,
+          "geometry_bottom_gap_m": 0.0,
+          "geometry_base_z_for_contact": 0.0,
+          "geometry_base_z_allowed_by_schema": true,
+          "parent_dynamic": false
+        }
+      ]
+    }
+  ],
+  "warnings": [],
+  "mesh_assets_read": 0,
+  "limits": [
+    "initial geometry only; no settling/contact/occlusion assessment",
+    "native object extents follow declared normalization; native internal surfaces are not inferred",
+    "semantic upright cannot be derived from bounds",
+    "envelope_underfilled is a heuristic, not an acceptance gate"
+  ],
+  "guidance": "geometry_preview.json is program/source-geometry advice before simulation, not GT or contact validation. uniform_fit takes the smallest requested_size/oriented_extent ratio. Check limiting_axes and actual_size_m; axis_target_examples are alternative envelopes, not automatic fixes: each keeps one requested axis length and source proportions, and may exceed other original limits. Choose pose from source geometry/reference images, not bounding boxes alone. support references the whole object top, not the nearest shelf. Composite box_top_faces report actual local part geometry, For composites, declared placement envelope and part geometry differ: composite_geometry gives actual part bottom/top and inset. A base_z=0 envelope can contain parts floating above its bottom; compare geometry_bottom_gap_m and geometry_base_z_for_contact. world top height and base_z_for_contact under the current contract; xy remains world coordinates. In either scene schema, a negative base_z can select a lower board. A face or footprint match is geometric advice only; clearance, semantic orientation and real contact still require inspection/simulation. Task Python can call from spatialforge.geometry_preview import preview_scene_geometry; preview_scene_geometry(program, \"/assets\") reads only referenced mesh.json files once per unique asset per call, without Isaac or a model API. Do not modify the Harness to use it."
+}

@@ -1,0 +1,87 @@
+{
+  "state": "planned",
+  "plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/a95b8ff365bb4433/plan.json",
+  "pipeline_id": "data.capability",
+  "stage_review": null,
+  "assessment_status": "structured",
+  "selections": [
+    {
+      "template_ids": [
+        "C01-T01"
+      ],
+      "count": 10,
+      "reason": "三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题"
+    },
+    {
+      "template_ids": [
+        "C01-T02"
+      ],
+      "count": 10,
+      "reason": "表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C01-T03"
+      ],
+      "count": 10,
+      "reason": "考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出"
+    },
+    {
+      "template_ids": [
+        "C03-T01"
+      ],
+      "count": 10,
+      "reason": "相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据"
+    },
+    {
+      "template_ids": [
+        "C04-T01"
+      ],
+      "count": 10,
+      "reason": "锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C04-T02"
+      ],
+      "count": 10,
+      "reason": "全排序比二选一更能区分排序捷径；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C05-T01"
+      ],
+      "count": 10,
+      "reason": "光轴深度与欧氏距离的口径分离是协议要求的主测切片"
+    },
+    {
+      "template_ids": [
+        "C07-T02"
+      ],
+      "count": 10,
+      "reason": "尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径"
+    },
+    {
+      "template_ids": [
+        "C09-T01"
+      ],
+      "count": 10,
+      "reason": "透视干扰是 N02 协议的关键难度轴，室内场景易构造"
+    },
+    {
+      "template_ids": [
+        "C11-T01"
+      ],
+      "count": 10,
+      "reason": "条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰"
+    }
+  ],
+  "evidence_required_for": [
+    "C03-T01",
+    "C05-T01",
+    "C07-T02",
+    "C09-T01",
+    "C11-T01"
+  ],
+  "next": "Apply the saved user edit with pipeline_plan(applies_edit=plan) before pipeline_run. S1 review opens after the executable application is validated."
+}

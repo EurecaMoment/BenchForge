@@ -1,0 +1,15 @@
+{
+ "preview_only": true,
+ "production_eligible": false,
+ "authoritative_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_cf398a9950d941e8.scene0/revision_0",
+ "views": [
+  "sf_office_work_area_view_0.png",
+  "sf_office_work_area_view_1.png",
+  "sf_office_work_area_view_2.png",
+  "sf_office_work_area_view_3.png",
+  "sf_office_work_area_view_4.png",
+  "sf_office_work_area_view_5.png",
+  "sf_office_work_area_view_6.png",
+  "sf_office_work_area_view_7.png"
+ ]
+}

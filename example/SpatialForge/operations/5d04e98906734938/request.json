@@ -1,0 +1,147 @@
+{
+  "tool": "pipeline_plan",
+  "arguments": {
+    "assessment_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/plan/sections/assessment_s1.json",
+    "inputs": {
+      "captures": [
+        "bench-office100/captures/sf_office_work_area.capture.json",
+        "bench-office100/captures/sf_lounge_meeting_corner.capture.json",
+        "bench-office100/captures/sf_study_pantry_corner.capture.json"
+      ],
+      "evidence": "bench-office100/evidence/evidence.jsonl",
+      "gt_policy": "官方资产测量 + SceneProgram authored 几何 + Isaac capture 回执 settled_center/相机标定 + 程序oracle；模型预测不作GT",
+      "scene_groups": [
+        "sf_office_work_area",
+        "sf_lounge_meeting_corner",
+        "sf_study_pantry_corner"
+      ],
+      "scene_programs": [
+        "bench-office100/scenes/sf_office_work_area.scene_program.json",
+        "bench-office100/scenes/sf_lounge_meeting_corner.scene_program.json",
+        "bench-office100/scenes/sf_study_pantry_corner.scene_program.json"
+      ],
+      "scene_selection": {
+        "allow_new_scenes": true,
+        "schema": "benchforge.scene-selection/v1",
+        "selection_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/scene-library/selections/session-13742859-5f94-4ca8-ab53-2ffc86ae2e12.json",
+        "selected_scenes": [],
+        "version": 1
+      },
+      "seed": 20261105,
+      "split": "test",
+      "split_policy": "按场景分组：sf_office_work_area→train(34)、sf_lounge_meeting_corner→dev(33)、sf_study_pantry_corner→test(33)；每题 evidence 记录携带显式 split，场景组与分区一一对应"
+    },
+    "objective": "室内场景空间理解评测集生产（目标100题）：按 C01-T01/T02/T03、C03-T01、C04-T01/T02、C05-T01、C07-T02、C09-T01、C11-T01 十个精确模板各10题，在新建的三个室内仿真场景（办公室工作区、起居会客角、阅览茶水角）上完成 S1计划→S2场景采集与验收→S3标注与真值→S4按模板出题→S5质检打包 五阶段；场景选择为空且允许新建，GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真回执，公开题目不泄露答案。v13b：阅览角台灯从边柜顶移至办公桌1桌面（真实评审\"底座悬空\"项修复），其余配额/seed/split/评分/硬要求不变。",
+    "pipeline_id": "data.capability",
+    "seed": 20261105,
+    "selections": [
+      {
+        "count": 10,
+        "reason": "N01主测变体三维中心距离；模板带程序生成器；10模板×10题均分（余数0）",
+        "template_ids": [
+          "C01-T01"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "表面最短间距与中心距离口径分离，距离感知核心混淆项",
+        "template_ids": [
+          "C01-T02"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "对象到标记点距离泛化，GT由authored坐标直接给出",
+        "template_ids": [
+          "C01-T03"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "相机光心到对象中心距离；程序oracle绑定仿真相机与实体中心",
+        "template_ids": [
+          "C03-T01"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "共同锚点最近对象关系判别主测变体；带程序生成器",
+        "template_ids": [
+          "C04-T01"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "远近全排序区分排序捷径，输出ID序列+Kendall tau",
+        "template_ids": [
+          "C04-T02"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "相机光轴深度二对象比较，与欧氏距离口径分离的主测切片",
+        "template_ids": [
+          "C05-T01"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "N02主测局部包围盒最长边（厘米），绑定官方资产测量",
+        "template_ids": [
+          "C07-T02"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "真实长度二选一含像素/真实反转干扰对，N02关键难度轴",
+        "template_ids": [
+          "C09-T01"
+        ]
+      },
+      {
+        "count": 10,
+        "reason": "距离范围内条件计数，检验场景级空间整合，整数GT最清晰",
+        "template_ids": [
+          "C11-T01"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "arguments": {
+          "evidence": "$inputs.evidence",
+          "selections": "$inputs.selections",
+          "seed": "$inputs.seed",
+          "split": "$inputs.split"
+        },
+        "id": "questions",
+        "uses": "templates.produce"
+      },
+      {
+        "arguments": {
+          "dataset": "$questions.dataset"
+        },
+        "id": "package",
+        "uses": "data.package"
+      }
+    ],
+    "target_items": 100,
+    "template_ids": [
+      "C01-T01",
+      "C01-T02",
+      "C01-T03",
+      "C03-T01",
+      "C04-T01",
+      "C04-T02",
+      "C05-T01",
+      "C07-T02",
+      "C09-T01",
+      "C11-T01"
+    ]
+  },
+  "time": "2026-11-06T04:24:28.055381+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "chatcmpl-tool-97b0bdf7a2c98611"
+  }
+}
