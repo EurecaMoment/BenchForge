@@ -39,9 +39,6 @@ def check_request(root, route, arguments):
         )
         return
     if route in {"/start", "/capture", "/refine", "/extend"}:
-        from capabilities.scene_authoring.program_submission import read_program_submission
-        from capabilities.scene_authoring.validation.acceptance import admit_program
-
         for intent, mode, policy in route_policies:
             path = intent.get("scene_program_path")
             must_submit_program = mode == "production"
@@ -51,8 +48,5 @@ def check_request(root, route, arguments):
                 )
             if path and policy:
                 check_references(path, policy)
-                submission = read_program_submission(root, path)
-                if mode == "production" or must_submit_program:
-                    admit_program(
-                        root, submission["program"], allow_generated=True, execution_mode=mode
-                    )
+            # The submission reader validates and freezes the file once at the
+            # application boundary; the lifecycle still protects direct callers.

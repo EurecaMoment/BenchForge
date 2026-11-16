@@ -1,5 +1,6 @@
 """Read-only initial geometry advice; never selects semantic pose or changes GT."""
 import json
+from copy import deepcopy
 import math
 from pathlib import Path
 import re
@@ -63,7 +64,7 @@ def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
     Unknown mesh/support dimensions propagate as unknown rather than fabricated GT.
     """
     root=Path(assets_root).resolve() if assets_root is not None else None
-    cache={};rows=[];by_id={};warnings=[]
+    cache={};fits={};rows=[];by_id={};warnings=[]
     def load(asset_id):
         if asset_id not in cache:
             try:
@@ -89,7 +90,19 @@ def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
             if 'preview_error' in mesh:row['unavailable']=mesh['preview_error']
             else:
                 try:
-                    row['mesh_fit']=mesh_fit_preview(mesh,obj['size'],obj.get('mesh_transform'))
+                    transform = obj.get('mesh_transform') or {}
+                    fit_key = (obj['asset_id'], tuple(obj['size']),
+                               tuple(transform.get('orientation_deg_xyz', [0, 0, 0])),
+                               transform.get('scale_mode', 'uniform_fit'),
+                               'orientation_deg_xyz' in transform)
+                    if fit_key not in fits:
+                        try:
+                            fits[fit_key] = mesh_fit_preview(mesh, obj['size'], obj.get('mesh_transform'))
+                        except (ValueError, KeyError, TypeError) as error:
+                            fits[fit_key] = error
+                    if isinstance(fits[fit_key], Exception):
+                        raise fits[fit_key]
+                    row['mesh_fit'] = deepcopy(fits[fit_key])
                     row['actual_size_m']=row['mesh_fit']['actual_size_m']
                     if min(row['mesh_fit']['fill_fraction'])<.5:
                         warnings.append({'object_id':obj['id'],'code':'envelope_underfilled',
@@ -120,6 +133,15 @@ def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
                 warnings.append({'object_id':obj['id'],'code':'composite_geometry_inset',
                     'detail':'parts do not reach the declared envelope bottom or top; check actual part bounds before treating base_z or whole_object_top as a contact surface; may be intentional'})
         row['initial_geometry_bottom_z_m']=geometry_bottom
+        if row['initial_center_m'] is not None:
+            local_bounds = ([part_bounds(part) for part in obj['parts']] if obj['kind'] == 'composite'
+                            else [([-value / 2 for value in size], [value / 2 for value in size])])
+            parts = [_initial_bounds(obj, row['initial_center_m'], lo, hi) for lo, hi in local_bounds]
+            row['initial_part_bounds_m'] = parts
+            row['initial_world_bounds_m'] = {
+                'min': [min(part['min'][i] for part in parts) for i in range(3)],
+                'max': [max(part['max'][i] for part in parts) for i in range(3)],
+            }
         if geometry_bottom is not None and support_top is not None:
             row['geometry_bottom_gap_above_support_envelope_m']=geometry_bottom-support_top
             row['base_z_for_geometry_bottom_at_support_envelope']=obj['base_z']-(geometry_bottom-support_top)
@@ -160,7 +182,7 @@ def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
         'guidance':GUIDANCE}
 
 
-def compact_preview(preview):
+def compact_preview(preview, *, full_report='geometry_preview.json'):
     """Keep prompt size bounded; full preview remains available through evidence."""
     warned={warning['object_id'] for warning in preview['warnings']}
     useful=[row for row in preview['objects'] if row.get('mesh_fit') or row['object_id'] in warned or row.get('unavailable')]
@@ -173,7 +195,7 @@ def compact_preview(preview):
     objects=[]
     characters=len(json.dumps(preview['warnings'][:32]))+len(GUIDANCE)+512
     for row in useful[:32]:
-        item={k:v for k,v in row.items() if k not in {'box_top_faces','support_face_options'}}
+        item={k:v for k,v in row.items() if k not in {'box_top_faces','support_face_options','initial_part_bounds_m'}}
         if row.get('support_face_options'):
             options=sorted(row['support_face_options'],key=lambda face:(not face['footprint_within_face'],-math.prod(face['size_xy_m']),abs(face['current_bottom_gap_m'])))
             item['support_face_options']=options[:6]
@@ -184,5 +206,40 @@ def compact_preview(preview):
         characters+=length+2
         objects.append(item)
     return {'authority':preview['authority'],'warnings':preview['warnings'][:32],
+        'total_warnings':len(preview['warnings']),
+        'truncated_warnings':max(0,len(preview['warnings'])-32),
+        'full_report':full_report,
+        'read_full_report_before_repair':len(preview['warnings'])>32 or len(useful)>len(objects),
         'objects':objects,
         'truncated_objects':len(useful)-len(objects),'guidance':GUIDANCE}
+
+
+def initial_bounds_overlaps(preview):
+    """Conservative broad phase over initial geometry; never a collision verdict."""
+    rows = sorted((row for row in preview['objects'] if row.get('initial_world_bounds_m')),
+                  key=lambda row: row['initial_world_bounds_m']['min'][0])
+    active = []
+    for right in rows:
+        b = right['initial_world_bounds_m']
+        active = [left for left in active if left['initial_world_bounds_m']['max'][0] > b['min'][0] + .005]
+        for left in active:
+            a = left['initial_world_bounds_m']
+            overlap = [min(a['max'][i], b['max'][i]) - max(a['min'][i], b['min'][i]) for i in range(3)]
+            if min(overlap) <= .005:
+                continue
+            left_parts = left['initial_part_bounds_m']
+            right_parts = right['initial_part_bounds_m']
+            if not any(all(min(p['max'][i], q['max'][i]) - max(p['min'][i], q['min'][i]) > .005
+                           for i in range(3)) for p in left_parts for q in right_parts):
+                continue
+            yield {'object_ids': [left['object_id'], right['object_id']],
+                   'overlap_extent_m': overlap,
+                   'basis': 'conservative initial part bounds; mesh intersection/contact not measured'}
+        active.append(right)
+
+
+def _initial_bounds(obj, center, lo, hi):
+    corners = [_world_xy(obj['xy'], [x, y], obj.get('yaw_deg', 0))
+               for x in (lo[0], hi[0]) for y in (lo[1], hi[1])]
+    return {'min': [min(p[0] for p in corners), min(p[1] for p in corners), center[2] + lo[2]],
+            'max': [max(p[0] for p in corners), max(p[1] for p in corners), center[2] + hi[2]]}

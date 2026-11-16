@@ -10,7 +10,9 @@ from pathlib import Path
 
 from capabilities.isaac_sim.usd_materials import usd, array, material_usd
 from capabilities.isaac_sim.mesh_materials import author_mesh_materials
-from capabilities.isaac_sim.scene_requirements import UnsupportedScene, validate_scene_requirements
+from capabilities.isaac_sim.scene_requirements import (
+    UnsupportedScene, UNSUPPORTED_MATERIAL_FIELDS, validate_capture_requirements,
+)
 from capabilities.scene_authoring.catalog.native import ASSETS
 from capabilities.scene_authoring.geometry.mesh import transform_mesh_geometry, transform_mesh_normals
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
@@ -39,7 +41,7 @@ def camera_matrix(camera):
 def material(program, obj, parent=None):
     named = next((item for item in program.get('materials', []) if item['id'] == obj.get('material_id')), {})
     settings = {**(parent or {}), **named, **obj.get('appearance', {})}
-    for key in ('texture_id', 'uv_scale_m', 'texture_tint', 'native_opacity_multiplier', 'specular', 'ior'):
+    for key in UNSUPPORTED_MATERIAL_FIELDS:
         if key in settings:
             raise UnsupportedScene(f'A100 SceneProgram material {key} has no faithful mapping; inspect the live catalog')
     return {'base_color': named.get('base_color', obj.get('color', (parent or {}).get('base_color', [.7] * 3))),
@@ -61,24 +63,9 @@ def physics_lines(obj):
 def compile_scene(program, assets_root, settings):
     """Return USD bytes plus declared inputs; only later native receipts are evidence."""
     validate_program(program)
-    validate_scene_requirements(program)
-    if any(obj.get('render_representation') == 'gaussian' for obj in program['objects']):
-        raise UnsupportedScene('SceneProgram capture requires mesh primary-surface annotations; Gaussian uses the native render API')
-    for obj in program['objects']:
-        if 'cast_shadows' in obj and not obj['cast_shadows']:
-            raise UnsupportedScene('A100 scene capture cannot disable individual shadow casting')
-        if (obj.get('asset_id') and obj.get('render_representation', 'auto') != 'mesh'
-                and (Path(assets_root) / obj['asset_id'] / 'gaussian.npz').is_file()):
-            raise UnsupportedScene('A paired Gaussian asset requires an explicit mesh representation for '
-                                   'primary-surface scene capture; appearance is not silently substituted')
+    validate_capture_requirements(program, assets_root, settings)
     environment = program.get('render_environment', {})
-    if environment.get('renderer') == 'RaytracedLighting':
-        raise UnsupportedScene('A100 does not provide the RTX RaytracedLighting renderer; select PathTracing explicitly')
-    if environment.get('exposure', 0) != 0:
-        raise UnsupportedScene('A100 scene.capture has no exposure control; do not silently discard exposure')
     spp = environment.get('samples_per_pixel', settings.get('samples_per_pixel', 32))
-    if not 1 <= spp <= 256:
-        raise UnsupportedScene('The running A100 scene.capture contract accepts samples_per_pixel up to 256')
     meshes = {}
     def load(identity):
         if identity not in meshes:
@@ -102,8 +89,6 @@ def compile_scene(program, assets_root, settings):
         entities[identity] = entity
         if kind in ASSETS:
             source = sources.get(kind)
-            if not source:
-                raise UnsupportedScene(f'Native asset {kind} needs an explicit providers.IsaacSim4A100.asset_sources binding; no proxy substitution')
             imports.append({'object': obj, 'path': root, 'source': source,
                             'center': center, 'catalog': ASSETS[kind]})
             continue
@@ -201,8 +186,6 @@ def compile_scene(program, assets_root, settings):
     for index, light in enumerate(program.get('lights') or [{'kind': 'environment', 'intensity': 1}]):
         if not light.get('enabled', True):
             continue
-        if light['kind'] not in ('environment', 'area') or any(key in light for key in ('environment_id', 'temperature', 'cast_shadows')):
-            raise UnsupportedScene('A100 scene.capture supports constant environment and rectangular area lights; inspect native catalog for other workflows')
         kind = 'DomeLight' if light['kind'] == 'environment' else 'RectLight'
         attrs = ['color3f inputs:color = ' + usd(light.get('color', [1, 1, 1])),
                  'float inputs:intensity = ' + usd(light.get('intensity', 1))]

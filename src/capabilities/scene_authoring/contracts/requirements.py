@@ -23,13 +23,19 @@ def validate_asset_requirements(scenes, *, robot_locomotion=False):
     robots = []
     for design in scenes.get('designs', []):
         roles = design.get('object_roles', [])
+        if not isinstance(roles, list):
+            raise ValueError('object_roles must be an array of object roles')
         required = set()
         for role in roles:
+            if not isinstance(role, dict):
+                raise ValueError('object_roles entries must be objects')
             representation = role.get('representation')
             if representation is None:
                 continue
-            if representation not in REPRESENTATIONS:
+            if not isinstance(representation, str) or representation not in REPRESENTATIONS:
                 raise ValueError('object_roles.representation must be native_asset or articulated_robot')
+            if not isinstance(role.get('object_id'), str) or not role['object_id']:
+                raise ValueError('Required asset identity needs an exact object_id')
             required.add(role['object_id'])
             if representation == 'articulated_robot':
                 robots.append(role['object_id'])

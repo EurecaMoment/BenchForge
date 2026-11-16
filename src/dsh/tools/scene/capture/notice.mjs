@@ -19,6 +19,8 @@ export function captureNotice(observation = {}, error) {
     run_id:observation.run_id, state:observation.state,
     issues:all.slice(0,12).map(value=>value.length > 600 ? value.slice(0,600)+'…' : value),
     issue_count:all.length,
+    diagnostics_truncated:all.length > 12 || all.some(value => value.length > 600),
+    before_repair:'Read the full detail result, combine all independent native/visual issues, and batch-preflight one complete candidate. This notice is only a summary.',
     tasks:(observation.tasks || []).map(task=>({id:task.id,state:task.state,records:task.records})),
     detail:{tool:'benchforge_scene_status',run_id:observation.run_id,detail:true},
   };

@@ -9,6 +9,7 @@ import json
 import logging
 from pathlib import Path
 import threading
+from functools import partial
 from urllib.parse import quote
 from urllib.parse import urlparse
 from urllib.parse import unquote
@@ -17,6 +18,7 @@ from pipelines.scene_production.service import create_store
 from pipelines.scene_production.engine import coordinate
 from capabilities.asset_generation.generation import GenerationTools
 from capabilities.scene_authoring.program_submission import read_program_submission
+from pipelines.scene_production.preflight import read_capture_submission, inspect_capture_submission
 from capabilities.asset_generation.layout import start_design_request
 from capabilities.asset_generation.layout import require_prior_reference
 from server import scene_requests as _scene_requests
@@ -42,12 +44,25 @@ def gallery_path(run_id):
     return '/gallery/' + quote(str(run_id), safe='')
 
 
-def start_scene_request(store,value,max_scenes=1000):
+def request_error_payload(exc, status):
+    """Preserve complete domain diagnostics beside the bounded error summary."""
+    from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError
+    from capabilities.scene_authoring.validation.contract_diagnostics import ProgramValidationError
+    payload = {'error': type(exc).__name__,
+               'detail': str(exc)[:1000] if status < 500 else 'Internal server error'}
+    if isinstance(exc, ScenePreflightError):
+        payload.update(code=exc.code, preflight=exc.report)
+    elif isinstance(exc, ProgramValidationError):
+        payload.update(code=exc.code, issues=exc.issues)
+    return payload
+
+
+def start_scene_request(store,value,max_scenes=1000,*,settings=None):
     return _scene_requests.start_scene_request(
         store,
         value,
         max_scenes,
-        submission_reader=read_program_submission,
+        submission_reader=partial(read_capture_submission, settings=settings),
         prior_reference_checker=require_prior_reference,
     )
 
@@ -63,28 +78,28 @@ def start_generation_request(store,tool,value):
     return {'run_id':rid,'task_id':rid+'.scene0','state':'accepted','tool':tool}
 
 
-def start_capture_request(store,value):
+def start_capture_request(store,value,*,settings=None):
     return _scene_requests.start_capture_request(
         store,
         value,
-        submission_reader=read_program_submission,
+        submission_reader=partial(read_capture_submission, settings=settings),
     )
 
 
-def refine_scene_request(store,value):
+def refine_scene_request(store,value,*,settings=None):
     return _scene_requests.refine_scene_request(
         store,
         value,
-        submission_reader=read_program_submission,
+        submission_reader=partial(read_capture_submission, settings=settings),
         prior_reference_checker=require_prior_reference,
     )
 
 
-def extend_scene_request(store,value):
+def extend_scene_request(store,value,*,settings=None):
     return _scene_requests.extend_scene_request(
         store,
         value,
-        submission_reader=read_program_submission,
+        submission_reader=partial(read_capture_submission, settings=settings),
         prior_reference_checker=require_prior_reference,
     )
 
@@ -95,6 +110,8 @@ def main():
     if hasattr(signal,'SIGUSR1'):faulthandler.register(signal.SIGUSR1)
     from service_access.runtime_config import load_service_config, apply_runtime_environment
     config=load_service_config(args.config)
+    from service_access.configuration import isaac_config
+    capture_settings = isaac_config(config)
     apply_runtime_environment(config)
     store=create_store(config['artifacts'],config.get('harness'),config.get('database_url'))
     from storage.scene_jobs.migrate_capture import migrate_capture
@@ -114,8 +131,7 @@ def main():
                     getattr(self, 'request_task_id', None),
                     exc_info=(type(exc), exc, exc.__traceback__),
                 )
-            detail = str(exc)[:1000] if status < 500 else 'Internal server error'
-            self.reply({'error': type(exc).__name__, 'detail': detail}, status)
+            self.reply(request_error_payload(exc, status), status)
 
         def reply(self,value,status=200):
             data=json.dumps(value,ensure_ascii=False,default=str).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
@@ -179,15 +195,20 @@ def main():
                     tool=self.path[1:].replace('-', '_')
                     self.reply(start_generation_request(store,tool,value))
                 elif self.path=='/start':
-                    self.reply(start_scene_request(store,value,config.get('max_scenes_per_run',1000)))
+                    self.reply(start_scene_request(store,value,config.get('max_scenes_per_run',1000),
+                                                   settings=capture_settings))
                 elif self.path=='/capture':
-                    self.reply(start_capture_request(store,value))
+                    self.reply(start_capture_request(store,value,settings=capture_settings))
                 elif self.path=='/preview':
                     from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
-                    program=read_program_submission(store.root,value['scene_program_path'])['program']
+                    program=read_program_submission(store.root,value['scene_program_path'],policy={})['program']
                     def mesh(asset_id):
                         return json.loads(GenerationTools(store.root).asset_path(asset_id,'mesh.json').read_text())
                     self.reply(preview_scene_geometry(program,mesh_loader=mesh))
+                elif self.path == '/scene-preflight':
+                    self.reply(inspect_capture_submission(
+                        store.root, value['scene_program_path'], execution_mode=value.get('execution_mode'),
+                        settings=capture_settings))
                 elif self.path=='/asset':
                     intent=value['intent']
                     if not isinstance(intent,dict) or not {'name','description'}<=set(intent) or set(intent)-{'name','description','label','source_image','source_mask','source_mesh','source_gaussian','asset_id','seed','source_up_axis','size_hint_m','subject_box','edit_reference'}:raise ValueError('invalid asset intent')
@@ -196,9 +217,9 @@ def main():
                     kwargs={'context':context} if context is not None else {}
                     self.reply({'run_id':store.submit(value['request_key'],[intent],'asset',**kwargs),'state':'accepted'})
                 elif self.path=='/extend':
-                    self.reply(extend_scene_request(store,value))
+                    self.reply(extend_scene_request(store,value,settings=capture_settings))
                 elif self.path=='/refine':
-                    self.reply(refine_scene_request(store,value))
+                    self.reply(refine_scene_request(store,value,settings=capture_settings))
                 elif self.path=='/observe':
                     from capabilities.capture.observation import observe
                     result=observe(store,value['run_id']);result.pop('cursor')

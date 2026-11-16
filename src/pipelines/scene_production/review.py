@@ -5,7 +5,6 @@ from capabilities.dataset_authoring.scene_capture.products import produce
 from capabilities.scene_authoring.validation.quality import audit_scene
 from service_access.progress import record_progress
 from capabilities.scene_authoring.geometry.preview import compact_preview
-from capabilities.scene_authoring.validation.acceptance import admit_program
 from capabilities.scene_authoring.validation.acceptance import capture_acceptance
 from capabilities.scene_authoring.validation.review_reference import review_spatial_context
 from capabilities.scene_authoring.validation.review_reference import GUIDANCE as REFERENCE_GUIDANCE
@@ -30,7 +29,7 @@ def review_scene(store,task,stop,*,capture_only=False):
     physical_precheck=capture_acceptance(store.root,program,report,evidence,{},capture,execution_mode) if strict_policy else {}
     physical_issues=physical_precheck.get('physical_issues',[])
     spatial_context=None
-    if report['status']=='captured' and not physical_issues:
+    if report['status']=='captured' and any(capture.glob('view_*.png')):
         prompt='检查实际 Isaac 视图和执行证据是否满足原始场景需求：'+json.dumps(unit['intent'],ensure_ascii=False)+'''。
 返回 JSON：{"acceptable":boolean,"visual_quality":1到5,"semantic_fidelity":1到5,"issues":[string],"repair_suggestions":[string],"visual_realism":{"status":"needs_improvement"|"visually_plausible"|"matches_declared_geometry"|"not_requested","issues":[string],"prioritized_repairs":[string],"basis":"rendered_views_only"}}。
 依据任务判断物体身份、尺度、支撑、功能分区、材质、采光和机位。逼真室内要求还应检查建筑围合、连接细节、间接光、接触阴影及亮部纹理；明确可见的实质缺陷应影响 acceptable。每项问题标出对应视图或执行记录，建议具体的资产、程序或采集调整。
@@ -40,10 +39,15 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
 模型意见不写入 GT，也不等同人审、照片真实感认证或正式 benchmark 通过。
 '''
         prompt+='\n沉降记录：'+json.dumps(report.get('physics',{}),ensure_ascii=False)
+        prompt+='\n本次已知物理/准入问题：'+json.dumps(physical_issues,ensure_ascii=False)
+        prompt+=('\n一次汇总全部机位中可确认的独立问题，并标明对象、视图和证据；'
+                 '已有物理失败不应阻止检查其它物体的可见外观、朝向和布局。'
+                 '每项单独判断，不能因一个物体失败而把其它物体也判失败。'
+                 '物理回执、静态包围盒疑点和视觉意见分开报告；建议将有关联的问题成组修复后统一采集。')
         if strict_policy:
             prompt+='''\n严格生产验收：默认要求真实可辨识的场景资产和符合生活常识的布局。简化几何只有保存计划明确声明的实验范围才可合格，不能以几何形状冒充真实家具。逐一检查物体身份、正常尺度、支撑与安装、房间用途与物品关系、通行与操作空间、材质与照明。任何不确定、缺图或问题必须 passed=false；不得仅凭名字、设计图或全静态 stable=true 宣称物理合理。额外返回 life_review:{checks:[{check:object_identity|realistic_scale|support_and_attachment|functional_layout|access_and_clearance|materials_and_lighting,passed:boolean,evidence:[{view:"view_0.png",observation:"该实际视图中的具体可见现象"}]}]}。六项分别恰好一条，每条给出真实已附图片文件名和具体观察；不合格给出可执行修改。visual_realism.status 必须根据实拍作出判断。模型意见不是物理测量或GT。'''
         if strict_policy:
-            admission = admit_program(store.root, program,execution_mode=execution_mode)
+            admission = physical_precheck
             if admission.get('scene_brief'):
                 brief=admission['scene_brief']
                 context={k:brief[k] for k in ('name','summary','object_roles','physical_assumptions')}
@@ -99,7 +103,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                      'capture_token':report.get('token')}
             prompt+='\n本次程序改动对照：'+json.dumps(changes,ensure_ascii=False)
         if geometry_path.is_file() and not strict_policy:
-            prompt+='\n仿真前的程序几何建议：'+json.dumps(compact_preview(json.loads(geometry_path.read_text())),ensure_ascii=False)
+            prompt+='\n仿真前的程序几何建议：'+json.dumps(compact_preview(
+                json.loads(geometry_path.read_text()), full_report=str(geometry_path)),ensure_ascii=False)
         camera_receipts=[{'frame_id':frame.get('frame_id'),'image':frame.get('image'),'camera':frame.get('camera'),'step_id':frame.get('step_id')} for frame in evidence.get('frames',[])]
         prompt+='\n相机执行记录：'+json.dumps(camera_receipts,ensure_ascii=False)
         prompt+='\n实际外力动作证据：'+json.dumps(evidence.get('interaction',{}),ensure_ascii=False)
@@ -124,7 +129,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                           bounded_review=bool(strict_policy),stop=stop,context=unit.get('run_context'))
     else: review={'acceptable':False,'issues':physical_issues or report.get('errors',[]),
                  'repair_suggestions':['Repair the actual support, attachment or layout issue in a new complete program and capture again.'],
-                 'visual_review_skipped':bool(physical_issues)}
+                 'visual_review_skipped':True,
+                 'visual_review_skip_reason':'native scene views are unavailable'}
     if spatial_context is not None:review['spatial_reference_context']=spatial_context
     review['physical_stable']=report.get('physics',{}).get('stable',False);review['renderable']=report.get('renderable',False)
     frames=evidence.get('frames',[])

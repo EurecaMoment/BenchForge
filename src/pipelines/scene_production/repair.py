@@ -15,6 +15,10 @@ import urllib.request
 import urllib.error
 
 from pipelines.reviews.service import review
+from pipelines.scene_production.preflight import inspect_capture_program
+from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, REPAIR_GUIDANCE
+from service_access.configuration import isaac_config
+from service_access.scene_service import ScenePreflightRejected
 
 
 def author_completion(prompt, directory, images, max_tokens=14000):
@@ -49,9 +53,15 @@ def save(path, value):
 
 
 def raise_service_error(route, error):
-    detail=error.read().decode()[:2500]
-    try:kind=json.loads(detail).get('error')
-    except (ValueError,AttributeError):kind=None
+    body = error.read().decode(errors='replace')
+    try:payload = json.loads(body)
+    except ValueError:payload = {}
+    if (error.code == 400 and isinstance(payload, dict)
+            and payload.get('code') == ScenePreflightRejected.code
+            and isinstance(payload.get('preflight'), dict)):
+        raise ScenePreflightRejected(payload['preflight']) from error
+    kind = payload.get('error') if isinstance(payload, dict) else None
+    detail = body[:2500]
     if kind in {'TimeoutError','URLError','ConnectionError','OSError'}:
         raise OSError(route+': '+detail) from error
     raise ValueError(route+': '+detail) from error
@@ -71,8 +81,6 @@ def repair_baseline(row, folder, attempt=0, feedback=None):
 def revise(config, row, folder, attempt=0, feedback=None):
     from pipelines.scene_production.planning import apply_scene_replacements
     from capabilities.scene_authoring.catalog.native import ASSETS
-    from capabilities.scene_authoring.validation.program import validate_program
-    from capabilities.scene_authoring.validation.acceptance import admit_program
     from capabilities.scene_authoring.contracts.scene_design import validate_scene_brief
     source = Path(row['source_directory'])
     program_path,context,frozen=repair_baseline(row,folder,attempt,feedback)
@@ -91,8 +99,11 @@ def revise(config, row, folder, attempt=0, feedback=None):
     protected=list(dict.fromkeys([*original['requirements'],*frozen.get('hard_requirements',[])]))
     images = sorted((context / 'capture').glob('view_*.png'))
     if len(images) > 4:images = [images[i * (len(images) - 1) // 3] for i in range(4)]
-    try:admit_program(config['artifacts'], program);diagnostic = 'admission passed; inspect spatial relationships in actual images'
-    except (ValueError, OSError) as error:diagnostic = str(error)
+    diagnostic = inspect_capture_program(config['artifacts'], program,
+        settings=isaac_config(config), execution_mode=config.get('execution_mode'))
+    save(work / 'baseline_preflight.json', diagnostic)
+    visible_diagnostic = {key: value for key, value in diagnostic.items()
+                          if key not in {'geometry_preview', 'checked'}}
     prompt = '''你是场景制作与空间布局修复者。使用所附实际场景图片、原始完整程序、物理/几何反馈，修复真实场景中不合生活常识或物理逻辑的关系，同时保留用途、主要物体和风格。不要泛泛而谈，不准改服务或降低验收标准。
 返回严格 JSON：{"brief":{"name":"中文标题","summary":"200到400字的完整场景段落，描述用途、空间、主要物体、朝向、支撑、照明、动线及取用关系","hard_requirements":[原始硬要求逐字保留],"object_roles":[{"object_id":"真实id","role":"用途与位置关系"}],"relations":[{"source":"id","type":"supported_by|mounted_to|clearance|near|facing|inside","target":"id或ground","description":"明确关系及理由"}],"physical_assumptions":["仿真材质、质量和安装方式的假设及验证范围"]},"changes":["引用实际视角或物理回执，说明发现及如何修改"],"unresolved":["尚未解决、需要补充机位或等待后续验证的问题；没有则返回空数组"],"evidence_refs":[{"path":"capture/view_0.png","observation":"该真实视角中的具体发现"},{"path":"capture/evidence.json","observation":"原生物理或验收回执中的具体发现"}],"replacements":[{"path":"/objects/0","value":完整物体记录}]}
 replacements 使用 JSON Pointer；新增字段可以直接添加，删除物体时替换完整 /objects 列表。不可只改摘要而不改错误程序；若上一轮发现摘要遗漏，可补充或修订软设计，但保留原始硬要求，写清观察依据。不要重复已失败的方案。
@@ -105,7 +116,8 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
 '''
     prompt += '\n原始及已冻结硬要求：' + json.dumps(protected, ensure_ascii=False)
     prompt += '\n前次反馈：' + json.dumps(feedback, ensure_ascii=False)
-    prompt += '\n入队诊断：' + diagnostic
+    prompt += '\n' + REPAIR_GUIDANCE
+    prompt += '\n完整入队诊断：' + json.dumps(visible_diagnostic, ensure_ascii=False)
     prompt += '\n可用 native 资产：' + json.dumps({k: {'size': v['size']} for k, v in ASSETS.items()})
     prompt += '\n原始完整程序：' + json.dumps(program, ensure_ascii=False)
     prompt += '\n执行合同：保留未修改字段；新增字段只能使用上述支持的字段，物体 id 唯一，尺寸为米，base_z 相对于所选支撑面顶部。输出要紧凑，只返回必要字段修改。'
@@ -148,8 +160,12 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
             provenance = candidate.setdefault('provenance', {})
             provenance['sources'] = [r for r in provenance.get('sources', []) if not isinstance(r, dict) or r.get('kind') != 'scene_plan']
             provenance['sources'].append({'kind': 'scene_plan', 'path': str(plan_file), 'scene_design_id': 'repair_design'})
-            validate_program(candidate)
-            admission = admit_program(config['artifacts'], candidate)
+            admission = inspect_capture_program(config['artifacts'], candidate,
+                settings=isaac_config(config), execution_mode=config.get('execution_mode'),
+                allow_generated=False)
+            save(work / ('candidate_preflight_' + str(trial) + '.json'), admission)
+            if not admission['passed']:
+                raise ScenePreflightError(admission)
             save(work / 'program.json', candidate)
             record = {'state': 'planned', 'source_id': row['id'], 'name': brief['name'], 'attempt': attempt,
                       'program_path': str(work / 'program.json'), 'plan_path': str(plan_file),

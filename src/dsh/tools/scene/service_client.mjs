@@ -1,5 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {HarnessError} from '@deepseek-ai/dsh-llm';
+
+export class ScenePreflightRejected extends HarnessError {
+  constructor(response, status) {
+    super(JSON.stringify(response), 'scene_preflight_failed');
+    this.status = status;
+    this.response = response;
+  }
+}
 
 function rejectDuplicateObjectKeys(source) {
   let index = 0;
@@ -156,9 +165,11 @@ export function createServiceClient({serviceUrl, operatorToken}) {
     });
     // Isaac camera matrices can contain -0.0; DSH's JSON transport rejects signed zero.
     const value = JSON.parse(await response.text(), (_key, item) => Object.is(item, -0) ? 0 : item);
-    if (!response.ok) throw Object.assign(new Error(JSON.stringify(value)), {
-      status: response.status, response: value,
-    });
+    if (!response.ok) {
+      if (response.status === 400 && value.code === 'scene_preflight_failed' && value.preflight)
+        throw new ScenePreflightRejected(value, response.status);
+      throw Object.assign(new Error(JSON.stringify(value)), {status:response.status, response:value});
+    }
     return value;
   };
 }

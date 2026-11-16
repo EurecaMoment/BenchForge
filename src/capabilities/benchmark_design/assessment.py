@@ -47,6 +47,11 @@ def assessment_template():
         'program_reference': {'kind': 'scene_plan', 'path': '保存计划的绝对路径',
                               'scene_design_id': '对应的设计 id'},
         'instructions': '每项说明填写具体内容，简洁完整即可，不按字数判定质量。SceneProgram.provenance.sources 引用保存的计划；口头声明或只在程序中写用途不构成例外。前端优先展示目的、简化范围和约束，标识放在技术详情。'}
+    value['scene_authoring']['preflight'] = {
+        'tool': 'benchforge_scene_preflight', 'input': 'scene_program_path',
+        'reports': ['issues', 'repair_groups', 'skipped_checks', 'report_path'],
+        'workflow': '首次采集及每批修订前批量检查完整程序；结合全部已有物理和逐图问题，成组修复后统一复检与采集。',
+        'limits': 'error 是合同或准入问题；warning 是疑点，pending/skipped 不是通过。包围盒不能证明碰撞、姿态或外观错误；不为消除启发式警告而盲目改正确资产。预检通过不等于实拍验收。'}
     value['scene_authoring']['scene_brief'] = {
         'location': 'assessment.scenes.designs[]', 'name': '清晰的场景标题',
         'summary': '先写200到400字的详细段落，说明用途、空间、物体、朝向、支撑、光照、动线和取用关系。',

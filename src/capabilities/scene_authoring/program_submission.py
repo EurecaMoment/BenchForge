@@ -1,8 +1,7 @@
 """Freeze validated task-authored scene data before queueing; never import code or GT."""
 import json
 from pathlib import Path
-from capabilities.scene_authoring.validation.program import validate_program
-from capabilities.scene_authoring.catalog.native import ASSETS
+from uuid import uuid4
 from service_access.runtime_config import environment_value
 
 MAX_PROGRAM_BYTES=1024*1024
@@ -23,7 +22,7 @@ def submission_identity(value):
     return {**value, 'schema': value['schema']}
 
 
-def read_program_submission(artifact_root,source_path):
+def read_program_document(artifact_root, source_path):
     roots=[(Path(artifact_root)/'operator_workspaces').resolve()]
     configured_root=environment_value('BENCHFORGE_TASK_ROOT')
     if configured_root:
@@ -44,21 +43,43 @@ def read_program_submission(artifact_root,source_path):
         program=json.loads(raw.decode('utf-8-sig'),object_pairs_hook=_pairs,parse_constant=invalid_constant)
         json.dumps(program,allow_nan=False)  # Also rejects exponent overflow such as 1e999.
     except (UnicodeError,ValueError,RecursionError) as exc:raise ValueError('invalid SceneProgram JSON: '+str(exc)[:300]) from exc
-    validate_program(program)
-    from capabilities.scene_authoring.catalog.native import normalize_native_asset_references
-    validate_program(normalize_native_asset_references(program))
-    # Validate mesh references without reading large meshes. Native aliases are
-    # normalized by the same established executor path after acceptance.
-    from capabilities.scene_authoring.validation.program import ident
-    for obj in program['objects']:
-        if obj['kind']!='mesh' or obj.get('asset_id') in ASSETS:continue
-        asset_id=ident(obj.get('asset_id'))
-        assets=(Path(artifact_root)/'generated_assets').resolve()
-        mesh=(assets/asset_id/'mesh.json').resolve()
-        if not mesh.is_relative_to(assets) or not mesh.is_file():raise ValueError(f'object {obj["id"]}: registered mesh unavailable: {asset_id}')
     return {'schema':'benchforge.program-submission/v1','source_path':str(path),
         'source_bytes':len(raw),'authority':'task-authored scene data; not GT',
         'program':program}
+
+
+def save_preflight_report(artifact_root, submission, report):
+    """Keep a complete immutable diagnostic and its exact input per invocation."""
+    directory = Path(artifact_root) / 'scene_preflights' / uuid4().hex
+    directory.mkdir(parents=True, exist_ok=False)
+    result = {**report, 'source_path': submission['source_path'],
+              'source_bytes': submission['source_bytes'],
+              'report_path': str((directory / 'scene_preflight.json').resolve()),
+              'program_snapshot_path': str((directory / 'program.json').resolve())}
+    (directory / 'program.json').write_text(
+        json.dumps(submission['program'], ensure_ascii=False, allow_nan=False), encoding='utf-8')
+    (directory / 'scene_preflight.json').write_text(
+        json.dumps(result, ensure_ascii=False, allow_nan=False, indent=2), encoding='utf-8')
+    return result
+
+
+def inspect_program_submission(artifact_root, source_path, *, execution_mode=None, inspector=None):
+    from capabilities.scene_authoring.validation.preflight import inspect_program
+    submission = read_program_document(artifact_root, source_path)
+    report = (inspector or inspect_program)(
+        artifact_root, submission['program'], execution_mode=execution_mode)
+    return save_preflight_report(artifact_root, submission, report)
+
+
+def read_program_submission(artifact_root, source_path, *, execution_mode=None, policy=None,
+                            inspector=None):
+    from capabilities.scene_authoring.validation.preflight import inspect_program, ScenePreflightError
+    submission = read_program_document(artifact_root, source_path)
+    report = (inspector or inspect_program)(
+        artifact_root, submission['program'], execution_mode=execution_mode, policy=policy)
+    if not report['passed']:
+        raise ScenePreflightError(save_preflight_report(artifact_root, submission, report))
+    return submission
 
 
 def handoff_receipt(submission,program,revision):

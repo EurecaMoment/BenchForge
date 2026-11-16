@@ -284,6 +284,9 @@ def _run_locked(args, directory, config, client):
             repair = create_plan(run=run_root, artifact=artifact, failure_code='execution_error', reason=str(error))
             graph.append_repair(repair)
             state['steps'][step['id']] = {'state': 'failed', 'error': str(error), 'artifact': artifact, 'repair': repair}
+            from service_access.scene_service import ScenePreflightRejected
+            if isinstance(error, ScenePreflightRejected):
+                state['steps'][step['id']]['preflight'] = error.preflight
             state['state'] = 'failed'
             state['error'] = str(error)
             write(state_path, state)

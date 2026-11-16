@@ -1,0 +1,84 @@
+"""Exercise actual preflight/submission HTTP responses without a model or GPU."""
+from concurrent.futures import ThreadPoolExecutor
+from http.server import ThreadingHTTPServer
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from threading import Event
+from types import SimpleNamespace
+import unittest
+from unittest.mock import Mock, patch
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+from server import http_api
+from test_scene_diagnostics import sample, object_record
+
+
+class PreflightHTTPTests(unittest.TestCase):
+    def test_diagnostics_and_submission_report_all_failures_without_enqueueing(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / 'operator_workspaces' / 'http'
+            workspace.mkdir(parents=True)
+            source = workspace / 'scene.json'
+            program = sample()
+            program['objects'] = [object_record(f'item_{i}', support=f'absent_{i}',
+                                                 cast_shadows=False) for i in range(40)]
+            source.write_text(json.dumps(program), encoding='utf-8')
+            store = SimpleNamespace(root=root, submit=Mock())
+            ready, holder = Event(), {}
+
+            def server_factory(_address, handler):
+                server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
+                holder['server'] = server
+                ready.set()
+                return server
+
+            config = {'artifacts': str(root), 'operator_token': 'fixture-only', 'port': 0}
+            with (
+                patch('sys.argv', ['http_api', '--config', 'fixture.json']),
+                patch('service_access.runtime_config.load_service_config', return_value=config),
+                patch('service_access.runtime_config.apply_runtime_environment'),
+                patch('storage.scene_jobs.migrate_capture.migrate_capture', return_value={}),
+                patch.object(http_api, 'create_store', return_value=store),
+                patch.object(http_api, 'coordinate'),
+                patch.object(http_api, 'ThreadingHTTPServer', side_effect=server_factory),
+                ThreadPoolExecutor(max_workers=1) as pool,
+            ):
+                future = pool.submit(http_api.main)
+                self.assertTrue(ready.wait(10))
+                server = holder['server']
+                base = 'http://127.0.0.1:' + str(server.server_address[1])
+
+                def request(route, authorized=True):
+                    headers = {'Content-Type': 'application/json'}
+                    if authorized:
+                        headers['Authorization'] = 'Bearer fixture-only'
+                    return Request(base + route, headers=headers, data=json.dumps({
+                        'scene_program_path': str(source), 'execution_mode': 'exploration',
+                        'request_key': 'fixture-request',
+                    }).encode())
+
+                try:
+                    with self.assertRaises(HTTPError) as denied:
+                        urlopen(request('/scene-preflight', False), timeout=5)
+                    self.assertEqual(denied.exception.code, 401)
+                    denied.exception.close()
+                    with urlopen(request('/scene-preflight'), timeout=10) as response:
+                        report = json.load(response)
+                    self.assertFalse(report['passed'])
+                    self.assertEqual(report['summary']['errors'], 80)
+                    self.assertEqual(json.loads(Path(report['report_path']).read_text(encoding='utf-8')), report)
+                    with self.assertRaises(HTTPError) as rejected:
+                        urlopen(request('/capture'), timeout=10)
+                    self.assertEqual(rejected.exception.code, 400)
+                    payload = json.load(rejected.exception)
+                    rejected.exception.close()
+                    self.assertEqual(payload['code'], 'scene_preflight_failed')
+                    self.assertEqual(payload['preflight']['issues'], report['issues'])
+                    self.assertNotEqual(payload['preflight']['report_path'], report['report_path'])
+                    store.submit.assert_not_called()
+                finally:
+                    server.shutdown()
+                    future.result(timeout=10)

@@ -9,22 +9,16 @@ import math
 from pathlib import Path
 import re
 
-from capabilities.scene_authoring.catalog.native import ASSETS
-from capabilities.scene_authoring.validation.program import validate_program
-from capabilities.scene_authoring.catalog.native import normalize_native_asset_references
-from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
-from capabilities.scene_authoring.validation.preflight import preflight_scene
-from capabilities.scene_authoring.contracts.scene_design import geometry_exception
-from capabilities.scene_authoring.contracts.scene_design import scene_brief
 from capabilities.scene_authoring.geometry.relations import native_part_bounds
 from capabilities.scene_authoring.geometry.relations import supported_by_parts
 from capabilities.scene_authoring.geometry.relations import supported_by_native_parts
 from capabilities.scene_authoring.geometry.relations import overlap_unresolved
 from capabilities.scene_authoring.geometry.relations import transported_mesh_bounds
 from capabilities.scene_authoring.validation.policy import check_references
-from capabilities.scene_authoring.validation.policy import policy_for
+from capabilities.scene_authoring.validation.policy import policy_for, structure, attachment
+from capabilities.scene_authoring.validation.preflight import inspect_program
+from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, format_issue
 
-STRUCTURE = re.compile(r'^(?:floor|ceiling|wall(?:_|$)|ground|terrain|pavement|asphalt|roof|road(?:_|$)|bay_line|rug|carpet|window|door(?:_|$))', re.I)
 VISUAL_CHECKS = {'object_identity', 'realistic_scale', 'support_and_attachment',
                  'functional_layout', 'access_and_clearance', 'materials_and_lighting'}
 
@@ -39,101 +33,20 @@ def captured_observation(row, frames):
             isinstance(row.get('observation'),str) and bool(row['observation'].strip()))
 
 
-def detailed_construction(obj):
-    """A modeled table/fixture is distinct from a single envelope placeholder.
-
-    This admits geometry for capture, never certifies its visual identity.
-    """
-    parts = obj.get('parts', [])
-    return (obj.get('kind') == 'composite' and len(parts) >= 3 and
-            len({tuple(part.get('offset', [0, 0, 0])) for part in parts}) >= 3)
 
 
-def attachment(obj, by_id):
-    value = obj.get('metadata', {}).get('spatial_attachment')
-    if value is None:return None
-    if (not isinstance(value, dict) or obj.get('dynamic') is not False or
-            value.get('target') not in by_id or value['target'] == obj['id'] or
-            by_id[value['target']].get('dynamic') is not False or value.get('method') != 'static_mount' or
-            type(value.get('axis')) is not int or value['axis'] not in (0, 1, 2) or
-            value.get('object_face') not in ('min', 'max') or value.get('target_face') not in ('min', 'max') or
-            value['object_face'] == value['target_face']):
-        raise ValueError(obj['id'] + ': invalid explicit static mounting relation')
-    return value
 
 
-def structure(obj):
-    # A name cannot turn a chair-sized cube into a floor or wall.
-    size = obj.get('size', [])
-    return (bool(STRUCTURE.search(str(obj.get('id', '')))) and len(size) == 3
-            and obj.get('dynamic') is False and min(size) <= .4
-            and max(size) >= 1)
 
 
 def admit_program(root, program, *, allow_generated=False, execution_mode=None):
     policy = _policy_for_mode(root, execution_mode)
-    if not policy:return {'enforced': False, 'passed': None, 'evaluation_status': 'not_evaluated'}
-    check_references(program, policy)
-    validate_program(program)
-    program = normalize_native_asset_references(program)
-    props = [obj for obj in program['objects'] if not structure(obj)]
-    if not props:raise ValueError('Realistic scenes need recognizable foreground assets')
-    declaration = geometry_exception(program, policy)
-    brief = scene_brief(program, policy, root)
-    simplified=set(declaration['object_ids']) if declaration else set()
-    by_id = {obj['id']: obj for obj in program['objects']}
-    problems = []
-    if brief:
-        for role in brief['object_roles']:
-            if role.get('representation') in {'native_asset', 'articulated_robot'}:
-                obj = by_id[role['object_id']]
-                if obj['kind'] not in ASSETS:
-                    problems.append(obj['id'] + ': requires a registered native asset; primitive geometry and metadata cannot substitute for asset identity')
-        for relation in brief['relations']:
-            obj = by_id[relation['source']]
-            if relation['type'] == 'supported_by' and obj['support'] != relation['target']:
-                problems.append(obj['id'] + ': support contradicts saved scene brief')
-            if relation['type'] == 'mounted_to' and (attachment(obj, by_id) or {}).get('target') != relation['target']:
-                problems.append(obj['id'] + ': mounting contradicts saved scene brief')
-    for obj in props:
-        kind = obj['kind']
-        mount = attachment(obj, by_id)
-        if obj['id'] not in simplified and kind not in ASSETS and kind not in {'mesh', 'bin', 'container'} and not detailed_construction(obj) and not (kind == 'generated' and allow_generated):
-            problems.append(obj['id'] + ': default scene design uses recognizable assets; simplified geometry needs an explicit scoped declaration in the saved scene plan')
-        if obj['id'] not in simplified and re.search(r'cube|立方体', obj['id'] + ' ' + obj['label'], re.I):
-            problems.append(obj['id'] + ': default scene design needs an explicit planned geometry exception for cube objects')
-        if kind in ASSETS:
-            ratios = [obj['size'][i] / ASSETS[kind]['size'][i] for i in range(3)]
-            if min(ratios) < .5 or max(ratios) > 2 or max(ratios)/min(ratios) > 1.5:
-                problems.append(obj['id'] + ': scale or proportions depart from the registered real asset')
-        if not mount and obj['support'] == 'ground' and abs(obj['base_z']) > .03:
-            problems.append(obj['id'] + ': ground object floats or penetrates ground; model actual support/attachment')
-        if obj['dynamic'] and not obj.get('physics'):
-            problems.append(obj['id'] + ': dynamic object needs explicit friction, restitution and mass provenance')
-        if obj['dynamic'] and not {'static_friction','dynamic_friction','restitution','mass_source'} <= set(obj.get('physics', {})):
-            problems.append(obj['id'] + ': incomplete physical material/inertia declaration')
-    if any(obj['kind']=='generated' for obj in props):
-        if not allow_generated:problems.append('Generated assets must be realized before capture admission')
-    camera = preflight_scene(program)
-    problems += [row['code'] for row in camera['errors']]
-    def mesh(asset_id):
-        path = Path(root)/'generated_assets'/asset_id/'mesh.json'
-        value = json.loads(path.read_text(encoding='utf-8'))
-        declared_assets = {obj.get('asset_id') for obj in props if obj['id'] in simplified}
-        if len(value.get('vertices', [])) <= 8 and asset_id not in declared_assets:
-            raise ValueError('Mesh is a primitive proxy, not a recognizable scene asset: ' + asset_id)
-        return value
-    if not allow_generated or not any(obj['kind'] == 'generated' for obj in props):
-        geometry = preview_scene_geometry(program, mesh_loader=mesh)
-        for row in geometry['objects']:
-            if row.get('unavailable'):problems.append(row['object_id'] + ': source geometry is unavailable')
-            obj=by_id[row['object_id']]
-            if not structure(obj) and not attachment(obj, by_id) and row.get('support_face_options') and not any(face['footprint_within_face'] and abs(face['geometry_bottom_gap_m']) <= .03 for face in row['support_face_options']):
-                problems.append(row['object_id'] + ': unsupported initial placement')
-    if problems:raise ValueError('Realistic scene admission failed: ' + '; '.join(problems)[:1800])
-    return {'enforced': True, 'passed': True, 'stage': 'before_capture',
-            'scene_style':'simplified_geometry' if declaration else 'realistic_assets','geometry_exception':declaration,'scene_brief':brief,
-            'scope': 'assets or declared simplification, scale, support and camera sanity; capture validation still required'}
+    if not policy:
+        return {'enforced': False, 'passed': None, 'evaluation_status': 'not_evaluated'}
+    report = inspect_program(root, program, policy=policy, allow_generated=allow_generated)
+    if not report['passed']:
+        raise ScenePreflightError(report)
+    return report
 
 
 def capture_acceptance(root, program, report, evidence, review, capture, execution_mode=None):
@@ -149,6 +62,9 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
     issues = []
     admission={}
     try:admission=admit_program(root, program, execution_mode=execution_mode)
+    except ScenePreflightError as error:
+        admission = error.report
+        issues.extend(format_issue(row) for row in admission['issues'] if row['blocking'])
     except (ValueError, OSError, KeyError, TypeError) as error:issues.append(str(error))
     physics = evidence.get('physics', {})
     if report.get('status') != 'captured' or report.get('renderable') is not True or evidence.get('origin') != 'isaac_native':
@@ -229,7 +145,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             left_parts = executed_parts.get(left['id']) or [boxes[left['id']]]
             right_parts = executed_parts.get(right['id']) or [boxes[right['id']]]
             if overlap_unresolved(left_parts, right_parts):
-                issues.append(left['id'] + '/' + right['id'] + ': overlapping native bounds require layout repair; mesh intersection is unresolved')
+                issues.append(left['id'] + '/' + right['id'] + ': overlapping native bounds leave mesh intersection unresolved; inspect native geometry/contact evidence before deciding a layout repair')
     physical_issues=list(issues)
     frames = {row.get('frame_id') + '.png' for row in evidence.get('frames', []) if isinstance(row.get('frame_id'), str)}
     frames = {name for name in frames if (Path(capture)/name).is_file()}
@@ -362,7 +278,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             'scene_style':style,'geometry_exception':admission.get('geometry_exception'),'scene_brief':brief,
             'physical_scope':'native settling, conservative world bounds, support gap and collider receipts; uncalibrated material parameters',
             'life_scope':'per-view model visual judgment, not measured truth or human certification',
-            'on_failure':'retain failed evidence; repair within budget; never export or mark complete'}
+            'on_failure':'retain all failed evidence; gather independent physical and visual issues, batch-preflight a complete repair candidate, then recapture within budget; never export or mark complete'}
 
 
 def require_accepted(root, directory, execution_mode=None):

@@ -45,6 +45,10 @@ DSH 只安装一个 `benchforge` 预设。工作台在同一会话的右侧栏�
 
 提交和重试规则在 `pipelines/scene_production/lifecycle.py`，由同目录
 `service.py` 装配到 Store；`storage/scene_jobs/` 保留事务、租约、状态转换和发布围栏。
+批量预检由 `pipelines/scene_production/preflight.py` 组合
+`scene_authoring/validation/` 的完整诊断与 `isaac_sim/scene_requirements.py` 的适配器限制。
+HTTP 和 DSH 只传递结构化结果；缺陷分组与准入判断不进入浏览器，
+场景领域也不反向依赖具体模拟器。每次预检保存输入快照，静态警告与原生验收分开。
 跨流程审阅由 `pipelines/reviews/` 组合各自的产物检查，流程之间不互相回调。
 模板数量的共用合同在 `capabilities/task_catalog/allocation.py`。
 S4 分片分配与 S5 实际交付分别由评测的 `production_allocation.py` 和
@@ -227,6 +231,8 @@ src/
 │   │   ├── validation/
 │   │   │   ├── __init__.py
 │   │   │   ├── acceptance.py
+│   │   │   ├── contract_diagnostics.py
+│   │   │   ├── diagnostics.py
 │   │   │   ├── policy.py
 │   │   │   ├── preflight.py
 │   │   │   ├── program.py
@@ -410,6 +416,7 @@ src/
 │   │   ├── engine.py
 │   │   ├── lifecycle.py
 │   │   ├── planning.py
+│   │   ├── preflight.py
 │   │   ├── repair.py
 │   │   ├── review.py
 │   │   ├── review_checks.py

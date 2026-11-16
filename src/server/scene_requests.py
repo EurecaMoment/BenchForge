@@ -2,7 +2,7 @@
 from capabilities.capture.capture_scope import capture_scope
 from capabilities.asset_generation.layout import default_layout
 from capabilities.asset_generation.layout import validate_layout
-from capabilities.scene_authoring.program_submission import read_program_submission
+from pipelines.scene_production.preflight import read_capture_submission
 from capabilities.dataset_authoring.quantity import validate_quantity_contract
 from service_access.request_context import RunContext
 from capabilities.scene_authoring.validation.policy import policy_for
@@ -77,7 +77,7 @@ def start_scene_request(
     value,
     max_scenes=1000,
     *,
-    submission_reader=read_program_submission,
+    submission_reader=read_capture_submission,
     prior_reference_checker=None,
 ):
     intents = value["intents"]
@@ -85,7 +85,7 @@ def start_scene_request(
         raise ValueError("scene count exceeds registered run budget")
     normalized = [_scene_intent(item, {**value, "root": store.root}) for item in intents]
     submissions = [
-        submission_reader(store.root, intent["scene_program_path"])
+        submission_reader(store.root, intent["scene_program_path"], execution_mode=intent["execution_mode"])
         if "scene_program_path" in intent
         else None
         for intent in normalized
@@ -123,10 +123,10 @@ def start_capture_request(
     store,
     value,
     *,
-    submission_reader=read_program_submission,
+    submission_reader=read_capture_submission,
 ):
-    submission = submission_reader(store.root, value["scene_program_path"])
     mode = resolve_execution_mode(value.get("execution_mode"))
+    submission = submission_reader(store.root, value["scene_program_path"], execution_mode=mode)
     policy_for(store.root, mode)
     intent = {
         "name": value.get("name", submission["program"]["title"]),
@@ -160,7 +160,7 @@ def refine_scene_request(
     store,
     value,
     *,
-    submission_reader=read_program_submission,
+    submission_reader=read_capture_submission,
     prior_reference_checker=None,
 ):
     parent = value["parent_task_id"]
@@ -211,7 +211,7 @@ def refine_scene_request(
         intent["layout"] = validate_layout(value["layout"])
     submission = None
     if "scene_program_path" in value:
-        submission = submission_reader(store.root, value["scene_program_path"])
+        submission = submission_reader(store.root, value["scene_program_path"], execution_mode=intent["execution_mode"])
         intent["scene_program_path"] = value["scene_program_path"]
     if prior_reference_checker is None:
         from capabilities.asset_generation.layout import require_prior_reference
@@ -248,7 +248,7 @@ def extend_scene_request(
     store,
     value,
     *,
-    submission_reader=read_program_submission,
+    submission_reader=read_capture_submission,
     prior_reference_checker=None,
 ):
     parent = value["parent_task_id"]
@@ -287,7 +287,7 @@ def extend_scene_request(
     if "layout" in value:
         intent["layout"] = validate_layout(value["layout"])
     submission = (
-        submission_reader(store.root, value["scene_program_path"])
+        submission_reader(store.root, value["scene_program_path"], execution_mode=intent["execution_mode"])
         if value.get("scene_program_path")
         else None
     )

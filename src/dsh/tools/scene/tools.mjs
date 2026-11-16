@@ -6,7 +6,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment';
 import {createServiceClient, loadServiceConfig} from './service_client.mjs';
 import {executeHandoff, handoffParameters} from '../../host/subagent_handoff.mjs';
-import {objectOutput, runOutput, taskRunOutput, observationOutput, taskOutput, cancellationOutput} from './contracts.mjs';
+import {objectOutput, preflightOutput, runOutput, taskRunOutput, observationOutput, taskOutput, cancellationOutput} from './contracts.mjs';
 import {createDeliveryReview, createCaptureReviewStep, productionReviewApplies} from './capture/quality_review.mjs';
 import {createDeliveryVisuals} from './capture/review_images.mjs';
 import {compactCaptureObservation, captureRunId} from './capture/capture_watch.mjs';
@@ -37,7 +37,7 @@ async function api(path,args,signal){
   const contextual = {...args};
   if (path === '/start' && Array.isArray(contextual.intents)) {
     contextual.intents = contextual.intents.map(intent => withExecutionMode(intent, loaded.executionMode));
-  } else if (['/capture','/refine','/extend','/retry'].includes(path)) {
+  } else if (['/capture','/refine','/extend','/retry','/scene-preflight'].includes(path)) {
     Object.assign(contextual, withExecutionMode(contextual, loaded.executionMode));
   }
   return post(path, contextual, signal);
@@ -98,6 +98,14 @@ const programInput={type:'string',description:'Complete SceneProgram JSON in the
     scene_program_path:{type:'string',required:true},name:{type:'string'},layout:layoutInput,
     capture_options:{type:'object',description:'Optional output selection for local iteration; defaults to every view and a USD export. Keeps the full program, physics and action recordings.',additionalProperties:false,properties:{view_indices:{type:'array',items:{type:'integer'},description:'Zero-based program camera indices. Original view_N filenames are retained. [] skips final scene views.'},export_scene:{type:'boolean',description:'Set false to skip USD/resource export for this capture; default true.'}}}});
   ctx.tools.register(defineTool({name:'benchforge_preview',description:'Compute placement bounds, support gaps and geometry advice from your SceneProgram without starting Isaac or a model. Use capture for actual images and physics.',parameters:{scene_program_path:{type:'string',required:true}},output,execute:(args,exec)=>api('/preview',args,exec.signal)}));
+  ctx.tools.register(defineTool({
+    name:'benchforge_scene_preflight',
+    description:'Batch-check a complete SceneProgram before capture or a repair submission. Returns all independent contract, asset, plan and geometry diagnostics, related repair groups, skipped checks and an immutable full report with its input snapshot. Read the full issues and combine them with existing native/visual evidence to repair related defects in one candidate. Warnings are hypotheses, not proof of collision or wrong pose; pending/skipped checks are not passes. Preserves input and hard requirements, starts no simulation or generation, and does not certify scene acceptance.',
+    parameters:{scene_program_path:{type:'string',required:true,description:'Complete JSON under the configured task workspace.'}},
+    output:preflightOutput,
+    isConcurrencySafe:()=>true,
+    execute:(args,exec)=>api('/scene-preflight',args,exec.signal),
+  }));
   ctx.tools.register(defineTool({name:'benchforge_layout',description:"Generate, edit or reuse a diffusion design reference. Optional standalone tool; run can prepare the reference internally. Read layout/reference.png with evidence, and reuse via layout={mode:\"reference\",design_task_id}. This produces a design image, not a simulated scene.",parameters:{request_key:requestKey,name:{type:'string',required:true},description:{type:'string',required:true},layout:layoutInput},output:runOutput,execute:(args,exec)=>submit('/layout',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_scene_evidence',description:"Read actual JSON, images and action traces from current or earlier revisions, including failed attempts. Omit file to list evidence. Use workspace_id to copy a file for task-code processing. Production evidence is read-only; authority GT is excluded.",parameters:{task_id:{type:'string',required:true},revision:{type:'integer'},file:{type:'string'},workspace_id:{type:'string'}},output:{...taskOutput,render:(_args,value)=>[{type:'text',text:JSON.stringify({...value,image:undefined})},...(value.image?[{type:'image',attachment:value.image}]:[])]},execute:async(args,exec)=>{
     const value=await api('/evidence',args,exec.signal);

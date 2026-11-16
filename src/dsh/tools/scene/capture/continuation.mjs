@@ -14,7 +14,7 @@ const noticeKey = (record,context) => `capture:${record.owner}:${record.run_id}:
 const text = record => {
   const state = outcome(record);
   return `采集结果通知：${state}。${captureFailure(record.observation) ?
-    '本次采集验收失败，整个任务仍未完成。读取下面的实际缺项和保存的审查文件，保留原始硬要求及可辨识资产，定点修复完整程序并重新采集。不要通过删除部件、机器人资产或改变用途消除报错。' :
+    '本次采集验收失败，整个任务仍未完成。先读取完整审查文件，汇总独立的物理与视觉缺项，保留原始硬要求及可辨识资产，按关联成组修复完整程序，经批量预检后重新采集。下面的通知只是摘要。不要通过删除部件、机器人资产或改变用途消除报错。' :
     record.error ? '后台查询失败，保留原作业，先用 benchforge_wait(background=true) 恢复跟踪。不要重复提交仍在运行的作业。' :
     '提交受理、采集完成和场景验收是不同状态。读取实际回执，验收通过后续跑原评测；单次采集结束不等于整项任务交付。'}
 ${JSON.stringify(captureNotice({...record.observation,run_id:record.run_id},record.error))}

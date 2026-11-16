@@ -12,7 +12,7 @@ def main():
     p=argparse.ArgumentParser(description='BenchForge production client')
     project = Path(environment_value('BENCHFORGE_ROOT', Path(__file__).resolve().parents[2]))
     p.add_argument('--config', type=Path, default=project/'config/generated/benchforge-server.local.json')
-    p.add_argument('operation',choices=['catalog','start','asset','extend','refine','dataset','inspect','retry','cancel','download','capture','status','evidence','preview','diffusion','sam3','trellis','depth','mesh-import','call'])
+    p.add_argument('operation',choices=['catalog','start','asset','extend','refine','dataset','inspect','retry','cancel','download','capture','status','evidence','preview','scene-preflight','diffusion','sam3','trellis','depth','mesh-import','call'])
     p.add_argument('value',nargs='?',help='SceneProgram path, run/task ID, or API route for call')
     p.add_argument('request_json',nargs='?',type=Path)
     p.add_argument('--revision',type=int);p.add_argument('--name');p.add_argument('--request-key');p.add_argument('--section')
@@ -32,6 +32,8 @@ def main():
     elif route=='capture':
         if args.value:data['scene_program_path']=str(Path(args.value).resolve())
         data.setdefault('request_key','cli-'+uuid.uuid4().hex)
+    elif route in {'preview', 'scene-preflight'} and args.value:
+        data['scene_program_path'] = str(Path(args.value).resolve())
     elif route=='status':
         route='observe'
         if args.value:data['run_id']=args.value

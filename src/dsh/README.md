@@ -99,6 +99,45 @@ same saved plan once, including after reload. Paused or canceled work stays stop
 The browser reads this projection and sends review actions through the existing
 Remote API. It owns no continuation timer or acceptance policy.
 
+## Batch scene preflight
+
+Before capture or a repair submission, call
+`benchforge_scene_preflight({scene_program_path: "<complete task JSON>"})`.
+It checks independent fields, objects, support components, assets, saved plans,
+camera declarations and known capture-adapter limitations in one pass. Failed
+submission uses the same diagnostics. The tool starts no model or simulation and
+does not modify the candidate.
+
+Read the complete `issues`, `repair_groups` and `skipped_checks`. Combine these
+with existing native and visual evidence, repair related defects together, and
+preflight the revised complete candidate before recapture. An invalid component
+does not hide other independent problems. A physical failure no longer suppresses
+visual checks when captured images are available; failed acceptance still blocks export.
+
+`error` blocks admission. `warning` identifies a hypothesis to investigate,
+including conservative bounds overlap, incomplete envelope fill and room bounds.
+These do not prove collision, wrong orientation, bad appearance or occlusion.
+`pending` and skipped checks are not passes. Preserve user requirements and correct
+assets; do not shrink, rotate or remove them just to silence a heuristic.
+Passing static checks does not replace native compilation, runtime physics,
+per-view visual review or scene acceptance.
+
+The HTTP endpoint is `POST /scene-preflight`; the operator CLI also accepts
+`python -m server.scene_cli scene-preflight <scene.json>`. Each explicit check and
+failed submission saves an independent report and input snapshot under the configured
+artifact root's `scene_preflights/<id>/`. `report_path` and `program_snapshot_path`
+refer to that exact invocation. The HTTP error summary is bounded; its structured
+`preflight` field retains every collected issue. Geometry detail stays in the saved
+report, while the native tool renders every issue and repair group without truncation.
+
+The registered tool uses `defineTool`, an explicit output schema, cancellation
+and concurrency-safe execution. It is available during pending user review as a
+static inspection; this does not release the stage or authorize capture.
+Authoring rules live in `capabilities/scene_authoring/validation/`, adapter rules
+in `capabilities/isaac_sim/scene_requirements.py`, and their composition in
+`pipelines/scene_production/preflight.py`. DSH and browser code own no duplicate
+scene acceptance rules.
+
 Stage definitions live in `capabilities/benchmark_design/resources/production-stages.json`
 and are shared by the planner, runner, preset and client. The Python runner requires
 explicit S2 `scene.acceptance` and S3 `collection.validate`

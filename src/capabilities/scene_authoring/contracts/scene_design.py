@@ -4,6 +4,8 @@ import math
 from pathlib import Path
 import re
 
+_UNRESOLVED_DESIGN = object()
+
 DETAIL_FIELDS = ('purpose', 'reason', 'simplifications', 'retained_constraints', 'excluded_claims')
 
 
@@ -89,8 +91,8 @@ def saved_design(program, policy=None):
     return scenes, next(row for row in scenes['designs'] if row['id'] == design), path
 
 
-def geometry_exception(program, policy=None):
-    saved = saved_design(program, policy)
+def geometry_exception(program, policy=None, *, resolved_design=_UNRESOLVED_DESIGN):
+    saved = saved_design(program, policy) if resolved_design is _UNRESOLVED_DESIGN else resolved_design
     if not saved:return None
     scenes, design, path = saved
     matched = [row for row in scenes.get('geometry_exceptions', []) if row['scene_design_id'] == design['id'] and row['scene_id'] == program.get('scene_id')]
@@ -173,34 +175,54 @@ def validate_reference(design, object_ids=None):
 
 def validate_scene_brief(design, object_ids=None):
     from capabilities.scene_authoring.contracts.requirements import requirement_stages
-    if not isinstance(design.get('name'), str) or not design['name'].strip():
-        raise ValueError('Scene brief needs a human-readable title')
-    if not isinstance(design.get('summary'), str) or not design['summary'].strip():
-        raise ValueError('Scene brief needs a non-empty description of its intended layout and use')
+    problems = []
+    for key, message in (
+            ('name', 'Scene brief needs a human-readable title'),
+            ('summary', 'Scene brief needs a non-empty description of its intended layout and use')):
+        if not isinstance(design.get(key), str) or not design[key].strip():
+            problems.append('/' + key + ': ' + message)
     for key in ('hard_requirements', 'physical_assumptions'):
         rows = design.get(key)
         if not isinstance(rows, list) or not rows or any(not isinstance(row, str) or not row.strip() for row in rows):
-            raise ValueError('Scene brief needs concrete ' + key)
-    requirement_stages(design)
+            problems.append('/' + key + ': Scene brief needs concrete ' + key)
+    try:
+        requirement_stages(design)
+    except (ValueError, KeyError, TypeError) as error:
+        problems.append('/requirement_stages: ' + str(error))
     roles = design.get('object_roles')
     if not isinstance(roles, list) or not roles:
-        raise ValueError('Scene brief needs object roles')
-    for row in roles:
-        if not isinstance(row, dict) or not isinstance(row.get('object_id'), str) or not row['object_id'].strip() or not isinstance(row.get('role'), str) or not row['role'].strip():
-            raise ValueError('Scene brief object role needs an exact object and useful explanation')
-        if object_ids is not None and row['object_id'] not in object_ids:
-            raise ValueError('Scene brief references a missing object: ' + row['object_id'])
+        problems.append('/object_roles: Scene brief needs object roles')
+    else:
+        for index, row in enumerate(roles):
+            if (not isinstance(row, dict) or not isinstance(row.get('object_id'), str) or
+                    not row['object_id'].strip() or not isinstance(row.get('role'), str) or not row['role'].strip()):
+                problems.append(f'/object_roles/{index}: Scene brief object role needs an exact object and useful explanation')
+                continue
+            if object_ids is not None and row['object_id'] not in object_ids:
+                problems.append(f'/object_roles/{index}: Scene brief references a missing object: ' + row['object_id'])
     relations = design.get('relations')
+    valid_relations = True
     if not isinstance(relations, list) or not relations:
-        raise ValueError('Scene brief needs explicit spatial relations')
-    for row in relations:
-        if (not isinstance(row, dict) or row.get('type') not in {'supported_by', 'mounted_to', 'clearance', 'near', 'facing', 'inside'} or
-                not isinstance(row.get('description'), str) or not row['description'].strip() or
-                any(not isinstance(row.get(key), str) or not row[key].strip() for key in ('source', 'target'))):
-            raise ValueError('Scene brief needs concrete typed spatial relations')
-        if object_ids is not None and (row.get('source') not in object_ids or row.get('target') not in object_ids | {'ground'}):
-            raise ValueError('Scene brief relation references an unavailable object')
-    validate_reference(design, object_ids)
+        problems.append('/relations: Scene brief needs explicit spatial relations')
+        valid_relations = False
+    else:
+        for index, row in enumerate(relations):
+            if (not isinstance(row, dict) or row.get('type') not in
+                    ('supported_by', 'mounted_to', 'clearance', 'near', 'facing', 'inside') or
+                    not isinstance(row.get('description'), str) or not row['description'].strip() or
+                    any(not isinstance(row.get(key), str) or not row[key].strip() for key in ('source', 'target'))):
+                problems.append(f'/relations/{index}: Scene brief needs concrete typed spatial relations')
+                valid_relations = False
+                continue
+            if object_ids is not None and (row['source'] not in object_ids or row['target'] not in object_ids | {'ground'}):
+                problems.append(f'/relations/{index}: Scene brief relation references an unavailable object')
+    if valid_relations:
+        try:
+            validate_reference(design, object_ids)
+        except (ValueError, KeyError, TypeError) as error:
+            problems.append('/spatial_reference: ' + str(error))
+    if problems:
+        raise ValueError('Scene brief needs corrections:\n' + '\n'.join(problems))
     return design
 
 
@@ -332,8 +354,8 @@ def plan_declaration_current(declaration):
         return False
 
 
-def scene_brief(program, policy=None, root=None):
-    saved = saved_design(program, policy)
+def scene_brief(program, policy=None, root=None, *, resolved_design=_UNRESOLVED_DESIGN):
+    saved = saved_design(program, policy) if resolved_design is _UNRESOLVED_DESIGN else resolved_design
     if not saved:
         if policy and (policy.get('require_scene_brief') or policy.get('enforce_realism')):
             raise ValueError('Save a titled, detailed scene brief in the production plan before scene submission')

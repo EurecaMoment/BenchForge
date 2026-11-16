@@ -11,6 +11,7 @@ PUBLIC_RELEASE_FILES = {'release/'+name for name in (
 
 def _allowed(name):
     return (name in {'program.json','submitted_program.json','program_handoff.json','proposal.json','repair_seed.json','scene_review.json','progress.json','geometry_preview.json','repair_context.json','repair_changes.json','data_selection.json','generation_stage.json',
+                     'scene_preflight.json','scene_admission.json','scene_acceptance.json','scene_brief.json','scene_brief_alignment.json',
                      'layout_reference.png','layout_reference.json','generation/reference.png','generation/input_mask.png','generation/asset_ref.json','generation/asset_request.json','capture/program.json','capture/report.json','capture/evidence.json','layout/reference.png','layout/receipt.json'}
             or bool(re.fullmatch(r'capture/view_\d+(?:\.png|\.json|_(?:depth|semantic|instance|normal_world|range|valid)\.npy)',name))
             or name in {'capture/scene.usda', 'capture/scene.usdc', 'capture/scene.usdz'}
@@ -18,7 +19,7 @@ def _allowed(name):
             or bool(re.fullmatch(r'capture/interaction_\d+(?:\.mp4|_recording\.json|_frames\.zip|_spatialtree\.json|_spatialtree\.zip)',name))
             or name in PUBLIC_RELEASE_FILES
             or bool(re.fullmatch(r'release/images/[^/]+\.png',name))
-            or bool(re.fullmatch(r'model_calls/scene_plan_\d+/(?:validation_error|response|parse_error)\.json',name))
+            or bool(re.fullmatch(r'model_calls/scene_plan_\d+/(?:validation_error|response|parse_error|geometry_preview)\.json',name))
             or bool(re.fullmatch(r'(?:generation|generation_stage)/[a-zA-Z0-9_./-]+\.(?:png|jpg|jpeg|json|npy|npz|glb|gltf|ply|obj)',name))
             or bool(re.fullmatch(r'generation/[a-zA-Z0-9_-]+/(?:reference\.png|input_mask\.png)',name)))
 

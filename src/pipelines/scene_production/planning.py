@@ -20,6 +20,7 @@ from capabilities.scene_authoring.geometry.preview import GUIDANCE as GEOMETRY_G
 from capabilities.scene_authoring.program_submission import handoff_receipt
 from capabilities.scene_authoring.validation.acceptance import policy_for
 from capabilities.scene_authoring.validation.acceptance import admit_program
+from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, REPAIR_GUIDANCE as BATCH_REPAIR_GUIDANCE
 from capabilities.scene_library.repair_context import build_repair_context
 from capabilities.scene_library.repair_context import bound_repair_context
 from capabilities.scene_library.repair_context import scene_changes
@@ -60,7 +61,7 @@ def scene_repair_prompt(raw, error, intent, base=None):
             'Replacements may add object fields, append list items with /-, or replace a whole record or document. '
             'Use a complete SceneProgram when deleting or reorganizing content. '
             'Keep the requested scene function and use the actual images and geometry feedback. '
-            'Model review is advice; simulation supplies the execution evidence.\n'
+            'Model review is advice; simulation supplies the execution evidence.\n' + BATCH_REPAIR_GUIDANCE + '\n'
             'Requirement: '+json.dumps(intent,ensure_ascii=False)+
             '\nFeedback: '+error+'\nCurrent FULL scene proposal: '+json.dumps(raw,ensure_ascii=False)+
             '\nExecutable scene format: '+SCENE_SCHEMA_DESCRIPTION)
@@ -196,7 +197,9 @@ def plan_scene(store,task,stop):
                                 delta_paths={obj['id']:f'/objects/{i}' for i,obj in enumerate(raw['objects'])}
                                 preview['objects']=[{**row,'path':delta_paths[row['object_id']]} for row in preview['objects'] if row['object_id'] in delta_paths]
                                 preview['warnings']=[warning for warning in preview['warnings'] if warning['object_id'] in delta_paths]
-                            feedback+='\nComputed initial geometry advice: '+json.dumps(compact_preview(preview),ensure_ascii=False)
+                            write_json(trace/'geometry_preview.json',preview)
+                            feedback+='\nComputed initial geometry advice: '+json.dumps(
+                                compact_preview(preview,full_report=str(trace/'geometry_preview.json')),ensure_ascii=False)
                         except (ValueError,KeyError,TypeError,IndexError):pass  # Contract errors remain the primary feedback for malformed proposals.
                         if repair_context is not None:
                             feedback+='\n'+REPAIR_GUIDANCE+'\nBounded repair capture/history context: '+json.dumps(repair_context,ensure_ascii=False)
@@ -242,12 +245,17 @@ def plan_scene(store,task,stop):
             obj.pop('generation',None)
     p=normalize_native_asset_references(p)
     validate_program(p)
-    admission=admit_program(store.root,p,execution_mode=execution_mode)
+    try:
+        admission=admit_program(store.root,p,execution_mode=execution_mode)
+    except ScenePreflightError as error:
+        write_json(directory/'scene_preflight.json',error.report)
+        raise
+    if admission.get('enforced'):write_json(directory/'scene_preflight.json',admission)
     if admission.get('enforced'):write_json(directory/'scene_admission.json',admission)
     if admission.get('scene_brief'):write_json(directory/'scene_brief.json',admission['scene_brief'])
     if store.snapshot(task['run_id'])['state']=='CANCELED':return
     record_progress(directory,'geometry_preparation',object_count=len(p['objects']))
-    geometry=preview_scene_geometry(p,mesh_loader=load_preview_mesh)
+    geometry=admission.get('geometry_preview') or preview_scene_geometry(p,mesh_loader=load_preview_mesh)
     write_json(directory/'geometry_preview.json',geometry)
     write_json(directory/'program.json',p)
     if repair_baseline is not None:
