@@ -1,0 +1,102 @@
+{
+  "state": "planned",
+  "plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/51fa9d15b7934bd4/plan.json",
+  "pipeline_id": "data.capability",
+  "stage_review": {
+    "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "key": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/51fa9d15b7934bd4/plan.json",
+    "stage": "S1",
+    "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/51fa9d15b7934bd4/plan.json",
+    "started": 1793872425.3196137,
+    "deadline": 1793872725.3196137,
+    "state": "waiting_user",
+    "instruction": "",
+    "review_id": 46,
+    "remaining_seconds": 300,
+    "server_time": 1793872425.3196137,
+    "wait_seconds": 300,
+    "can_continue": false,
+    "next": "Use stage_review(action=wait), then resume the existing production when can_continue is true."
+  },
+  "assessment_status": "structured",
+  "selections": [
+    {
+      "count": 10,
+      "reason": "N01主测变体三维中心距离；模板带程序生成器；10模板×10题均分（余数0）",
+      "template_ids": [
+        "C01-T01"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "表面最短间距与中心距离口径分离，距离感知核心混淆项",
+      "template_ids": [
+        "C01-T02"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "对象到标记点距离泛化，GT由authored坐标直接给出",
+      "template_ids": [
+        "C01-T03"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "相机光心到对象中心距离；程序oracle绑定仿真相机与实体中心",
+      "template_ids": [
+        "C03-T01"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "共同锚点最近对象关系判别主测变体；带程序生成器",
+      "template_ids": [
+        "C04-T01"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "远近全排序区分排序捷径，输出ID序列+Kendall tau",
+      "template_ids": [
+        "C04-T02"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "相机光轴深度二对象比较，与欧氏距离口径分离的主测切片",
+      "template_ids": [
+        "C05-T01"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "N02主测局部包围盒最长边（厘米），绑定官方资产测量",
+      "template_ids": [
+        "C07-T02"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "真实长度二选一含像素/真实反转干扰对，N02关键难度轴",
+      "template_ids": [
+        "C09-T01"
+      ]
+    },
+    {
+      "count": 10,
+      "reason": "距离范围内条件计数，检验场景级空间整合，整数GT最清晰",
+      "template_ids": [
+        "C11-T01"
+      ]
+    }
+  ],
+  "evidence_required_for": [
+    "C03-T01",
+    "C05-T01",
+    "C07-T02",
+    "C09-T01",
+    "C11-T01"
+  ],
+  "next": "pipeline_run; when evidence is required, use exact template protocol with task code or existing collectors, then supply evidence. No legacy 3240-template substitution."
+}

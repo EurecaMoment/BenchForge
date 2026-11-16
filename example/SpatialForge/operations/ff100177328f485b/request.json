@@ -1,0 +1,13 @@
+{
+  "tool": "stage_review",
+  "arguments": {
+    "action": "wait",
+    "review_id": 48,
+    "timeout_seconds": 300
+  },
+  "time": "2026-11-06T03:57:39.060752+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "chatcmpl-tool-9fa719c2a0670c5f"
+  }
+}

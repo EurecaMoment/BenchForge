@@ -1,0 +1,243 @@
+{
+  "frame_id": "view_3",
+  "image": "view_3.png",
+  "step_id": 180,
+  "timestamp_sim": 3.0,
+  "image_size": {
+    "width": 960,
+    "height": 720
+  },
+  "objects": [
+    {
+      "object_id": "floor_a",
+      "label": "房间地面",
+      "bbox_2d": {
+        "xyxy": [
+          827,
+          662,
+          960,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 5890
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 2.9391417503356934
+    },
+    {
+      "object_id": "wall_w_a",
+      "label": "西墙",
+      "bbox_2d": {
+        "xyxy": [
+          0,
+          0,
+          960,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 108292
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 2.899407386779785
+    },
+    {
+      "object_id": "wall_sk_a_w",
+      "label": "西墙踢脚线",
+      "bbox_2d": {
+        "xyxy": [
+          829,
+          633,
+          960,
+          689
+        ]
+      },
+      "mask": {
+        "area_px": 3886
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 3.0838422775268555
+    },
+    {
+      "object_id": "bookcase_a",
+      "label": "书柜",
+      "bbox_2d": {
+        "xyxy": [
+          25,
+          0,
+          857,
+          720
+        ]
+      },
+      "mask": {
+        "area_px": 573132
+      },
+      "confidence": {
+        "value": 1.0
+      },
+      "valid_for_question_generation": true,
+      "depth_z_median": 2.1367504596710205
+    }
+  ],
+  "camera": {
+    "position": [
+      -0.7,
+      -1.35,
+      1.42
+    ],
+    "target": [
+      -2.72,
+      -0.6,
+      1.15
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "T_world_camera_usd": [
+      [
+        0.3480700041959576,
+        0.937468544634446,
+        -6.938893903907228e-18,
+        0.0
+      ],
+      [
+        -0.11655818593764215,
+        0.043276554184768126,
+        0.99224056012079,
+        -0.0
+      ],
+      [
+        0.9301943138237044,
+        -0.3453691759246427,
+        0.12433290333287136,
+        0.0
+      ],
+      [
+        -0.7000000000000001,
+        -1.3500000000000003,
+        1.4200000000000002,
+        1.0
+      ]
+    ],
+    "convention": "USD camera -Z forward +Y up",
+    "matrix_layout": "usd_row_vectors",
+    "projection": "perspective",
+    "focal_length_mm": 35.0,
+    "horizontal_aperture_mm": 36.0,
+    "vertical_aperture_mm": 15.290800094604492,
+    "horizontal_aperture_offset_mm": 0.0,
+    "vertical_aperture_offset_mm": 0.0,
+    "schema": "benchforge.native-camera-readout/v1",
+    "pixel_aspect_ratio": 1.0,
+    "aspect_ratio_conform_policy": "expandAperture",
+    "render_product_resolution": {
+      "width": 960,
+      "height": 720
+    },
+    "meters_per_scene_unit": 1.0,
+    "calibration_source": "same live UsdGeomCamera and UsdRenderProduct",
+    "camera_path": "/World/CaptureCamera",
+    "render_product_path": "/Render/OmniverseKit/HydraTextures/Replicator",
+    "pixel_coordinates": "upper-left pixel boundary is (0,0); pixel centers are (u+0.5,v+0.5)",
+    "pixel_center_offset_px": [
+      0.5,
+      0.5
+    ],
+    "K": [
+      [
+        933.3333333333334,
+        0,
+        480.0
+      ],
+      [
+        0,
+        933.3333333333334,
+        360.0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "K_basis": "captured_optics_and_readout"
+  },
+  "semantic_info": {
+    "idToLabels": {
+      "0": {
+        "class": "BACKGROUND"
+      },
+      "1": {
+        "class": "UNLABELLED"
+      },
+      "2": {
+        "class": "floor_a"
+      },
+      "8": {
+        "class": "wall_w_a"
+      },
+      "10": {
+        "class": "bookcase_a"
+      },
+      "18": {
+        "class": "wall_sk_a_w"
+      }
+    }
+  },
+  "instance_info": {
+    "idToLabels": {
+      "0": "BACKGROUND",
+      "1": "UNLABELLED",
+      "2": "/World/Objects/floor_a",
+      "8": "/World/Objects/wall_w_a",
+      "10": "/World/Objects/bookcase_a",
+      "18": "/World/Objects/wall_sk_a_w"
+    },
+    "idToSemantics": {
+      "0": {
+        "class": "BACKGROUND"
+      },
+      "1": {
+        "class": "UNLABELLED"
+      },
+      "2": {
+        "class": "floor_a"
+      },
+      "8": {
+        "class": "wall_w_a"
+      },
+      "10": {
+        "class": "bookcase_a"
+      },
+      "18": {
+        "class": "wall_sk_a_w"
+      }
+    }
+  },
+  "depth_kind": "optical_axis_z_m",
+  "rgb_std": 39.54466911501473,
+  "quality": {
+    "passed": true,
+    "rgb_std": 39.54466911501473,
+    "finite_depth_fraction": 1.0,
+    "visible_entity_count": 4,
+    "reasons": [],
+    "thresholds": {
+      "rgb_std_min": 5.0,
+      "finite_depth_fraction_min": 0.05,
+      "visible_entity_count_min": 1
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "spatialforge.program-handoff/v1",
+  "source_path": "/home/maqiang/SpatialForge-tasks/bench-office100-20261105/scenes/sf_study_pantry_corner.scene_program.json",
+  "authority": "task-authored scene data; not GT",
+  "revision": 0,
+  "program_stage": "prepared_for_capture; execution requires capture evidence",
+  "first_pass_mode": "validated file snapshot without planner rewrite",
+  "submitted_object_count": 31,
+  "prepared_object_count": 31,
+  "submitted_camera_count": 8,
+  "prepared_camera_count": 8,
+  "exact_program_match": true,
+  "added_objects": [],
+  "removed_objects": [],
+  "changed_objects": [],
+  "changed_sections": [],
+  "notes": [
+    "generated assets and native aliases retain existing realization/normalization rules",
+    "submitted scene data stays operator-controlled; inspect captures and submit your own revision",
+    "handoff equality is not simulation, contact, photorealism or benchmark acceptance"
+  ]
+}

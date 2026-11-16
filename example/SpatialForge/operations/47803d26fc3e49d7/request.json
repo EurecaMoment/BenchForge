@@ -1,0 +1,12 @@
+{
+  "tool": "pipeline_plan",
+  "arguments": {
+    "request_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/facing-recovery-20261106/apply-plan.request.json",
+    "validate_only": false
+  },
+  "time": "2026-11-06T09:43:51.780459+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "authorized-saved-plan-application-20261106"
+  }
+}

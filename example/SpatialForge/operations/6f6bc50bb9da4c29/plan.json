@@ -1,0 +1,1659 @@
+{
+  "schema": "benchforge.pipeline/v1",
+  "version": 1,
+  "pipeline_id": "data.capability",
+  "objective": "本计划针对三个全新建造的室内仿真场景（办公室工作区、起居会客角、阅览茶水角），按 89 任务/267 模板目录中 10 个精确测量模板各生产 10 题，共 100 题，覆盖距离感知、尺寸感知、相机参照系深度比较与条件计数四类室内空间能力。所有真值仅来自官方资产测量、SceneProgram  authored 几何与 Isaac 采集回执（沉降后实体中心/位姿），公开媒体为真实采集图的标注版本，题目不泄露答案。场景选择约束：selected_scenes 为空、allow_new_scenes=true，因此本计划不引用任何历史场景与其派生产物；场景库 policy.json 中被删除的立方体/几何盒替代场景及其派生物一律禁止复用。执行分为 S1 计划、S2 场景采集与验收、S3 标注与真值、S4 按模板出题、S5 质检打包五阶段，每阶段落盘可查看的真实产物并等待用户审阅。",
+  "inputs": {
+    "seed": 20261105,
+    "selections": [
+      {
+        "template_ids": [
+          "C01-T01"
+        ],
+        "count": 10,
+        "reason": "三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题"
+      },
+      {
+        "template_ids": [
+          "C01-T02"
+        ],
+        "count": 10,
+        "reason": "表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器"
+      },
+      {
+        "template_ids": [
+          "C01-T03"
+        ],
+        "count": 10,
+        "reason": "考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出"
+      },
+      {
+        "template_ids": [
+          "C03-T01"
+        ],
+        "count": 10,
+        "reason": "相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据"
+      },
+      {
+        "template_ids": [
+          "C04-T01"
+        ],
+        "count": 10,
+        "reason": "锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器"
+      },
+      {
+        "template_ids": [
+          "C04-T02"
+        ],
+        "count": 10,
+        "reason": "全排序比二选一更能区分排序捷径；带程序生成器"
+      },
+      {
+        "template_ids": [
+          "C05-T01"
+        ],
+        "count": 10,
+        "reason": "光轴深度与欧氏距离的口径分离是协议要求的主测切片"
+      },
+      {
+        "template_ids": [
+          "C07-T02"
+        ],
+        "count": 10,
+        "reason": "尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径"
+      },
+      {
+        "template_ids": [
+          "C09-T01"
+        ],
+        "count": 10,
+        "reason": "透视干扰是 N02 协议的关键难度轴，室内场景易构造"
+      },
+      {
+        "template_ids": [
+          "C11-T01"
+        ],
+        "count": 10,
+        "reason": "条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰"
+      }
+    ],
+    "target_items": 100,
+    "target_scene_count": 3,
+    "split": "train",
+    "evidence": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/evidence/evidence.calibrated-20261106.jsonl"
+  },
+  "steps": [
+    {
+      "arguments": {
+        "evidence": "$inputs.evidence",
+        "selections": "$inputs.selections",
+        "seed": "$inputs.seed",
+        "split": "$inputs.split"
+      },
+      "id": "questions",
+      "uses": "templates.produce"
+    },
+    {
+      "arguments": {
+        "dataset": "$questions.dataset"
+      },
+      "id": "package",
+      "uses": "data.package"
+    }
+  ],
+  "selections": [
+    {
+      "template_ids": [
+        "C01-T01"
+      ],
+      "count": 10,
+      "reason": "三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题"
+    },
+    {
+      "template_ids": [
+        "C01-T02"
+      ],
+      "count": 10,
+      "reason": "表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C01-T03"
+      ],
+      "count": 10,
+      "reason": "考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出"
+    },
+    {
+      "template_ids": [
+        "C03-T01"
+      ],
+      "count": 10,
+      "reason": "相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据"
+    },
+    {
+      "template_ids": [
+        "C04-T01"
+      ],
+      "count": 10,
+      "reason": "锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C04-T02"
+      ],
+      "count": 10,
+      "reason": "全排序比二选一更能区分排序捷径；带程序生成器"
+    },
+    {
+      "template_ids": [
+        "C05-T01"
+      ],
+      "count": 10,
+      "reason": "光轴深度与欧氏距离的口径分离是协议要求的主测切片"
+    },
+    {
+      "template_ids": [
+        "C07-T02"
+      ],
+      "count": 10,
+      "reason": "尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径"
+    },
+    {
+      "template_ids": [
+        "C09-T01"
+      ],
+      "count": 10,
+      "reason": "透视干扰是 N02 协议的关键难度轴，室内场景易构造"
+    },
+    {
+      "template_ids": [
+        "C11-T01"
+      ],
+      "count": 10,
+      "reason": "条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰"
+    }
+  ],
+  "template_contracts": [
+    {
+      "id": "C01-T01",
+      "task_id": "C01",
+      "task_name": "实体间绝对距离估计",
+      "protocol_id": "D89-C01-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "带尺度多视图或RGB-D",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "唯一实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "不同唯一实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C01-T02",
+      "task_id": "C01",
+      "task_name": "实体间绝对距离估计",
+      "protocol_id": "D89-C01-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "表面可辨且有尺度",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "已知碰撞体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "非穿透碰撞体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；使用表面最近点；接触为0；剔除穿透情形，禁止用中心距离标签。",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C01-T03",
+      "task_id": "C01",
+      "task_name": "实体间绝对距离估计",
+      "protocol_id": "D89-C01-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "尺度可恢复",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "唯一实体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "P",
+          "domain_or_binding": "明确三维标记点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "unit",
+          "domain_or_binding": "米或厘米",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；点必须三维可定位；换单位按同一真值换算，不把运动路径长度作为答案。",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C03-T01",
+      "task_id": "C03",
+      "task_name": "相机到对象距离估计",
+      "protocol_id": "D89-C03-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "标定多视图",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "object",
+          "domain_or_binding": "唯一对象",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。；不同离轴角但相同距离配对，排除只读z。",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C04-T01",
+      "task_id": "C04",
+      "task_name": "锚点距离比较与排序",
+      "protocol_id": "D89-C04-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "尺度统一的场景",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "唯一锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "objects",
+          "domain_or_binding": "3至6个候选ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。；最近目标必须唯一且与第二名相差超过tie_epsilon。",
+      "output_schema": {
+        "choice_id": "existing candidate ID or accepted ID set if multi-answer"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C04-T02",
+      "task_id": "C04",
+      "task_name": "锚点距离比较与排序",
+      "protocol_id": "D89-C04-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "空间可辨",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "objects",
+          "domain_or_binding": "3至8个ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "固定锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。；严格排序题剔除等距；不要只评分第一名。",
+      "output_schema": {
+        "sequence": "entity/frame ID array"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C05-T01",
+      "task_id": "C05",
+      "task_name": "相机相对对象深度比较",
+      "protocol_id": "D89-C05-v1",
+      "parameters": [
+        {
+          "name": "camera",
+          "domain_or_binding": "固定相机ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "image",
+          "domain_or_binding": "有效场景",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "epsilon",
+          "domain_or_binding": "冻结容差",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "给定观察相机与对象；明确比较光轴z或欧氏中心距离；允许相等时声明容差。；使用z；所有目标在相机前方。",
+      "output_schema": {
+        "label": "one declared label"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C07-T02",
+      "task_id": "C07",
+      "task_name": "物体指定维度长度估计",
+      "protocol_id": "D89-C07-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "局部轴可确定",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "object",
+          "domain_or_binding": "非对称实体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "对象局部坐标与指定尺寸轴明确；尺度已标定；遮挡情况下有充分多视图信息。；不是世界轴AABB最长边；避免旋转改变标注。",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N02",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C09-T01",
+      "task_id": "C09",
+      "task_name": "物体真实尺寸比较",
+      "protocol_id": "D89-C09-v1",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "标定多视图",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "对象真实尺度可确定；明确比较同一维度，提供足够尺度线索。；保证两对象局部长度定义相同且非等长。",
+      "output_schema": {
+        "choice_id": "existing candidate ID or accepted ID set if multi-answer"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N02",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C11-T01",
+      "task_id": "C11",
+      "task_name": "条件对象计数",
+      "protocol_id": "D89-C11-v1",
+      "parameters": [
+        {
+          "name": "scene",
+          "domain_or_binding": "标定几何",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "唯一锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "radius",
+          "domain_or_binding": "正阈值",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "effective_measurement_conditions": "明确计数谓词、对象全集/可见范围、边界规则和跨视图去重；对象ID可在真值中持久。；边界≤包含；锚点不计入；本模板不继承现有同类训练题为测试。",
+      "output_schema": {
+        "value": "nonnegative integer"
+      },
+      "catalog_capability_links": [
+        {
+          "id": "N07",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N18",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    }
+  ],
+  "assessment": {
+    "schema": "benchforge.assessment/v1",
+    "title": "室内场景空间理解评测集（办公室·起居·阅览三角色，100题）生产计划",
+    "summary": "本计划针对三个全新建造的室内仿真场景（办公室工作区、起居会客角、阅览茶水角），按 89 任务/267 模板目录中 10 个精确测量模板各生产 10 题，共 100 题，覆盖距离感知、尺寸感知、相机参照系深度比较与条件计数四类室内空间能力。所有真值仅来自官方资产测量、SceneProgram  authored 几何与 Isaac 采集回执（沉降后实体中心/位姿），公开媒体为真实采集图的标注版本，题目不泄露答案。场景选择约束：selected_scenes 为空、allow_new_scenes=true，因此本计划不引用任何历史场景与其派生产物；场景库 policy.json 中被删除的立方体/几何盒替代场景及其派生物一律禁止复用。执行分为 S1 计划、S2 场景采集与验收、S3 标注与真值、S4 按模板出题、S5 质检打包五阶段，每阶段落盘可查看的真实产物并等待用户审阅。",
+    "objectives": [
+      {
+        "id": "OBJ-DIST",
+        "capability": "N01 距离感知（实体间与相机参照系）",
+        "research_question": "在被测模型只看到带尺度线索的多机位实拍时，它能否正确估计物体几何中心间距、表面最短间距、物体到标记点的距离，并在相机坐标系下正确比较光轴深度？",
+        "success_criterion": "设计目标：C01/C03/C04/C05 六个模板共 60 题全部满足信息防火墙与协议绑定；数值题按 tau=max(0.02m, 0.05*|gt|) 报告容差内正确率与 MAE；比较/排序题按准确率与 Kendall tau 报告。",
+        "exclusions": "不测真实机器人操作成功率、不测动态运动学（无 C43/C44 类时序题）、不以单张无尺度 RGB 出绝对距离题（协议禁止）。"
+      },
+      {
+        "id": "OBJ-SIZE",
+        "capability": "N02 尺寸感知",
+        "research_question": "给定标定多视图与对象编号标记，被测模型能否正确估计物体局部包围盒最长边（厘米），并在透视差异下正确比较两物体的真实长度？",
+        "success_criterion": "设计目标：C07-T02 与 C09-T01 共 20 题；长度题按 tau=max(0.005m, 0.05*|gt|) 评分；比较题保证两对象同维度定义且非等长，含像素大小与真实长度相反的近远配对干扰。",
+        "exclusions": "不测世界轴 AABB 尺寸（与局部轴单列）、不测薄片厚度亚毫米级样本。"
+      },
+      {
+        "id": "OBJ-COUNT",
+        "capability": "条件对象计数（C11，关联 N10/N11）",
+        "research_question": "被测模型能否在标定室内场景中按『到锚点中心距离不超过给定半径』的谓词正确去重计数？",
+        "success_criterion": "设计目标：C11-T01 共 10 题；整数精确率与绝对计数误差；边界含 ≤，锚点自身不计入；半径取远离实际距离值的档位，杜绝边界歧义。",
+        "exclusions": "不测跨视图身份对应推断（C11-T03 不选），不测遮挡比例阈值类计数。"
+      }
+    ],
+    "coverage": [
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C01-T01",
+        "count": 10,
+        "difficulty": "中：中心距离 0.4–3.5 m 混合，含遮挡与离轴样本",
+        "conditions": "标定多视图实拍（同一相机两张不同机位或单张含地面标尺与已知家具尺度线索），对象以绿色框+编号标记，声明米制与中心距离定义",
+        "selection_reason": "三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题"
+      },
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C01-T02",
+        "count": 10,
+        "difficulty": "中高：表面间距 0.03–1.2 m，剔除穿透与非水平对",
+        "conditions": "同上；表面最近点由 authored 网格/解析 AABB 最近点程序求解，接触为 0 的情形不进题",
+        "selection_reason": "表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器"
+      },
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C01-T03",
+        "count": 10,
+        "difficulty": "中：标记点取地面十字标记或台面角点，公开媒体上绘制 P 标记",
+        "conditions": "点必须三维可定位并在公开图中标出；单位米；不把路径长度当答案",
+        "selection_reason": "考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出"
+      },
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C03-T01",
+        "count": 10,
+        "difficulty": "中：相机光心到对象中心 1.0–4.5 m，覆盖不同离轴角",
+        "conditions": "采集回执提供每机位标定相机矩阵（对外只声明『标定相机』，不泄露数值位姿），输入具有尺度；对象唯一编号",
+        "selection_reason": "相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据"
+      },
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C04-T01",
+        "count": 10,
+        "difficulty": "易中：4–6 个候选对象，最近与第二名差 >0.15 m",
+        "conditions": "统一中心距离定义；锚点以编号标记；全部候选在同一媒体可见",
+        "selection_reason": "锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器"
+      },
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C04-T02",
+        "count": 10,
+        "difficulty": "中：4–5 个对象全排序，相邻名次差 >0.12 m，剔除等距",
+        "conditions": "严格排序，输出 ID 序列；只评整序与 Kendall tau，不只评第一名",
+        "selection_reason": "全排序比二选一更能区分排序捷径；带程序生成器"
+      },
+      {
+        "objective_id": "OBJ-DIST",
+        "template_id": "C05-T01",
+        "count": 10,
+        "difficulty": "易中：光轴深度差 ≥0.25 m 才出『更小/更大』，|Δz|≤0.1 m 判『相同』（该容差写入题目条件）",
+        "conditions": "两个目标均在该相机前方且中心在画面内；坐标系为相机光轴 z（米），在题目条件中声明",
+        "selection_reason": "光轴深度与欧氏距离的口径分离是协议要求的主测切片"
+      },
+      {
+        "objective_id": "OBJ-SIZE",
+        "template_id": "C07-T02",
+        "count": 10,
+        "difficulty": "中：最长边 20–222 cm，含旋转摆放对象（yaw 已声明）",
+        "conditions": "局部包围盒最长边；单位厘米；对象局部轴定义随 authored 元数据在公开标定卡中给出轴向示意",
+        "selection_reason": "尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径"
+      },
+      {
+        "objective_id": "OBJ-SIZE",
+        "template_id": "C09-T01",
+        "count": 10,
+        "difficulty": "中难：至少 4 题为像素尺寸与真实长度排序相反的近远配对",
+        "conditions": "同一维度（最长边）比较；两对象非等长（差 ≥8%）；多视图提供尺度线索",
+        "selection_reason": "透视干扰是 N02 协议的关键难度轴，室内场景易构造"
+      },
+      {
+        "objective_id": "OBJ-COUNT",
+        "template_id": "C11-T01",
+        "count": 10,
+        "difficulty": "中：半径 0.8/1.2/1.8/2.4 m 档位，边界距离与半径差 >0.15 m",
+        "conditions": "中心距离谓词、锚点不计入、全集为该场景内全部静态实体（公开图含全景视图供核对）",
+        "selection_reason": "条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰"
+      }
+    ],
+    "scenes": {
+      "source_policy": "本会话场景选择 selected_scenes 为空、allow_new_scenes=true：不引用任何历史场景/task_id/revision；三个场景全部新建于本会话，采集验收通过后登记进 scene-library/catalog.json。场景库 policy.json 删除清单（立方体与几何盒替代场景及其派生产物）不可复用。默认使用 Isaac 官方可辨识家具资产，不启用任何简化几何例外（geometry_exceptions 为空即声明：本计划不含简化几何实验）。",
+      "selection_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/scene-library/selections/session-13742859-5f94-4ca8-ab53-2ffc86ae2e12.json",
+      "selected_scenes": [],
+      "allow_new_scenes": true,
+      "target_scene_count": 3,
+      "designs": [
+        {
+          "id": "design-office-work",
+          "name": "办公室工作区（sf_office_work_area）",
+          "purpose": "承担办公场景下的距离、尺寸、相机参照系与计数测量；一项目一场景，供 C01/C03/C04/C05/C07/C09/C11 的 train 分区题目。",
+          "layout": "6.0×5.0×2.8 m 矩形房间，实体墙面四片+地板+吊顶，南墙内嵌 3 m 模块化窗提供天光方向感；办公桌靠北墙居中，办公椅面向桌面留出腿部空间；书柜贴西墙，文件柜靠东墙，饮水机置于东南角，盆栽立于窗侧墙角，垃圾桶在桌侧可取用处。动线：从东侧通行带到桌前通道 ≥0.9 m。",
+          "objects": "office_desk、office_chair、office_monitor、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_water_cooler、office_book×3、mug×2、bin，加 authored 墙体/地板/天花 composite 与 office_window；小物件（马克杯、书本、笔筒类 bin）置于桌面/柜顶支撑面上，动态质量与摩擦按合成先验声明。",
+          "cameras": "view_0 全景对角机位（覆盖 ≥12 个对象）、view_1 侧向机位（与 view_0 形成基线，供多视图尺度恢复）、view_2 桌面特写（monitor/mug/books 近景）、view_3 书柜-文件柜侧近景；均为标定相机，水平视角由 focal/aperture 记录于采集回执。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。",
+          "variation": "与其余两场景变化维度：家具品类组合（办公类）、对象数 16、锚点候选（桌、柜、机位）；对象间距与角度按 15 度以上 yaw 散布以避免轴向捷径。",
+          "artifact": "scenes/sf_office_work_area.scene_program.json → captures/sf_office_work_area/（实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出）",
+          "summary": "这是一间供单人日常办公的仿真房间，用于测量模型在办公环境中的距离、尺寸与计数能力。房间 6.0×5.0 米、高 2.8 米，木地板（wood_laminate 纹理）、四片实体墙与吊顶围合成封闭室内，南墙内嵌 3 米模块窗给出一侧天光方向，配合顶部面光使全部家具在实拍中可辨识。办公桌贴北墙居中摆放，桌面上依次放显示器（居中朝椅）与两只马克杯（左侧、前缘），显示器由桌面真实支撑；官方笔记本资产在实拍中呈 1.9cm 薄板不可辨识，已从软设计移除（非用户硬要求）；办公椅在桌前就坐区，正面朝向显示器屏幕并保留腿部空间；屏幕朝向对应办公椅，功能朝向按已校准的原生资产正面和目标位置计算。西墙立书柜（柜格留空以如实反映可验证支撑面），三件书类分别竖放在办公桌左角、桌面前缘与文件柜顶；东墙放文件柜，柜顶居中竖放书组；台灯移至办公桌右端桌面作为读写照明；东南角饮水机靠墙，取其不遮窗；窗前角落放盆栽；桌旁地面放收纳 bin。从东侧通行带到桌前形成连续通路，净宽不小于 0.9 米，柜门开启方向不与椅位冲突。所有大件静态、小件带质量与摩擦先验，沉降后中心由仿真回执提供，作为公开媒体标记与真值的双重来源。",
+          "hard_requirements": [
+            "室内场景，真实可辨识资产，禁止立方体/几何盒替代家具（scene-library policy.json 删除清单）",
+            "目标题量 100 条，本场景承担 train 分区约 34 题",
+            "GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真采集回执；模型预测不得充当 GT",
+            "公开题目不泄露答案；单张无尺度 RGB 不出绝对距离题"
+          ],
+          "object_roles": [
+            {
+              "object_id": "floor_a",
+              "role": "房间地面，支撑全部家具，world Z=0 起算面"
+            },
+            {
+              "object_id": "wall_n_a",
+              "role": "北墙，办公桌贴靠的边界"
+            },
+            {
+              "object_id": "wall_s_a",
+              "role": "南墙，内嵌模块窗，界定天光方向"
+            },
+            {
+              "object_id": "wall_w_a",
+              "role": "西墙，书柜贴靠"
+            },
+            {
+              "object_id": "wall_e_a",
+              "role": "东墙，文件柜贴靠，留出入口通道"
+            },
+            {
+              "object_id": "ceiling_a",
+              "role": "吊顶，封闭室内体积"
+            },
+            {
+              "object_id": "window_s_a",
+              "role": "南窗，真实窗资产，提供尺度与方向线索"
+            },
+            {
+              "object_id": "desk_a",
+              "role": "办公桌主体，北墙居中，桌面高约 0.76 m，承载显示器/书组/两只马克杯"
+            },
+            {
+              "object_id": "chair_a",
+              "role": "桌前就坐区的办公椅，正面朝向显示器并留出腿部空间，功能朝向由新采集核对。"
+            },
+            {
+              "object_id": "monitor_a",
+              "role": "显示器，桌面居中朝椅"
+            },
+            {
+              "object_id": "mug_a1",
+              "role": "马克杯，桌面左侧可取用处"
+            },
+            {
+              "object_id": "mug_a2",
+              "role": "马克杯，桌面前缘靠通道侧"
+            },
+            {
+              "object_id": "bookcase_a",
+              "role": "书柜，贴西墙，格内放书"
+            },
+            {
+              "object_id": "books_a1",
+              "role": "书组，办公桌左角竖放"
+            },
+            {
+              "object_id": "books_a2",
+              "role": "书组，文件柜顶竖放居中"
+            },
+            {
+              "object_id": "books_a3",
+              "role": "单本书，桌面前缘竖放，验证厚度方向"
+            },
+            {
+              "object_id": "filecab_a",
+              "role": "文件柜，靠东墙，柜顶放书组"
+            },
+            {
+              "object_id": "lamp_a",
+              "role": "台灯，办公桌右端桌面，读写照明"
+            },
+            {
+              "object_id": "cooler_a",
+              "role": "饮水机，东南角不遮窗"
+            },
+            {
+              "object_id": "plant_a",
+              "role": "盆栽，窗侧墙角，界定软分区"
+            },
+            {
+              "object_id": "bin_a",
+              "role": "收纳 bin，桌旁地面，可取用位置"
+            }
+          ],
+          "relations": [
+            {
+              "source": "desk_a",
+              "type": "supported_by",
+              "target": "floor_a",
+              "description": "四脚落地贴北墙，工作主面"
+            },
+            {
+              "source": "chair_a",
+              "type": "facing",
+              "target": "desk_a",
+              "description": "在对应桌前就坐，正面朝向显示器并保留腿部净空，由新采集核对可正常使用。"
+            },
+            {
+              "source": "monitor_a",
+              "type": "supported_by",
+              "target": "desk_a",
+              "description": "底座落在桌面，朝向椅位"
+            },
+            {
+              "source": "mug_a1",
+              "type": "supported_by",
+              "target": "desk_a",
+              "description": "动态小件，沉降由仿真回执确认接触"
+            },
+            {
+              "source": "mug_a2",
+              "type": "supported_by",
+              "target": "desk_a",
+              "description": "同上，位置与 mug_a1 拉开便于计数与排序"
+            },
+            {
+              "source": "books_a3",
+              "type": "supported_by",
+              "target": "desk_a",
+              "description": "平放叠置，验证厚度方向"
+            },
+            {
+              "source": "bookcase_a",
+              "type": "supported_by",
+              "target": "floor_a",
+              "description": "贴西墙落地，柜格真实层板"
+            },
+            {
+              "source": "books_a1",
+              "type": "supported_by",
+              "target": "desk_a",
+              "description": "书组竖放于办公桌左角，由桌面真实支撑"
+            },
+            {
+              "source": "books_a2",
+              "type": "supported_by",
+              "target": "filecab_a",
+              "description": "书组竖放文件柜顶面中央，比例与柜体协调"
+            },
+            {
+              "source": "lamp_a",
+              "type": "supported_by",
+              "target": "desk_a",
+              "description": "台灯底座落在办公桌右端桌面，高度与显示器齐平"
+            },
+            {
+              "source": "filecab_a",
+              "type": "near",
+              "target": "wall_e_a",
+              "description": "靠东墙，开门方向避开椅位"
+            },
+            {
+              "source": "cooler_a",
+              "type": "near",
+              "target": "wall_e_a",
+              "description": "东南角取用点，不遮挡窗"
+            },
+            {
+              "source": "plant_a",
+              "type": "supported_by",
+              "target": "floor_a",
+              "description": "窗侧墙角，界定动线"
+            },
+            {
+              "source": "bin_a",
+              "type": "near",
+              "target": "desk_a",
+              "description": "桌旁 0.5 m 地面，取用方便"
+            },
+            {
+              "source": "window_s_a",
+              "type": "mounted_to",
+              "target": "wall_s_a",
+              "description": "内嵌于南墙开口平面"
+            }
+          ],
+          "physical_assumptions": [
+            "家具静态件 mass_kg=0（static），其位置即 authored 位姿，碰撞体由原生 USD 几何提供",
+            "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+            "台灯为办公桌右端桌面静态摆件，底座由桌面支撑；不测倾覆动力学。",
+            "墙体/地板/天花为显式 authored 几何，support=ground 仅相对 Z=0 定位，地面由 floor_a 实体提供"
+          ]
+        },
+        {
+          "id": "design-lounge-meeting",
+          "name": "起居会客角（sf_lounge_meeting_corner）",
+          "purpose": "会客/休息类室内布局，测同一批模板在软体家具主导空间下的表现；承担 dev 分区约 33 题。",
+          "layout": "5.6×4.8×2.8 m 房间；长沙发贴北墙、单人扶手椅两只分列东西两侧均朝向茶几，形成围合谈话区；地毯居中界定活动区，茶几上放两只马克杯与一本合上的书；西墙书柜、东墙边柜（file_cabinet 复用为边柜），台灯在边柜上，盆栽在南窗角，bin 在沙发侧。动线：南侧入口至围合区外缘 ≥1.0 m，椅前留 ≥0.45 m 腿部空间。 盆栽移至地面中心 (1.50,-1.55) m，按整株原生尺寸避开东踢脚线、边柜、柜顶书组和座椅；南侧主要通行线保留。",
+          "objects": "office_sofa、office_armchair×2、office_coffee_table、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_window、mug×2、office_book×2、bin、rug（织物纹理 composite，厚 1.5 cm）+ 墙体/地板/吊顶。",
+          "cameras": "view_0 全景（自南向北含围合区）、view_1 低机位斜向（强化近远对象透视差，供 C09 反转配对）、view_2 茶几特写、view_3 沙发-书柜侧向近景。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。",
+          "variation": "对象数 15；软体家具体量相近，制造更难的尺寸比较；锚点候选为茶几中心与沙发。",
+          "artifact": "scenes/sf_lounge_meeting_corner.scene_program.json → captures/sf_lounge_meeting_corner/",
+          "summary": "这是一个供三四人在此交谈、喝茶、取阅书刊的起居会客仿真空间，用于测量模型在软体家具环境中的空间判断。房间 5.6×4.8 米、高 2.8 米，木地板与浅色墙面围合，南墙整幅 3 米模块窗引入天光，与顶面面光共同照亮全场。北墙前放双人布艺长沙发，四脚落地、靠墙留出 5 cm 安装余量；东西两侧各一只单人扶手椅，均正面朝向房间中央的长方形茶几，椅前与茶几之间留约 0.45 米腿部距离，构成可围坐谈话的动线。羊毛质感地毯平铺中央，茶几落在地毯上，台面摆放两只马克杯与一本竖放的书，均由台面支撑并等待沉降验证。西墙立书柜（柜格留空以保证支撑可验证）；东墙边柜上放台灯，灯高约 1.85 米在可及范围；南窗内侧偏东 (1.50,-1.55) 米处放盆栽，整株叶片避开东墙踢脚线、边柜及其书组；沙发侧边地面放收纳 bin。会客座椅正面朝向茶几，沙发正面朝南、背靠北墙；围坐区域外侧保留通行路径，净空由新采集与平面布局核对，不将沙发背后的安装余量作为通道。大件静态，杯书本动态，质量摩擦为合成先验，最终接触与位置以仿真采集回执为准。 会客顶面增设两处面光补足座椅暗部；补光必须真实进入生成程序的灯列表，逐图复核曝光与材质可辨识性。",
+          "hard_requirements": [
+            "室内场景，真实可辨识资产，禁止几何盒替代家具",
+            "承担 dev 分区约 33 题，GT 仅来自官方/程序/仿真",
+            "围合朝向与通道净空在实拍中可验证；扶手椅必须正立并面向茶几",
+            "公开题目不泄露答案"
+          ],
+          "object_roles": [
+            {
+              "object_id": "floor_b",
+              "role": "地面，支撑全部家具"
+            },
+            {
+              "object_id": "wall_n_b",
+              "role": "北墙，沙发贴靠"
+            },
+            {
+              "object_id": "wall_s_b",
+              "role": "南墙，整幅窗"
+            },
+            {
+              "object_id": "wall_w_b",
+              "role": "西墙，书柜贴靠"
+            },
+            {
+              "object_id": "wall_e_b",
+              "role": "东墙，边柜贴靠"
+            },
+            {
+              "object_id": "ceiling_b",
+              "role": "吊顶，封闭室内体积"
+            },
+            {
+              "object_id": "window_s_b",
+              "role": "南窗，主采光与尺度线索"
+            },
+            {
+              "object_id": "sofa_b",
+              "role": "双人沙发，北墙居中，主要坐具"
+            },
+            {
+              "object_id": "armchair_b1",
+              "role": "扶手椅，西侧面向茶几"
+            },
+            {
+              "object_id": "armchair_b2",
+              "role": "扶手椅，东侧面向茶几，与 b1 成镜像围合"
+            },
+            {
+              "object_id": "coffee_table_b",
+              "role": "茶几，围合中心，台面承载杯与书"
+            },
+            {
+              "object_id": "rug_b",
+              "role": "地毯，界定谈话活动区，1.5 cm 薄片真实厚度"
+            },
+            {
+              "object_id": "mug_b1",
+              "role": "马克杯，茶几台面"
+            },
+            {
+              "object_id": "mug_b2",
+              "role": "马克杯，茶几台面另一侧"
+            },
+            {
+              "object_id": "book_b1",
+              "role": "书，茶几台面竖放"
+            },
+            {
+              "object_id": "bookcase_b",
+              "role": "书柜，贴西墙"
+            },
+            {
+              "object_id": "book_b2",
+              "role": "书组，边柜台面竖放于台灯旁"
+            },
+            {
+              "object_id": "sidecab_b",
+              "role": "边柜（文件柜资产），东墙，柜顶放灯"
+            },
+            {
+              "object_id": "lamp_b",
+              "role": "台灯，边柜顶，会客照明"
+            },
+            {
+              "object_id": "plant_b",
+              "role": "盆栽，南窗角"
+            },
+            {
+              "object_id": "bin_b",
+              "role": "收纳 bin，沙发侧地面"
+            }
+          ],
+          "relations": [
+            {
+              "source": "sofa_b",
+              "type": "near",
+              "target": "wall_n_b",
+              "description": "贴北墙留 5 cm 余量，正面朝南"
+            },
+            {
+              "source": "armchair_b1",
+              "type": "facing",
+              "target": "coffee_table_b",
+              "description": "自西面向茶几，椅前留 0.45 m 腿部空间"
+            },
+            {
+              "source": "armchair_b2",
+              "type": "facing",
+              "target": "coffee_table_b",
+              "description": "自东面向茶几，与 b1 围合"
+            },
+            {
+              "source": "coffee_table_b",
+              "type": "supported_by",
+              "target": "rug_b",
+              "description": "四角落在地毯平面，地毯 1.5 cm 抬升由沉降回执确认"
+            },
+            {
+              "source": "mug_b1",
+              "type": "supported_by",
+              "target": "coffee_table_b",
+              "description": "台面动态件，沉降后接触"
+            },
+            {
+              "source": "mug_b2",
+              "type": "supported_by",
+              "target": "coffee_table_b",
+              "description": "台面另一侧，间距明确"
+            },
+            {
+              "source": "book_b1",
+              "type": "supported_by",
+              "target": "coffee_table_b",
+              "description": "单本书竖放茶几台面，由台面支撑"
+            },
+            {
+              "source": "book_b2",
+              "type": "supported_by",
+              "target": "sidecab_b",
+              "description": "书组竖放边柜顶面，与台灯相邻由柜顶支撑"
+            },
+            {
+              "source": "lamp_b",
+              "type": "supported_by",
+              "target": "sidecab_b",
+              "description": "柜顶放置，位置与朝向符合声明的使用功能"
+            },
+            {
+              "source": "sidecab_b",
+              "type": "near",
+              "target": "wall_e_b",
+              "description": "贴东墙，抽屉开启方向避开通道"
+            },
+            {
+              "source": "bookcase_b",
+              "type": "near",
+              "target": "wall_w_b",
+              "description": "贴西墙落地，位置与朝向符合声明的使用功能"
+            },
+            {
+              "source": "rug_b",
+              "type": "supported_by",
+              "target": "floor_b",
+              "description": "平铺地面，位置与朝向符合声明的使用功能"
+            },
+            {
+              "source": "plant_b",
+              "type": "near",
+              "target": "window_s_b",
+              "description": "南窗内侧偏东落地，整株与东踢脚线、边柜和柜顶书组分离；不阻南侧主要动线。"
+            },
+            {
+              "source": "bin_b",
+              "type": "near",
+              "target": "sofa_b",
+              "description": "沙发扶手侧，取用方便"
+            },
+            {
+              "source": "window_s_b",
+              "type": "mounted_to",
+              "target": "wall_s_b",
+              "description": "内嵌南墙，位置与朝向符合声明的使用功能"
+            }
+          ],
+          "physical_assumptions": [
+            "沙发/扶手椅/茶几/柜类静态（原生 USD 碰撞体，mass_kg=0）",
+            "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+            "地毯为静态薄板，声明真实厚度 1.5 cm，不声称织物形变",
+            "光照为渲染先验，按新采集的物体可辨识性调整；不声明实测照度或光学标定。"
+          ]
+        },
+        {
+          "id": "design-study-pantry",
+          "name": "阅览茶水角（sf_study_pantry_corner）",
+          "purpose": "学习+茶水混合功能区，提供第三组对象间距分布；承担 test 分区约 33 题（sealed 留待后续冻结）。",
+          "layout": "5.4×4.6×2.8米房间；两张办公桌沿北墙并排，间隔30厘米，各配转椅面向对应工作目标。东墙两组书柜开口朝室内；西墙文件柜作为收纳柜，柜顶只放一个收纳盒，饮水机在柜体北侧约0.9米处。两只马克杯和两组书分别放在两桌上，台灯放左桌右前区域。南窗下阅读椅面朝房内，盆栽在其东侧1.2米中心距离处。侧方与中央安排通行，东侧连续净宽至少0.75米；不把阅读椅背后的安装间隙作为通道。",
+          "objects": "office_desk×2、office_chair×2、office_bookcase×2、office_monitor×1、office_file_cabinet、office_water_cooler、office_lamp、office_plant、office_window、office_armchair（窗边阅读椅）、mug×2、bin×1、office_books×2。",
+          "cameras": "view_0 全景、view_1 对角高机位、view_2 茶水角近景、view_3 书柜墙面近景。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。",
+          "variation": "对象数 18（最多），双桌双椅同型号对象测试身份去重与计数；柜顶平放书与竖放书混布测厚度/长度维度混淆。",
+          "artifact": "scenes/sf_study_pantry_corner.scene_program.json → captures/sf_study_pantry_corner/",
+          "summary": "这是一间兼具办公、阅览与饮水功能的小型仿真房间，服务两到三人，并为评测提供同型号多实例的计数与身份去重条件。房间5.4×4.6米、高2.8米，木地板与浅色墙，南墙嵌3米模块窗。北墙并排两张办公桌，中间留30厘米缝，每桌配一把转椅并留出腿部空间；左桌转椅面向对应显示器，显示器屏幕面向左桌转椅，右桌转椅面向右桌工作区，朝向按已校准的原生资产正面计算。总共只有两只马克杯，各放在一张桌面的可取用处；两组书也分别放在两桌的左侧，右桌已有书和杯，不以单个视角的遮挡认定为空。台灯放在左桌右前区域，由桌面支撑，与显示器及书组错开。东墙相邻两组书柜，开口朝室内，柜格留空以保证支撑可验证。西墙文件柜用于日常收纳，柜顶只放一个收纳盒，柜顶作为收纳平面，不作为食品操作台；饮水机在柜体北侧约0.9米处贴墙。窗下偏西放一只阅读扶手椅，背部朝南窗、正面朝房内，后方留约0.3米安装余量，通行安排在侧方及房间中央。盆栽移至阅读椅东侧，两者中心相距1.2米，东侧连续通道净宽至少0.75米，并由最终采集检查。大件静态，杯、书和收纳盒带合成质量与摩擦，最终接触、姿态和中心以新仿真沉降回执为准；公开媒体标记与真值同源。",
+          "hard_requirements": [
+            "室内场景，真实可辨识资产，禁止几何盒替代家具",
+            "承担 test 分区约 33 题；同场景题目同分区，禁止跨分区泄漏",
+            "GT 仅来自官方/程序/仿真；双桌双椅同型号必须可按持久 ID 区分",
+            "公开题目不泄露答案"
+          ],
+          "object_roles": [
+            {
+              "object_id": "floor_c",
+              "role": "地面，支撑全部家具并作为高度起算面"
+            },
+            {
+              "object_id": "wall_n_c",
+              "role": "北墙，双桌贴靠"
+            },
+            {
+              "object_id": "wall_s_c",
+              "role": "南墙，窗与阅读椅"
+            },
+            {
+              "object_id": "wall_w_c",
+              "role": "西墙，茶水角"
+            },
+            {
+              "object_id": "wall_e_c",
+              "role": "东墙，双书柜"
+            },
+            {
+              "object_id": "ceiling_c",
+              "role": "吊顶，封闭室内体积"
+            },
+            {
+              "object_id": "window_s_c",
+              "role": "南窗，提供采光与尺度线索"
+            },
+            {
+              "object_id": "desk_c1",
+              "role": "办公桌1，北墙西侧，配显示器"
+            },
+            {
+              "object_id": "desk_c2",
+              "role": "办公桌2，北墙东侧，配马克杯与书组，与 c1 间隔 30 cm"
+            },
+            {
+              "object_id": "chair_c1",
+              "role": "转椅1，正对 desk_c1"
+            },
+            {
+              "object_id": "chair_c2",
+              "role": "转椅2，正对 desk_c2"
+            },
+            {
+              "object_id": "monitor_c",
+              "role": "显示器，desk_c1 桌面"
+            },
+            {
+              "object_id": "mug_c1",
+              "role": "马克杯，desk_c1 桌面"
+            },
+            {
+              "object_id": "mug_c2",
+              "role": "马克杯，desk_c2 桌面"
+            },
+            {
+              "object_id": "bookcase_c1",
+              "role": "书柜1，东墙南侧"
+            },
+            {
+              "object_id": "bookcase_c2",
+              "role": "书柜2，东墙北侧，与 c1 相邻"
+            },
+            {
+              "object_id": "books_c1",
+              "role": "书组，desk_c1 桌面左角竖放"
+            },
+            {
+              "object_id": "books_c2",
+              "role": "书组，办公桌2桌面左角竖放"
+            },
+            {
+              "object_id": "sidecab_c",
+              "role": "西墙文件收纳柜，柜顶只放一个收纳盒，按日常收纳用途使用。"
+            },
+            {
+              "object_id": "bin_c",
+              "role": "bin，边柜台面"
+            },
+            {
+              "object_id": "cooler_c",
+              "role": "饮水机，西墙边柜北侧 0.8 m"
+            },
+            {
+              "object_id": "lamp_c",
+              "role": "台灯，办公桌1桌面右前角，阅读照明"
+            },
+            {
+              "object_id": "plant_c",
+              "role": "窗侧盆栽，位于阅读椅东侧，两者中心相距1.2米，保留东侧连续通道。"
+            },
+            {
+              "object_id": "armchair_c",
+              "role": "单人阅读椅，窗下面朝房内"
+            }
+          ],
+          "relations": [
+            {
+              "source": "desk_c1",
+              "type": "near",
+              "target": "wall_n_c",
+              "description": "贴北墙，桌面工作区"
+            },
+            {
+              "source": "desk_c2",
+              "type": "near",
+              "target": "wall_n_c",
+              "description": "贴北墙与 c1 间隔 30 cm"
+            },
+            {
+              "source": "chair_c1",
+              "type": "facing",
+              "target": "desk_c1",
+              "description": "正对桌面留腿部空间"
+            },
+            {
+              "source": "chair_c2",
+              "type": "facing",
+              "target": "desk_c2",
+              "description": "正对桌面，位置与朝向符合声明的使用功能"
+            },
+            {
+              "source": "monitor_c",
+              "type": "supported_by",
+              "target": "desk_c1",
+              "description": "底座由左桌支撑，屏幕正面面向左桌转椅，采用已校准的原生资产正面计算朝向。"
+            },
+            {
+              "source": "mug_c1",
+              "type": "supported_by",
+              "target": "desk_c1",
+              "description": "动态件，台面沉降"
+            },
+            {
+              "source": "mug_c2",
+              "type": "supported_by",
+              "target": "desk_c2",
+              "description": "动态件，台面沉降"
+            },
+            {
+              "source": "books_c1",
+              "type": "supported_by",
+              "target": "desk_c1",
+              "description": "书组竖放办公桌1左角，由桌面真实支撑"
+            },
+            {
+              "source": "books_c2",
+              "type": "supported_by",
+              "target": "desk_c2",
+              "description": "书组竖放办公桌2桌面左角，由桌面真实支撑，与办公桌1桌面书组构成同型号双桌区分"
+            },
+            {
+              "source": "sidecab_c",
+              "type": "near",
+              "target": "wall_w_c",
+              "description": "文件柜作为西墙日常收纳柜，柜顶放收纳盒，不作为食品操作台。"
+            },
+            {
+              "source": "bin_c",
+              "type": "supported_by",
+              "target": "sidecab_c",
+              "description": "台面放置，位置与朝向符合声明的使用功能"
+            },
+            {
+              "source": "cooler_c",
+              "type": "near",
+              "target": "sidecab_c",
+              "description": "文件收纳柜北侧约0.9米的贴墙取水点。"
+            },
+            {
+              "source": "armchair_c",
+              "type": "near",
+              "target": "window_s_c",
+              "description": "窗下阅读位，背部朝南窗、正面朝房内，背后留约0.3米安装余量，通行在侧方。"
+            },
+            {
+              "source": "lamp_c",
+              "type": "supported_by",
+              "target": "desk_c1",
+              "description": "台灯底座落在办公桌1桌面右前角，与左角显示器、书组错开，提供有效桌面照明"
+            },
+            {
+              "source": "plant_c",
+              "type": "supported_by",
+              "target": "floor_c",
+              "description": "窗侧地面，界定软分区"
+            },
+            {
+              "source": "window_s_c",
+              "type": "mounted_to",
+              "target": "wall_s_c",
+              "description": "内嵌南墙，位置与朝向符合声明的使用功能"
+            }
+          ],
+          "physical_assumptions": [
+            "桌/椅/柜/窗静态（原生 USD 碰撞体）；双桌双椅同型号但世界坐标与 ID 持久可分",
+            "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+            "台灯为左桌右前区域的静态摆件，底座由办公桌1桌面支撑；不测倾覆。",
+            "窗资产透明度用 native_opacity_multiplier 先验调节，不声称光学实测透射率"
+          ]
+        }
+      ],
+      "reuse_constraints": "禁止复用 selected_scenes 之外的任何历史场景、其采集目录与派生数据集（含 policy.json 删除清单及 operations/fr-eval100 等旧产物）；历史产物仅可作为接口格式参考，不进入本次 GT、媒体或统计。新场景验收后登记 scene-library/catalog.json（记录 task_id、revision、程序路径、验收回执）。",
+      "preview_policy": "每个 SceneProgram 先经 spatialforge_preview 检查支撑链与包围盒冲突，修复后再进入 spatialforge_capture 采集；采集后逐图检查真实图像与原生回执，scene_admission.json 与 scene_acceptance.json 双通过方可进入 S3；最多两次自动修复，仍失败则停在本阶段并如实报告缺口。"
+    },
+    "annotations": {
+      "authority_source": "三层权威：(1) 官方资产测量——Isaac 资产库 USD 几何界（native_assets 登记的 size 米制包围盒）；(2) SceneProgram authored 参数——墙/地/点标记物与自定义 composite 的精确尺寸与位姿；(3) Isaac 仿真采集回执——capture/evidence.json 中每实体 settled_center、world_transform 与相机标定矩阵。模型预测（SAM3/DA3/FLUX 等）不进入标注链路，本数据集不使用任何模型输出作 GT。",
+      "fields": "每实体一条标注记录：scene_id、object_id、label（公开称呼）、kind、dynamic、size_xyz_m（官方/authored 尺寸）、authored_center_m 与 settled_center_m（世界系，Z-up，米）、yaw_deg、longest_local_extent_cm、world_aabb、top_z_m、support_chain、碰撞回执摘要；每机位一条：camera_id、image 路径、resolution、focal_length_mm、aperture_mm、view 矩阵（采集回执原值）、投影内参 K；每题一条 item：item_id、template_id、task_id、protocol_id、parameters、media 哈希、answer、tolerance_config、seed、split、scene_group_id、provenance（程序与回执路径）、question_spec。",
+      "derivation": "中心距离=L2(settled_center_A, settled_center_B)；表面最短间距=authored AABB 三维间隙 max(0, per-axis gap 组合)（对同支撑面横向对取水平间隙），接触对与穿透对直接剔除；相机距离=‖K⁻¹ 反投影与相机-世界变换求解的 settled_center 在相机系范数｜到中心欧氏距离｜与 z 分量（分别对应 C03/C05）；最长边=官方 max(size_xyz) 换算厘米（复合件取 authored 局部包围盒）；计数=按谓词对全集实体 ID 集合求基数。所有数值先由生成脚本按冻结公式推导并与 evidence.json 交叉核对，偏差 >2cm 的对象以回执 settled_center 为准并记录差异。 C01-T02 采用原生三角网格最近表面点与三维距离，接触为零并剔除穿透；按原计划剔除非横向主导的实体对，不增加最近点必须同高的额外门槛。公开最近点标记与同源真实 K/深度一致，不能用 AABB 间距代替真值。",
+      "alignment": "公开媒体=真实采集 PNG 上叠加程序投影标注：对象绿色框取 evidence 中碰撞体 AABB 八角点投影凸包，ID 文字标签置于框上方；C01-T03 的标记点 P 以程序投影绘制十字+标签；坐标原点/像素系与 view 矩阵同源同帧。逐题核对『题目所指对象名-媒体标注-parameters 绑定』三者一致，对象称呼只用注册资产标签（如『办公桌』『书柜』），禁止凭空命名。",
+      "validation": "自动校验：GT 复算一致（两次独立实现比对）、媒体文件存在且为 PNG、每题 answer 不出现在 stem/context/options 文本中、C04 相邻名次差>0.12m、C05 |Δz| 落在标注标签内、C11 边界距离与半径差>0.15m；人工抽检：每模板至少 1 题由人对照实拍图确认可回答性，结果记录在 qc/spot_check.md。"
+    },
+    "questions": {
+      "public_observations": "公开材料=同一场景的 2–4 张真实采集视图（含全景与相关近景），对象以颜色框+持久编号标记；题目条件声明：米制单位、距离/深度的坐标系定义、C01-T03 的标记点在图中给出、C11 的计数谓词与边界规则、C05 的相同判定容差。绝对距离类题目一律至少两张不同基线视图或一张含已知尺寸家具与地面标定的视图（满足『标定多视图/可恢复尺度』准入）。不公开相机位姿数值、不公开任何坐标表。",
+      "answerability": "每题的可答性来自三要素闭环：(1) 目标对象在公开媒体中有清晰框与编号；(2) 尺度由多视差或已知家具尺寸线索恢复（协议允许的计算版将相机标定作为 provided_information 记录）；(3) 判定规则全部写进题目条件。生成时对每题验证目标在两视图中的投影未被完全遮挡。",
+      "output_contract": "数值题：{\"value\": number, \"unit\": \"m|cm\"}；选择题/标签题：候选 ID 或标签字符串；排序题：ID 数组；分组题不适用（未选 C04-T03）；整数题：非负整数。缺答/格式错误保留原答记 0 分并单列。",
+      "difficulty_design": "距离跨度 0.3–4.5 m、尺寸 18–222 cm、C09 特意混入『近处小物 vs 远处大物』反转对、C04 排序含 0.12–0.35 m 名次间隔、C11 半径档位含锚点周围密集与稀疏两种分布。同模板 10 题按 4(train)/3(dev)/3(test) 场景分布，避免单场景模板内集中。",
+      "anti_shortcut_checks": "检查项：候选顺序随机化（正确答案位置均匀）；『更大/更近』标签两向平衡；像素面积与真实尺寸冲突对占比≥40%（C09）；中心距与表面距答案不同源（防止互相泄漏）；题干与媒体文件名不含数值答案或坐标；同场景内 C01-T01 与 C04 复用配对时答案独立推导；禁止把隐藏 GT 字段（相机位姿表、坐标）当公开条件。",
+      "example": "示例（不含真实答案，字段为 question_spec 结构）：stem=『观察图1、图2（同一办公室两个机位实拍，绿框与编号标识对象），估计「办公桌」(03) 与「书柜」(11) 几何中心之间的直线距离，单位米。』context=『两张图来自同一标定相机的不同机位；图中编号仅标识对象身份。』conditions=『答案为中心到中心的三维欧氏距离，单位米，保留一位小数；不要按像素距离折算。』options=[] response=『提交一个数值并带单位 m。』media_labels=『图1：办公室全景机位实拍（含对象编号框）』『图2：侧向机位实拍（含对象编号框）』；parameter_bindings 与该题源 parameters 完全一致。"
+    },
+    "dataset": {
+      "target_items": 100,
+      "split_policy": "按场景分组划分：design-office-work→train 34 题，design-lounge-meeting→dev 33 题，design-study-pantry→test 33 题；同场景全部题目（含改写与配对样本）同分区，跨分区场景零重叠；sealed 暂不启用（留待正式模型评测前冻结）。",
+      "seed": 20261105,
+      "grouping": "scene_group_id=scene-v1:<scene_id>；题目配对（同对象对不同模板）共享底层几何但分区由场景决定；每模板内按场景 4/3/3 均衡取样。",
+      "deduplication": "同一 (template_id, 对象集合) 组合全数据集唯一；中心距离与表面间距同对象对允许共存（不同测量定义）；改写题不生成（模板即协议，不做自然变体冒充新题）。",
+      "balance": "模板 10×10 严格均分（余数 0）；场景×模板 4/3/3；数值答案跨度分位对齐（距离 0.3–4.5m 均匀分桶）；选择题正确选项位置均匀；C09 反转对≥4 题。缺口如实记录：若某模板因剔除规则凑不满 10 题，报告实产与原因，不跨模板挪用配额。"
+    },
+    "scoring": {
+      "metrics": [
+        {
+          "template_id": "C01-T01",
+          "metric": "MAE + 容差内正确率",
+          "unit": "m",
+          "tolerance": "tau=max(0.02, 0.05*|gt|)；近零(|gt|<0.1m)只看绝对误差",
+          "aggregation": "模板内均值；总览不跨模板平均物理量"
+        },
+        {
+          "template_id": "C01-T02",
+          "metric": "MAE + 容差内正确率",
+          "unit": "m",
+          "tolerance": "tau=max(0.02, 0.05*|gt|)，接触 0 值样本按绝对误差",
+          "aggregation": "模板内均值"
+        },
+        {
+          "template_id": "C01-T03",
+          "metric": "MAE + 容差内正确率",
+          "unit": "m",
+          "tolerance": "tau=max(0.02, 0.05*|gt|)",
+          "aggregation": "模板内均值"
+        },
+        {
+          "template_id": "C03-T01",
+          "metric": "MAE + 容差内正确率（中心欧氏距离定义）",
+          "unit": "m",
+          "tolerance": "tau=max(0.02, 0.05*|gt|)",
+          "aggregation": "模板内均值；离轴角分桶另列"
+        },
+        {
+          "template_id": "C04-T01",
+          "metric": "最近对象准确率",
+          "unit": "%",
+          "tolerance": "唯一最近且与第二名差>0.15m（题面不公布）",
+          "aggregation": "准确率；混淆报告错选对象的距离名次"
+        },
+        {
+          "template_id": "C04-T02",
+          "metric": "完全排序正确率 + 平均 Kendall tau-b",
+          "unit": "比例",
+          "tolerance": "严格全序，缺项/重复项判该题 0",
+          "aggregation": "两指标分别均值"
+        },
+        {
+          "template_id": "C05-T01",
+          "metric": "三分类准确率（更小/更大/相同）",
+          "unit": "%",
+          "tolerance": "标签由 |Δz|≤0.1m 判相同（题目条件公开该规则）",
+          "aggregation": "准确率；『相同』类单独报告"
+        },
+        {
+          "template_id": "C07-T02",
+          "metric": "MAE + 容差内正确率",
+          "unit": "cm",
+          "tolerance": "tau=max(1cm, 0.05*|gt|)",
+          "aggregation": "模板内均值，按尺寸分桶"
+        },
+        {
+          "template_id": "C09-T01",
+          "metric": "比较准确率",
+          "unit": "%",
+          "tolerance": "两对象最长边差≥8%（生成时保证）",
+          "aggregation": "总体+『像素/真实反转』切片"
+        },
+        {
+          "template_id": "C11-T01",
+          "metric": "整数精确率 + 计数误差分布",
+          "unit": "个",
+          "tolerance": "精确匹配",
+          "aggregation": "模板内准确率，误差直方图"
+        }
+      ],
+      "missing_response": "缺失/拒答/格式错误：保留原始输出，该题记 0，错误类型单列不计入能力均值之外的诊断表。",
+      "baselines": "设计三条对照（本次不执行模型评测，仅随数据集交付评分器与基线定义）：随机基线（选择题按候选数、数值题按 GT±tau 均匀采样、排序按随机置换）、中心先验基线（一律答场景中心距离中位数）、深度图像素基线（以单视图像素尺寸估距，验证反捷径设计）。",
+      "model_evaluation": "本会话只生产数据集与质检，不调用任何未授权目标模型评测接口；scoring 由交付的 verifier 在评测时执行。"
+    },
+    "quality_gates": [
+      {
+        "id": "QG-ADMISSION",
+        "check": "每个场景 captures/<scene>/scene_admission.json 存在且 enforced 通过（程序提交先于采集，政策来源绑定本计划路径）",
+        "threshold": "admission 无 error；provenance.sources 指向本保存计划",
+        "evidence": "captures/<scene>/scene_admission.json + 正式计划路径及版本绑定",
+        "on_failure": "按具体准入问题修正程序后重新preview与capture；重复执行故障先修执行层，保留已有文件，不因固定次数重复请示。"
+      },
+      {
+        "id": "QG-ACCEPTANCE",
+        "check": "scene_acceptance.json passed=true 且含逐图生活审查（物体身份/尺度/支撑/功能布局/通行净空/材质照明 六项，每项引用真实视图）与原生碰撞沉降回执",
+        "threshold": "passed=true，无未处置high问题；每轮修订对应具体缺陷，并保留新的实际采集与验收回执。",
+        "evidence": "captures/<scene>/scene_acceptance.json、review trace、view_*.png 实拍",
+        "on_failure": "读取实际issues定点修正程序并重新采集，核对支撑、功能朝向、生活用途与通行；结合相关机位和执行证据处理视觉误判，保留真实缺陷，不用旧通过记录代替新验收。"
+      },
+      {
+        "id": "QG-GT-PROVENANCE",
+        "check": "每题 item 的 answer 可由程序从 evidence.json/authored 几何独立复算一致；标注记录中不出现模型预测字段",
+        "threshold": "复算一致率 100%，双实现偏差≤1e-6",
+        "evidence": "annotations/ 复算日志 + items 源 JSON",
+        "on_failure": "剔除该题并记缺口，修 oracle 后重新推导"
+      },
+      {
+        "id": "QG-COVERAGE",
+        "check": "实产题量：模板×10、场景×(34,33,33)、split 无同场景跨区",
+        "threshold": "目标 100；缺口需逐模板列出原因",
+        "evidence": "dataset/report 精确每模板计数 + qc/coverage.csv",
+        "on_failure": "如剔除致缺口：如实报告实产（不得跨模板凑数），在 S5 报告写明数量与原因"
+      },
+      {
+        "id": "QG-NOLEAK",
+        "check": "答案值/坐标/内部ID不出现于 stem、context、conditions、选项文案与媒体文件名；『相同/等距』标签不含隐藏阈值之外的提示",
+        "threshold": "自动扫描命中 0；人工抽检 10 题 0 泄露",
+        "evidence": "qc/leak_scan.json + qc/spot_check.md",
+        "on_failure": "重写题目措辞并复检，未通过不得导出"
+      },
+      {
+        "id": "QG-MEDIA",
+        "check": "每题引用的 PNG 存在、可解码、分辨率≥800×600，且叠加标记与原采集画布对齐（投影框落在对象上）",
+        "threshold": "100% 有效；对齐抽检误差≤8px",
+        "evidence": "qc/media_check.json + 每模板代表题标注图",
+        "on_failure": "重新渲染该媒体或剔除该题"
+      },
+      {
+        "id": "QG-ANSWERABILITY",
+        "check": "每模板至少 1 题人工对照公开实拍确认可仅凭公开信息作答（无隐藏 GT 当条件）",
+        "threshold": "10/10 模板通过",
+        "evidence": "qc/spot_check.md（逐模板引用真实媒体路径）",
+        "on_failure": "该模板题目全部重做信息设计；模型 API 不代替人工看图"
+      },
+      {
+        "id": "QG-SPLIT",
+        "check": "scene_group_id 与 split 一一对应；派生文件无跨区副本",
+        "threshold": "违规 0",
+        "evidence": "qc/split_check.json",
+        "on_failure": "强制移组或剔除"
+      }
+    ],
+    "execution": [
+      {
+        "stage": "S1",
+        "action": "读取场景选择与 267 模板合同，拆解 10 模板×10 题分配与三场景设计，撰写本评估文档并保存计划、绑定 scene_selection 输入，打开审阅窗口等待 5 分钟",
+        "inputs": "scene-library/selections/session-13742859....json、pipeline_catalog 模板与协议、scene-library/policy.json",
+        "outputs": "已保存的 pipeline 计划（operations/<...>/plan.json 路径回执）+ 本 assessment",
+        "completion_condition": "计划落盘且 stage_review S1 获认可或到期无新指令；不在此阶段声称任何采集/题量已完成"
+      },
+      {
+        "stage": "S2",
+        "action": "依据三个场景完整摘要编写并登记SceneProgram，使用已校准的原生资产正面计算功能朝向；preview校验真实资产、支撑与碰撞，再提交Isaac原生capture，逐图生活审查并结合原生回执核对。未通过时针对具体缺陷定点修订并重新采集；按已有授权持续修复，不因固定次数重复请示，不重复无实质变更的采集。三场景实际验收完成后仅开一次五分钟用户窗口。",
+        "inputs": "S1 计划的 scenes.designs 与 scene_brief；已保存计划路径作 provenance 绑定",
+        "outputs": "captures/<scene>/ 实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出；场景库登记记录",
+        "completion_condition": "3 个场景 scene_acceptance.passed=true 且证据路径落盘；未通过场景如实记缺口，题目配额向通过场景再分配（不跨模板挪用）"
+      },
+      {
+        "stage": "S3",
+        "action": "从采集回执提取实体 settled_center/world_transform/相机标定与官方尺寸，生成 annotations 表（对象+相机+几何）；双实现复算 GT；渲染带编号框与点标记的公开标注媒体",
+        "inputs": "captures/<scene>/evidence.json、SceneProgram、native_assets 尺寸登记",
+        "outputs": "annotations/（objects/cameras/geometry jsonl）、annotations/recompute_log.json、public media 标注 PNG 目录",
+        "completion_condition": "每验收场景 ≥12 个对象全量标注、复算一致率 100%、媒体对齐抽检通过"
+      },
+      {
+        "stage": "S4",
+        "action": "逐题按模板协议生成 items 源 JSON（含 answer/admission/parameters）、写 evidence JSONL（question_spec 全字段+parameter_bindings 与 parameters 一致），执行 pipeline 计划 questions 步骤（templates.produce 协议绑定）与 package 步骤",
+        "inputs": "S3 标注与媒体、10 模板合同、dataset 分配表、seed=20261105",
+        "outputs": "items/ 源 JSON×100、evidence/evidence.jsonl、questions.csv、pipeline run 的 dataset 与 package 回执",
+        "completion_condition": "templates.produce 与 data.package 步骤状态 completed，逐模板计数落盘；缺口如实入报"
+      },
+      {
+        "stage": "S5",
+        "action": "执行 QG-* 全部质量门（脚本+逐模板人工看代表题）、生成覆盖/泄漏/分区/媒体检查报告与最终交付报告，打开 S5 审阅窗口",
+        "inputs": "package 产物、qc 检查脚本、抽检清单",
+        "outputs": "qc/*.json|md、report.md 最终交付报告（含实产统计、缺口、验收证据路径）",
+        "completion_condition": "QG-GT-PROVENANCE/QG-NOLEAK/QG-MEDIA/QG-SPLIT 全绿，QG-COVERAGE 报告实产 vs 100；交付声明仅基于已落盘证据"
+      }
+    ],
+    "delivery": {
+      "artifacts": [
+        {
+          "stage": "S1",
+          "path": "bench-office100/plan/sections/（本 assessment 分节 JSON）+ pipeline_plan 返回计划路径",
+          "format": "json",
+          "contents": "完整评估文档、模板分配、场景 brief"
+        },
+        {
+          "stage": "S2",
+          "path": "bench-office100/captures/<scene>/view_*.png + scene_acceptance.json",
+          "format": "png+json",
+          "contents": "真实采集图、原生物理回执、六项逐图生活审查结论；审阅窗口直接展示实拍图"
+        },
+        {
+          "stage": "S3",
+          "path": "bench-office100/annotations/objects.jsonl + cameras.jsonl + recompute_log.json",
+          "format": "jsonl+json",
+          "contents": "全对象几何标注、相机标定、双实现 GT 复算一致记录"
+        },
+        {
+          "stage": "S4",
+          "path": "bench-office100/questions.csv + evidence/evidence.jsonl + items/sources/*.json",
+          "format": "csv+jsonl",
+          "contents": "100 条题目台账（模板/场景/split/输出合同，答案列仅 authority 侧文件含，csv 公开版不含答案）、协议绑定证据、逐题源记录"
+        },
+        {
+          "stage": "S5",
+          "path": "bench-office100/package/（public+authority）+ bench-office100/report.md + qc/",
+          "format": "目录+md+json",
+          "contents": "公开题包（媒体+题面+作答接口）、私有 authority（GT/容差/哈希）、质量门报告、最终交付报告"
+        }
+      ],
+      "acceptance": "验收入口=stage_review 五窗口逐一展示的落盘产物 + report.md 中的 QG 结果表：仅当 3 场景 acceptance 全过、GT 复算 100%、泄漏/媒体/分区扫描 0 违规时宣布交付，题量按实产申报（目标 100）；任何未过项列为缺口而非静默降级。"
+    },
+    "risks": [
+      {
+        "issue": "桌面 Isaac 队列排队或 worker 退出导致采集超时/中断",
+        "impact": "S2 延迟，题量交付后移",
+        "mitigation": "capture 保留作业按同一 request_key 恢复；执行故障不消耗设计修订预算；等待期先完成 S3 生成器与质检脚本",
+        "status": "待执行观察"
+      },
+      {
+        "issue": "真实资产库为办公品类（无床/厨房），室内多样性受限",
+        "impact": "场景语义分布偏办公/起居，室内覆盖不含卫浴厨房",
+        "mitigation": "以三个功能角色最大化布局差异；在报告声明覆盖边界；不引入未注册外部资产路径",
+        "status": "已接受，写入覆盖范围声明"
+      },
+      {
+        "issue": "表面最短间距（C01-T02）用 AABB 解析解对非凸家具（椅脚、灯罩）存在保守偏差",
+        "impact": "个别题 GT 高估间隙",
+        "mitigation": "只用凸主体可解析对象对出该题，或改用碰撞体凸包间距；无法确定的题剔除并记缺口，不降标准",
+        "status": "生成时逐对核验"
+      },
+      {
+        "issue": "某模板因剔除（穿透/等距/遮挡）不足 10 题",
+        "impact": "实产<100",
+        "mitigation": "对象对候选池冗余设计（每模板≥18 候选对）；仍不足则如实报告实产与原因",
+        "status": "配额保护设计，待执行验证"
+      },
+      {
+        "issue": "逐图生活审查模型网络超时",
+        "impact": "验收环节卡顿",
+        "mitigation": "仅对审查阶段传输失败用 spatialforge_retry 重试同一冻结采集，≤2 次，不消耗设计修订；质量失败必须修程序重采",
+        "status": "预案就绪"
+      },
+      {
+        "issue": "计划阈值（tau、0.12m 名次间隔等）未经实测校准冻结",
+        "impact": "评分容差可能偏松/偏紧",
+        "mitigation": "交付时以 tolerance_config 显式随包发布并在报告标注为设计初值，正式评测前冻结",
+        "status": "待确认"
+      }
+    ]
+  },
+  "authoring_sources": {
+    "request_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/camera-repair-20261106/apply-plan.request.json"
+  },
+  "edit_revision": {
+    "base_plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/47803d26fc3e49d7/plan.json",
+    "changes": [
+      "scenes",
+      "annotations",
+      "markdown_document"
+    ],
+    "application_required": true,
+    "markdown_edit": true,
+    "markdown_normalization": false,
+    "base_narrative": "# 室内场景空间理解评测集（办公室·起居·阅览三角色，100题）生产计划\n\n本计划针对三个全新建造的室内仿真场景（办公室工作区、起居会客角、阅览茶水角），按 89 任务/267 模板目录中 10 个精确测量模板各生产 10 题，共 100 题，覆盖距离感知、尺寸感知、相机参照系深度比较与条件计数四类室内空间能力。所有真值仅来自官方资产测量、SceneProgram  authored 几何与 Isaac 采集回执（沉降后实体中心/位姿），公开媒体为真实采集图的标注版本，题目不泄露答案。场景选择约束：selected_scenes 为空、allow_new_scenes=true，因此本计划不引用任何历史场景与其派生产物；场景库 policy.json 中被删除的立方体/几何盒替代场景及其派生物一律禁止复用。执行分为 S1 计划、S2 场景采集与验收、S3 标注与真值、S4 按模板出题、S5 质检打包五阶段，每阶段落盘可查看的真实产物并等待用户审阅。\n\n## 评测目标与边界\n\n- \n  测量能力: N01 距离感知（实体间与相机参照系）\n  具体评测问题: 在被测模型只看到带尺度线索的多机位实拍时，它能否正确估计物体几何中心间距、表面最短间距、物体到标记点的距离，并在相机坐标系下正确比较光轴深度？\n  成功条件: 设计目标：C01/C03/C04/C05 六个模板共 60 题全部满足信息防火墙与协议绑定；数值题按 tau=max(0.02m, 0.05*|gt|) 报告容差内正确率与 MAE；比较/排序题按准确率与 Kendall tau 报告。\n  范围边界: 不测真实机器人操作成功率、不测动态运动学（无 C43/C44 类时序题）、不以单张无尺度 RGB 出绝对距离题（协议禁止）。\n- \n  测量能力: N02 尺寸感知\n  具体评测问题: 给定标定多视图与对象编号标记，被测模型能否正确估计物体局部包围盒最长边（厘米），并在透视差异下正确比较两物体的真实长度？\n  成功条件: 设计目标：C07-T02 与 C09-T01 共 20 题；长度题按 tau=max(0.005m, 0.05*|gt|) 评分；比较题保证两对象同维度定义且非等长，含像素大小与真实长度相反的近远配对干扰。\n  范围边界: 不测世界轴 AABB 尺寸（与局部轴单列）、不测薄片厚度亚毫米级样本。\n- \n  测量能力: 条件对象计数（C11，关联 N10/N11）\n  具体评测问题: 被测模型能否在标定室内场景中按『到锚点中心距离不超过给定半径』的谓词正确去重计数？\n  成功条件: 设计目标：C11-T01 共 10 题；整数精确率与绝对计数误差；边界含 ≤，锚点自身不计入；半径取远离实际距离值的档位，杜绝边界歧义。\n  范围边界: 不测跨视图身份对应推断（C11-T03 不选），不测遮挡比例阈值类计数。\n\n## 能力、模板与题量分配\n\n- \n  模板: C01-T01\n  题数: 10\n  难度: 中：中心距离 0.4–3.5 m 混合，含遮挡与离轴样本\n  测量条件: 标定多视图实拍（同一相机两张不同机位或单张含地面标尺与已知家具尺度线索），对象以绿色框+编号标记，声明米制与中心距离定义\n  选择理由: 三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题\n- \n  模板: C01-T02\n  题数: 10\n  难度: 中高：表面间距 0.03–1.2 m，剔除穿透与非水平对\n  测量条件: 同上；表面最近点由 authored 网格/解析 AABB 最近点程序求解，接触为 0 的情形不进题\n  选择理由: 表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器\n- \n  模板: C01-T03\n  题数: 10\n  难度: 中：标记点取地面十字标记或台面角点，公开媒体上绘制 P 标记\n  测量条件: 点必须三维可定位并在公开图中标出；单位米；不把路径长度当答案\n  选择理由: 考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出\n- \n  模板: C03-T01\n  题数: 10\n  难度: 中：相机光心到对象中心 1.0–4.5 m，覆盖不同离轴角\n  测量条件: 采集回执提供每机位标定相机矩阵（对外只声明『标定相机』，不泄露数值位姿），输入具有尺度；对象唯一编号\n  选择理由: 相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据\n- \n  模板: C04-T01\n  题数: 10\n  难度: 易中：4–6 个候选对象，最近与第二名差 >0.15 m\n  测量条件: 统一中心距离定义；锚点以编号标记；全部候选在同一媒体可见\n  选择理由: 锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器\n- \n  模板: C04-T02\n  题数: 10\n  难度: 中：4–5 个对象全排序，相邻名次差 >0.12 m，剔除等距\n  测量条件: 严格排序，输出 ID 序列；只评整序与 Kendall tau，不只评第一名\n  选择理由: 全排序比二选一更能区分排序捷径；带程序生成器\n- \n  模板: C05-T01\n  题数: 10\n  难度: 易中：光轴深度差 ≥0.25 m 才出『更小/更大』，|Δz|≤0.1 m 判『相同』（该容差写入题目条件）\n  测量条件: 两个目标均在该相机前方且中心在画面内；坐标系为相机光轴 z（米），在题目条件中声明\n  选择理由: 光轴深度与欧氏距离的口径分离是协议要求的主测切片\n- \n  模板: C07-T02\n  题数: 10\n  难度: 中：最长边 20–222 cm，含旋转摆放对象（yaw 已声明）\n  测量条件: 局部包围盒最长边；单位厘米；对象局部轴定义随 authored 元数据在公开标定卡中给出轴向示意\n  选择理由: 尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径\n- \n  模板: C09-T01\n  题数: 10\n  难度: 中难：至少 4 题为像素尺寸与真实长度排序相反的近远配对\n  测量条件: 同一维度（最长边）比较；两对象非等长（差 ≥8%）；多视图提供尺度线索\n  选择理由: 透视干扰是 N02 协议的关键难度轴，室内场景易构造\n- \n  模板: C11-T01\n  题数: 10\n  难度: 中：半径 0.8/1.2/1.8/2.4 m 档位，边界距离与半径差 >0.15 m\n  测量条件: 中心距离谓词、锚点不计入、全集为该场景内全部静态实体（公开图含全景视图供核对）\n  选择理由: 条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰\n\n## 场景与采集设计\n\n来源策略: 本会话场景选择 selected_scenes 为空、allow_new_scenes=true：不引用任何历史场景/task_id/revision；三个场景全部新建于本会话，采集验收通过后登记进 scene-library/catalog.json。场景库 policy.json 删除清单（立方体与几何盒替代场景及其派生产物）不可复用。默认使用 Isaac 官方可辨识家具资产，不启用任何简化几何例外（geometry_exceptions 为空即声明：本计划不含简化几何实验）。\n选用场景: \n\n允许新增场景: True\n目标场景数: 3\n场景设计: \n  - \n    场景名称: 办公室工作区\n    测量用途: 承担办公场景下的距离、尺寸、相机参照系与计数测量；一项目一场景，供 C01/C03/C04/C05/C07/C09/C11 的 train 分区题目。\n    布局: 6.0×5.0×2.8 m 矩形房间，实体墙面四片+地板+吊顶，南墙内嵌 3 m 模块化窗提供天光方向感；办公桌靠北墙居中，办公椅面向桌面留出腿部空间；书柜贴西墙，文件柜靠东墙，饮水机置于东南角，盆栽立于窗侧墙角，垃圾桶在桌侧可取用处。动线：从东侧通行带到桌前通道 ≥0.9 m。\n    物体配置: 办公桌、办公转椅、显示器、书柜、文件收纳柜、台灯、盆栽、饮水机、单本书×3、马克杯×2、收纳盒，加 authored 墙体/地板/天花 composite 与 窗；小物件（马克杯、书本、笔筒类 收纳盒）置于桌面/柜顶支撑面上，动态质量与摩擦按合成先验声明。\n    视角与采集: view_0 全景对角机位（覆盖 ≥12 个对象）、view_1 侧向机位（与 view_0 形成基线，供多视图尺度恢复）、view_2 桌面特写（monitor/马克杯/books 近景）、view_3 书柜-文件柜侧近景；均为标定相机，水平视角由 focal/aperture 记录于采集回执。\n    变化维度: 与其余两场景变化维度：家具品类组合（办公类）、对象数 16、锚点候选（桌、柜、机位）；对象间距与角度按 15 度以上 yaw 散布以避免轴向捷径。\n    场景摘要: 这是一间供单人日常办公的仿真房间，用于测量模型在办公环境中的距离、尺寸与计数能力。房间 6.0×5.0 米、高 2.8 米，木地板（wood_laminate 纹理）、四片实体墙与吊顶围合成封闭室内，南墙内嵌 3 米模块窗给出一侧天光方向，配合顶部面光使全部家具在实拍中可辨识。办公桌贴北墙居中摆放，桌面上依次放显示器（居中朝椅）与两只马克杯（左侧、前缘），显示器由桌面真实支撑；官方笔记本资产在实拍中呈 1.9cm 薄板不可辨识，已从软设计移除（非用户硬要求）；办公椅在桌前就坐区，正面朝向显示器屏幕并保留腿部空间；屏幕朝向对应办公椅，功能朝向按已校准的原生资产正面和目标位置计算。西墙立书柜（柜格留空以如实反映可验证支撑面），三件书类分别竖放在办公桌左角、桌面前缘与文件柜顶；东墙放文件柜，柜顶居中竖放书组；台灯移至办公桌右端桌面作为读写照明；东南角饮水机靠墙，取其不遮窗；窗前角落放盆栽；桌旁地面放收纳 收纳盒。从东侧通行带到桌前形成连续通路，净宽不小于 0.9 米，柜门开启方向不与椅位冲突。所有大件静态、小件带质量与摩擦先验，沉降后中心由仿真回执提供，作为公开媒体标记与真值的双重来源。\n    必须满足的要求: \n      - 室内场景，真实可辨识资产，禁止立方体/几何盒替代家具（scene-library policy.json 删除清单）\n      - 目标题量 100 条，本场景承担 train 分区约 34 题\n      - GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真采集回执；模型预测不得充当 GT\n      - 公开题目不泄露答案；单张无尺度 RGB 不出绝对距离题\n    物体用途: \n      - \n        用途与位置: 房间地面，支撑全部家具，world Z=0 起算面\n      - \n        用途与位置: 北墙，办公桌贴靠的边界\n      - \n        用途与位置: 南墙，内嵌模块窗，界定天光方向\n      - \n        用途与位置: 西墙，书柜贴靠\n      - \n        用途与位置: 东墙，文件柜贴靠，留出入口通道\n      - \n        用途与位置: 吊顶，封闭室内体积\n      - \n        用途与位置: 南窗，真实窗资产，提供尺度与方向线索\n      - \n        用途与位置: 办公桌主体，北墙居中，桌面高约 0.76 m，承载显示器/书组/两只马克杯\n      - \n        用途与位置: 桌前就坐区的办公椅，正面朝向显示器并留出腿部空间，功能朝向由新采集核对。\n      - \n        用途与位置: 显示器，桌面居中朝椅\n      - \n        用途与位置: 马克杯，桌面左侧可取用处\n      - \n        用途与位置: 马克杯，桌面前缘靠通道侧\n      - \n        用途与位置: 书柜，贴西墙，格内放书\n      - \n        用途与位置: 书组，办公桌左角竖放\n      - \n        用途与位置: 书组，文件柜顶竖放居中\n      - \n        用途与位置: 单本书，桌面前缘竖放，验证厚度方向\n      - \n        用途与位置: 文件柜，靠东墙，柜顶放书组\n      - \n        用途与位置: 台灯，办公桌右端桌面，读写照明\n      - \n        用途与位置: 饮水机，东南角不遮窗\n      - \n        用途与位置: 盆栽，窗侧墙角，界定软分区\n      - \n        用途与位置: 收纳 收纳盒，桌旁地面，可取用位置\n    空间与使用关系: \n      - \n        关系: supported_by\n        具体说明: 四脚落地贴北墙，工作主面\n      - \n        关系: facing\n        具体说明: 在对应桌前就坐，正面朝向显示器并保留腿部净空，由新采集核对可正常使用。\n      - \n        关系: supported_by\n        具体说明: 底座落在桌面，朝向椅位\n      - \n        关系: supported_by\n        具体说明: 动态小件，沉降由仿真回执确认接触\n      - \n        关系: supported_by\n        具体说明: 同上，位置与 马克杯1 拉开便于计数与排序\n      - \n        关系: supported_by\n        具体说明: 平放叠置，验证厚度方向\n      - \n        关系: supported_by\n        具体说明: 贴西墙落地，柜格真实层板\n      - \n        关系: supported_by\n        具体说明: 书组竖放于办公桌左角，由桌面真实支撑\n      - \n        关系: supported_by\n        具体说明: 书组竖放文件柜顶面中央，比例与柜体协调\n      - \n        关系: supported_by\n        具体说明: 台灯底座落在办公桌右端桌面，高度与显示器齐平\n      - \n        关系: near\n        具体说明: 靠东墙，开门方向避开椅位\n      - \n        关系: near\n        具体说明: 东南角取用点，不遮挡窗\n      - \n        关系: supported_by\n        具体说明: 窗侧墙角，界定动线\n      - \n        关系: near\n        具体说明: 桌旁 0.5 m 地面，取用方便\n      - \n        关系: mounted_to\n        具体说明: 内嵌于南墙开口平面\n    物理假设与验证范围: \n      - 家具静态件 mass_kg=0（static），其位置即 authored 位姿，碰撞体由原生 USD 几何提供\n      - 马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\n      - 台灯为办公桌右端桌面静态摆件，底座由桌面支撑；不测倾覆动力学。\n      - 墙体/地板/天花为显式 authored 几何，support=ground 仅相对 Z=0 定位，地面由 floor_a 实体提供\n  - \n    场景名称: 起居会客角\n    测量用途: 会客/休息类室内布局，测同一批模板在软体家具主导空间下的表现；承担 dev 分区约 33 题。\n    布局: 5.6×4.8×2.8 m 房间；长沙发贴北墙、单人扶手椅两只分列东西两侧均朝向茶几，形成围合谈话区；地毯居中界定活动区，茶几上放两只马克杯与一本合上的书；西墙书柜、东墙边柜（file_cabinet 复用为边柜），台灯在边柜上，盆栽在南窗角，收纳盒 在沙发侧。动线：南侧入口至围合区外缘 ≥1.0 m，椅前留 ≥0.45 m 腿部空间。\n    物体配置: 双人沙发、扶手椅×2、茶几、书柜、文件收纳柜、台灯、盆栽、窗、马克杯×2、单本书×2、收纳盒、rug（织物纹理 composite，厚 1.5 cm）+ 墙体/地板/吊顶。\n    视角与采集: view_0 全景（自南向北含围合区）、view_1 低机位斜向（强化近远对象透视差，供 C09 反转配对）、view_2 茶几特写、view_3 沙发-书柜侧向近景。\n    变化维度: 对象数 15；软体家具体量相近，制造更难的尺寸比较；锚点候选为茶几中心与沙发。\n    场景摘要: 这是一个供三四人在此交谈、喝茶、取阅书刊的起居会客仿真空间，用于测量模型在软体家具环境中的空间判断。房间 5.6×4.8 米、高 2.8 米，木地板与浅色墙面围合，南墙整幅 3 米模块窗引入天光，与顶面面光共同照亮全场。北墙前放双人布艺长沙发，四脚落地、靠墙留出 5 cm 安装余量；东西两侧各一只单人扶手椅，均正面朝向房间中央的长方形茶几，椅前与茶几之间留约 0.45 米腿部距离，构成可围坐谈话的动线。羊毛质感地毯平铺中央，茶几落在地毯上，台面摆放两只马克杯与一本竖放的书，均由台面支撑并等待沉降验证。西墙立书柜（柜格留空以保证支撑可验证）；东墙边柜上放台灯，灯高约 1.85 米在可及范围；南窗东南角放盆栽软化边界；沙发侧边地面放收纳 收纳盒。会客座椅正面朝向茶几，沙发正面朝南、背靠北墙；围坐区域外侧保留通行路径，净空由新采集与平面布局核对，不将沙发背后的安装余量作为通道。大件静态，杯书本动态，质量摩擦为合成先验，最终接触与位置以仿真采集回执为准。\n    必须满足的要求: \n      - 室内场景，真实可辨识资产，禁止几何盒替代家具\n      - 承担 dev 分区约 33 题，GT 仅来自官方/程序/仿真\n      - 围合朝向与通道净空在实拍中可验证；扶手椅必须正立并面向茶几\n      - 公开题目不泄露答案\n    物体用途: \n      - \n        用途与位置: 地面，支撑全部家具\n      - \n        用途与位置: 北墙，沙发贴靠\n      - \n        用途与位置: 南墙，整幅窗\n      - \n        用途与位置: 西墙，书柜贴靠\n      - \n        用途与位置: 东墙，边柜贴靠\n      - \n        用途与位置: 吊顶，封闭室内体积\n      - \n        用途与位置: 南窗，主采光与尺度线索\n      - \n        用途与位置: 双人沙发，北墙居中，主要坐具\n      - \n        用途与位置: 扶手椅，西侧面向茶几\n      - \n        用途与位置: 扶手椅，东侧面向茶几，与 b1 成镜像围合\n      - \n        用途与位置: 茶几，围合中心，台面承载杯与书\n      - \n        用途与位置: 地毯，界定谈话活动区，1.5 cm 薄片真实厚度\n      - \n        用途与位置: 马克杯，茶几台面\n      - \n        用途与位置: 马克杯，茶几台面另一侧\n      - \n        用途与位置: 书，茶几台面竖放\n      - \n        用途与位置: 书柜，贴西墙\n      - \n        用途与位置: 书组，边柜台面竖放于台灯旁\n      - \n        用途与位置: 边柜（文件柜资产），东墙，柜顶放灯\n      - \n        用途与位置: 台灯，边柜顶，会客照明\n      - \n        用途与位置: 盆栽，南窗角\n      - \n        用途与位置: 收纳 收纳盒，沙发侧地面\n    空间与使用关系: \n      - \n        关系: near\n        具体说明: 贴北墙留 5 cm 余量，正面朝南\n      - \n        关系: facing\n        具体说明: 自西面向茶几，椅前留 0.45 m 腿部空间\n      - \n        关系: facing\n        具体说明: 自东面向茶几，与 b1 围合\n      - \n        关系: supported_by\n        具体说明: 四角落在地毯平面，地毯 1.5 cm 抬升由沉降回执确认\n      - \n        关系: supported_by\n        具体说明: 台面动态件，沉降后接触\n      - \n        关系: supported_by\n        具体说明: 台面另一侧，间距明确\n      - \n        关系: supported_by\n        具体说明: 单本书竖放茶几台面，由台面支撑\n      - \n        关系: supported_by\n        具体说明: 书组竖放边柜顶面，与台灯相邻由柜顶支撑\n      - \n        关系: supported_by\n        具体说明: 柜顶放置，位置与朝向符合声明的使用功能\n      - \n        关系: near\n        具体说明: 贴东墙，抽屉开启方向避开通道\n      - \n        关系: near\n        具体说明: 贴西墙落地，位置与朝向符合声明的使用功能\n      - \n        关系: supported_by\n        具体说明: 平铺地面，位置与朝向符合声明的使用功能\n      - \n        关系: near\n        具体说明: 窗角绿化，不阻动线\n      - \n        关系: near\n        具体说明: 沙发扶手侧，取用方便\n      - \n        关系: mounted_to\n        具体说明: 内嵌南墙，位置与朝向符合声明的使用功能\n    物理假设与验证范围: \n      - 沙发/扶手椅/茶几/柜类静态（原生 USD 碰撞体，mass_kg=0）\n      - 马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\n      - 地毯为静态薄板，声明真实厚度 1.5 cm，不声称织物形变\n      - 光照为渲染先验，按新采集的物体可辨识性调整；不声明实测照度或光学标定。\n  - \n    场景名称: 阅览茶水角\n    测量用途: 学习+茶水混合功能区，提供第三组对象间距分布；承担 test 分区约 33 题（sealed 留待后续冻结）。\n    布局: 5.4×4.6×2.8米房间；两张办公桌沿北墙并排，间隔30厘米，各配转椅面向对应工作目标。东墙两组书柜开口朝室内；西墙文件柜作为收纳柜，柜顶只放一个收纳盒，饮水机在柜体北侧约0.9米处。两只马克杯和两组书分别放在两桌上，台灯放左桌右前区域。南窗下阅读椅面朝房内，盆栽在其东侧1.2米中心距离处。侧方与中央安排通行，东侧连续净宽至少0.75米；不把阅读椅背后的安装间隙作为通道。\n    物体配置: 办公桌×2、办公转椅×2、书柜×2、显示器×1、文件收纳柜、饮水机、台灯、盆栽、窗、扶手椅（窗边阅读椅）、马克杯×2、收纳盒×1、书组×2。\n    视角与采集: view_0 全景、view_1 对角高机位、view_2 茶水角近景、view_3 书柜墙面近景。\n    变化维度: 对象数 18（最多），双桌双椅同型号对象测试身份去重与计数；柜顶平放书与竖放书混布测厚度/长度维度混淆。\n    场景摘要: 这是一间兼具办公、阅览与饮水功能的小型仿真房间，服务两到三人，并为评测提供同型号多实例的计数与身份去重条件。房间5.4×4.6米、高2.8米，木地板与浅色墙，南墙嵌3米模块窗。北墙并排两张办公桌，中间留30厘米缝，每桌配一把转椅并留出腿部空间；左桌转椅面向对应显示器，显示器屏幕面向左桌转椅，右桌转椅面向右桌工作区，朝向按已校准的原生资产正面计算。总共只有两只马克杯，各放在一张桌面的可取用处；两组书也分别放在两桌的左侧，右桌已有书和杯，不以单个视角的遮挡认定为空。台灯放在左桌右前区域，由桌面支撑，与显示器及书组错开。东墙相邻两组书柜，开口朝室内，柜格留空以保证支撑可验证。西墙文件柜用于日常收纳，柜顶只放一个收纳盒，柜顶作为收纳平面，不作为食品操作台；饮水机在柜体北侧约0.9米处贴墙。窗下偏西放一只阅读扶手椅，背部朝南窗、正面朝房内，后方留约0.3米安装余量，通行安排在侧方及房间中央。盆栽移至阅读椅东侧，两者中心相距1.2米，东侧连续通道净宽至少0.75米，并由最终采集检查。大件静态，杯、书和收纳盒带合成质量与摩擦，最终接触、姿态和中心以新仿真沉降回执为准；公开媒体标记与真值同源。\n    必须满足的要求: \n      - 室内场景，真实可辨识资产，禁止几何盒替代家具\n      - 承担 test 分区约 33 题；同场景题目同分区，禁止跨分区泄漏\n      - GT 仅来自官方/程序/仿真；双桌双椅同型号必须可按持久 ID 区分\n      - 公开题目不泄露答案\n    物体用途: \n      - \n        用途与位置: 地面，支撑全部家具并作为高度起算面\n      - \n        用途与位置: 北墙，双桌贴靠\n      - \n        用途与位置: 南墙，窗与阅读椅\n      - \n        用途与位置: 西墙，茶水角\n      - \n        用途与位置: 东墙，双书柜\n      - \n        用途与位置: 吊顶，封闭室内体积\n      - \n        用途与位置: 南窗，提供采光与尺度线索\n      - \n        用途与位置: 办公桌1，北墙西侧，配显示器\n      - \n        用途与位置: 办公桌2，北墙东侧，配马克杯与书组，与 c1 间隔 30 cm\n      - \n        用途与位置: 转椅1，正对 办公桌1\n      - \n        用途与位置: 转椅2，正对 办公桌2\n      - \n        用途与位置: 显示器，办公桌1 桌面\n      - \n        用途与位置: 马克杯，办公桌1 桌面\n      - \n        用途与位置: 马克杯，办公桌2 桌面\n      - \n        用途与位置: 书柜1，东墙南侧\n      - \n        用途与位置: 书柜2，东墙北侧，与 c1 相邻\n      - \n        用途与位置: 书组，办公桌1 桌面左角竖放\n      - \n        用途与位置: 书组，办公桌2桌面左角竖放\n      - \n        用途与位置: 西墙文件收纳柜，柜顶只放一个收纳盒，按日常收纳用途使用。\n      - \n        用途与位置: 收纳盒，边柜台面\n      - \n        用途与位置: 饮水机，西墙边柜北侧 0.8 m\n      - \n        用途与位置: 台灯，办公桌1桌面右前角，阅读照明\n      - \n        用途与位置: 窗侧盆栽，位于阅读椅东侧，两者中心相距1.2米，保留东侧连续通道。\n      - \n        用途与位置: 单人阅读椅，窗下面朝房内\n    空间与使用关系: \n      - \n        关系: near\n        具体说明: 贴北墙，桌面工作区\n      - \n        关系: near\n        具体说明: 贴北墙与 c1 间隔 30 cm\n      - \n        关系: facing\n        具体说明: 正对桌面留腿部空间\n      - \n        关系: facing\n        具体说明: 正对桌面，位置与朝向符合声明的使用功能\n      - \n        关系: supported_by\n        具体说明: 底座由左桌支撑，屏幕正面面向左桌转椅，采用已校准的原生资产正面计算朝向。\n      - \n        关系: supported_by\n        具体说明: 动态件，台面沉降\n      - \n        关系: supported_by\n        具体说明: 动态件，台面沉降\n      - \n        关系: supported_by\n        具体说明: 书组竖放办公桌1左角，由桌面真实支撑\n      - \n        关系: supported_by\n        具体说明: 书组竖放办公桌2桌面左角，由桌面真实支撑，与办公桌1桌面书组构成同型号双桌区分\n      - \n        关系: near\n        具体说明: 文件柜作为西墙日常收纳柜，柜顶放收纳盒，不作为食品操作台。\n      - \n        关系: supported_by\n        具体说明: 台面放置，位置与朝向符合声明的使用功能\n      - \n        关系: near\n        具体说明: 文件收纳柜北侧约0.9米的贴墙取水点。\n      - \n        关系: near\n        具体说明: 窗下阅读位，背部朝南窗、正面朝房内，背后留约0.3米安装余量，通行在侧方。\n      - \n        关系: supported_by\n        具体说明: 台灯底座落在办公桌1桌面右前角，与左角显示器、书组错开，提供有效桌面照明\n      - \n        关系: supported_by\n        具体说明: 窗侧地面，界定软分区\n      - \n        关系: mounted_to\n        具体说明: 内嵌南墙，位置与朝向符合声明的使用功能\n    物理假设与验证范围: \n      - 桌/椅/柜/窗静态（原生 USD 碰撞体）；双桌双椅同型号但世界坐标与 ID 持久可分\n      - 马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\n      - 台灯为左桌右前区域的静态摆件，底座由办公桌1桌面支撑；不测倾覆。\n      - 窗资产透明度用 native_opacity_multiplier 先验调节，不声称光学实测透射率\n复用约束: 禁止复用 selected_scenes 之外的任何历史场景、其采集目录与派生数据集（含 policy.json 删除清单及 operations/fr-eval100 等旧产物）；历史产物仅可作为接口格式参考，不进入本次 GT、媒体或统计。新场景验收后登记 scene-library/catalog.json（记录 task_id、revision、程序路径、验收回执）。\n视频或全景展示: 每个 SceneProgram 先经 spatialforge_preview 检查支撑链与包围盒冲突，修复后再进入 spatialforge_capture 采集；采集后逐图检查真实图像与原生回执，scene_admission.json 与 scene_acceptance.json 双通过方可进入 S3；最多两次自动修复，仍失败则停在本阶段并如实报告缺口。\n\n## 标注与真值来源\n\n真值来源: 三层权威：(1) 官方资产测量——Isaac 资产库 USD 几何界（native_assets 登记的 size 米制包围盒）；(2) SceneProgram authored 参数——墙/地/点标记物与自定义 composite 的精确尺寸与位姿；(3) Isaac 仿真采集回执——capture/evidence.json 中每实体 settled_center、world_transform 与相机标定矩阵。模型预测（SAM3/DA3/FLUX 等）不进入标注链路，本数据集不使用任何模型输出作 GT。\n字段与单位: 每实体一条标注记录：scene_id、object_id、label（公开称呼）、kind、dynamic、size_xyz_m（官方/authored 尺寸）、authored_center_m 与 settled_center_m（世界系，Z-up，米）、yaw_deg、longest_local_extent_cm、world_aabb、top_z_m、support_chain、碰撞回执摘要；每机位一条：camera_id、image 路径、resolution、focal_length_mm、aperture_mm、view 矩阵（采集回执原值）、投影内参 K；每题一条 item：item_id、template_id、task_id、protocol_id、parameters、media 哈希、answer、tolerance_config、seed、split、scene_group_id、provenance（程序与回执路径）、question_spec。\n推导方法: 中心距离=L2(settled_center_A, settled_center_B)；表面最短间距=authored AABB 三维间隙 max(0, per-axis gap 组合)（对同支撑面横向对取水平间隙），接触对与穿透对直接剔除；相机距离=‖K⁻¹ 反投影与相机-世界变换求解的 settled_center 在相机系范数｜到中心欧氏距离｜与 z 分量（分别对应 C03/C05）；最长边=官方 max(size_xyz) 换算厘米（复合件取 authored 局部包围盒）；计数=按谓词对全集实体 ID 集合求基数。所有数值先由生成脚本按冻结公式推导并与 evidence.json 交叉核对，偏差 >2cm 的对象以回执 settled_center 为准并记录差异。\n媒体与标注对齐: 公开媒体=真实采集 PNG 上叠加程序投影标注：对象绿色框取 evidence 中碰撞体 AABB 八角点投影凸包，ID 文字标签置于框上方；C01-T03 的标记点 P 以程序投影绘制十字+标签；坐标原点/像素系与 view 矩阵同源同帧。逐题核对『题目所指对象名-媒体标注-parameters 绑定』三者一致，对象称呼只用注册资产标签（如『办公桌』『书柜』），禁止凭空命名。\n校验规则: 自动校验：GT 复算一致（两次独立实现比对）、媒体文件存在且为 PNG、每题 answer 不出现在 stem/context/options 文本中、C04 相邻名次差>0.12m、C05 |Δz| 落在标注标签内、C11 边界距离与半径差>0.15m；人工抽检：每模板至少 1 题由人对照实拍图确认可回答性，结果记录在 qc/spot_check.md。\n\n## 出题规则与公开样例\n\n公开观测: 公开材料=同一场景的 2–4 张真实采集视图（含全景与相关近景），对象以颜色框+持久编号标记；题目条件声明：米制单位、距离/深度的坐标系定义、C01-T03 的标记点在图中给出、C11 的计数谓词与边界规则、C05 的相同判定容差。绝对距离类题目一律至少两张不同基线视图或一张含已知尺寸家具与地面标定的视图（满足『标定多视图/可恢复尺度』准入）。不公开相机位姿数值、不公开任何坐标表。\n可回答性: 每题的可答性来自三要素闭环：(1) 目标对象在公开媒体中有清晰框与编号；(2) 尺度由多视差或已知家具尺寸线索恢复（协议允许的计算版将相机标定作为 provided_information 记录）；(3) 判定规则全部写进题目条件。生成时对每题验证目标在两视图中的投影未被完全遮挡。\n输出格式: 数值题：{\"value\": number, \"unit\": \"m|cm\"}；选择题/标签题：候选 ID 或标签字符串；排序题：ID 数组；分组题不适用（未选 C04-T03）；整数题：非负整数。缺答/格式错误保留原答记 0 分并单列。\n难度设计: 距离跨度 0.3–4.5 m、尺寸 18–222 cm、C09 特意混入『近处小物 vs 远处大物』反转对、C04 排序含 0.12–0.35 m 名次间隔、C11 半径档位含锚点周围密集与稀疏两种分布。同模板 10 题按 4(train)/3(dev)/3(test) 场景分布，避免单场景模板内集中。\n捷径与歧义检查: 检查项：候选顺序随机化（正确答案位置均匀）；『更大/更近』标签两向平衡；像素面积与真实尺寸冲突对占比≥40%（C09）；中心距与表面距答案不同源（防止互相泄漏）；题干与媒体文件名不含数值答案或坐标；同场景内 C01-T01 与 C04 复用配对时答案独立推导；禁止把隐藏 GT 字段（相机位姿表、坐标）当公开条件。\n公开题目样例: 示例（不含真实答案，字段为 question_spec 结构）：stem=『观察图1、图2（同一办公室两个机位实拍，绿框与编号标识对象），估计「办公桌」(03) 与「书柜」(11) 几何中心之间的直线距离，单位米。』context=『两张图来自同一标定相机的不同机位；图中编号仅标识对象身份。』conditions=『答案为中心到中心的三维欧氏距离，单位米，保留一位小数；不要按像素距离折算。』options=[] response=『提交一个数值并带单位 m。』media_labels=『图1：办公室全景机位实拍（含对象编号框）』『图2：侧向机位实拍（含对象编号框）』；parameter_bindings 与该题源 parameters 完全一致。\n\n## 数据集规模与分区\n\n目标题量: 100\n分区策略: 按场景分组划分：design-office-work→train 34 题，design-lounge-meeting→dev 33 题，design-study-pantry→test 33 题；同场景全部题目（含改写与配对样本）同分区，跨分区场景零重叠；sealed 暂不启用（留待正式模型评测前冻结）。\n随机种子: 20261105\n分组单位: scene_group_id=scene-v1:<scene_id>；题目配对（同对象对不同模板）共享底层几何但分区由场景决定；每模板内按场景 4/3/3 均衡取样。\n去重规则: 同一 (template_id, 对象集合) 组合全数据集唯一；中心距离与表面间距同对象对允许共存（不同测量定义）；改写题不生成（模板即协议，不做自然变体冒充新题）。\n分布平衡: 模板 10×10 严格均分（余数 0）；场景×模板 4/3/3；数值答案跨度分位对齐（距离 0.3–4.5m 均匀分桶）；选择题正确选项位置均匀；C09 反转对≥4 题。缺口如实记录：若某模板因剔除规则凑不满 10 题，报告实产与原因，不跨模板挪用配额。\n\n## 评分方法与对照\n\n逐模板评分: \n  - \n    模板: C01-T01\n    指标: MAE + 容差内正确率\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)；近零(|gt|<0.1m)只看绝对误差\n    聚合方式: 模板内均值；总览不跨模板平均物理量\n  - \n    模板: C01-T02\n    指标: MAE + 容差内正确率\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)，接触 0 值样本按绝对误差\n    聚合方式: 模板内均值\n  - \n    模板: C01-T03\n    指标: MAE + 容差内正确率\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)\n    聚合方式: 模板内均值\n  - \n    模板: C03-T01\n    指标: MAE + 容差内正确率（中心欧氏距离定义）\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)\n    聚合方式: 模板内均值；离轴角分桶另列\n  - \n    模板: C04-T01\n    指标: 最近对象准确率\n    单位: %\n    容差: 唯一最近且与第二名差>0.15m（题面不公布）\n    聚合方式: 准确率；混淆报告错选对象的距离名次\n  - \n    模板: C04-T02\n    指标: 完全排序正确率 + 平均 Kendall tau-b\n    单位: 比例\n    容差: 严格全序，缺项/重复项判该题 0\n    聚合方式: 两指标分别均值\n  - \n    模板: C05-T01\n    指标: 三分类准确率（更小/更大/相同）\n    单位: %\n    容差: 标签由 |Δz|≤0.1m 判相同（题目条件公开该规则）\n    聚合方式: 准确率；『相同』类单独报告\n  - \n    模板: C07-T02\n    指标: MAE + 容差内正确率\n    单位: cm\n    容差: tau=max(1cm, 0.05*|gt|)\n    聚合方式: 模板内均值，按尺寸分桶\n  - \n    模板: C09-T01\n    指标: 比较准确率\n    单位: %\n    容差: 两对象最长边差≥8%（生成时保证）\n    聚合方式: 总体+『像素/真实反转』切片\n  - \n    模板: C11-T01\n    指标: 整数精确率 + 计数误差分布\n    单位: 个\n    容差: 精确匹配\n    聚合方式: 模板内准确率，误差直方图\n缺失与无效响应: 缺失/拒答/格式错误：保留原始输出，该题记 0，错误类型单列不计入能力均值之外的诊断表。\n对照基线: 设计三条对照（本次不执行模型评测，仅随数据集交付评分器与基线定义）：随机基线（选择题按候选数、数值题按 GT±tau 均匀采样、排序按随机置换）、中心先验基线（一律答场景中心距离中位数）、深度图像素基线（以单视图像素尺寸估距，验证反捷径设计）。\n模型评测安排: 本会话只生产数据集与质检，不调用任何未授权目标模型评测接口；scoring 由交付的 verifier 在评测时执行。\n\n## 质量检查与验收\n\n- \n  检查内容: 每个场景 captures/<scene>/scene_admission.json 存在且 enforced 通过（程序提交先于采集，政策来源绑定本计划路径）\n  通过阈值: admission 无 error；provenance.sources 指向本保存计划\n  失败处理: 按具体准入问题修正程序后重新preview与capture；重复执行故障先修执行层，保留已有文件，不因固定次数重复请示。\n- \n  检查内容: scene_acceptance.json passed=true 且含逐图生活审查（物体身份/尺度/支撑/功能布局/通行净空/材质照明 六项，每项引用真实视图）与原生碰撞沉降回执\n  通过阈值: passed=true，无未处置high问题；每轮修订对应具体缺陷，并保留新的实际采集与验收回执。\n  失败处理: 读取实际issues定点修正程序并重新采集，核对支撑、功能朝向、生活用途与通行；结合相关机位和执行证据处理视觉误判，保留真实缺陷，不用旧通过记录代替新验收。\n- \n  检查内容: 每题 item 的 answer 可由程序从 evidence.json/authored 几何独立复算一致；标注记录中不出现模型预测字段\n  通过阈值: 复算一致率 100%，双实现偏差≤1e-6\n  失败处理: 剔除该题并记缺口，修 oracle 后重新推导\n- \n  检查内容: 实产题量：模板×10、场景×(34,33,33)、split 无同场景跨区\n  通过阈值: 目标 100；缺口需逐模板列出原因\n  失败处理: 如剔除致缺口：如实报告实产（不得跨模板凑数），在 S5 报告写明数量与原因\n- \n  检查内容: 答案值/坐标/内部ID不出现于 stem、context、conditions、选项文案与媒体文件名；『相同/等距』标签不含隐藏阈值之外的提示\n  通过阈值: 自动扫描命中 0；人工抽检 10 题 0 泄露\n  失败处理: 重写题目措辞并复检，未通过不得导出\n- \n  检查内容: 每题引用的 PNG 存在、可解码、分辨率≥800×600，且叠加标记与原采集画布对齐（投影框落在对象上）\n  通过阈值: 100% 有效；对齐抽检误差≤8px\n  失败处理: 重新渲染该媒体或剔除该题\n- \n  检查内容: 每模板至少 1 题人工对照公开实拍确认可仅凭公开信息作答（无隐藏 GT 当条件）\n  通过阈值: 10/10 模板通过\n  失败处理: 该模板题目全部重做信息设计；模型 API 不代替人工看图\n- \n  检查内容: scene_group_id 与 split 一一对应；派生文件无跨区副本\n  通过阈值: 违规 0\n  失败处理: 强制移组或剔除\n\n## 五阶段执行安排\n\n- \n  阶段: S1\n  执行动作: 读取场景选择与 267 模板合同，拆解 10 模板×10 题分配与三场景设计，撰写本评估文档并保存计划、绑定 scene_selection 输入，打开审阅窗口等待 5 分钟\n  输入: scene-library/selections/session-13742859....json、pipeline_catalog 模板与协议、scene-library/policy.json\n  输出: 已保存的 pipeline 计划（operations/<...>/plan.json 路径回执）+ 本 assessment\n  完成条件: 计划落盘且 stage_review S1 获认可或到期无新指令；不在此阶段声称任何采集/题量已完成\n- \n  阶段: S2\n  执行动作: 依据三个场景完整摘要编写并登记SceneProgram，使用已校准的原生资产正面计算功能朝向；preview校验真实资产、支撑与碰撞，再提交Isaac原生capture，逐图生活审查并结合原生回执核对。未通过时针对具体缺陷定点修订并重新采集；按已有授权持续修复，不因固定次数重复请示，不重复无实质变更的采集。三场景实际验收完成后仅开一次五分钟用户窗口。\n  输入: S1 计划的 scenes.designs 与 scene_brief；已保存计划路径作 provenance 绑定\n  输出: captures/<scene>/ 实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出；场景库登记记录\n  完成条件: 3 个场景 scene_acceptance.passed=true 且证据路径落盘；未通过场景如实记缺口，题目配额向通过场景再分配（不跨模板挪用）\n- \n  阶段: S3\n  执行动作: 从采集回执提取实体 settled_center/world_transform/相机标定与官方尺寸，生成 annotations 表（对象+相机+几何）；双实现复算 GT；渲染带编号框与点标记的公开标注媒体\n  输入: captures/<scene>/evidence.json、SceneProgram、native_assets 尺寸登记\n  输出: annotations/（objects/cameras/geometry jsonl）、annotations/recompute_log.json、public media 标注 PNG 目录\n  完成条件: 每验收场景 ≥12 个对象全量标注、复算一致率 100%、媒体对齐抽检通过\n- \n  阶段: S4\n  执行动作: 逐题按模板协议生成 items 源 JSON（含 answer/admission/parameters）、写 evidence JSONL（question_spec 全字段+parameter_bindings 与 parameters 一致），执行 pipeline 计划 questions 步骤（templates.produce 协议绑定）与 package 步骤\n  输入: S3 标注与媒体、10 模板合同、dataset 分配表、seed=20261105\n  输出: items/ 源 JSON×100、evidence/evidence.jsonl、questions.csv、pipeline run 的 dataset 与 package 回执\n  完成条件: templates.produce 与 data.package 步骤状态 completed，逐模板计数落盘；缺口如实入报\n- \n  阶段: S5\n  执行动作: 执行 QG-* 全部质量门（脚本+逐模板人工看代表题）、生成覆盖/泄漏/分区/媒体检查报告与最终交付报告，打开 S5 审阅窗口\n  输入: package 产物、qc 检查脚本、抽检清单\n  输出: qc/*.json|md、report.md 最终交付报告（含实产统计、缺口、验收证据路径）\n  完成条件: QG-GT-PROVENANCE/QG-NOLEAK/QG-MEDIA/QG-SPLIT 全绿，QG-COVERAGE 报告实产 vs 100；交付声明仅基于已落盘证据\n\n## 交付物与验收入口\n\n交付文件: \n  - \n    阶段: S1\n    格式: json\n    内容: 完整评估文档、模板分配、场景 brief\n  - \n    阶段: S2\n    格式: png+json\n    内容: 真实采集图、原生物理回执、六项逐图生活审查结论；审阅窗口直接展示实拍图\n  - \n    阶段: S3\n    格式: jsonl+json\n    内容: 全对象几何标注、相机标定、双实现 GT 复算一致记录\n  - \n    阶段: S4\n    格式: csv+jsonl\n    内容: 100 条题目台账（模板/场景/split/输出合同，答案列仅 authority 侧文件含，csv 公开版不含答案）、协议绑定证据、逐题源记录\n  - \n    阶段: S5\n    格式: 目录+md+json\n    内容: 公开题包（媒体+题面+作答接口）、私有 authority（GT/容差/哈希）、质量门报告、最终交付报告\n交付验收: 验收入口=stage_review 五窗口逐一展示的落盘产物 + report.md 中的 QG 结果表：仅当 3 场景 acceptance 全过、GT 复算 100%、泄漏/媒体/分区扫描 0 违规时宣布交付，题量按实产申报（目标 100）；任何未过项列为缺口而非静默降级。\n\n## 风险与待解决事项\n\n- \n  风险或限制: 桌面 Isaac 队列排队或 worker 退出导致采集超时/中断\n  影响: S2 延迟，题量交付后移\n  应对方式: capture 保留作业按同一 request_key 恢复；执行故障不消耗设计修订预算；等待期先完成 S3 生成器与质检脚本\n  状态: 待执行观察\n- \n  风险或限制: 真实资产库为办公品类（无床/厨房），室内多样性受限\n  影响: 场景语义分布偏办公/起居，室内覆盖不含卫浴厨房\n  应对方式: 以三个功能角色最大化布局差异；在报告声明覆盖边界；不引入未注册外部资产路径\n  状态: 已接受，写入覆盖范围声明\n- \n  风险或限制: 表面最短间距（C01-T02）用 AABB 解析解对非凸家具（椅脚、灯罩）存在保守偏差\n  影响: 个别题 GT 高估间隙\n  应对方式: 只用凸主体可解析对象对出该题，或改用碰撞体凸包间距；无法确定的题剔除并记缺口，不降标准\n  状态: 生成时逐对核验\n- \n  风险或限制: 某模板因剔除（穿透/等距/遮挡）不足 10 题\n  影响: 实产<100\n  应对方式: 对象对候选池冗余设计（每模板≥18 候选对）；仍不足则如实报告实产与原因\n  状态: 配额保护设计，待执行验证\n- \n  风险或限制: 逐图生活审查模型网络超时\n  影响: 验收环节卡顿\n  应对方式: 仅对审查阶段传输失败用 spatialforge_retry 重试同一冻结采集，≤2 次，不消耗设计修订；质量失败必须修程序重采\n  状态: 预案就绪\n- \n  风险或限制: 计划阈值（tau、0.12m 名次间隔等）未经实测校准冻结\n  影响: 评分容差可能偏松/偏紧\n  应对方式: 交付时以 tolerance_config 显式随包发布并在报告标注为设计初值，正式评测前冻结\n  状态: 待确认\n\n## 本轮具体修复\n\n显示器正面面向对应操作者，办公椅面向显示器或工作区，会客座椅面向茶几，北墙沙发面向房间；使用已校准的原生资产正面计算实际yaw。阅览区盆栽移至阅读椅东侧，两者中心相距1.2米，保留通道。这里只修正已查明的功能朝向、位置与摘要矛盾；新场景必须重新原生采集及验收，旧通过回执不代替新版本。每阶段实际完成后只开一次五分钟用户窗口。",
+    "markdown_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/fd93ea1777504175/assessment-plan.md"
+  },
+  "user_markdown": "# 室内场景空间理解评测集（办公室·起居·阅览三角色，100题）生产计划\n\n本计划针对三个全新建造的室内仿真场景（办公室工作区、起居会客角、阅览茶水角），按 89 任务/267 模板目录中 10 个精确测量模板各生产 10 题，共 100 题，覆盖距离感知、尺寸感知、相机参照系深度比较与条件计数四类室内空间能力。所有真值仅来自官方资产测量、SceneProgram  authored 几何与 Isaac 采集回执（沉降后实体中心/位姿），公开媒体为真实采集图的标注版本，题目不泄露答案。场景选择约束：selected_scenes 为空、allow_new_scenes=true，因此本计划不引用任何历史场景与其派生产物；场景库 policy.json 中被删除的立方体/几何盒替代场景及其派生物一律禁止复用。执行分为 S1 计划、S2 场景采集与验收、S3 标注与真值、S4 按模板出题、S5 质检打包五阶段，每阶段落盘可查看的真实产物并等待用户审阅。\n\n## 评测目标与边界\n\n- \n  测量能力: N01 距离感知（实体间与相机参照系）\n  具体评测问题: 在被测模型只看到带尺度线索的多机位实拍时，它能否正确估计物体几何中心间距、表面最短间距、物体到标记点的距离，并在相机坐标系下正确比较光轴深度？\n  成功条件: 设计目标：C01/C03/C04/C05 六个模板共 60 题全部满足信息防火墙与协议绑定；数值题按 tau=max(0.02m, 0.05*|gt|) 报告容差内正确率与 MAE；比较/排序题按准确率与 Kendall tau 报告。\n  范围边界: 不测真实机器人操作成功率、不测动态运动学（无 C43/C44 类时序题）、不以单张无尺度 RGB 出绝对距离题（协议禁止）。\n- \n  测量能力: N02 尺寸感知\n  具体评测问题: 给定标定多视图与对象编号标记，被测模型能否正确估计物体局部包围盒最长边（厘米），并在透视差异下正确比较两物体的真实长度？\n  成功条件: 设计目标：C07-T02 与 C09-T01 共 20 题；长度题按 tau=max(0.005m, 0.05*|gt|) 评分；比较题保证两对象同维度定义且非等长，含像素大小与真实长度相反的近远配对干扰。\n  范围边界: 不测世界轴 AABB 尺寸（与局部轴单列）、不测薄片厚度亚毫米级样本。\n- \n  测量能力: 条件对象计数（C11，关联 N10/N11）\n  具体评测问题: 被测模型能否在标定室内场景中按『到锚点中心距离不超过给定半径』的谓词正确去重计数？\n  成功条件: 设计目标：C11-T01 共 10 题；整数精确率与绝对计数误差；边界含 ≤，锚点自身不计入；半径取远离实际距离值的档位，杜绝边界歧义。\n  范围边界: 不测跨视图身份对应推断（C11-T03 不选），不测遮挡比例阈值类计数。\n\n## 能力、模板与题量分配\n\n- \n  模板: C01-T01\n  题数: 10\n  难度: 中：中心距离 0.4–3.5 m 混合，含遮挡与离轴样本\n  测量条件: 标定多视图实拍（同一相机两张不同机位或单张含地面标尺与已知家具尺度线索），对象以绿色框+编号标记，声明米制与中心距离定义\n  选择理由: 三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题\n- \n  模板: C01-T02\n  题数: 10\n  难度: 中高：表面间距 0.03–1.2 m，剔除穿透与非水平对\n  测量条件: 同上；表面最近点由 authored 网格/解析 AABB 最近点程序求解，接触为 0 的情形不进题\n  选择理由: 表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器\n- \n  模板: C01-T03\n  题数: 10\n  难度: 中：标记点取地面十字标记或台面角点，公开媒体上绘制 P 标记\n  测量条件: 点必须三维可定位并在公开图中标出；单位米；不把路径长度当答案\n  选择理由: 考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出\n- \n  模板: C03-T01\n  题数: 10\n  难度: 中：相机光心到对象中心 1.0–4.5 m，覆盖不同离轴角\n  测量条件: 采集回执提供每机位标定相机矩阵（对外只声明『标定相机』，不泄露数值位姿），输入具有尺度；对象唯一编号\n  选择理由: 相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据\n- \n  模板: C04-T01\n  题数: 10\n  难度: 易中：4–6 个候选对象，最近与第二名差 >0.15 m\n  测量条件: 统一中心距离定义；锚点以编号标记；全部候选在同一媒体可见\n  选择理由: 锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器\n- \n  模板: C04-T02\n  题数: 10\n  难度: 中：4–5 个对象全排序，相邻名次差 >0.12 m，剔除等距\n  测量条件: 严格排序，输出 ID 序列；只评整序与 Kendall tau，不只评第一名\n  选择理由: 全排序比二选一更能区分排序捷径；带程序生成器\n- \n  模板: C05-T01\n  题数: 10\n  难度: 易中：光轴深度差 ≥0.25 m 才出『更小/更大』，|Δz|≤0.1 m 判『相同』（该容差写入题目条件）\n  测量条件: 两个目标均在该相机前方且中心在画面内；坐标系为相机光轴 z（米），在题目条件中声明\n  选择理由: 光轴深度与欧氏距离的口径分离是协议要求的主测切片\n- \n  模板: C07-T02\n  题数: 10\n  难度: 中：最长边 20–222 cm，含旋转摆放对象（yaw 已声明）\n  测量条件: 局部包围盒最长边；单位厘米；对象局部轴定义随 authored 元数据在公开标定卡中给出轴向示意\n  选择理由: 尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径\n- \n  模板: C09-T01\n  题数: 10\n  难度: 中难：至少 4 题为像素尺寸与真实长度排序相反的近远配对\n  测量条件: 同一维度（最长边）比较；两对象非等长（差 ≥8%）；多视图提供尺度线索\n  选择理由: 透视干扰是 N02 协议的关键难度轴，室内场景易构造\n- \n  模板: C11-T01\n  题数: 10\n  难度: 中：半径 0.8/1.2/1.8/2.4 m 档位，边界距离与半径差 >0.15 m\n  测量条件: 中心距离谓词、锚点不计入、全集为该场景内全部静态实体（公开图含全景视图供核对）\n  选择理由: 条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰\n\n## 场景与采集设计\n\n来源策略: 本会话场景选择 selected_scenes 为空、allow_new_scenes=true：不引用任何历史场景/task_id/revision；三个场景全部新建于本会话，采集验收通过后登记进 scene-library/catalog.json。场景库 policy.json 删除清单（立方体与几何盒替代场景及其派生产物）不可复用。默认使用 Isaac 官方可辨识家具资产，不启用任何简化几何例外（geometry_exceptions 为空即声明：本计划不含简化几何实验）。\n选用场景: \n\n允许新增场景: True\n目标场景数: 3\n场景设计: \n  - \n    场景名称: 办公室工作区\n    测量用途: 承担办公场景下的距离、尺寸、相机参照系与计数测量；一项目一场景，供 C01/C03/C04/C05/C07/C09/C11 的 train 分区题目。\n    布局: 6.0×5.0×2.8 m 矩形房间，实体墙面四片+地板+吊顶，南墙内嵌 3 m 模块化窗提供天光方向感；办公桌靠北墙居中，办公椅面向桌面留出腿部空间；书柜贴西墙，文件柜靠东墙，饮水机置于东南角，盆栽立于窗侧墙角，垃圾桶在桌侧可取用处。动线：从东侧通行带到桌前通道 ≥0.9 m。\n    物体配置: 办公桌、办公转椅、显示器、书柜、文件收纳柜、台灯、盆栽、饮水机、单本书×3、马克杯×2、收纳盒，加 authored 墙体/地板/天花 composite 与 窗；小物件（马克杯、书本、笔筒类 收纳盒）置于桌面/柜顶支撑面上，动态质量与摩擦按合成先验声明。\n    视角与采集: view_0 全景对角机位（覆盖 ≥12 个对象）、view_1 侧向机位（与 view_0 形成基线，供多视图尺度恢复）、view_2 桌面特写（monitor/马克杯/books 近景）、view_3 书柜-文件柜侧近景；均为标定相机，水平视角由 focal/aperture 记录于采集回执。\n    变化维度: 与其余两场景变化维度：家具品类组合（办公类）、对象数 16、锚点候选（桌、柜、机位）；对象间距与角度按 15 度以上 yaw 散布以避免轴向捷径。\n    场景摘要: 这是一间供单人日常办公的仿真房间，用于测量模型在办公环境中的距离、尺寸与计数能力。房间 6.0×5.0 米、高 2.8 米，木地板（wood_laminate 纹理）、四片实体墙与吊顶围合成封闭室内，南墙内嵌 3 米模块窗给出一侧天光方向，配合顶部面光使全部家具在实拍中可辨识。办公桌贴北墙居中摆放，桌面上依次放显示器（居中朝椅）与两只马克杯（左侧、前缘），显示器由桌面真实支撑；官方笔记本资产在实拍中呈 1.9cm 薄板不可辨识，已从软设计移除（非用户硬要求）；办公椅在桌前就坐区，正面朝向显示器屏幕并保留腿部空间；屏幕朝向对应办公椅，功能朝向按已校准的原生资产正面和目标位置计算。西墙立书柜（柜格留空以如实反映可验证支撑面），三件书类分别竖放在办公桌左角、桌面前缘与文件柜顶；东墙放文件柜，柜顶居中竖放书组；台灯移至办公桌右端桌面作为读写照明；东南角饮水机靠墙，取其不遮窗；窗前角落放盆栽；桌旁地面放收纳 收纳盒。从东侧通行带到桌前形成连续通路，净宽不小于 0.9 米，柜门开启方向不与椅位冲突。所有大件静态、小件带质量与摩擦先验，沉降后中心由仿真回执提供，作为公开媒体标记与真值的双重来源。\n    必须满足的要求: \n      - 室内场景，真实可辨识资产，禁止立方体/几何盒替代家具（scene-library policy.json 删除清单）\n      - 目标题量 100 条，本场景承担 train 分区约 34 题\n      - GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真采集回执；模型预测不得充当 GT\n      - 公开题目不泄露答案；单张无尺度 RGB 不出绝对距离题\n    物体用途: \n      - \n        用途与位置: 房间地面，支撑全部家具，world Z=0 起算面\n      - \n        用途与位置: 北墙，办公桌贴靠的边界\n      - \n        用途与位置: 南墙，内嵌模块窗，界定天光方向\n      - \n        用途与位置: 西墙，书柜贴靠\n      - \n        用途与位置: 东墙，文件柜贴靠，留出入口通道\n      - \n        用途与位置: 吊顶，封闭室内体积\n      - \n        用途与位置: 南窗，真实窗资产，提供尺度与方向线索\n      - \n        用途与位置: 办公桌主体，北墙居中，桌面高约 0.76 m，承载显示器/书组/两只马克杯\n      - \n        用途与位置: 桌前就坐区的办公椅，正面朝向显示器并留出腿部空间，功能朝向由新采集核对。\n      - \n        用途与位置: 显示器，桌面居中朝椅\n      - \n        用途与位置: 马克杯，桌面左侧可取用处\n      - \n        用途与位置: 马克杯，桌面前缘靠通道侧\n      - \n        用途与位置: 书柜，贴西墙，格内放书\n      - \n        用途与位置: 书组，办公桌左角竖放\n      - \n        用途与位置: 书组，文件柜顶竖放居中\n      - \n        用途与位置: 单本书，桌面前缘竖放，验证厚度方向\n      - \n        用途与位置: 文件柜，靠东墙，柜顶放书组\n      - \n        用途与位置: 台灯，办公桌右端桌面，读写照明\n      - \n        用途与位置: 饮水机，东南角不遮窗\n      - \n        用途与位置: 盆栽，窗侧墙角，界定软分区\n      - \n        用途与位置: 收纳 收纳盒，桌旁地面，可取用位置\n    空间与使用关系: \n      - \n        关系: supported_by\n        具体说明: 四脚落地贴北墙，工作主面\n      - \n        关系: facing\n        具体说明: 在对应桌前就坐，正面朝向显示器并保留腿部净空，由新采集核对可正常使用。\n      - \n        关系: supported_by\n        具体说明: 底座落在桌面，朝向椅位\n      - \n        关系: supported_by\n        具体说明: 动态小件，沉降由仿真回执确认接触\n      - \n        关系: supported_by\n        具体说明: 同上，位置与 马克杯1 拉开便于计数与排序\n      - \n        关系: supported_by\n        具体说明: 平放叠置，验证厚度方向\n      - \n        关系: supported_by\n        具体说明: 贴西墙落地，柜格真实层板\n      - \n        关系: supported_by\n        具体说明: 书组竖放于办公桌左角，由桌面真实支撑\n      - \n        关系: supported_by\n        具体说明: 书组竖放文件柜顶面中央，比例与柜体协调\n      - \n        关系: supported_by\n        具体说明: 台灯底座落在办公桌右端桌面，高度与显示器齐平\n      - \n        关系: near\n        具体说明: 靠东墙，开门方向避开椅位\n      - \n        关系: near\n        具体说明: 东南角取用点，不遮挡窗\n      - \n        关系: supported_by\n        具体说明: 窗侧墙角，界定动线\n      - \n        关系: near\n        具体说明: 桌旁 0.5 m 地面，取用方便\n      - \n        关系: mounted_to\n        具体说明: 内嵌于南墙开口平面\n    物理假设与验证范围: \n      - 家具静态件 mass_kg=0（static），其位置即 authored 位姿，碰撞体由原生 USD 几何提供\n      - 马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\n      - 台灯为办公桌右端桌面静态摆件，底座由桌面支撑；不测倾覆动力学。\n      - 墙体/地板/天花为显式 authored 几何，support=ground 仅相对 Z=0 定位，地面由 floor_a 实体提供\n  - \n    场景名称: 起居会客角\n    测量用途: 会客/休息类室内布局，测同一批模板在软体家具主导空间下的表现；承担 dev 分区约 33 题。\n    布局: 5.6×4.8×2.8 m 房间；长沙发贴北墙、单人扶手椅两只分列东西两侧均朝向茶几，形成围合谈话区；地毯居中界定活动区，茶几上放两只马克杯与一本合上的书；西墙书柜、东墙边柜（file_cabinet 复用为边柜），台灯在边柜上，盆栽在南窗角，收纳盒 在沙发侧。动线：南侧入口至围合区外缘 ≥1.0 m，椅前留 ≥0.45 m 腿部空间。\n    物体配置: 双人沙发、扶手椅×2、茶几、书柜、文件收纳柜、台灯、盆栽、窗、马克杯×2、单本书×2、收纳盒、rug（织物纹理 composite，厚 1.5 cm）+ 墙体/地板/吊顶。\n    视角与采集: view_0 全景（自南向北含围合区）、view_1 低机位斜向（强化近远对象透视差，供 C09 反转配对）、view_2 茶几特写、view_3 沙发-书柜侧向近景。\n    变化维度: 对象数 15；软体家具体量相近，制造更难的尺寸比较；锚点候选为茶几中心与沙发。\n    场景摘要: 这是一个供三四人在此交谈、喝茶、取阅书刊的起居会客仿真空间，用于测量模型在软体家具环境中的空间判断。房间 5.6×4.8 米、高 2.8 米，木地板与浅色墙面围合，南墙整幅 3 米模块窗引入天光，与顶面面光共同照亮全场。北墙前放双人布艺长沙发，四脚落地、靠墙留出 5 cm 安装余量；东西两侧各一只单人扶手椅，均正面朝向房间中央的长方形茶几，椅前与茶几之间留约 0.45 米腿部距离，构成可围坐谈话的动线。羊毛质感地毯平铺中央，茶几落在地毯上，台面摆放两只马克杯与一本竖放的书，均由台面支撑并等待沉降验证。西墙立书柜（柜格留空以保证支撑可验证）；东墙边柜上放台灯，灯高约 1.85 米在可及范围；南窗东南角放盆栽软化边界；沙发侧边地面放收纳 收纳盒。会客座椅正面朝向茶几，沙发正面朝南、背靠北墙；围坐区域外侧保留通行路径，净空由新采集与平面布局核对，不将沙发背后的安装余量作为通道。大件静态，杯书本动态，质量摩擦为合成先验，最终接触与位置以仿真采集回执为准。\n    必须满足的要求: \n      - 室内场景，真实可辨识资产，禁止几何盒替代家具\n      - 承担 dev 分区约 33 题，GT 仅来自官方/程序/仿真\n      - 围合朝向与通道净空在实拍中可验证；扶手椅必须正立并面向茶几\n      - 公开题目不泄露答案\n    物体用途: \n      - \n        用途与位置: 地面，支撑全部家具\n      - \n        用途与位置: 北墙，沙发贴靠\n      - \n        用途与位置: 南墙，整幅窗\n      - \n        用途与位置: 西墙，书柜贴靠\n      - \n        用途与位置: 东墙，边柜贴靠\n      - \n        用途与位置: 吊顶，封闭室内体积\n      - \n        用途与位置: 南窗，主采光与尺度线索\n      - \n        用途与位置: 双人沙发，北墙居中，主要坐具\n      - \n        用途与位置: 扶手椅，西侧面向茶几\n      - \n        用途与位置: 扶手椅，东侧面向茶几，与 b1 成镜像围合\n      - \n        用途与位置: 茶几，围合中心，台面承载杯与书\n      - \n        用途与位置: 地毯，界定谈话活动区，1.5 cm 薄片真实厚度\n      - \n        用途与位置: 马克杯，茶几台面\n      - \n        用途与位置: 马克杯，茶几台面另一侧\n      - \n        用途与位置: 书，茶几台面竖放\n      - \n        用途与位置: 书柜，贴西墙\n      - \n        用途与位置: 书组，边柜台面竖放于台灯旁\n      - \n        用途与位置: 边柜（文件柜资产），东墙，柜顶放灯\n      - \n        用途与位置: 台灯，边柜顶，会客照明\n      - \n        用途与位置: 盆栽，南窗角\n      - \n        用途与位置: 收纳 收纳盒，沙发侧地面\n    空间与使用关系: \n      - \n        关系: near\n        具体说明: 贴北墙留 5 cm 余量，正面朝南\n      - \n        关系: facing\n        具体说明: 自西面向茶几，椅前留 0.45 m 腿部空间\n      - \n        关系: facing\n        具体说明: 自东面向茶几，与 b1 围合\n      - \n        关系: supported_by\n        具体说明: 四角落在地毯平面，地毯 1.5 cm 抬升由沉降回执确认\n      - \n        关系: supported_by\n        具体说明: 台面动态件，沉降后接触\n      - \n        关系: supported_by\n        具体说明: 台面另一侧，间距明确\n      - \n        关系: supported_by\n        具体说明: 单本书竖放茶几台面，由台面支撑\n      - \n        关系: supported_by\n        具体说明: 书组竖放边柜顶面，与台灯相邻由柜顶支撑\n      - \n        关系: supported_by\n        具体说明: 柜顶放置，位置与朝向符合声明的使用功能\n      - \n        关系: near\n        具体说明: 贴东墙，抽屉开启方向避开通道\n      - \n        关系: near\n        具体说明: 贴西墙落地，位置与朝向符合声明的使用功能\n      - \n        关系: supported_by\n        具体说明: 平铺地面，位置与朝向符合声明的使用功能\n      - \n        关系: near\n        具体说明: 窗角绿化，不阻动线\n      - \n        关系: near\n        具体说明: 沙发扶手侧，取用方便\n      - \n        关系: mounted_to\n        具体说明: 内嵌南墙，位置与朝向符合声明的使用功能\n    物理假设与验证范围: \n      - 沙发/扶手椅/茶几/柜类静态（原生 USD 碰撞体，mass_kg=0）\n      - 马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\n      - 地毯为静态薄板，声明真实厚度 1.5 cm，不声称织物形变\n      - 光照为渲染先验，按新采集的物体可辨识性调整；不声明实测照度或光学标定。\n  - \n    场景名称: 阅览茶水角\n    测量用途: 学习+茶水混合功能区，提供第三组对象间距分布；承担 test 分区约 33 题（sealed 留待后续冻结）。\n    布局: 5.4×4.6×2.8米房间；两张办公桌沿北墙并排，间隔30厘米，各配转椅面向对应工作目标。东墙两组书柜开口朝室内；西墙文件柜作为收纳柜，柜顶只放一个收纳盒，饮水机在柜体北侧约0.9米处。两只马克杯和两组书分别放在两桌上，台灯放左桌右前区域。南窗下阅读椅面朝房内，盆栽在其东侧1.2米中心距离处。侧方与中央安排通行，东侧连续净宽至少0.75米；不把阅读椅背后的安装间隙作为通道。\n    物体配置: 办公桌×2、办公转椅×2、书柜×2、显示器×1、文件收纳柜、饮水机、台灯、盆栽、窗、扶手椅（窗边阅读椅）、马克杯×2、收纳盒×1、书组×2。\n    视角与采集: view_0 全景、view_1 对角高机位、view_2 茶水角近景、view_3 书柜墙面近景。\n    变化维度: 对象数 18（最多），双桌双椅同型号对象测试身份去重与计数；柜顶平放书与竖放书混布测厚度/长度维度混淆。\n    场景摘要: 这是一间兼具办公、阅览与饮水功能的小型仿真房间，服务两到三人，并为评测提供同型号多实例的计数与身份去重条件。房间5.4×4.6米、高2.8米，木地板与浅色墙，南墙嵌3米模块窗。北墙并排两张办公桌，中间留30厘米缝，每桌配一把转椅并留出腿部空间；左桌转椅面向对应显示器，显示器屏幕面向左桌转椅，右桌转椅面向右桌工作区，朝向按已校准的原生资产正面计算。总共只有两只马克杯，各放在一张桌面的可取用处；两组书也分别放在两桌的左侧，右桌已有书和杯，不以单个视角的遮挡认定为空。台灯放在左桌右前区域，由桌面支撑，与显示器及书组错开。东墙相邻两组书柜，开口朝室内，柜格留空以保证支撑可验证。西墙文件柜用于日常收纳，柜顶只放一个收纳盒，柜顶作为收纳平面，不作为食品操作台；饮水机在柜体北侧约0.9米处贴墙。窗下偏西放一只阅读扶手椅，背部朝南窗、正面朝房内，后方留约0.3米安装余量，通行安排在侧方及房间中央。盆栽移至阅读椅东侧，两者中心相距1.2米，东侧连续通道净宽至少0.75米，并由最终采集检查。大件静态，杯、书和收纳盒带合成质量与摩擦，最终接触、姿态和中心以新仿真沉降回执为准；公开媒体标记与真值同源。\n    必须满足的要求: \n      - 室内场景，真实可辨识资产，禁止几何盒替代家具\n      - 承担 test 分区约 33 题；同场景题目同分区，禁止跨分区泄漏\n      - GT 仅来自官方/程序/仿真；双桌双椅同型号必须可按持久 ID 区分\n      - 公开题目不泄露答案\n    物体用途: \n      - \n        用途与位置: 地面，支撑全部家具并作为高度起算面\n      - \n        用途与位置: 北墙，双桌贴靠\n      - \n        用途与位置: 南墙，窗与阅读椅\n      - \n        用途与位置: 西墙，茶水角\n      - \n        用途与位置: 东墙，双书柜\n      - \n        用途与位置: 吊顶，封闭室内体积\n      - \n        用途与位置: 南窗，提供采光与尺度线索\n      - \n        用途与位置: 办公桌1，北墙西侧，配显示器\n      - \n        用途与位置: 办公桌2，北墙东侧，配马克杯与书组，与 c1 间隔 30 cm\n      - \n        用途与位置: 转椅1，正对 办公桌1\n      - \n        用途与位置: 转椅2，正对 办公桌2\n      - \n        用途与位置: 显示器，办公桌1 桌面\n      - \n        用途与位置: 马克杯，办公桌1 桌面\n      - \n        用途与位置: 马克杯，办公桌2 桌面\n      - \n        用途与位置: 书柜1，东墙南侧\n      - \n        用途与位置: 书柜2，东墙北侧，与 c1 相邻\n      - \n        用途与位置: 书组，办公桌1 桌面左角竖放\n      - \n        用途与位置: 书组，办公桌2桌面左角竖放\n      - \n        用途与位置: 西墙文件收纳柜，柜顶只放一个收纳盒，按日常收纳用途使用。\n      - \n        用途与位置: 收纳盒，边柜台面\n      - \n        用途与位置: 饮水机，西墙边柜北侧 0.8 m\n      - \n        用途与位置: 台灯，办公桌1桌面右前角，阅读照明\n      - \n        用途与位置: 窗侧盆栽，位于阅读椅东侧，两者中心相距1.2米，保留东侧连续通道。\n      - \n        用途与位置: 单人阅读椅，窗下面朝房内\n    空间与使用关系: \n      - \n        关系: near\n        具体说明: 贴北墙，桌面工作区\n      - \n        关系: near\n        具体说明: 贴北墙与 c1 间隔 30 cm\n      - \n        关系: facing\n        具体说明: 正对桌面留腿部空间\n      - \n        关系: facing\n        具体说明: 正对桌面，位置与朝向符合声明的使用功能\n      - \n        关系: supported_by\n        具体说明: 底座由左桌支撑，屏幕正面面向左桌转椅，采用已校准的原生资产正面计算朝向。\n      - \n        关系: supported_by\n        具体说明: 动态件，台面沉降\n      - \n        关系: supported_by\n        具体说明: 动态件，台面沉降\n      - \n        关系: supported_by\n        具体说明: 书组竖放办公桌1左角，由桌面真实支撑\n      - \n        关系: supported_by\n        具体说明: 书组竖放办公桌2桌面左角，由桌面真实支撑，与办公桌1桌面书组构成同型号双桌区分\n      - \n        关系: near\n        具体说明: 文件柜作为西墙日常收纳柜，柜顶放收纳盒，不作为食品操作台。\n      - \n        关系: supported_by\n        具体说明: 台面放置，位置与朝向符合声明的使用功能\n      - \n        关系: near\n        具体说明: 文件收纳柜北侧约0.9米的贴墙取水点。\n      - \n        关系: near\n        具体说明: 窗下阅读位，背部朝南窗、正面朝房内，背后留约0.3米安装余量，通行在侧方。\n      - \n        关系: supported_by\n        具体说明: 台灯底座落在办公桌1桌面右前角，与左角显示器、书组错开，提供有效桌面照明\n      - \n        关系: supported_by\n        具体说明: 窗侧地面，界定软分区\n      - \n        关系: mounted_to\n        具体说明: 内嵌南墙，位置与朝向符合声明的使用功能\n    物理假设与验证范围: \n      - 桌/椅/柜/窗静态（原生 USD 碰撞体）；双桌双椅同型号但世界坐标与 ID 持久可分\n      - 马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\n      - 台灯为左桌右前区域的静态摆件，底座由办公桌1桌面支撑；不测倾覆。\n      - 窗资产透明度用 native_opacity_multiplier 先验调节，不声称光学实测透射率\n复用约束: 禁止复用 selected_scenes 之外的任何历史场景、其采集目录与派生数据集（含 policy.json 删除清单及 operations/fr-eval100 等旧产物）；历史产物仅可作为接口格式参考，不进入本次 GT、媒体或统计。新场景验收后登记 scene-library/catalog.json（记录 task_id、revision、程序路径、验收回执）。\n视频或全景展示: 每个 SceneProgram 先经 spatialforge_preview 检查支撑链与包围盒冲突，修复后再进入 spatialforge_capture 采集；采集后逐图检查真实图像与原生回执，scene_admission.json 与 scene_acceptance.json 双通过方可进入 S3；最多两次自动修复，仍失败则停在本阶段并如实报告缺口。\n\n## 标注与真值来源\n\n真值来源: 三层权威：(1) 官方资产测量——Isaac 资产库 USD 几何界（native_assets 登记的 size 米制包围盒）；(2) SceneProgram authored 参数——墙/地/点标记物与自定义 composite 的精确尺寸与位姿；(3) Isaac 仿真采集回执——capture/evidence.json 中每实体 settled_center、world_transform 与相机标定矩阵。模型预测（SAM3/DA3/FLUX 等）不进入标注链路，本数据集不使用任何模型输出作 GT。\n字段与单位: 每实体一条标注记录：scene_id、object_id、label（公开称呼）、kind、dynamic、size_xyz_m（官方/authored 尺寸）、authored_center_m 与 settled_center_m（世界系，Z-up，米）、yaw_deg、longest_local_extent_cm、world_aabb、top_z_m、support_chain、碰撞回执摘要；每机位一条：camera_id、image 路径、resolution、focal_length_mm、aperture_mm、view 矩阵（采集回执原值）、投影内参 K；每题一条 item：item_id、template_id、task_id、protocol_id、parameters、media 哈希、answer、tolerance_config、seed、split、scene_group_id、provenance（程序与回执路径）、question_spec。\n推导方法: 中心距离=L2(settled_center_A, settled_center_B)；表面最短间距=authored AABB 三维间隙 max(0, per-axis gap 组合)（对同支撑面横向对取水平间隙），接触对与穿透对直接剔除；相机距离=‖K⁻¹ 反投影与相机-世界变换求解的 settled_center 在相机系范数｜到中心欧氏距离｜与 z 分量（分别对应 C03/C05）；最长边=官方 max(size_xyz) 换算厘米（复合件取 authored 局部包围盒）；计数=按谓词对全集实体 ID 集合求基数。所有数值先由生成脚本按冻结公式推导并与 evidence.json 交叉核对，偏差 >2cm 的对象以回执 settled_center 为准并记录差异。\n媒体与标注对齐: 公开媒体=真实采集 PNG 上叠加程序投影标注：对象绿色框取 evidence 中碰撞体 AABB 八角点投影凸包，ID 文字标签置于框上方；C01-T03 的标记点 P 以程序投影绘制十字+标签；坐标原点/像素系与 view 矩阵同源同帧。逐题核对『题目所指对象名-媒体标注-parameters 绑定』三者一致，对象称呼只用注册资产标签（如『办公桌』『书柜』），禁止凭空命名。\n校验规则: 自动校验：GT 复算一致（两次独立实现比对）、媒体文件存在且为 PNG、每题 answer 不出现在 stem/context/options 文本中、C04 相邻名次差>0.12m、C05 |Δz| 落在标注标签内、C11 边界距离与半径差>0.15m；人工抽检：每模板至少 1 题由人对照实拍图确认可回答性，结果记录在 qc/spot_check.md。\n\n## 出题规则与公开样例\n\n公开观测: 公开材料=同一场景的 2–4 张真实采集视图（含全景与相关近景），对象以颜色框+持久编号标记；题目条件声明：米制单位、距离/深度的坐标系定义、C01-T03 的标记点在图中给出、C11 的计数谓词与边界规则、C05 的相同判定容差。绝对距离类题目一律至少两张不同基线视图或一张含已知尺寸家具与地面标定的视图（满足『标定多视图/可恢复尺度』准入）。不公开相机位姿数值、不公开任何坐标表。\n可回答性: 每题的可答性来自三要素闭环：(1) 目标对象在公开媒体中有清晰框与编号；(2) 尺度由多视差或已知家具尺寸线索恢复（协议允许的计算版将相机标定作为 provided_information 记录）；(3) 判定规则全部写进题目条件。生成时对每题验证目标在两视图中的投影未被完全遮挡。\n输出格式: 数值题：{\"value\": number, \"unit\": \"m|cm\"}；选择题/标签题：候选 ID 或标签字符串；排序题：ID 数组；分组题不适用（未选 C04-T03）；整数题：非负整数。缺答/格式错误保留原答记 0 分并单列。\n难度设计: 距离跨度 0.3–4.5 m、尺寸 18–222 cm、C09 特意混入『近处小物 vs 远处大物』反转对、C04 排序含 0.12–0.35 m 名次间隔、C11 半径档位含锚点周围密集与稀疏两种分布。同模板 10 题按 4(train)/3(dev)/3(test) 场景分布，避免单场景模板内集中。\n捷径与歧义检查: 检查项：候选顺序随机化（正确答案位置均匀）；『更大/更近』标签两向平衡；像素面积与真实尺寸冲突对占比≥40%（C09）；中心距与表面距答案不同源（防止互相泄漏）；题干与媒体文件名不含数值答案或坐标；同场景内 C01-T01 与 C04 复用配对时答案独立推导；禁止把隐藏 GT 字段（相机位姿表、坐标）当公开条件。\n公开题目样例: 示例（不含真实答案，字段为 question_spec 结构）：stem=『观察图1、图2（同一办公室两个机位实拍，绿框与编号标识对象），估计「办公桌」(03) 与「书柜」(11) 几何中心之间的直线距离，单位米。』context=『两张图来自同一标定相机的不同机位；图中编号仅标识对象身份。』conditions=『答案为中心到中心的三维欧氏距离，单位米，保留一位小数；不要按像素距离折算。』options=[] response=『提交一个数值并带单位 m。』media_labels=『图1：办公室全景机位实拍（含对象编号框）』『图2：侧向机位实拍（含对象编号框）』；parameter_bindings 与该题源 parameters 完全一致。\n\n## 数据集规模与分区\n\n目标题量: 100\n分区策略: 按场景分组划分：design-office-work→train 34 题，design-lounge-meeting→dev 33 题，design-study-pantry→test 33 题；同场景全部题目（含改写与配对样本）同分区，跨分区场景零重叠；sealed 暂不启用（留待正式模型评测前冻结）。\n随机种子: 20261105\n分组单位: scene_group_id=scene-v1:<scene_id>；题目配对（同对象对不同模板）共享底层几何但分区由场景决定；每模板内按场景 4/3/3 均衡取样。\n去重规则: 同一 (template_id, 对象集合) 组合全数据集唯一；中心距离与表面间距同对象对允许共存（不同测量定义）；改写题不生成（模板即协议，不做自然变体冒充新题）。\n分布平衡: 模板 10×10 严格均分（余数 0）；场景×模板 4/3/3；数值答案跨度分位对齐（距离 0.3–4.5m 均匀分桶）；选择题正确选项位置均匀；C09 反转对≥4 题。缺口如实记录：若某模板因剔除规则凑不满 10 题，报告实产与原因，不跨模板挪用配额。\n\n## 评分方法与对照\n\n逐模板评分: \n  - \n    模板: C01-T01\n    指标: MAE + 容差内正确率\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)；近零(|gt|<0.1m)只看绝对误差\n    聚合方式: 模板内均值；总览不跨模板平均物理量\n  - \n    模板: C01-T02\n    指标: MAE + 容差内正确率\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)，接触 0 值样本按绝对误差\n    聚合方式: 模板内均值\n  - \n    模板: C01-T03\n    指标: MAE + 容差内正确率\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)\n    聚合方式: 模板内均值\n  - \n    模板: C03-T01\n    指标: MAE + 容差内正确率（中心欧氏距离定义）\n    单位: m\n    容差: tau=max(0.02, 0.05*|gt|)\n    聚合方式: 模板内均值；离轴角分桶另列\n  - \n    模板: C04-T01\n    指标: 最近对象准确率\n    单位: %\n    容差: 唯一最近且与第二名差>0.15m（题面不公布）\n    聚合方式: 准确率；混淆报告错选对象的距离名次\n  - \n    模板: C04-T02\n    指标: 完全排序正确率 + 平均 Kendall tau-b\n    单位: 比例\n    容差: 严格全序，缺项/重复项判该题 0\n    聚合方式: 两指标分别均值\n  - \n    模板: C05-T01\n    指标: 三分类准确率（更小/更大/相同）\n    单位: %\n    容差: 标签由 |Δz|≤0.1m 判相同（题目条件公开该规则）\n    聚合方式: 准确率；『相同』类单独报告\n  - \n    模板: C07-T02\n    指标: MAE + 容差内正确率\n    单位: cm\n    容差: tau=max(1cm, 0.05*|gt|)\n    聚合方式: 模板内均值，按尺寸分桶\n  - \n    模板: C09-T01\n    指标: 比较准确率\n    单位: %\n    容差: 两对象最长边差≥8%（生成时保证）\n    聚合方式: 总体+『像素/真实反转』切片\n  - \n    模板: C11-T01\n    指标: 整数精确率 + 计数误差分布\n    单位: 个\n    容差: 精确匹配\n    聚合方式: 模板内准确率，误差直方图\n缺失与无效响应: 缺失/拒答/格式错误：保留原始输出，该题记 0，错误类型单列不计入能力均值之外的诊断表。\n对照基线: 设计三条对照（本次不执行模型评测，仅随数据集交付评分器与基线定义）：随机基线（选择题按候选数、数值题按 GT±tau 均匀采样、排序按随机置换）、中心先验基线（一律答场景中心距离中位数）、深度图像素基线（以单视图像素尺寸估距，验证反捷径设计）。\n模型评测安排: 本会话只生产数据集与质检，不调用任何未授权目标模型评测接口；scoring 由交付的 verifier 在评测时执行。\n\n## 质量检查与验收\n\n- \n  检查内容: 每个场景 captures/<scene>/scene_admission.json 存在且 enforced 通过（程序提交先于采集，政策来源绑定本计划路径）\n  通过阈值: admission 无 error；provenance.sources 指向本保存计划\n  失败处理: 按具体准入问题修正程序后重新preview与capture；重复执行故障先修执行层，保留已有文件，不因固定次数重复请示。\n- \n  检查内容: scene_acceptance.json passed=true 且含逐图生活审查（物体身份/尺度/支撑/功能布局/通行净空/材质照明 六项，每项引用真实视图）与原生碰撞沉降回执\n  通过阈值: passed=true，无未处置high问题；每轮修订对应具体缺陷，并保留新的实际采集与验收回执。\n  失败处理: 读取实际issues定点修正程序并重新采集，核对支撑、功能朝向、生活用途与通行；结合相关机位和执行证据处理视觉误判，保留真实缺陷，不用旧通过记录代替新验收。\n- \n  检查内容: 每题 item 的 answer 可由程序从 evidence.json/authored 几何独立复算一致；标注记录中不出现模型预测字段\n  通过阈值: 复算一致率 100%，双实现偏差≤1e-6\n  失败处理: 剔除该题并记缺口，修 oracle 后重新推导\n- \n  检查内容: 实产题量：模板×10、场景×(34,33,33)、split 无同场景跨区\n  通过阈值: 目标 100；缺口需逐模板列出原因\n  失败处理: 如剔除致缺口：如实报告实产（不得跨模板凑数），在 S5 报告写明数量与原因\n- \n  检查内容: 答案值/坐标/内部ID不出现于 stem、context、conditions、选项文案与媒体文件名；『相同/等距』标签不含隐藏阈值之外的提示\n  通过阈值: 自动扫描命中 0；人工抽检 10 题 0 泄露\n  失败处理: 重写题目措辞并复检，未通过不得导出\n- \n  检查内容: 每题引用的 PNG 存在、可解码、分辨率≥800×600，且叠加标记与原采集画布对齐（投影框落在对象上）\n  通过阈值: 100% 有效；对齐抽检误差≤8px\n  失败处理: 重新渲染该媒体或剔除该题\n- \n  检查内容: 每模板至少 1 题人工对照公开实拍确认可仅凭公开信息作答（无隐藏 GT 当条件）\n  通过阈值: 10/10 模板通过\n  失败处理: 该模板题目全部重做信息设计；模型 API 不代替人工看图\n- \n  检查内容: scene_group_id 与 split 一一对应；派生文件无跨区副本\n  通过阈值: 违规 0\n  失败处理: 强制移组或剔除\n\n## 五阶段执行安排\n\n- \n  阶段: S1\n  执行动作: 读取场景选择与 267 模板合同，拆解 10 模板×10 题分配与三场景设计，撰写本评估文档并保存计划、绑定 scene_selection 输入，打开审阅窗口等待 5 分钟\n  输入: scene-library/selections/session-13742859....json、pipeline_catalog 模板与协议、scene-library/policy.json\n  输出: 已保存的 pipeline 计划（operations/<...>/plan.json 路径回执）+ 本 assessment\n  完成条件: 计划落盘且 stage_review S1 获认可或到期无新指令；不在此阶段声称任何采集/题量已完成\n- \n  阶段: S2\n  执行动作: 依据三个场景完整摘要编写并登记SceneProgram，使用已校准的原生资产正面计算功能朝向；preview校验真实资产、支撑与碰撞，再提交Isaac原生capture，逐图生活审查并结合原生回执核对。未通过时针对具体缺陷定点修订并重新采集；按已有授权持续修复，不因固定次数重复请示，不重复无实质变更的采集。三场景实际验收完成后仅开一次五分钟用户窗口。\n  输入: S1 计划的 scenes.designs 与 scene_brief；已保存计划路径作 provenance 绑定\n  输出: captures/<scene>/ 实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出；场景库登记记录\n  完成条件: 3 个场景 scene_acceptance.passed=true 且证据路径落盘；未通过场景如实记缺口，题目配额向通过场景再分配（不跨模板挪用）\n- \n  阶段: S3\n  执行动作: 从采集回执提取实体 settled_center/world_transform/相机标定与官方尺寸，生成 annotations 表（对象+相机+几何）；双实现复算 GT；渲染带编号框与点标记的公开标注媒体\n  输入: captures/<scene>/evidence.json、SceneProgram、native_assets 尺寸登记\n  输出: annotations/（objects/cameras/geometry jsonl）、annotations/recompute_log.json、public media 标注 PNG 目录\n  完成条件: 每验收场景 ≥12 个对象全量标注、复算一致率 100%、媒体对齐抽检通过\n- \n  阶段: S4\n  执行动作: 逐题按模板协议生成 items 源 JSON（含 answer/admission/parameters）、写 evidence JSONL（question_spec 全字段+parameter_bindings 与 parameters 一致），执行 pipeline 计划 questions 步骤（templates.produce 协议绑定）与 package 步骤\n  输入: S3 标注与媒体、10 模板合同、dataset 分配表、seed=20261105\n  输出: items/ 源 JSON×100、evidence/evidence.jsonl、questions.csv、pipeline run 的 dataset 与 package 回执\n  完成条件: templates.produce 与 data.package 步骤状态 completed，逐模板计数落盘；缺口如实入报\n- \n  阶段: S5\n  执行动作: 执行 QG-* 全部质量门（脚本+逐模板人工看代表题）、生成覆盖/泄漏/分区/媒体检查报告与最终交付报告，打开 S5 审阅窗口\n  输入: package 产物、qc 检查脚本、抽检清单\n  输出: qc/*.json|md、report.md 最终交付报告（含实产统计、缺口、验收证据路径）\n  完成条件: QG-GT-PROVENANCE/QG-NOLEAK/QG-MEDIA/QG-SPLIT 全绿，QG-COVERAGE 报告实产 vs 100；交付声明仅基于已落盘证据\n\n## 交付物与验收入口\n\n交付文件: \n  - \n    阶段: S1\n    格式: json\n    内容: 完整评估文档、模板分配、场景 brief\n  - \n    阶段: S2\n    格式: png+json\n    内容: 真实采集图、原生物理回执、六项逐图生活审查结论；审阅窗口直接展示实拍图\n  - \n    阶段: S3\n    格式: jsonl+json\n    内容: 全对象几何标注、相机标定、双实现 GT 复算一致记录\n  - \n    阶段: S4\n    格式: csv+jsonl\n    内容: 100 条题目台账（模板/场景/split/输出合同，答案列仅 authority 侧文件含，csv 公开版不含答案）、协议绑定证据、逐题源记录\n  - \n    阶段: S5\n    格式: 目录+md+json\n    内容: 公开题包（媒体+题面+作答接口）、私有 authority（GT/容差/哈希）、质量门报告、最终交付报告\n交付验收: 验收入口=stage_review 五窗口逐一展示的落盘产物 + report.md 中的 QG 结果表：仅当 3 场景 acceptance 全过、GT 复算 100%、泄漏/媒体/分区扫描 0 违规时宣布交付，题量按实产申报（目标 100）；任何未过项列为缺口而非静默降级。\n\n## 风险与待解决事项\n\n- \n  风险或限制: 桌面 Isaac 队列排队或 worker 退出导致采集超时/中断\n  影响: S2 延迟，题量交付后移\n  应对方式: capture 保留作业按同一 request_key 恢复；执行故障不消耗设计修订预算；等待期先完成 S3 生成器与质检脚本\n  状态: 待执行观察\n- \n  风险或限制: 真实资产库为办公品类（无床/厨房），室内多样性受限\n  影响: 场景语义分布偏办公/起居，室内覆盖不含卫浴厨房\n  应对方式: 以三个功能角色最大化布局差异；在报告声明覆盖边界；不引入未注册外部资产路径\n  状态: 已接受，写入覆盖范围声明\n- \n  风险或限制: 表面最短间距（C01-T02）用 AABB 解析解对非凸家具（椅脚、灯罩）存在保守偏差\n  影响: 个别题 GT 高估间隙\n  应对方式: 只用凸主体可解析对象对出该题，或改用碰撞体凸包间距；无法确定的题剔除并记缺口，不降标准\n  状态: 生成时逐对核验\n- \n  风险或限制: 某模板因剔除（穿透/等距/遮挡）不足 10 题\n  影响: 实产<100\n  应对方式: 对象对候选池冗余设计（每模板≥18 候选对）；仍不足则如实报告实产与原因\n  状态: 配额保护设计，待执行验证\n- \n  风险或限制: 逐图生活审查模型网络超时\n  影响: 验收环节卡顿\n  应对方式: 仅对审查阶段传输失败用 spatialforge_retry 重试同一冻结采集，≤2 次，不消耗设计修订；质量失败必须修程序重采\n  状态: 预案就绪\n- \n  风险或限制: 计划阈值（tau、0.12m 名次间隔等）未经实测校准冻结\n  影响: 评分容差可能偏松/偏紧\n  应对方式: 交付时以 tolerance_config 显式随包发布并在报告标注为设计初值，正式评测前冻结\n  状态: 待确认\n\n## 本轮具体修复\n\n显示器正面面向对应操作者，办公椅面向显示器或工作区，会客座椅面向茶几，北墙沙发面向房间；使用已校准的原生资产正面计算实际yaw。阅览区盆栽移至阅读椅东侧，两者中心相距1.2米，保留通道。这里只修正已查明的功能朝向、位置与摘要矛盾；新场景必须重新原生采集及验收，旧通过回执不代替新版本。每阶段实际完成后只开一次五分钟用户窗口。\n\n```assessment-yaml\n{\n  \"schema\": \"spatialforge.assessment/v1\",\n  \"title\": \"室内场景空间理解评测集（办公室·起居·阅览三角色，100题）生产计划\",\n  \"summary\": \"本计划针对三个全新建造的室内仿真场景（办公室工作区、起居会客角、阅览茶水角），按 89 任务/267 模板目录中 10 个精确测量模板各生产 10 题，共 100 题，覆盖距离感知、尺寸感知、相机参照系深度比较与条件计数四类室内空间能力。所有真值仅来自官方资产测量、SceneProgram  authored 几何与 Isaac 采集回执（沉降后实体中心/位姿），公开媒体为真实采集图的标注版本，题目不泄露答案。场景选择约束：selected_scenes 为空、allow_new_scenes=true，因此本计划不引用任何历史场景与其派生产物；场景库 policy.json 中被删除的立方体/几何盒替代场景及其派生物一律禁止复用。执行分为 S1 计划、S2 场景采集与验收、S3 标注与真值、S4 按模板出题、S5 质检打包五阶段，每阶段落盘可查看的真实产物并等待用户审阅。\",\n  \"objectives\": [\n    {\n      \"id\": \"OBJ-DIST\",\n      \"capability\": \"N01 距离感知（实体间与相机参照系）\",\n      \"research_question\": \"在被测模型只看到带尺度线索的多机位实拍时，它能否正确估计物体几何中心间距、表面最短间距、物体到标记点的距离，并在相机坐标系下正确比较光轴深度？\",\n      \"success_criterion\": \"设计目标：C01/C03/C04/C05 六个模板共 60 题全部满足信息防火墙与协议绑定；数值题按 tau=max(0.02m, 0.05*|gt|) 报告容差内正确率与 MAE；比较/排序题按准确率与 Kendall tau 报告。\",\n      \"exclusions\": \"不测真实机器人操作成功率、不测动态运动学（无 C43/C44 类时序题）、不以单张无尺度 RGB 出绝对距离题（协议禁止）。\"\n    },\n    {\n      \"id\": \"OBJ-SIZE\",\n      \"capability\": \"N02 尺寸感知\",\n      \"research_question\": \"给定标定多视图与对象编号标记，被测模型能否正确估计物体局部包围盒最长边（厘米），并在透视差异下正确比较两物体的真实长度？\",\n      \"success_criterion\": \"设计目标：C07-T02 与 C09-T01 共 20 题；长度题按 tau=max(0.005m, 0.05*|gt|) 评分；比较题保证两对象同维度定义且非等长，含像素大小与真实长度相反的近远配对干扰。\",\n      \"exclusions\": \"不测世界轴 AABB 尺寸（与局部轴单列）、不测薄片厚度亚毫米级样本。\"\n    },\n    {\n      \"id\": \"OBJ-COUNT\",\n      \"capability\": \"条件对象计数（C11，关联 N10/N11）\",\n      \"research_question\": \"被测模型能否在标定室内场景中按『到锚点中心距离不超过给定半径』的谓词正确去重计数？\",\n      \"success_criterion\": \"设计目标：C11-T01 共 10 题；整数精确率与绝对计数误差；边界含 ≤，锚点自身不计入；半径取远离实际距离值的档位，杜绝边界歧义。\",\n      \"exclusions\": \"不测跨视图身份对应推断（C11-T03 不选），不测遮挡比例阈值类计数。\"\n    }\n  ],\n  \"coverage\": [\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C01-T01\",\n      \"count\": 10,\n      \"difficulty\": \"中：中心距离 0.4–3.5 m 混合，含遮挡与离轴样本\",\n      \"conditions\": \"标定多视图实拍（同一相机两张不同机位或单张含地面标尺与已知家具尺度线索），对象以绿色框+编号标记，声明米制与中心距离定义\",\n      \"selection_reason\": \"三维中心距离是 N01 主测变体，模板带程序生成器；室内家具对丰富，均分基线 10 题\"\n    },\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C01-T02\",\n      \"count\": 10,\n      \"difficulty\": \"中高：表面间距 0.03–1.2 m，剔除穿透与非水平对\",\n      \"conditions\": \"同上；表面最近点由 authored 网格/解析 AABB 最近点程序求解，接触为 0 的情形不进题\",\n      \"selection_reason\": \"表面间距与中心距离分开报告，是距离感知核心混淆项；带程序生成器\"\n    },\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C01-T03\",\n      \"count\": 10,\n      \"difficulty\": \"中：标记点取地面十字标记或台面角点，公开媒体上绘制 P 标记\",\n      \"conditions\": \"点必须三维可定位并在公开图中标出；单位米；不把路径长度当答案\",\n      \"selection_reason\": \"考察点-对象距离泛化；模板带程序生成器，GT 由 authored 坐标直接给出\"\n    },\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C03-T01\",\n      \"count\": 10,\n      \"difficulty\": \"中：相机光心到对象中心 1.0–4.5 m，覆盖不同离轴角\",\n      \"conditions\": \"采集回执提供每机位标定相机矩阵（对外只声明『标定相机』，不泄露数值位姿），输入具有尺度；对象唯一编号\",\n      \"selection_reason\": \"相机参照系测距是室内空间理解基本操作；无程序生成器，由程序 oracle 按仿真相机与实体中心绑定证据\"\n    },\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C04-T01\",\n      \"count\": 10,\n      \"difficulty\": \"易中：4–6 个候选对象，最近与第二名差 >0.15 m\",\n      \"conditions\": \"统一中心距离定义；锚点以编号标记；全部候选在同一媒体可见\",\n      \"selection_reason\": \"锚点最近对象是 N01/N11 关系判别主测变体；带程序生成器\"\n    },\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C04-T02\",\n      \"count\": 10,\n      \"difficulty\": \"中：4–5 个对象全排序，相邻名次差 >0.12 m，剔除等距\",\n      \"conditions\": \"严格排序，输出 ID 序列；只评整序与 Kendall tau，不只评第一名\",\n      \"selection_reason\": \"全排序比二选一更能区分排序捷径；带程序生成器\"\n    },\n    {\n      \"objective_id\": \"OBJ-DIST\",\n      \"template_id\": \"C05-T01\",\n      \"count\": 10,\n      \"difficulty\": \"易中：光轴深度差 ≥0.25 m 才出『更小/更大』，|Δz|≤0.1 m 判『相同』（该容差写入题目条件）\",\n      \"conditions\": \"两个目标均在该相机前方且中心在画面内；坐标系为相机光轴 z（米），在题目条件中声明\",\n      \"selection_reason\": \"光轴深度与欧氏距离的口径分离是协议要求的主测切片\"\n    },\n    {\n      \"objective_id\": \"OBJ-SIZE\",\n      \"template_id\": \"C07-T02\",\n      \"count\": 10,\n      \"difficulty\": \"中：最长边 20–222 cm，含旋转摆放对象（yaw 已声明）\",\n      \"conditions\": \"局部包围盒最长边；单位厘米；对象局部轴定义随 authored 元数据在公开标定卡中给出轴向示意\",\n      \"selection_reason\": \"尺寸感知主测变体，与真实资产测量直接绑定；避免世界轴 AABB 捷径\"\n    },\n    {\n      \"objective_id\": \"OBJ-SIZE\",\n      \"template_id\": \"C09-T01\",\n      \"count\": 10,\n      \"difficulty\": \"中难：至少 4 题为像素尺寸与真实长度排序相反的近远配对\",\n      \"conditions\": \"同一维度（最长边）比较；两对象非等长（差 ≥8%）；多视图提供尺度线索\",\n      \"selection_reason\": \"透视干扰是 N02 协议的关键难度轴，室内场景易构造\"\n    },\n    {\n      \"objective_id\": \"OBJ-COUNT\",\n      \"template_id\": \"C11-T01\",\n      \"count\": 10,\n      \"difficulty\": \"中：半径 0.8/1.2/1.8/2.4 m 档位，边界距离与半径差 >0.15 m\",\n      \"conditions\": \"中心距离谓词、锚点不计入、全集为该场景内全部静态实体（公开图含全景视图供核对）\",\n      \"selection_reason\": \"条件计数直接检验场景级空间整合；整数答案对 GT 依赖最清晰\"\n    }\n  ],\n  \"scenes\": {\n    \"source_policy\": \"本会话场景选择 selected_scenes 为空、allow_new_scenes=true：不引用任何历史场景/task_id/revision；三个场景全部新建于本会话，采集验收通过后登记进 scene-library/catalog.json。场景库 policy.json 删除清单（立方体与几何盒替代场景及其派生产物）不可复用。默认使用 Isaac 官方可辨识家具资产，不启用任何简化几何例外（geometry_exceptions 为空即声明：本计划不含简化几何实验）。\",\n    \"selection_path\": \"/slow_share2/jby/BenchForgeV2/example/SpatialForge/scene-library/selections/session-13742859-5f94-4ca8-ab53-2ffc86ae2e12.json\",\n    \"selected_scenes\": [],\n    \"allow_new_scenes\": true,\n    \"target_scene_count\": 3,\n    \"designs\": [\n      {\n        \"id\": \"design-office-work\",\n        \"name\": \"办公室工作区（sf_office_work_area）\",\n        \"purpose\": \"承担办公场景下的距离、尺寸、相机参照系与计数测量；一项目一场景，供 C01/C03/C04/C05/C07/C09/C11 的 train 分区题目。\",\n        \"layout\": \"6.0×5.0×2.8 m 矩形房间，实体墙面四片+地板+吊顶，南墙内嵌 3 m 模块化窗提供天光方向感；办公桌靠北墙居中，办公椅面向桌面留出腿部空间；书柜贴西墙，文件柜靠东墙，饮水机置于东南角，盆栽立于窗侧墙角，垃圾桶在桌侧可取用处。动线：从东侧通行带到桌前通道 ≥0.9 m。\",\n        \"objects\": \"office_desk、office_chair、office_monitor、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_water_cooler、office_book×3、mug×2、bin，加 authored 墙体/地板/天花 composite 与 office_window；小物件（马克杯、书本、笔筒类 bin）置于桌面/柜顶支撑面上，动态质量与摩擦按合成先验声明。\",\n        \"cameras\": \"view_0 全景对角机位（覆盖 ≥12 个对象）、view_1 侧向机位（与 view_0 形成基线，供多视图尺度恢复）、view_2 桌面特写（monitor/mug/books 近景）、view_3 书柜-文件柜侧近景；均为标定相机，水平视角由 focal/aperture 记录于采集回执。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。\",\n        \"variation\": \"与其余两场景变化维度：家具品类组合（办公类）、对象数 16、锚点候选（桌、柜、机位）；对象间距与角度按 15 度以上 yaw 散布以避免轴向捷径。\",\n        \"artifact\": \"scenes/sf_office_work_area.scene_program.json → captures/sf_office_work_area/（实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出）\",\n        \"summary\": \"这是一间供单人日常办公的仿真房间，用于测量模型在办公环境中的距离、尺寸与计数能力。房间 6.0×5.0 米、高 2.8 米，木地板（wood_laminate 纹理）、四片实体墙与吊顶围合成封闭室内，南墙内嵌 3 米模块窗给出一侧天光方向，配合顶部面光使全部家具在实拍中可辨识。办公桌贴北墙居中摆放，桌面上依次放显示器（居中朝椅）与两只马克杯（左侧、前缘），显示器由桌面真实支撑；官方笔记本资产在实拍中呈 1.9cm 薄板不可辨识，已从软设计移除（非用户硬要求）；办公椅在桌前就坐区，正面朝向显示器屏幕并保留腿部空间；屏幕朝向对应办公椅，功能朝向按已校准的原生资产正面和目标位置计算。西墙立书柜（柜格留空以如实反映可验证支撑面），三件书类分别竖放在办公桌左角、桌面前缘与文件柜顶；东墙放文件柜，柜顶居中竖放书组；台灯移至办公桌右端桌面作为读写照明；东南角饮水机靠墙，取其不遮窗；窗前角落放盆栽；桌旁地面放收纳 bin。从东侧通行带到桌前形成连续通路，净宽不小于 0.9 米，柜门开启方向不与椅位冲突。所有大件静态、小件带质量与摩擦先验，沉降后中心由仿真回执提供，作为公开媒体标记与真值的双重来源。\",\n        \"hard_requirements\": [\n          \"室内场景，真实可辨识资产，禁止立方体/几何盒替代家具（scene-library policy.json 删除清单）\",\n          \"目标题量 100 条，本场景承担 train 分区约 34 题\",\n          \"GT 仅来自官方资产测量、SceneProgram authored 几何与 Isaac 仿真采集回执；模型预测不得充当 GT\",\n          \"公开题目不泄露答案；单张无尺度 RGB 不出绝对距离题\"\n        ],\n        \"object_roles\": [\n          {\n            \"object_id\": \"floor_a\",\n            \"role\": \"房间地面，支撑全部家具，world Z=0 起算面\"\n          },\n          {\n            \"object_id\": \"wall_n_a\",\n            \"role\": \"北墙，办公桌贴靠的边界\"\n          },\n          {\n            \"object_id\": \"wall_s_a\",\n            \"role\": \"南墙，内嵌模块窗，界定天光方向\"\n          },\n          {\n            \"object_id\": \"wall_w_a\",\n            \"role\": \"西墙，书柜贴靠\"\n          },\n          {\n            \"object_id\": \"wall_e_a\",\n            \"role\": \"东墙，文件柜贴靠，留出入口通道\"\n          },\n          {\n            \"object_id\": \"ceiling_a\",\n            \"role\": \"吊顶，封闭室内体积\"\n          },\n          {\n            \"object_id\": \"window_s_a\",\n            \"role\": \"南窗，真实窗资产，提供尺度与方向线索\"\n          },\n          {\n            \"object_id\": \"desk_a\",\n            \"role\": \"办公桌主体，北墙居中，桌面高约 0.76 m，承载显示器/书组/两只马克杯\"\n          },\n          {\n            \"object_id\": \"chair_a\",\n            \"role\": \"桌前就坐区的办公椅，正面朝向显示器并留出腿部空间，功能朝向由新采集核对。\"\n          },\n          {\n            \"object_id\": \"monitor_a\",\n            \"role\": \"显示器，桌面居中朝椅\"\n          },\n          {\n            \"object_id\": \"mug_a1\",\n            \"role\": \"马克杯，桌面左侧可取用处\"\n          },\n          {\n            \"object_id\": \"mug_a2\",\n            \"role\": \"马克杯，桌面前缘靠通道侧\"\n          },\n          {\n            \"object_id\": \"bookcase_a\",\n            \"role\": \"书柜，贴西墙，格内放书\"\n          },\n          {\n            \"object_id\": \"books_a1\",\n            \"role\": \"书组，办公桌左角竖放\"\n          },\n          {\n            \"object_id\": \"books_a2\",\n            \"role\": \"书组，文件柜顶竖放居中\"\n          },\n          {\n            \"object_id\": \"books_a3\",\n            \"role\": \"单本书，桌面前缘竖放，验证厚度方向\"\n          },\n          {\n            \"object_id\": \"filecab_a\",\n            \"role\": \"文件柜，靠东墙，柜顶放书组\"\n          },\n          {\n            \"object_id\": \"lamp_a\",\n            \"role\": \"台灯，办公桌右端桌面，读写照明\"\n          },\n          {\n            \"object_id\": \"cooler_a\",\n            \"role\": \"饮水机，东南角不遮窗\"\n          },\n          {\n            \"object_id\": \"plant_a\",\n            \"role\": \"盆栽，窗侧墙角，界定软分区\"\n          },\n          {\n            \"object_id\": \"bin_a\",\n            \"role\": \"收纳 bin，桌旁地面，可取用位置\"\n          }\n        ],\n        \"relations\": [\n          {\n            \"source\": \"desk_a\",\n            \"type\": \"supported_by\",\n            \"target\": \"floor_a\",\n            \"description\": \"四脚落地贴北墙，工作主面\"\n          },\n          {\n            \"source\": \"chair_a\",\n            \"type\": \"facing\",\n            \"target\": \"desk_a\",\n            \"description\": \"在对应桌前就坐，正面朝向显示器并保留腿部净空，由新采集核对可正常使用。\"\n          },\n          {\n            \"source\": \"monitor_a\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_a\",\n            \"description\": \"底座落在桌面，朝向椅位\"\n          },\n          {\n            \"source\": \"mug_a1\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_a\",\n            \"description\": \"动态小件，沉降由仿真回执确认接触\"\n          },\n          {\n            \"source\": \"mug_a2\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_a\",\n            \"description\": \"同上，位置与 mug_a1 拉开便于计数与排序\"\n          },\n          {\n            \"source\": \"books_a3\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_a\",\n            \"description\": \"平放叠置，验证厚度方向\"\n          },\n          {\n            \"source\": \"bookcase_a\",\n            \"type\": \"supported_by\",\n            \"target\": \"floor_a\",\n            \"description\": \"贴西墙落地，柜格真实层板\"\n          },\n          {\n            \"source\": \"books_a1\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_a\",\n            \"description\": \"书组竖放于办公桌左角，由桌面真实支撑\"\n          },\n          {\n            \"source\": \"books_a2\",\n            \"type\": \"supported_by\",\n            \"target\": \"filecab_a\",\n            \"description\": \"书组竖放文件柜顶面中央，比例与柜体协调\"\n          },\n          {\n            \"source\": \"lamp_a\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_a\",\n            \"description\": \"台灯底座落在办公桌右端桌面，高度与显示器齐平\"\n          },\n          {\n            \"source\": \"filecab_a\",\n            \"type\": \"near\",\n            \"target\": \"wall_e_a\",\n            \"description\": \"靠东墙，开门方向避开椅位\"\n          },\n          {\n            \"source\": \"cooler_a\",\n            \"type\": \"near\",\n            \"target\": \"wall_e_a\",\n            \"description\": \"东南角取用点，不遮挡窗\"\n          },\n          {\n            \"source\": \"plant_a\",\n            \"type\": \"supported_by\",\n            \"target\": \"floor_a\",\n            \"description\": \"窗侧墙角，界定动线\"\n          },\n          {\n            \"source\": \"bin_a\",\n            \"type\": \"near\",\n            \"target\": \"desk_a\",\n            \"description\": \"桌旁 0.5 m 地面，取用方便\"\n          },\n          {\n            \"source\": \"window_s_a\",\n            \"type\": \"mounted_to\",\n            \"target\": \"wall_s_a\",\n            \"description\": \"内嵌于南墙开口平面\"\n          }\n        ],\n        \"physical_assumptions\": [\n          \"家具静态件 mass_kg=0（static），其位置即 authored 位姿，碰撞体由原生 USD 几何提供\",\n          \"马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\",\n          \"台灯为办公桌右端桌面静态摆件，底座由桌面支撑；不测倾覆动力学。\",\n          \"墙体/地板/天花为显式 authored 几何，support=ground 仅相对 Z=0 定位，地面由 floor_a 实体提供\"\n        ]\n      },\n      {\n        \"id\": \"design-lounge-meeting\",\n        \"name\": \"起居会客角（sf_lounge_meeting_corner）\",\n        \"purpose\": \"会客/休息类室内布局，测同一批模板在软体家具主导空间下的表现；承担 dev 分区约 33 题。\",\n        \"layout\": \"5.6×4.8×2.8 m 房间；长沙发贴北墙、单人扶手椅两只分列东西两侧均朝向茶几，形成围合谈话区；地毯居中界定活动区，茶几上放两只马克杯与一本合上的书；西墙书柜、东墙边柜（file_cabinet 复用为边柜），台灯在边柜上，盆栽在南窗角，bin 在沙发侧。动线：南侧入口至围合区外缘 ≥1.0 m，椅前留 ≥0.45 m 腿部空间。 盆栽移至地面中心 (1.50,-1.55) m，按整株原生尺寸避开东踢脚线、边柜、柜顶书组和座椅；南侧主要通行线保留。\",\n        \"objects\": \"office_sofa、office_armchair×2、office_coffee_table、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_window、mug×2、office_book×2、bin、rug（织物纹理 composite，厚 1.5 cm）+ 墙体/地板/吊顶。\",\n        \"cameras\": \"view_0 全景（自南向北含围合区）、view_1 低机位斜向（强化近远对象透视差，供 C09 反转配对）、view_2 茶几特写、view_3 沙发-书柜侧向近景。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。\",\n        \"variation\": \"对象数 15；软体家具体量相近，制造更难的尺寸比较；锚点候选为茶几中心与沙发。\",\n        \"artifact\": \"scenes/sf_lounge_meeting_corner.scene_program.json → captures/sf_lounge_meeting_corner/\",\n        \"summary\": \"这是一个供三四人在此交谈、喝茶、取阅书刊的起居会客仿真空间，用于测量模型在软体家具环境中的空间判断。房间 5.6×4.8 米、高 2.8 米，木地板与浅色墙面围合，南墙整幅 3 米模块窗引入天光，与顶面面光共同照亮全场。北墙前放双人布艺长沙发，四脚落地、靠墙留出 5 cm 安装余量；东西两侧各一只单人扶手椅，均正面朝向房间中央的长方形茶几，椅前与茶几之间留约 0.45 米腿部距离，构成可围坐谈话的动线。羊毛质感地毯平铺中央，茶几落在地毯上，台面摆放两只马克杯与一本竖放的书，均由台面支撑并等待沉降验证。西墙立书柜（柜格留空以保证支撑可验证）；东墙边柜上放台灯，灯高约 1.85 米在可及范围；南窗内侧偏东 (1.50,-1.55) 米处放盆栽，整株叶片避开东墙踢脚线、边柜及其书组；沙发侧边地面放收纳 bin。会客座椅正面朝向茶几，沙发正面朝南、背靠北墙；围坐区域外侧保留通行路径，净空由新采集与平面布局核对，不将沙发背后的安装余量作为通道。大件静态，杯书本动态，质量摩擦为合成先验，最终接触与位置以仿真采集回执为准。 会客顶面增设两处面光补足座椅暗部；补光必须真实进入生成程序的灯列表，逐图复核曝光与材质可辨识性。\",\n        \"hard_requirements\": [\n          \"室内场景，真实可辨识资产，禁止几何盒替代家具\",\n          \"承担 dev 分区约 33 题，GT 仅来自官方/程序/仿真\",\n          \"围合朝向与通道净空在实拍中可验证；扶手椅必须正立并面向茶几\",\n          \"公开题目不泄露答案\"\n        ],\n        \"object_roles\": [\n          {\n            \"object_id\": \"floor_b\",\n            \"role\": \"地面，支撑全部家具\"\n          },\n          {\n            \"object_id\": \"wall_n_b\",\n            \"role\": \"北墙，沙发贴靠\"\n          },\n          {\n            \"object_id\": \"wall_s_b\",\n            \"role\": \"南墙，整幅窗\"\n          },\n          {\n            \"object_id\": \"wall_w_b\",\n            \"role\": \"西墙，书柜贴靠\"\n          },\n          {\n            \"object_id\": \"wall_e_b\",\n            \"role\": \"东墙，边柜贴靠\"\n          },\n          {\n            \"object_id\": \"ceiling_b\",\n            \"role\": \"吊顶，封闭室内体积\"\n          },\n          {\n            \"object_id\": \"window_s_b\",\n            \"role\": \"南窗，主采光与尺度线索\"\n          },\n          {\n            \"object_id\": \"sofa_b\",\n            \"role\": \"双人沙发，北墙居中，主要坐具\"\n          },\n          {\n            \"object_id\": \"armchair_b1\",\n            \"role\": \"扶手椅，西侧面向茶几\"\n          },\n          {\n            \"object_id\": \"armchair_b2\",\n            \"role\": \"扶手椅，东侧面向茶几，与 b1 成镜像围合\"\n          },\n          {\n            \"object_id\": \"coffee_table_b\",\n            \"role\": \"茶几，围合中心，台面承载杯与书\"\n          },\n          {\n            \"object_id\": \"rug_b\",\n            \"role\": \"地毯，界定谈话活动区，1.5 cm 薄片真实厚度\"\n          },\n          {\n            \"object_id\": \"mug_b1\",\n            \"role\": \"马克杯，茶几台面\"\n          },\n          {\n            \"object_id\": \"mug_b2\",\n            \"role\": \"马克杯，茶几台面另一侧\"\n          },\n          {\n            \"object_id\": \"book_b1\",\n            \"role\": \"书，茶几台面竖放\"\n          },\n          {\n            \"object_id\": \"bookcase_b\",\n            \"role\": \"书柜，贴西墙\"\n          },\n          {\n            \"object_id\": \"book_b2\",\n            \"role\": \"书组，边柜台面竖放于台灯旁\"\n          },\n          {\n            \"object_id\": \"sidecab_b\",\n            \"role\": \"边柜（文件柜资产），东墙，柜顶放灯\"\n          },\n          {\n            \"object_id\": \"lamp_b\",\n            \"role\": \"台灯，边柜顶，会客照明\"\n          },\n          {\n            \"object_id\": \"plant_b\",\n            \"role\": \"盆栽，南窗角\"\n          },\n          {\n            \"object_id\": \"bin_b\",\n            \"role\": \"收纳 bin，沙发侧地面\"\n          }\n        ],\n        \"relations\": [\n          {\n            \"source\": \"sofa_b\",\n            \"type\": \"near\",\n            \"target\": \"wall_n_b\",\n            \"description\": \"贴北墙留 5 cm 余量，正面朝南\"\n          },\n          {\n            \"source\": \"armchair_b1\",\n            \"type\": \"facing\",\n            \"target\": \"coffee_table_b\",\n            \"description\": \"自西面向茶几，椅前留 0.45 m 腿部空间\"\n          },\n          {\n            \"source\": \"armchair_b2\",\n            \"type\": \"facing\",\n            \"target\": \"coffee_table_b\",\n            \"description\": \"自东面向茶几，与 b1 围合\"\n          },\n          {\n            \"source\": \"coffee_table_b\",\n            \"type\": \"supported_by\",\n            \"target\": \"rug_b\",\n            \"description\": \"四角落在地毯平面，地毯 1.5 cm 抬升由沉降回执确认\"\n          },\n          {\n            \"source\": \"mug_b1\",\n            \"type\": \"supported_by\",\n            \"target\": \"coffee_table_b\",\n            \"description\": \"台面动态件，沉降后接触\"\n          },\n          {\n            \"source\": \"mug_b2\",\n            \"type\": \"supported_by\",\n            \"target\": \"coffee_table_b\",\n            \"description\": \"台面另一侧，间距明确\"\n          },\n          {\n            \"source\": \"book_b1\",\n            \"type\": \"supported_by\",\n            \"target\": \"coffee_table_b\",\n            \"description\": \"单本书竖放茶几台面，由台面支撑\"\n          },\n          {\n            \"source\": \"book_b2\",\n            \"type\": \"supported_by\",\n            \"target\": \"sidecab_b\",\n            \"description\": \"书组竖放边柜顶面，与台灯相邻由柜顶支撑\"\n          },\n          {\n            \"source\": \"lamp_b\",\n            \"type\": \"supported_by\",\n            \"target\": \"sidecab_b\",\n            \"description\": \"柜顶放置，位置与朝向符合声明的使用功能\"\n          },\n          {\n            \"source\": \"sidecab_b\",\n            \"type\": \"near\",\n            \"target\": \"wall_e_b\",\n            \"description\": \"贴东墙，抽屉开启方向避开通道\"\n          },\n          {\n            \"source\": \"bookcase_b\",\n            \"type\": \"near\",\n            \"target\": \"wall_w_b\",\n            \"description\": \"贴西墙落地，位置与朝向符合声明的使用功能\"\n          },\n          {\n            \"source\": \"rug_b\",\n            \"type\": \"supported_by\",\n            \"target\": \"floor_b\",\n            \"description\": \"平铺地面，位置与朝向符合声明的使用功能\"\n          },\n          {\n            \"source\": \"plant_b\",\n            \"type\": \"near\",\n            \"target\": \"window_s_b\",\n            \"description\": \"南窗内侧偏东落地，整株与东踢脚线、边柜和柜顶书组分离；不阻南侧主要动线。\"\n          },\n          {\n            \"source\": \"bin_b\",\n            \"type\": \"near\",\n            \"target\": \"sofa_b\",\n            \"description\": \"沙发扶手侧，取用方便\"\n          },\n          {\n            \"source\": \"window_s_b\",\n            \"type\": \"mounted_to\",\n            \"target\": \"wall_s_b\",\n            \"description\": \"内嵌南墙，位置与朝向符合声明的使用功能\"\n          }\n        ],\n        \"physical_assumptions\": [\n          \"沙发/扶手椅/茶几/柜类静态（原生 USD 碰撞体，mass_kg=0）\",\n          \"马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\",\n          \"地毯为静态薄板，声明真实厚度 1.5 cm，不声称织物形变\",\n          \"光照为渲染先验，按新采集的物体可辨识性调整；不声明实测照度或光学标定。\"\n        ]\n      },\n      {\n        \"id\": \"design-study-pantry\",\n        \"name\": \"阅览茶水角（sf_study_pantry_corner）\",\n        \"purpose\": \"学习+茶水混合功能区，提供第三组对象间距分布；承担 test 分区约 33 题（sealed 留待后续冻结）。\",\n        \"layout\": \"5.4×4.6×2.8米房间；两张办公桌沿北墙并排，间隔30厘米，各配转椅面向对应工作目标。东墙两组书柜开口朝室内；西墙文件柜作为收纳柜，柜顶只放一个收纳盒，饮水机在柜体北侧约0.9米处。两只马克杯和两组书分别放在两桌上，台灯放左桌右前区域。南窗下阅读椅面朝房内，盆栽在其东侧1.2米中心距离处。侧方与中央安排通行，东侧连续净宽至少0.75米；不把阅读椅背后的安装间隙作为通道。\",\n        \"objects\": \"office_desk×2、office_chair×2、office_bookcase×2、office_monitor×1、office_file_cabinet、office_water_cooler、office_lamp、office_plant、office_window、office_armchair（窗边阅读椅）、mug×2、bin×1、office_books×2。\",\n        \"cameras\": \"view_0 全景、view_1 对角高机位、view_2 茶水角近景、view_3 书柜墙面近景。 同次原生采集增加 view_4–view_7 侧向及上方视角，暴露需要测量的物体表面；每机位读取其真实 RenderProduct 完整光学与读出参数、K、米制光轴深度和实例掩码，保留原 view_0–view_3。仅在公开输入能重建目标量且达到评分容差时准入。\",\n        \"variation\": \"对象数 18（最多），双桌双椅同型号对象测试身份去重与计数；柜顶平放书与竖放书混布测厚度/长度维度混淆。\",\n        \"artifact\": \"scenes/sf_study_pantry_corner.scene_program.json → captures/sf_study_pantry_corner/\",\n        \"summary\": \"这是一间兼具办公、阅览与饮水功能的小型仿真房间，服务两到三人，并为评测提供同型号多实例的计数与身份去重条件。房间5.4×4.6米、高2.8米，木地板与浅色墙，南墙嵌3米模块窗。北墙并排两张办公桌，中间留30厘米缝，每桌配一把转椅并留出腿部空间；左桌转椅面向对应显示器，显示器屏幕面向左桌转椅，右桌转椅面向右桌工作区，朝向按已校准的原生资产正面计算。总共只有两只马克杯，各放在一张桌面的可取用处；两组书也分别放在两桌的左侧，右桌已有书和杯，不以单个视角的遮挡认定为空。台灯放在左桌右前区域，由桌面支撑，与显示器及书组错开。东墙相邻两组书柜，开口朝室内，柜格留空以保证支撑可验证。西墙文件柜用于日常收纳，柜顶只放一个收纳盒，柜顶作为收纳平面，不作为食品操作台；饮水机在柜体北侧约0.9米处贴墙。窗下偏西放一只阅读扶手椅，背部朝南窗、正面朝房内，后方留约0.3米安装余量，通行安排在侧方及房间中央。盆栽移至阅读椅东侧，两者中心相距1.2米，东侧连续通道净宽至少0.75米，并由最终采集检查。大件静态，杯、书和收纳盒带合成质量与摩擦，最终接触、姿态和中心以新仿真沉降回执为准；公开媒体标记与真值同源。\",\n        \"hard_requirements\": [\n          \"室内场景，真实可辨识资产，禁止几何盒替代家具\",\n          \"承担 test 分区约 33 题；同场景题目同分区，禁止跨分区泄漏\",\n          \"GT 仅来自官方/程序/仿真；双桌双椅同型号必须可按持久 ID 区分\",\n          \"公开题目不泄露答案\"\n        ],\n        \"object_roles\": [\n          {\n            \"object_id\": \"floor_c\",\n            \"role\": \"地面，支撑全部家具并作为高度起算面\"\n          },\n          {\n            \"object_id\": \"wall_n_c\",\n            \"role\": \"北墙，双桌贴靠\"\n          },\n          {\n            \"object_id\": \"wall_s_c\",\n            \"role\": \"南墙，窗与阅读椅\"\n          },\n          {\n            \"object_id\": \"wall_w_c\",\n            \"role\": \"西墙，茶水角\"\n          },\n          {\n            \"object_id\": \"wall_e_c\",\n            \"role\": \"东墙，双书柜\"\n          },\n          {\n            \"object_id\": \"ceiling_c\",\n            \"role\": \"吊顶，封闭室内体积\"\n          },\n          {\n            \"object_id\": \"window_s_c\",\n            \"role\": \"南窗，提供采光与尺度线索\"\n          },\n          {\n            \"object_id\": \"desk_c1\",\n            \"role\": \"办公桌1，北墙西侧，配显示器\"\n          },\n          {\n            \"object_id\": \"desk_c2\",\n            \"role\": \"办公桌2，北墙东侧，配马克杯与书组，与 c1 间隔 30 cm\"\n          },\n          {\n            \"object_id\": \"chair_c1\",\n            \"role\": \"转椅1，正对 desk_c1\"\n          },\n          {\n            \"object_id\": \"chair_c2\",\n            \"role\": \"转椅2，正对 desk_c2\"\n          },\n          {\n            \"object_id\": \"monitor_c\",\n            \"role\": \"显示器，desk_c1 桌面\"\n          },\n          {\n            \"object_id\": \"mug_c1\",\n            \"role\": \"马克杯，desk_c1 桌面\"\n          },\n          {\n            \"object_id\": \"mug_c2\",\n            \"role\": \"马克杯，desk_c2 桌面\"\n          },\n          {\n            \"object_id\": \"bookcase_c1\",\n            \"role\": \"书柜1，东墙南侧\"\n          },\n          {\n            \"object_id\": \"bookcase_c2\",\n            \"role\": \"书柜2，东墙北侧，与 c1 相邻\"\n          },\n          {\n            \"object_id\": \"books_c1\",\n            \"role\": \"书组，desk_c1 桌面左角竖放\"\n          },\n          {\n            \"object_id\": \"books_c2\",\n            \"role\": \"书组，办公桌2桌面左角竖放\"\n          },\n          {\n            \"object_id\": \"sidecab_c\",\n            \"role\": \"西墙文件收纳柜，柜顶只放一个收纳盒，按日常收纳用途使用。\"\n          },\n          {\n            \"object_id\": \"bin_c\",\n            \"role\": \"bin，边柜台面\"\n          },\n          {\n            \"object_id\": \"cooler_c\",\n            \"role\": \"饮水机，西墙边柜北侧 0.8 m\"\n          },\n          {\n            \"object_id\": \"lamp_c\",\n            \"role\": \"台灯，办公桌1桌面右前角，阅读照明\"\n          },\n          {\n            \"object_id\": \"plant_c\",\n            \"role\": \"窗侧盆栽，位于阅读椅东侧，两者中心相距1.2米，保留东侧连续通道。\"\n          },\n          {\n            \"object_id\": \"armchair_c\",\n            \"role\": \"单人阅读椅，窗下面朝房内\"\n          }\n        ],\n        \"relations\": [\n          {\n            \"source\": \"desk_c1\",\n            \"type\": \"near\",\n            \"target\": \"wall_n_c\",\n            \"description\": \"贴北墙，桌面工作区\"\n          },\n          {\n            \"source\": \"desk_c2\",\n            \"type\": \"near\",\n            \"target\": \"wall_n_c\",\n            \"description\": \"贴北墙与 c1 间隔 30 cm\"\n          },\n          {\n            \"source\": \"chair_c1\",\n            \"type\": \"facing\",\n            \"target\": \"desk_c1\",\n            \"description\": \"正对桌面留腿部空间\"\n          },\n          {\n            \"source\": \"chair_c2\",\n            \"type\": \"facing\",\n            \"target\": \"desk_c2\",\n            \"description\": \"正对桌面，位置与朝向符合声明的使用功能\"\n          },\n          {\n            \"source\": \"monitor_c\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_c1\",\n            \"description\": \"底座由左桌支撑，屏幕正面面向左桌转椅，采用已校准的原生资产正面计算朝向。\"\n          },\n          {\n            \"source\": \"mug_c1\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_c1\",\n            \"description\": \"动态件，台面沉降\"\n          },\n          {\n            \"source\": \"mug_c2\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_c2\",\n            \"description\": \"动态件，台面沉降\"\n          },\n          {\n            \"source\": \"books_c1\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_c1\",\n            \"description\": \"书组竖放办公桌1左角，由桌面真实支撑\"\n          },\n          {\n            \"source\": \"books_c2\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_c2\",\n            \"description\": \"书组竖放办公桌2桌面左角，由桌面真实支撑，与办公桌1桌面书组构成同型号双桌区分\"\n          },\n          {\n            \"source\": \"sidecab_c\",\n            \"type\": \"near\",\n            \"target\": \"wall_w_c\",\n            \"description\": \"文件柜作为西墙日常收纳柜，柜顶放收纳盒，不作为食品操作台。\"\n          },\n          {\n            \"source\": \"bin_c\",\n            \"type\": \"supported_by\",\n            \"target\": \"sidecab_c\",\n            \"description\": \"台面放置，位置与朝向符合声明的使用功能\"\n          },\n          {\n            \"source\": \"cooler_c\",\n            \"type\": \"near\",\n            \"target\": \"sidecab_c\",\n            \"description\": \"文件收纳柜北侧约0.9米的贴墙取水点。\"\n          },\n          {\n            \"source\": \"armchair_c\",\n            \"type\": \"near\",\n            \"target\": \"window_s_c\",\n            \"description\": \"窗下阅读位，背部朝南窗、正面朝房内，背后留约0.3米安装余量，通行在侧方。\"\n          },\n          {\n            \"source\": \"lamp_c\",\n            \"type\": \"supported_by\",\n            \"target\": \"desk_c1\",\n            \"description\": \"台灯底座落在办公桌1桌面右前角，与左角显示器、书组错开，提供有效桌面照明\"\n          },\n          {\n            \"source\": \"plant_c\",\n            \"type\": \"supported_by\",\n            \"target\": \"floor_c\",\n            \"description\": \"窗侧地面，界定软分区\"\n          },\n          {\n            \"source\": \"window_s_c\",\n            \"type\": \"mounted_to\",\n            \"target\": \"wall_s_c\",\n            \"description\": \"内嵌南墙，位置与朝向符合声明的使用功能\"\n          }\n        ],\n        \"physical_assumptions\": [\n          \"桌/椅/柜/窗静态（原生 USD 碰撞体）；双桌双椅同型号但世界坐标与 ID 持久可分\",\n          \"马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。\",\n          \"台灯为左桌右前区域的静态摆件，底座由办公桌1桌面支撑；不测倾覆。\",\n          \"窗资产透明度用 native_opacity_multiplier 先验调节，不声称光学实测透射率\"\n        ]\n      }\n    ],\n    \"reuse_constraints\": \"禁止复用 selected_scenes 之外的任何历史场景、其采集目录与派生数据集（含 policy.json 删除清单及 operations/fr-eval100 等旧产物）；历史产物仅可作为接口格式参考，不进入本次 GT、媒体或统计。新场景验收后登记 scene-library/catalog.json（记录 task_id、revision、程序路径、验收回执）。\",\n    \"preview_policy\": \"每个 SceneProgram 先经 spatialforge_preview 检查支撑链与包围盒冲突，修复后再进入 spatialforge_capture 采集；采集后逐图检查真实图像与原生回执，scene_admission.json 与 scene_acceptance.json 双通过方可进入 S3；最多两次自动修复，仍失败则停在本阶段并如实报告缺口。\"\n  },\n  \"annotations\": {\n    \"authority_source\": \"三层权威：(1) 官方资产测量——Isaac 资产库 USD 几何界（native_assets 登记的 size 米制包围盒）；(2) SceneProgram authored 参数——墙/地/点标记物与自定义 composite 的精确尺寸与位姿；(3) Isaac 仿真采集回执——capture/evidence.json 中每实体 settled_center、world_transform 与相机标定矩阵。模型预测（SAM3/DA3/FLUX 等）不进入标注链路，本数据集不使用任何模型输出作 GT。\",\n    \"fields\": \"每实体一条标注记录：scene_id、object_id、label（公开称呼）、kind、dynamic、size_xyz_m（官方/authored 尺寸）、authored_center_m 与 settled_center_m（世界系，Z-up，米）、yaw_deg、longest_local_extent_cm、world_aabb、top_z_m、support_chain、碰撞回执摘要；每机位一条：camera_id、image 路径、resolution、focal_length_mm、aperture_mm、view 矩阵（采集回执原值）、投影内参 K；每题一条 item：item_id、template_id、task_id、protocol_id、parameters、media 哈希、answer、tolerance_config、seed、split、scene_group_id、provenance（程序与回执路径）、question_spec。\",\n    \"derivation\": \"中心距离=L2(settled_center_A, settled_center_B)；表面最短间距=authored AABB 三维间隙 max(0, per-axis gap 组合)（对同支撑面横向对取水平间隙），接触对与穿透对直接剔除；相机距离=‖K⁻¹ 反投影与相机-世界变换求解的 settled_center 在相机系范数｜到中心欧氏距离｜与 z 分量（分别对应 C03/C05）；最长边=官方 max(size_xyz) 换算厘米（复合件取 authored 局部包围盒）；计数=按谓词对全集实体 ID 集合求基数。所有数值先由生成脚本按冻结公式推导并与 evidence.json 交叉核对，偏差 >2cm 的对象以回执 settled_center 为准并记录差异。 C01-T02 采用原生三角网格最近表面点与三维距离，接触为零并剔除穿透；按原计划剔除非横向主导的实体对，不增加最近点必须同高的额外门槛。公开最近点标记与同源真实 K/深度一致，不能用 AABB 间距代替真值。\",\n    \"alignment\": \"公开媒体=真实采集 PNG 上叠加程序投影标注：对象绿色框取 evidence 中碰撞体 AABB 八角点投影凸包，ID 文字标签置于框上方；C01-T03 的标记点 P 以程序投影绘制十字+标签；坐标原点/像素系与 view 矩阵同源同帧。逐题核对『题目所指对象名-媒体标注-parameters 绑定』三者一致，对象称呼只用注册资产标签（如『办公桌』『书柜』），禁止凭空命名。\",\n    \"validation\": \"自动校验：GT 复算一致（两次独立实现比对）、媒体文件存在且为 PNG、每题 answer 不出现在 stem/context/options 文本中、C04 相邻名次差>0.12m、C05 |Δz| 落在标注标签内、C11 边界距离与半径差>0.15m；人工抽检：每模板至少 1 题由人对照实拍图确认可回答性，结果记录在 qc/spot_check.md。\"\n  },\n  \"questions\": {\n    \"public_observations\": \"公开材料=同一场景的 2–4 张真实采集视图（含全景与相关近景），对象以颜色框+持久编号标记；题目条件声明：米制单位、距离/深度的坐标系定义、C01-T03 的标记点在图中给出、C11 的计数谓词与边界规则、C05 的相同判定容差。绝对距离类题目一律至少两张不同基线视图或一张含已知尺寸家具与地面标定的视图（满足『标定多视图/可恢复尺度』准入）。不公开相机位姿数值、不公开任何坐标表。\",\n    \"answerability\": \"每题的可答性来自三要素闭环：(1) 目标对象在公开媒体中有清晰框与编号；(2) 尺度由多视差或已知家具尺寸线索恢复（协议允许的计算版将相机标定作为 provided_information 记录）；(3) 判定规则全部写进题目条件。生成时对每题验证目标在两视图中的投影未被完全遮挡。\",\n    \"output_contract\": \"数值题：{\\\"value\\\": number, \\\"unit\\\": \\\"m|cm\\\"}；选择题/标签题：候选 ID 或标签字符串；排序题：ID 数组；分组题不适用（未选 C04-T03）；整数题：非负整数。缺答/格式错误保留原答记 0 分并单列。\",\n    \"difficulty_design\": \"距离跨度 0.3–4.5 m、尺寸 18–222 cm、C09 特意混入『近处小物 vs 远处大物』反转对、C04 排序含 0.12–0.35 m 名次间隔、C11 半径档位含锚点周围密集与稀疏两种分布。同模板 10 题按 4(train)/3(dev)/3(test) 场景分布，避免单场景模板内集中。\",\n    \"anti_shortcut_checks\": \"检查项：候选顺序随机化（正确答案位置均匀）；『更大/更近』标签两向平衡；像素面积与真实尺寸冲突对占比≥40%（C09）；中心距与表面距答案不同源（防止互相泄漏）；题干与媒体文件名不含数值答案或坐标；同场景内 C01-T01 与 C04 复用配对时答案独立推导；禁止把隐藏 GT 字段（相机位姿表、坐标）当公开条件。\",\n    \"example\": \"示例（不含真实答案，字段为 question_spec 结构）：stem=『观察图1、图2（同一办公室两个机位实拍，绿框与编号标识对象），估计「办公桌」(03) 与「书柜」(11) 几何中心之间的直线距离，单位米。』context=『两张图来自同一标定相机的不同机位；图中编号仅标识对象身份。』conditions=『答案为中心到中心的三维欧氏距离，单位米，保留一位小数；不要按像素距离折算。』options=[] response=『提交一个数值并带单位 m。』media_labels=『图1：办公室全景机位实拍（含对象编号框）』『图2：侧向机位实拍（含对象编号框）』；parameter_bindings 与该题源 parameters 完全一致。\"\n  },\n  \"dataset\": {\n    \"target_items\": 100,\n    \"split_policy\": \"按场景分组划分：design-office-work→train 34 题，design-lounge-meeting→dev 33 题，design-study-pantry→test 33 题；同场景全部题目（含改写与配对样本）同分区，跨分区场景零重叠；sealed 暂不启用（留待正式模型评测前冻结）。\",\n    \"seed\": 20261105,\n    \"grouping\": \"scene_group_id=scene-v1:<scene_id>；题目配对（同对象对不同模板）共享底层几何但分区由场景决定；每模板内按场景 4/3/3 均衡取样。\",\n    \"deduplication\": \"同一 (template_id, 对象集合) 组合全数据集唯一；中心距离与表面间距同对象对允许共存（不同测量定义）；改写题不生成（模板即协议，不做自然变体冒充新题）。\",\n    \"balance\": \"模板 10×10 严格均分（余数 0）；场景×模板 4/3/3；数值答案跨度分位对齐（距离 0.3–4.5m 均匀分桶）；选择题正确选项位置均匀；C09 反转对≥4 题。缺口如实记录：若某模板因剔除规则凑不满 10 题，报告实产与原因，不跨模板挪用配额。\"\n  },\n  \"scoring\": {\n    \"metrics\": [\n      {\n        \"template_id\": \"C01-T01\",\n        \"metric\": \"MAE + 容差内正确率\",\n        \"unit\": \"m\",\n        \"tolerance\": \"tau=max(0.02, 0.05*|gt|)；近零(|gt|<0.1m)只看绝对误差\",\n        \"aggregation\": \"模板内均值；总览不跨模板平均物理量\"\n      },\n      {\n        \"template_id\": \"C01-T02\",\n        \"metric\": \"MAE + 容差内正确率\",\n        \"unit\": \"m\",\n        \"tolerance\": \"tau=max(0.02, 0.05*|gt|)，接触 0 值样本按绝对误差\",\n        \"aggregation\": \"模板内均值\"\n      },\n      {\n        \"template_id\": \"C01-T03\",\n        \"metric\": \"MAE + 容差内正确率\",\n        \"unit\": \"m\",\n        \"tolerance\": \"tau=max(0.02, 0.05*|gt|)\",\n        \"aggregation\": \"模板内均值\"\n      },\n      {\n        \"template_id\": \"C03-T01\",\n        \"metric\": \"MAE + 容差内正确率（中心欧氏距离定义）\",\n        \"unit\": \"m\",\n        \"tolerance\": \"tau=max(0.02, 0.05*|gt|)\",\n        \"aggregation\": \"模板内均值；离轴角分桶另列\"\n      },\n      {\n        \"template_id\": \"C04-T01\",\n        \"metric\": \"最近对象准确率\",\n        \"unit\": \"%\",\n        \"tolerance\": \"唯一最近且与第二名差>0.15m（题面不公布）\",\n        \"aggregation\": \"准确率；混淆报告错选对象的距离名次\"\n      },\n      {\n        \"template_id\": \"C04-T02\",\n        \"metric\": \"完全排序正确率 + 平均 Kendall tau-b\",\n        \"unit\": \"比例\",\n        \"tolerance\": \"严格全序，缺项/重复项判该题 0\",\n        \"aggregation\": \"两指标分别均值\"\n      },\n      {\n        \"template_id\": \"C05-T01\",\n        \"metric\": \"三分类准确率（更小/更大/相同）\",\n        \"unit\": \"%\",\n        \"tolerance\": \"标签由 |Δz|≤0.1m 判相同（题目条件公开该规则）\",\n        \"aggregation\": \"准确率；『相同』类单独报告\"\n      },\n      {\n        \"template_id\": \"C07-T02\",\n        \"metric\": \"MAE + 容差内正确率\",\n        \"unit\": \"cm\",\n        \"tolerance\": \"tau=max(1cm, 0.05*|gt|)\",\n        \"aggregation\": \"模板内均值，按尺寸分桶\"\n      },\n      {\n        \"template_id\": \"C09-T01\",\n        \"metric\": \"比较准确率\",\n        \"unit\": \"%\",\n        \"tolerance\": \"两对象最长边差≥8%（生成时保证）\",\n        \"aggregation\": \"总体+『像素/真实反转』切片\"\n      },\n      {\n        \"template_id\": \"C11-T01\",\n        \"metric\": \"整数精确率 + 计数误差分布\",\n        \"unit\": \"个\",\n        \"tolerance\": \"精确匹配\",\n        \"aggregation\": \"模板内准确率，误差直方图\"\n      }\n    ],\n    \"missing_response\": \"缺失/拒答/格式错误：保留原始输出，该题记 0，错误类型单列不计入能力均值之外的诊断表。\",\n    \"baselines\": \"设计三条对照（本次不执行模型评测，仅随数据集交付评分器与基线定义）：随机基线（选择题按候选数、数值题按 GT±tau 均匀采样、排序按随机置换）、中心先验基线（一律答场景中心距离中位数）、深度图像素基线（以单视图像素尺寸估距，验证反捷径设计）。\",\n    \"model_evaluation\": \"本会话只生产数据集与质检，不调用任何未授权目标模型评测接口；scoring 由交付的 verifier 在评测时执行。\"\n  },\n  \"quality_gates\": [\n    {\n      \"id\": \"QG-ADMISSION\",\n      \"check\": \"每个场景 captures/<scene>/scene_admission.json 存在且 enforced 通过（程序提交先于采集，政策来源绑定本计划路径）\",\n      \"threshold\": \"admission 无 error；provenance.sources 指向本保存计划\",\n      \"evidence\": \"captures/<scene>/scene_admission.json + 正式计划路径及版本绑定\",\n      \"on_failure\": \"按具体准入问题修正程序后重新preview与capture；重复执行故障先修执行层，保留已有文件，不因固定次数重复请示。\"\n    },\n    {\n      \"id\": \"QG-ACCEPTANCE\",\n      \"check\": \"scene_acceptance.json passed=true 且含逐图生活审查（物体身份/尺度/支撑/功能布局/通行净空/材质照明 六项，每项引用真实视图）与原生碰撞沉降回执\",\n      \"threshold\": \"passed=true，无未处置high问题；每轮修订对应具体缺陷，并保留新的实际采集与验收回执。\",\n      \"evidence\": \"captures/<scene>/scene_acceptance.json、review trace、view_*.png 实拍\",\n      \"on_failure\": \"读取实际issues定点修正程序并重新采集，核对支撑、功能朝向、生活用途与通行；结合相关机位和执行证据处理视觉误判，保留真实缺陷，不用旧通过记录代替新验收。\"\n    },\n    {\n      \"id\": \"QG-GT-PROVENANCE\",\n      \"check\": \"每题 item 的 answer 可由程序从 evidence.json/authored 几何独立复算一致；标注记录中不出现模型预测字段\",\n      \"threshold\": \"复算一致率 100%，双实现偏差≤1e-6\",\n      \"evidence\": \"annotations/ 复算日志 + items 源 JSON\",\n      \"on_failure\": \"剔除该题并记缺口，修 oracle 后重新推导\"\n    },\n    {\n      \"id\": \"QG-COVERAGE\",\n      \"check\": \"实产题量：模板×10、场景×(34,33,33)、split 无同场景跨区\",\n      \"threshold\": \"目标 100；缺口需逐模板列出原因\",\n      \"evidence\": \"dataset/report 精确每模板计数 + qc/coverage.csv\",\n      \"on_failure\": \"如剔除致缺口：如实报告实产（不得跨模板凑数），在 S5 报告写明数量与原因\"\n    },\n    {\n      \"id\": \"QG-NOLEAK\",\n      \"check\": \"答案值/坐标/内部ID不出现于 stem、context、conditions、选项文案与媒体文件名；『相同/等距』标签不含隐藏阈值之外的提示\",\n      \"threshold\": \"自动扫描命中 0；人工抽检 10 题 0 泄露\",\n      \"evidence\": \"qc/leak_scan.json + qc/spot_check.md\",\n      \"on_failure\": \"重写题目措辞并复检，未通过不得导出\"\n    },\n    {\n      \"id\": \"QG-MEDIA\",\n      \"check\": \"每题引用的 PNG 存在、可解码、分辨率≥800×600，且叠加标记与原采集画布对齐（投影框落在对象上）\",\n      \"threshold\": \"100% 有效；对齐抽检误差≤8px\",\n      \"evidence\": \"qc/media_check.json + 每模板代表题标注图\",\n      \"on_failure\": \"重新渲染该媒体或剔除该题\"\n    },\n    {\n      \"id\": \"QG-ANSWERABILITY\",\n      \"check\": \"每模板至少 1 题人工对照公开实拍确认可仅凭公开信息作答（无隐藏 GT 当条件）\",\n      \"threshold\": \"10/10 模板通过\",\n      \"evidence\": \"qc/spot_check.md（逐模板引用真实媒体路径）\",\n      \"on_failure\": \"该模板题目全部重做信息设计；模型 API 不代替人工看图\"\n    },\n    {\n      \"id\": \"QG-SPLIT\",\n      \"check\": \"scene_group_id 与 split 一一对应；派生文件无跨区副本\",\n      \"threshold\": \"违规 0\",\n      \"evidence\": \"qc/split_check.json\",\n      \"on_failure\": \"强制移组或剔除\"\n    }\n  ],\n  \"execution\": [\n    {\n      \"stage\": \"S1\",\n      \"action\": \"读取场景选择与 267 模板合同，拆解 10 模板×10 题分配与三场景设计，撰写本评估文档并保存计划、绑定 scene_selection 输入，打开审阅窗口等待 5 分钟\",\n      \"inputs\": \"scene-library/selections/session-13742859....json、pipeline_catalog 模板与协议、scene-library/policy.json\",\n      \"outputs\": \"已保存的 pipeline 计划（operations/<...>/plan.json 路径回执）+ 本 assessment\",\n      \"completion_condition\": \"计划落盘且 stage_review S1 获认可或到期无新指令；不在此阶段声称任何采集/题量已完成\"\n    },\n    {\n      \"stage\": \"S2\",\n      \"action\": \"依据三个场景完整摘要编写并登记SceneProgram，使用已校准的原生资产正面计算功能朝向；preview校验真实资产、支撑与碰撞，再提交Isaac原生capture，逐图生活审查并结合原生回执核对。未通过时针对具体缺陷定点修订并重新采集；按已有授权持续修复，不因固定次数重复请示，不重复无实质变更的采集。三场景实际验收完成后仅开一次五分钟用户窗口。\",\n      \"inputs\": \"S1 计划的 scenes.designs 与 scene_brief；已保存计划路径作 provenance 绑定\",\n      \"outputs\": \"captures/<scene>/ 实拍 view_*.png、evidence.json、scene_admission.json、scene_acceptance.json、USD 导出；场景库登记记录\",\n      \"completion_condition\": \"3 个场景 scene_acceptance.passed=true 且证据路径落盘；未通过场景如实记缺口，题目配额向通过场景再分配（不跨模板挪用）\"\n    },\n    {\n      \"stage\": \"S3\",\n      \"action\": \"从采集回执提取实体 settled_center/world_transform/相机标定与官方尺寸，生成 annotations 表（对象+相机+几何）；双实现复算 GT；渲染带编号框与点标记的公开标注媒体\",\n      \"inputs\": \"captures/<scene>/evidence.json、SceneProgram、native_assets 尺寸登记\",\n      \"outputs\": \"annotations/（objects/cameras/geometry jsonl）、annotations/recompute_log.json、public media 标注 PNG 目录\",\n      \"completion_condition\": \"每验收场景 ≥12 个对象全量标注、复算一致率 100%、媒体对齐抽检通过\"\n    },\n    {\n      \"stage\": \"S4\",\n      \"action\": \"逐题按模板协议生成 items 源 JSON（含 answer/admission/parameters）、写 evidence JSONL（question_spec 全字段+parameter_bindings 与 parameters 一致），执行 pipeline 计划 questions 步骤（templates.produce 协议绑定）与 package 步骤\",\n      \"inputs\": \"S3 标注与媒体、10 模板合同、dataset 分配表、seed=20261105\",\n      \"outputs\": \"items/ 源 JSON×100、evidence/evidence.jsonl、questions.csv、pipeline run 的 dataset 与 package 回执\",\n      \"completion_condition\": \"templates.produce 与 data.package 步骤状态 completed，逐模板计数落盘；缺口如实入报\"\n    },\n    {\n      \"stage\": \"S5\",\n      \"action\": \"执行 QG-* 全部质量门（脚本+逐模板人工看代表题）、生成覆盖/泄漏/分区/媒体检查报告与最终交付报告，打开 S5 审阅窗口\",\n      \"inputs\": \"package 产物、qc 检查脚本、抽检清单\",\n      \"outputs\": \"qc/*.json|md、report.md 最终交付报告（含实产统计、缺口、验收证据路径）\",\n      \"completion_condition\": \"QG-GT-PROVENANCE/QG-NOLEAK/QG-MEDIA/QG-SPLIT 全绿，QG-COVERAGE 报告实产 vs 100；交付声明仅基于已落盘证据\"\n    }\n  ],\n  \"delivery\": {\n    \"artifacts\": [\n      {\n        \"stage\": \"S1\",\n        \"path\": \"bench-office100/plan/sections/（本 assessment 分节 JSON）+ pipeline_plan 返回计划路径\",\n        \"format\": \"json\",\n        \"contents\": \"完整评估文档、模板分配、场景 brief\"\n      },\n      {\n        \"stage\": \"S2\",\n        \"path\": \"bench-office100/captures/<scene>/view_*.png + scene_acceptance.json\",\n        \"format\": \"png+json\",\n        \"contents\": \"真实采集图、原生物理回执、六项逐图生活审查结论；审阅窗口直接展示实拍图\"\n      },\n      {\n        \"stage\": \"S3\",\n        \"path\": \"bench-office100/annotations/objects.jsonl + cameras.jsonl + recompute_log.json\",\n        \"format\": \"jsonl+json\",\n        \"contents\": \"全对象几何标注、相机标定、双实现 GT 复算一致记录\"\n      },\n      {\n        \"stage\": \"S4\",\n        \"path\": \"bench-office100/questions.csv + evidence/evidence.jsonl + items/sources/*.json\",\n        \"format\": \"csv+jsonl\",\n        \"contents\": \"100 条题目台账（模板/场景/split/输出合同，答案列仅 authority 侧文件含，csv 公开版不含答案）、协议绑定证据、逐题源记录\"\n      },\n      {\n        \"stage\": \"S5\",\n        \"path\": \"bench-office100/package/（public+authority）+ bench-office100/report.md + qc/\",\n        \"format\": \"目录+md+json\",\n        \"contents\": \"公开题包（媒体+题面+作答接口）、私有 authority（GT/容差/哈希）、质量门报告、最终交付报告\"\n      }\n    ],\n    \"acceptance\": \"验收入口=stage_review 五窗口逐一展示的落盘产物 + report.md 中的 QG 结果表：仅当 3 场景 acceptance 全过、GT 复算 100%、泄漏/媒体/分区扫描 0 违规时宣布交付，题量按实产申报（目标 100）；任何未过项列为缺口而非静默降级。\"\n  },\n  \"risks\": [\n    {\n      \"issue\": \"桌面 Isaac 队列排队或 worker 退出导致采集超时/中断\",\n      \"impact\": \"S2 延迟，题量交付后移\",\n      \"mitigation\": \"capture 保留作业按同一 request_key 恢复；执行故障不消耗设计修订预算；等待期先完成 S3 生成器与质检脚本\",\n      \"status\": \"待执行观察\"\n    },\n    {\n      \"issue\": \"真实资产库为办公品类（无床/厨房），室内多样性受限\",\n      \"impact\": \"场景语义分布偏办公/起居，室内覆盖不含卫浴厨房\",\n      \"mitigation\": \"以三个功能角色最大化布局差异；在报告声明覆盖边界；不引入未注册外部资产路径\",\n      \"status\": \"已接受，写入覆盖范围声明\"\n    },\n    {\n      \"issue\": \"表面最短间距（C01-T02）用 AABB 解析解对非凸家具（椅脚、灯罩）存在保守偏差\",\n      \"impact\": \"个别题 GT 高估间隙\",\n      \"mitigation\": \"只用凸主体可解析对象对出该题，或改用碰撞体凸包间距；无法确定的题剔除并记缺口，不降标准\",\n      \"status\": \"生成时逐对核验\"\n    },\n    {\n      \"issue\": \"某模板因剔除（穿透/等距/遮挡）不足 10 题\",\n      \"impact\": \"实产<100\",\n      \"mitigation\": \"对象对候选池冗余设计（每模板≥18 候选对）；仍不足则如实报告实产与原因\",\n      \"status\": \"配额保护设计，待执行验证\"\n    },\n    {\n      \"issue\": \"逐图生活审查模型网络超时\",\n      \"impact\": \"验收环节卡顿\",\n      \"mitigation\": \"仅对审查阶段传输失败用 spatialforge_retry 重试同一冻结采集，≤2 次，不消耗设计修订；质量失败必须修程序重采\",\n      \"status\": \"预案就绪\"\n    },\n    {\n      \"issue\": \"计划阈值（tau、0.12m 名次间隔等）未经实测校准冻结\",\n      \"impact\": \"评分容差可能偏松/偏紧\",\n      \"mitigation\": \"交付时以 tolerance_config 显式随包发布并在报告标注为设计初值，正式评测前冻结\",\n      \"status\": \"待确认\"\n    }\n  ]\n}\n```\n\n本次场景修订：修复会客补光代码未生效及盆栽空间重叠，补充同源标定视角。保留三场景、十模板各十题、评分合同与已结束的 S1 用户窗口；不能把准备文件当成已验收产物。\n",
+  "user_markdown_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/6f6bc50bb9da4c29/assessment-plan.md",
+  "applies_edit": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/fd93ea1777504175/plan.json"
+}

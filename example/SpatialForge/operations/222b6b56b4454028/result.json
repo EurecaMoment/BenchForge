@@ -1,0 +1,247 @@
+{
+  "run": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final",
+  "schema": "spatialforge.pipeline-state/v1",
+  "steps": {
+    "questions": {
+      "state": "completed",
+      "result": {
+        "dataset": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/questions/dataset",
+        "report": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/questions/dataset/quality_report.json",
+        "requested": 100,
+        "accepted": 100,
+        "shortfall": 0,
+        "per_template": {
+          "C01-T01": 10,
+          "C01-T02": 10,
+          "C01-T03": 10,
+          "C03-T01": 10,
+          "C04-T01": 10,
+          "C04-T02": 10,
+          "C05-T01": 10,
+          "C07-T02": 10,
+          "C09-T01": 10,
+          "C11-T01": 10
+        },
+        "requested_per_template": {
+          "C01-T01": 10,
+          "C01-T02": 10,
+          "C01-T03": 10,
+          "C03-T01": 10,
+          "C04-T01": 10,
+          "C04-T02": 10,
+          "C05-T01": 10,
+          "C07-T02": 10,
+          "C09-T01": 10,
+          "C11-T01": 10
+        },
+        "split": "mixed",
+        "requested_split": "train",
+        "preserve_source_splits": true,
+        "per_partition": {
+          "train": 40,
+          "dev": 30,
+          "test": 30
+        },
+        "per_template_partitions": {
+          "C01-T01": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C01-T02": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C01-T03": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C03-T01": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C04-T01": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C04-T02": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C05-T01": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C07-T02": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C09-T01": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          },
+          "C11-T01": {
+            "train": 4,
+            "dev": 3,
+            "test": 3
+          }
+        },
+        "sft_split": "train",
+        "sft_items": 40,
+        "public_asset_count": 970,
+        "training_bundle_eligible": false,
+        "scene_groups": 3,
+        "rejections": [],
+        "source": "89tasks-267templates-v1.0-design",
+        "benchmark_approved": false,
+        "capability_scope": "document task operations and measurement variants; links are not validated mastery",
+        "state": "completed"
+      },
+      "artifact": {
+        "schema": "benchforge.artifact/v1",
+        "artifact_id": "artifact:run-formal-pipeline-20261107-final:questions:v1",
+        "artifact_type": "benchmark.dataset",
+        "version": 1,
+        "parents": [],
+        "producer": "templates.produce",
+        "evidence_refs": [
+          "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/evidence/evidence.calibrated-20261106.jsonl"
+        ],
+        "contract_results": {
+          "status": "passed",
+          "checks": [
+            {
+              "id": "dataset",
+              "status": "passed",
+              "message": "dataset result contains dataset"
+            },
+            {
+              "id": "report",
+              "status": "passed",
+              "message": "dataset result contains report"
+            },
+            {
+              "id": "accepted",
+              "status": "passed",
+              "message": "dataset result contains accepted"
+            }
+          ],
+          "errors": [],
+          "note": "Shape contract only; it does not establish GT or scene quality."
+        },
+        "status": "candidate",
+        "result_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/questions/result.json",
+        "metadata": {
+          "run_id": "run-formal-pipeline-20261107-final",
+          "step_id": "questions",
+          "operation": "templates.produce",
+          "error": null
+        },
+        "created_at": "2026-11-06T19:54:15.888026+00:00"
+      }
+    },
+    "package": {
+      "state": "completed",
+      "result": {
+        "public_bundle": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/package/public_bundle.zip",
+        "authority_bundle": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/package/authority_bundle.zip",
+        "dataset": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/questions/dataset",
+        "accepted": 100,
+        "split": "mixed",
+        "per_partition": {
+          "train": 40,
+          "dev": 30,
+          "test": 30
+        },
+        "public_asset_count": 970,
+        "sft_split": "train",
+        "sft_items": 40,
+        "training_bundle_eligible": false,
+        "quality_report": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/questions/dataset/quality_report.json",
+        "report": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/package/delivery_report.json",
+        "delivery_report": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/package/delivery_report.md"
+      },
+      "artifact": {
+        "schema": "benchforge.artifact/v1",
+        "artifact_id": "artifact:run-formal-pipeline-20261107-final:package:v1",
+        "artifact_type": "benchmark.package",
+        "version": 1,
+        "parents": [
+          "artifact:run-formal-pipeline-20261107-final:questions:v1"
+        ],
+        "producer": "data.package",
+        "evidence_refs": [
+          "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/questions/dataset"
+        ],
+        "contract_results": {
+          "status": "passed",
+          "checks": [
+            {
+              "id": "dataset",
+              "status": "passed",
+              "message": "package result contains dataset"
+            },
+            {
+              "id": "accepted",
+              "status": "passed",
+              "message": "package result contains accepted"
+            },
+            {
+              "id": "quality_report",
+              "status": "passed",
+              "message": "package result contains quality_report"
+            },
+            {
+              "id": "bundle",
+              "status": "passed",
+              "message": "package result exposes a public or authority bundle"
+            }
+          ],
+          "errors": [],
+          "note": "Shape contract only; it does not establish GT or scene quality."
+        },
+        "status": "candidate",
+        "result_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/steps/package/result.json",
+        "metadata": {
+          "run_id": "run-formal-pipeline-20261107-final",
+          "step_id": "package",
+          "operation": "data.package",
+          "error": null
+        },
+        "created_at": "2026-11-06T20:00:05.691599+00:00"
+      }
+    }
+  },
+  "state": "waiting_user",
+  "run_id": "run-formal-pipeline-20261107-final",
+  "context": {
+    "session_ids": [
+      "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12"
+    ]
+  },
+  "stage_review": {
+    "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "key": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final:stage:S5",
+    "stage": "S5",
+    "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/formal-pipeline-20261107-final/reviews/S5.json",
+    "started": 1793995205.715352,
+    "deadline": 1793995505.715352,
+    "state": "waiting_user",
+    "instruction": "",
+    "review_id": 56,
+    "remaining_seconds": 300,
+    "server_time": 1793995205.715352,
+    "wait_seconds": 300,
+    "can_continue": false,
+    "next": "Use stage_review(action=wait), then resume the existing production when can_continue is true."
+  },
+  "next": "Wait for the user review window with stage_review(action=wait), then resume this same run. Apply pending user instructions first."
+}

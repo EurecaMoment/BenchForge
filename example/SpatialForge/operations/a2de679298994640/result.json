@@ -1,0 +1,16 @@
+{
+  "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+  "key": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/51fa9d15b7934bd4/plan.json",
+  "stage": "S1",
+  "artifact": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/51fa9d15b7934bd4/plan.json",
+  "started": 1793872425.3196137,
+  "deadline": 1793872725.3196137,
+  "state": "elapsed",
+  "instruction": "",
+  "review_id": 46,
+  "remaining_seconds": 0,
+  "server_time": 1793872725.5215445,
+  "wait_seconds": 300,
+  "can_continue": true,
+  "next": "Use stage_review(action=wait), then resume the existing production when can_continue is true."
+}

@@ -1,0 +1,937 @@
+{
+  "acceptable": true,
+  "visual_quality": 4,
+  "semantic_fidelity": 5,
+  "issues": [
+    "view_0.png: 地板木纹贴图在房间中央呈现明显的矩形拼贴边界，缺乏自然过渡。",
+    "view_1.png: 窗外背景为纯色渐变，缺乏真实室外景深，略显单调。"
+  ],
+  "repair_suggestions": [
+    "调整地板材质程序，增加随机旋转或混合遮罩以消除 view_0.png 中的明显拼贴接缝。",
+    "若需提升真实感，可替换窗外背景为高清城市或自然景观贴图。"
+  ],
+  "visual_realism": {
+    "status": "visually_plausible",
+    "issues": [
+      "view_0.png: 地板纹理重复感较强，可见矩形边界。",
+      "view_1.png: 窗外缺乏具体景物细节。"
+    ],
+    "prioritized_repairs": [
+      "优化地板材质平铺算法。"
+    ],
+    "basis": "rendered_views_only"
+  },
+  "life_review": {
+    "checks": [
+      {
+        "check": "object_identity",
+        "passed": true,
+        "evidence": [
+          {
+            "view": "view_0.png",
+            "observation": "办公桌、转椅、显示器、书柜和文件柜等家具形态清晰，符合办公场景定义。"
+          }
+        ]
+      },
+      {
+        "check": "realistic_scale",
+        "passed": true,
+        "evidence": [
+          {
+            "view": "view_2.png",
+            "observation": "文件柜高度适中，柜顶收纳盒与柜体比例协调，符合人体工学。"
+          }
+        ]
+      },
+      {
+        "check": "support_and_attachment",
+        "passed": true,
+        "evidence": [
+          {
+            "view": "view_6.png",
+            "observation": "台灯底座稳固放置在桌面上，显示器支架接触桌面，无悬空现象。"
+          }
+        ]
+      },
+      {
+        "check": "functional_layout",
+        "passed": true,
+        "evidence": [
+          {
+            "view": "view_4.png",
+            "observation": "饮水机紧邻文件柜放置，方便取水；双桌并排布局合理，符合办公需求。"
+          }
+        ]
+      },
+      {
+        "check": "access_and_clearance",
+        "passed": true,
+        "evidence": [
+          {
+            "view": "view_1.png",
+            "observation": "书柜前方留有宽敞通道，转椅后方空间充足，不影响人员通行。"
+          }
+        ]
+      },
+      {
+        "check": "materials_and_lighting",
+        "passed": true,
+        "evidence": [
+          {
+            "view": "view_3.png",
+            "observation": "书柜内部有补光照明，木纹材质清晰可见，阴影自然。"
+          }
+        ]
+      }
+    ]
+  },
+  "brief_alignment": {
+    "passed": true,
+    "hard_requirements_preserved": true,
+    "observations": [
+      {
+        "view": "view_0.png",
+        "observation": "展示了双桌双椅布局，显示器位于左桌，书柜位于右侧，符合摘要描述。"
+      },
+      {
+        "view": "view_1.png",
+        "observation": "展示了东墙书柜和南窗区域，盆栽位于窗边，阅读椅背对窗户。"
+      },
+      {
+        "view": "view_2.png",
+        "observation": "特写西墙文件柜，柜顶放置收纳盒，旁边是饮水机，符合茶水角设定。"
+      },
+      {
+        "view": "view_3.png",
+        "observation": "近距离观察书柜内部，柜格留空，有竖向补光，符合摘要要求。"
+      },
+      {
+        "view": "view_4.png",
+        "observation": "从东向西看，展示了左桌台灯、显示器及西墙文件柜的相对位置。"
+      },
+      {
+        "view": "view_5.png",
+        "observation": "全景视角，确认了房间整体布局、家具朝向及采光情况。"
+      },
+      {
+        "view": "view_6.png",
+        "observation": "俯视左桌，确认台灯位于右侧近人区，显示器居中，书在左侧。"
+      },
+      {
+        "view": "view_7.png",
+        "observation": "俯视右桌，确认书组位于左侧，马克杯位于右侧，布局整洁。"
+      }
+    ],
+    "unresolved": [],
+    "proposed_summary_revision": {
+      "reason": "无",
+      "summary": "",
+      "changes": []
+    },
+    "requirement_checks": [
+      {
+        "index": 0,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "所有家具均为真实模型，无几何盒替代，符合室内场景要求。"
+      },
+      {
+        "index": 1,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "场景资产完整，未见明显缺失，符合测试分区要求。"
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "view": "view_6.png",
+        "observation": "双桌双椅及同型号物品（如杯子）在空间上可区分，满足ID去重条件。"
+      },
+      {
+        "index": 3,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "画面中无文字或标签泄露答案，符合公开题目要求。"
+      }
+    ],
+    "relation_checks": [
+      {
+        "index": 0,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "左桌紧贴北墙放置，符合 near 关系。"
+      },
+      {
+        "index": 1,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "右桌紧贴北墙，与左桌保持间隔，符合 near 关系。"
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "view": "view_6.png",
+        "observation": "左椅正对左桌，留有腿部空间，符合 facing 关系。"
+      },
+      {
+        "index": 3,
+        "passed": true,
+        "view": "view_7.png",
+        "observation": "右椅正对右桌，位置合理，符合 facing 关系。"
+      },
+      {
+        "index": 9,
+        "passed": true,
+        "view": "view_2.png",
+        "observation": "文件柜紧贴西墙，作为收纳使用，符合 near 关系。"
+      },
+      {
+        "index": 11,
+        "passed": true,
+        "view": "view_4.png",
+        "observation": "饮水机位于文件柜北侧，距离适中，符合 near 关系。"
+      },
+      {
+        "index": 12,
+        "passed": true,
+        "view": "view_1.png",
+        "observation": "阅读椅位于窗下，背对窗户，符合 near 关系。"
+      }
+    ]
+  },
+  "spatial_reference_context": {
+    "schema": "benchforge.review-spatial-context/v1",
+    "authority": "native coordinate/support context only; actual images still determine visual/life acceptance",
+    "resolved_frames": [
+      {
+        "id": "left_work_surface_user",
+        "kind": "user",
+        "origin_object_id": "desk_c1",
+        "origin_m": [
+          -1.15,
+          1.8,
+          0.37993
+        ],
+        "front_world": [
+          -0.0,
+          -1.0,
+          -0.0
+        ],
+        "right_world": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "up_world": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "front_definition": "toward_observer",
+        "basis": "declared semantics and final captured centers; actual facing still needs image verification"
+      }
+    ],
+    "directional_facts": [
+      {
+        "index": 13,
+        "source": "lamp_c",
+        "target": "desk_c1",
+        "reference_frame": "left_work_surface_user",
+        "world_delta_m": [
+          0.4999999999999999,
+          -0.15000000000000013,
+          0.633925
+        ],
+        "projections_m": {
+          "right": 0.4999999999999999,
+          "front": 0.15000000000000013,
+          "up": 0.633925
+        },
+        "expected_direction": [
+          "right",
+          "front"
+        ],
+        "declared_direction_signs": {
+          "right": 0.4999999999999999,
+          "front": 0.15000000000000013
+        },
+        "basis": "captured center projection; no visible-contact or life pass assertion"
+      }
+    ],
+    "unresolved_reference": [],
+    "native_support_checks": [
+      {
+        "index": 4,
+        "type": "supported_by",
+        "source": "monitor_c",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 5,
+        "type": "supported_by",
+        "source": "mug_c1",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 6,
+        "type": "supported_by",
+        "source": "mug_c2",
+        "target": "desk_c2",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 7,
+        "type": "supported_by",
+        "source": "books_c1",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 8,
+        "type": "supported_by",
+        "source": "books_c2",
+        "target": "desk_c2",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 10,
+        "type": "supported_by",
+        "source": "bin_c",
+        "target": "sidecab_c",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 13,
+        "type": "supported_by",
+        "source": "lamp_c",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 14,
+        "type": "supported_by",
+        "source": "plant_c",
+        "target": "floor_c",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 15,
+        "type": "mounted_to",
+        "source": "window_s_c",
+        "target": "wall_s_c",
+        "passed": false,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      }
+    ],
+    "reference_declaration": {
+      "schema": "benchforge.review-reference/v1",
+      "world_up": [
+        0,
+        0,
+        1
+      ],
+      "frames": [
+        {
+          "id": "left_work_surface_user",
+          "kind": "user",
+          "origin_object_id": "desk_c1",
+          "observer_object_id": "chair_c1",
+          "facing_target_object_id": "desk_c1",
+          "front": "toward_observer"
+        }
+      ]
+    }
+  },
+  "physical_stable": true,
+  "renderable": true,
+  "scene_quality": {
+    "schema": "benchforge.scene-quality/v2",
+    "scene_id": "sf_study_pantry_corner",
+    "tier": "pilot_candidate",
+    "evidence_summary": {
+      "observed_or_measured_dimensions": 5,
+      "dimensions": 6,
+      "publication_gate": "all six dimensions require simulator/official evidence"
+    },
+    "dimensions": {
+      "geometry": {
+        "evidence_level": "observed",
+        "observations": [
+          "proposal contains 31 object instances",
+          "capture is renderable"
+        ],
+        "capability_gaps": [
+          "native mesh bounds/collider checks are absent",
+          "renderability does not establish collision correctness"
+        ],
+        "repair_suggestions": [
+          "record Isaac mesh bounds, collider cooking and contact checks"
+        ],
+        "truth_scope": "renderability_only"
+      },
+      "render": {
+        "evidence_level": "observed",
+        "observations": [
+          "proposal cameras: 8",
+          "captured views: 8",
+          "multi-view render receipt exists",
+          "structured auxiliary render modality recorded"
+        ],
+        "capability_gaps": [
+          "lighting/material response is not independently measured"
+        ],
+        "repair_suggestions": [
+          "record renderer, light rig and material diagnostics"
+        ],
+        "truth_scope": "rendered_pixels_and_declared_modalities"
+      },
+      "physics": {
+        "evidence_level": "observed",
+        "observations": [
+          "Isaac/PhysX reports a stable rollout",
+          "rollout steps: 180"
+        ],
+        "capability_gaps": [
+          "stability does not establish real-world mass, friction, damping or restitution",
+          "contact/manifold evidence is unavailable"
+        ],
+        "repair_suggestions": [
+          "calibrate material and inertial parameters against measured or asset-authoritative references",
+          "record contact pairs, settling displacement and joint-limit violations"
+        ],
+        "truth_scope": "rollout_stability_only"
+      },
+      "interaction": {
+        "evidence_level": "missing",
+        "observations": [],
+        "capability_gaps": [
+          "scene has no interaction or navigation contract"
+        ],
+        "repair_suggestions": [
+          "declare task-relevant affordances without restricting free-form scene composition"
+        ],
+        "truth_scope": "none"
+      },
+      "semantic": {
+        "evidence_level": "measured",
+        "observations": [
+          "1 semantic layers declared",
+          "structured semantic/instance label receipt is present"
+        ],
+        "capability_gaps": [
+          "instance IDs and geometry labels do not prove visual class correctness"
+        ],
+        "repair_suggestions": [
+          "keep reviewer semantic judgments separate from native GT"
+        ],
+        "truth_scope": "native_geometry_and_instance_identity_only"
+      },
+      "coverage": {
+        "evidence_level": "observed",
+        "observations": [
+          "8 proposal cameras",
+          "8 captured views"
+        ],
+        "capability_gaps": [],
+        "repair_suggestions": [],
+        "truth_scope": "captured_view_count"
+      }
+    },
+    "capability_gaps": [
+      "native mesh bounds/collider checks are absent",
+      "renderability does not establish collision correctness",
+      "lighting/material response is not independently measured",
+      "stability does not establish real-world mass, friction, damping or restitution",
+      "contact/manifold evidence is unavailable",
+      "scene has no interaction or navigation contract",
+      "instance IDs and geometry labels do not prove visual class correctness"
+    ],
+    "repair_suggestions": [
+      "record Isaac mesh bounds, collider cooking and contact checks",
+      "record renderer, light rig and material diagnostics",
+      "calibrate material and inertial parameters against measured or asset-authoritative references",
+      "record contact pairs, settling displacement and joint-limit violations",
+      "declare task-relevant affordances without restricting free-form scene composition",
+      "keep reviewer semantic judgments separate from native GT"
+    ],
+    "gt_authority": "native_simulator_or_official_source_only",
+    "gt_written": false
+  },
+  "interaction": {
+    "validated": false,
+    "test_kind": "external_force_response",
+    "action_results": [],
+    "evidence_source": "Isaac physics states and rendered before/after images",
+    "limitations": [
+      "external force response; no robot, grasp or contact-manipulation success is claimed",
+      "synthetic contact parameters are uncalibrated; sim2real gap is not measured"
+    ],
+    "reason": "no executable interaction requested"
+  },
+  "interaction_requested": false,
+  "interaction_passed": null,
+  "production_acceptance": {
+    "schema": "benchforge.scene-acceptance/v1",
+    "enforced": true,
+    "passed": true,
+    "issues": [],
+    "physical_issues": [],
+    "native_relation_checks": [
+      {
+        "index": 4,
+        "type": "supported_by",
+        "source": "monitor_c",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 5,
+        "type": "supported_by",
+        "source": "mug_c1",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 6,
+        "type": "supported_by",
+        "source": "mug_c2",
+        "target": "desk_c2",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 7,
+        "type": "supported_by",
+        "source": "books_c1",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 8,
+        "type": "supported_by",
+        "source": "books_c2",
+        "target": "desk_c2",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 10,
+        "type": "supported_by",
+        "source": "bin_c",
+        "target": "sidecab_c",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 13,
+        "type": "supported_by",
+        "source": "lamp_c",
+        "target": "desk_c1",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 14,
+        "type": "supported_by",
+        "source": "plant_c",
+        "target": "floor_c",
+        "passed": true,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      },
+      {
+        "index": 15,
+        "type": "mounted_to",
+        "source": "window_s_c",
+        "target": "wall_s_c",
+        "passed": false,
+        "evidence": "capture/evidence.json",
+        "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+      }
+    ],
+    "mesh_bound_checks": [],
+    "mesh_versions": {},
+    "scene_id": "sf_study_pantry_corner",
+    "capture_token": "attempt_0913b82619d44c56",
+    "evidence_versions": {
+      "program.json": [
+        22830,
+        1793981406549433974
+      ],
+      "capture/report.json": [
+        76242,
+        1793981505604387106
+      ],
+      "capture/evidence.json": [
+        218397,
+        1793981505176377089
+      ]
+    },
+    "scene_style": "realistic_assets",
+    "geometry_exception": null,
+    "scene_brief": {
+      "id": "design-study-pantry",
+      "name": "阅览茶水角",
+      "purpose": "学习+茶水混合功能区，提供第三组对象间距分布；承担 test 分区约 33 题（sealed 留待后续冻结）。",
+      "layout": "5.4×4.6×2.8米房间；两张办公桌沿北墙并排，间隔30厘米，各配转椅面向对应工作目标。东墙两组书柜开口朝室内；西墙文件柜作为收纳柜，柜顶只放一个收纳盒，饮水机在柜体北侧约0.9米处。两只马克杯和两组书分别放在两桌上，台灯保持左桌右侧近人半桌，桌前沿按南侧座椅参照定义。南窗下阅读椅面朝房内，盆栽在其东侧1.2米中心距离处。侧方与中央安排通行，东侧连续净宽至少0.75米；不把阅读椅背后的安装间隙作为通道。 边柜与柜顶箱沿西墙共同南移0.35米，保持柜北侧饮水机与西墙关系；其余物体布局保持。",
+      "objects": "office_desk×2、office_chair×2、office_bookcase×2、office_monitor×1、office_file_cabinet、office_water_cooler、office_lamp、office_plant、office_window、office_armchair（窗边阅读椅）、mug×2、bin×1、office_books×2。",
+      "cameras": "保留当前全部8机位的位姿、目标点、光学参数与读出参数。view_0和view_5共同观察西侧入口、双桌与地面；view_3观察两组空书柜的柜格和底板；其余view_1/view_2/view_4/view_6/view_7保持，并联合验证全部场景要求。各机位K、米制光轴深度和实例掩码仍由同次原生捕获读取；本轮不调整相机。",
+      "variation": "对象数 18（最多），双桌双椅同型号对象测试身份去重与计数；柜顶平放书与竖放书混布测厚度/长度维度混淆。",
+      "artifact": "scenes/sf_study_pantry_corner.scene_program.json → captures/sf_study_pantry_corner/",
+      "summary": "这是一间兼具办公、阅览与饮水功能的小型仿真房间，服务两到三人，并为评测提供同型号多实例的计数与身份去重条件。房间5.4×4.6米、高2.8米，木地板与浅色墙，南墙嵌3米模块窗。北墙并排两张办公桌，中间留30厘米缝，每桌配一把转椅并留出腿部空间；左桌转椅面向对应显示器，显示器屏幕面向左桌转椅，右桌转椅面向右桌工作区，朝向按已校准的原生资产正面计算。总共只有两只马克杯，各放在一张桌面的可取用处；两组书也分别放在两桌的左侧，右桌已有书和杯，不以单个视角的遮挡认定为空。桌前沿统一指朝向南侧转椅的近人侧，右指东侧。台灯在左桌桌心以东0.50米、以南0.15米的右侧近人半区，保留已通过原生支撑的摆位，与显示器及书组错开；底座由侧向与俯视机位共同观察。东墙相邻两组书柜，开口朝西侧室内，柜格留空；在开口前方设置覆盖柜高的竖向宽面补光，目标是在新实拍中辨识空柜格与底板。西墙文件柜用于日常收纳，柜顶只放一个收纳盒，柜顶作为收纳平面，不作为食品操作台；饮水机在柜体北侧约0.9米处贴墙。窗下偏西放一只阅读扶手椅，背部朝南窗、正面朝房内，后方留约0.3米安装余量，通行安排在侧方及房间中央。盆栽移至阅读椅东侧，两者中心相距1.2米，东侧连续通道净宽至少0.75米，并由最终采集检查。大件静态，杯、书和收纳盒带合成质量与摩擦，最终接触、姿态和中心以新仿真沉降回执为准；公开媒体标记与真值同源。 保留当前西南概览和全部8机位光学参数、位姿，以及同源K、米制深度和实例掩码记录；盆栽、阅读椅、双桌双椅、台灯和杯子保持。 最新原生地板只有一个共面上表面，规则木纹块没有真实台阶；本轮保持地板几何，只采用注册木纹建议的整体图像重复尺度以减少密集拼块观感。边柜和柜顶收纳箱沿西墙一起南移0.35米，柜顶局部偏移和支撑保持；改善边柜与左椅的局部入口，饮水机仍在柜北侧。左桌台灯的使用者参照、右侧近人半桌摆位与已验证的杯/灯支撑保持。新补光、木纹和通道效果仍须原生实拍与逐图验收。",
+      "hard_requirements": [
+        "室内场景，真实可辨识资产，禁止几何盒替代家具",
+        "承担 test 分区约 33 题；同场景题目同分区，禁止跨分区泄漏",
+        "GT 仅来自官方/程序/仿真；双桌双椅同型号必须可按持久 ID 区分",
+        "公开题目不泄露答案"
+      ],
+      "object_roles": [
+        {
+          "object_id": "floor_c",
+          "role": "地面，支撑全部家具并作为高度起算面"
+        },
+        {
+          "object_id": "wall_n_c",
+          "role": "北墙，双桌贴靠"
+        },
+        {
+          "object_id": "wall_s_c",
+          "role": "南墙，窗与阅读椅"
+        },
+        {
+          "object_id": "wall_w_c",
+          "role": "西墙，茶水角"
+        },
+        {
+          "object_id": "wall_e_c",
+          "role": "东墙，双书柜"
+        },
+        {
+          "object_id": "ceiling_c",
+          "role": "吊顶，封闭室内体积"
+        },
+        {
+          "object_id": "window_s_c",
+          "role": "南窗，提供采光与尺度线索"
+        },
+        {
+          "object_id": "desk_c1",
+          "role": "办公桌1，北墙西侧，配显示器"
+        },
+        {
+          "object_id": "desk_c2",
+          "role": "办公桌2，北墙东侧，配马克杯与书组，与 c1 间隔 30 cm"
+        },
+        {
+          "object_id": "chair_c1",
+          "role": "转椅1，正对 desk_c1"
+        },
+        {
+          "object_id": "chair_c2",
+          "role": "转椅2，正对 desk_c2"
+        },
+        {
+          "object_id": "monitor_c",
+          "role": "显示器，desk_c1 桌面"
+        },
+        {
+          "object_id": "mug_c1",
+          "role": "马克杯，desk_c1 桌面"
+        },
+        {
+          "object_id": "mug_c2",
+          "role": "马克杯，desk_c2 桌面"
+        },
+        {
+          "object_id": "bookcase_c1",
+          "role": "书柜1，东墙南侧；开口向西，柜格留空并由开口前方补光支持实际观测。；保持原材质与空柜格，以开口前覆盖柜高的竖向宽面补光改善可辨识性。"
+        },
+        {
+          "object_id": "bookcase_c2",
+          "role": "书柜2，东墙北侧，与 c1 相邻；开口向西，柜格留空并由开口前方补光支持实际观测。；保持原材质与空柜格，以开口前覆盖柜高的竖向宽面补光改善可辨识性。"
+        },
+        {
+          "object_id": "books_c1",
+          "role": "书组，desk_c1 桌面左角竖放"
+        },
+        {
+          "object_id": "books_c2",
+          "role": "书组，办公桌2桌面左角竖放"
+        },
+        {
+          "object_id": "sidecab_c",
+          "role": "西墙文件收纳柜，柜顶只放一个收纳盒，按日常收纳用途使用。；沿西墙南移0.35米至y=0.05，改善左椅旁入口，保持饮水机在北侧。"
+        },
+        {
+          "object_id": "bin_c",
+          "role": "bin，边柜台面；随边柜共同南移0.35米，保留柜顶局部偏移(0,0.02)米与动态支撑。"
+        },
+        {
+          "object_id": "cooler_c",
+          "role": "饮水机，西墙边柜北侧 0.8 m"
+        },
+        {
+          "object_id": "lamp_c",
+          "role": "台灯，办公桌1右侧近人半桌，桌前沿按南侧转椅参照；保留已通过原生检查的桌面支撑摆位。"
+        },
+        {
+          "object_id": "plant_c",
+          "role": "窗侧盆栽，位于阅读椅东侧，两者中心相距1.2米，保留东侧连续通道。"
+        },
+        {
+          "object_id": "armchair_c",
+          "role": "单人阅读椅，窗下面朝房内"
+        }
+      ],
+      "relations": [
+        {
+          "source": "desk_c1",
+          "type": "near",
+          "target": "wall_n_c",
+          "description": "贴北墙，桌面工作区"
+        },
+        {
+          "source": "desk_c2",
+          "type": "near",
+          "target": "wall_n_c",
+          "description": "贴北墙与 c1 间隔 30 cm"
+        },
+        {
+          "source": "chair_c1",
+          "type": "facing",
+          "target": "desk_c1",
+          "description": "正对桌面留腿部空间"
+        },
+        {
+          "source": "chair_c2",
+          "type": "facing",
+          "target": "desk_c2",
+          "description": "正对桌面，位置与朝向符合声明的使用功能"
+        },
+        {
+          "source": "monitor_c",
+          "type": "supported_by",
+          "target": "desk_c1",
+          "description": "底座由左桌支撑，屏幕正面面向左桌转椅，采用已校准的原生资产正面计算朝向。"
+        },
+        {
+          "source": "mug_c1",
+          "type": "supported_by",
+          "target": "desk_c1",
+          "description": "动态件，台面沉降"
+        },
+        {
+          "source": "mug_c2",
+          "type": "supported_by",
+          "target": "desk_c2",
+          "description": "动态件，台面沉降"
+        },
+        {
+          "source": "books_c1",
+          "type": "supported_by",
+          "target": "desk_c1",
+          "description": "书组竖放办公桌1左角，由桌面真实支撑"
+        },
+        {
+          "source": "books_c2",
+          "type": "supported_by",
+          "target": "desk_c2",
+          "description": "书组竖放办公桌2桌面左角，由桌面真实支撑，与办公桌1桌面书组构成同型号双桌区分"
+        },
+        {
+          "source": "sidecab_c",
+          "type": "near",
+          "target": "wall_w_c",
+          "description": "文件柜作为西墙日常收纳柜，柜顶放收纳盒，不作为食品操作台。"
+        },
+        {
+          "source": "bin_c",
+          "type": "supported_by",
+          "target": "sidecab_c",
+          "description": "台面放置，位置与朝向符合声明的使用功能"
+        },
+        {
+          "source": "cooler_c",
+          "type": "near",
+          "target": "sidecab_c",
+          "description": "文件收纳柜北侧约0.9米的贴墙取水点。"
+        },
+        {
+          "source": "armchair_c",
+          "type": "near",
+          "target": "window_s_c",
+          "description": "窗下阅读位，背部朝南窗、正面朝房内，背后留约0.3米安装余量，通行在侧方。"
+        },
+        {
+          "source": "lamp_c",
+          "type": "supported_by",
+          "target": "desk_c1",
+          "description": "台灯保留办公桌1右侧近人半桌的现有位置，完整由桌面支撑，与显示器、书组错开；桌前沿按南侧座椅参照，不沿相机画面判断前后。",
+          "reference_frame": "left_work_surface_user",
+          "expected_direction": [
+            "right",
+            "front"
+          ]
+        },
+        {
+          "source": "plant_c",
+          "type": "supported_by",
+          "target": "floor_c",
+          "description": "窗侧地面，界定软分区"
+        },
+        {
+          "source": "window_s_c",
+          "type": "mounted_to",
+          "target": "wall_s_c",
+          "description": "内嵌南墙，位置与朝向符合声明的使用功能"
+        }
+      ],
+      "physical_assumptions": [
+        "桌/椅/柜/窗静态（原生 USD 碰撞体）；双桌双椅同型号但世界坐标与 ID 持久可分",
+        "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+        "台灯为左桌右侧近人半区（桌前沿按南侧座椅参照）的静态摆件，底座由办公桌1桌面支撑；不测倾覆。",
+        "窗资产透明度用 native_opacity_multiplier 先验调节，不声称光学实测透射率"
+      ],
+      "spatial_reference": {
+        "schema": "benchforge.review-reference/v1",
+        "world_up": [
+          0,
+          0,
+          1
+        ],
+        "frames": [
+          {
+            "id": "left_work_surface_user",
+            "kind": "user",
+            "origin_object_id": "desk_c1",
+            "observer_object_id": "chair_c1",
+            "facing_target_object_id": "desk_c1",
+            "front": "toward_observer"
+          }
+        ]
+      },
+      "previous_capture_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_1fabc75f26fa499d.scene0/revision_0",
+      "revision_history": [
+        {
+          "revision": 1,
+          "evidence_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_e4ce7211629a4ccd.scene0/revision_0",
+          "changes": [
+            "以当前原生位姿及view_4/view_6修正桌前沿参照歧义，保留已通过支撑的台灯和杯子位置。",
+            "view_0改为西南概览避开原近距离盆栽前景，全部物体与8个机位的光学参数保持。",
+            "将两条书柜补光从柜体内移到西侧开口外并增强，柜格仍留空。"
+          ],
+          "unresolved": [
+            "调整view_0和书柜补光的效果仍须由新原生实拍及逐图验收确认。"
+          ],
+          "evidence_refs": [
+            {
+              "path": "capture/view_0.png",
+              "observation": "盆栽占近距离前景，但画面中的左桌灯底座可见；不移动盆栽或已修好的台灯。"
+            },
+            {
+              "path": "capture/view_3.png",
+              "observation": "柜格内部明显偏暗，需要补光改善可观察性。"
+            },
+            {
+              "path": "capture/view_4.png",
+              "observation": "侧向机位可见台灯底座，桌前沿是朝向南侧座椅的近人长边。"
+            },
+            {
+              "path": "capture/view_6.png",
+              "observation": "俯视可见台灯底座处于桌右侧近人半区。"
+            },
+            {
+              "path": "capture/evidence.json",
+              "observation": "desk_c1桌心为(-1.15,1.8)，lamp_c为(-.65,1.65)，mug_c1已在新位置沉降。"
+            },
+            {
+              "path": "scene_acceptance.json",
+              "observation": "lamp_c、mug_c1和mug_c2的原生supported_by检查通过；整体视觉验收仍失败。"
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "evidence_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_1fabc75f26fa499d.scene0/revision_0",
+          "changes": [
+            "view3柜格仍暗，将同两条1000点光改为开口前竖向宽面补光，保留书柜原材质、位置、尺寸和空柜格。",
+            "原生floor单一共面上表面证明没有拼块台阶；不改几何，只把wood_laminate整体图像重复尺度改为注册建议2.4×1.2米。",
+            "原生柜-桌间隔0.754米，但柜-左椅局部0.528米偏紧；边柜和柜顶箱共同南移0.35米，保留支撑局部偏移。",
+            "保留台灯/杯子位置、全部8机位/K、使用者坐标参照、所有原始硬要求及此前修订记录。"
+          ],
+          "unresolved": [
+            "宽面补光能否使全部空柜格与底板清楚可辨，木纹重复调整能否改善拼块观感，均须新实拍确认。",
+            "平移后实际通行与柜顶箱沉降须新采集验证；AABB间距不是人体通行或接触认证。"
+          ],
+          "evidence_refs": [
+            {
+              "path": "capture/view_0.png",
+              "observation": "文件柜近景显大，西侧入口需要以实际边界核对；地板规则纹理块可见。"
+            },
+            {
+              "path": "capture/view_3.png",
+              "observation": "柜格内部仍真实偏暗，原1000点光没有达到柜格/底板可辨目标。"
+            },
+            {
+              "path": "capture/view_5.png",
+              "observation": "双桌、台灯、杯与地板木纹可见，真实支撑摆位继续保护。"
+            },
+            {
+              "path": "capture/report.json",
+              "observation": "8机位实际捕获、物理稳定；两条1000点光及地板木纹/UV已真实执行。"
+            },
+            {
+              "path": "capture/scene.usda",
+              "observation": "定点读取floor24顶点上表面全Z≈0，仅不可见Collision子Cube；柜/桌/椅边界和补光位置可核对。"
+            },
+            {
+              "path": "scene_acceptance.json",
+              "observation": "本轮physical_issues为空，但视觉/生活验收仍失败；失败回执保留。"
+            }
+          ]
+        }
+      ],
+      "plan_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/living-light-repair-20261107/study-final-minimal-scene-plan.json",
+      "plan_version": [
+        18430,
+        1793981390575667663
+      ],
+      "authority": "versioned scene design, not captured physical truth",
+      "iteration_rule": "repair scene to brief; revise omissions from actual evidence; preserve user hard requirements and failed evidence"
+    },
+    "physical_scope": "native settling, conservative world bounds, support gap and collider receipts; uncalibrated material parameters",
+    "life_scope": "per-view model visual judgment, not measured truth or human certification",
+    "on_failure": "retain failed evidence; repair within budget; never export or mark complete"
+  },
+  "passed": true,
+  "publication_status": "pilot_candidate"
+}

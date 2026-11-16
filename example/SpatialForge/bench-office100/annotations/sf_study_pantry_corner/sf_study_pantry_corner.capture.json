@@ -1,0 +1,287 @@
+{
+  "schema": "bench-office100.capture-receipt/v2",
+  "extractor": "extract_annotations.py native-body-size-20261106",
+  "scene_id": "sf_study_pantry_corner",
+  "source_task_id": "sf_4cac06cdb58c40d3.scene0",
+  "source_task_revision": 0,
+  "runtime_revision": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0",
+  "capture_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture",
+  "scene_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/program.json",
+  "native_scene_source": {
+    "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/scene.usdc",
+    "bytes": 1145003,
+    "mtime_ns": 1793981505148376434
+  },
+  "scene_path_provenance": "frozen capture/program.json (the exact snapshot the renderer executed); public-media pairing authority",
+  "program_run_root_copy": null,
+  "views": [
+    "sf_study_pantry_corner_view_0.png",
+    "sf_study_pantry_corner_view_1.png",
+    "sf_study_pantry_corner_view_2.png",
+    "sf_study_pantry_corner_view_3.png",
+    "sf_study_pantry_corner_view_4.png",
+    "sf_study_pantry_corner_view_5.png",
+    "sf_study_pantry_corner_view_6.png",
+    "sf_study_pantry_corner_view_7.png"
+  ],
+  "views_source": "copied from capture frames; actual source frames, PNG signature and recorded file versions",
+  "acceptance_passed": true,
+  "acceptance_raw": true,
+  "acceptance_enforced": true,
+  "acceptance_issues": [],
+  "acceptance_evidence": {
+    "scene_acceptance.json": {
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_acceptance.json",
+      "copy": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_acceptance.json",
+      "version": {
+        "bytes": 20198,
+        "mtime_ns": 1793983308347727680
+      }
+    },
+    "scene_admission.json": {
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_admission.json",
+      "copy": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_admission.json",
+      "version": {
+        "bytes": 16929,
+        "mtime_ns": 1793983308351728123
+      }
+    },
+    "scene_brief.json": {
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_brief.json",
+      "copy": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_brief.json",
+      "version": {
+        "bytes": 15999,
+        "mtime_ns": 1793983308351728123
+      }
+    },
+    "scene_brief_alignment.json": {
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_brief_alignment.json",
+      "copy": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_brief_alignment.json",
+      "version": {
+        "bytes": 20372,
+        "mtime_ns": 1793983308351728123
+      }
+    },
+    "scene_review.json": {
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_review.json",
+      "copy": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_review.json",
+      "version": {
+        "bytes": 37113,
+        "mtime_ns": 1793983308351728123
+      }
+    }
+  },
+  "capture_origin": "isaac_native",
+  "capture_report_status": "captured",
+  "production_eligible": true,
+  "non_production": false,
+  "smoke_trigger": null,
+  "usage_restriction": "production artifact eligible for S4/S5 only if acceptance_passed=true",
+  "physics_steps": 180,
+  "stable": true,
+  "max_settled_deviation_m": 0.0024,
+  "media_pairing_problems": [],
+  "objects_unobserved_in_views": [
+    "wall_sk_c_s2"
+  ],
+  "source_artifacts": {
+    "capture/evidence.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/evidence.json",
+      "bytes": 218397,
+      "mtime_ns": 1793981505176377089
+    },
+    "capture/report.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/report.json",
+      "bytes": 76242,
+      "mtime_ns": 1793981505604387106
+    },
+    "capture/program.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/program.json",
+      "bytes": 22829,
+      "mtime_ns": 1793981505156376621
+    },
+    "scene_acceptance.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_acceptance.json",
+      "bytes": 20198,
+      "mtime_ns": 1793981734173661260
+    },
+    "capture/scene.usdc": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/scene.usdc",
+      "bytes": 1145003,
+      "mtime_ns": 1793981505148376434
+    },
+    "capture/view_0.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_0.json",
+      "bytes": 12516,
+      "mtime_ns": 1793981443198907306
+    },
+    "capture/view_1.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_1.json",
+      "bytes": 13157,
+      "mtime_ns": 1793981452887139667
+    },
+    "capture/view_2.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_2.json",
+      "bytes": 7376,
+      "mtime_ns": 1793981461527346053
+    },
+    "capture/view_3.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_3.json",
+      "bytes": 5356,
+      "mtime_ns": 1793981466855472938
+    },
+    "capture/view_4.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_4.json",
+      "bytes": 11989,
+      "mtime_ns": 1793981476811709255
+    },
+    "capture/view_5.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_5.json",
+      "bytes": 11990,
+      "mtime_ns": 1793981486083928437
+    },
+    "capture/view_6.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_6.json",
+      "bytes": 9368,
+      "mtime_ns": 1793981495584152125
+    },
+    "capture/view_7.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_7.json",
+      "bytes": 8356,
+      "mtime_ns": 1793981504900370629
+    }
+  },
+  "written_artifacts": {
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_0.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_0.png",
+      "bytes": 811367,
+      "mtime_ns": 1793983308331725911,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_0.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_1.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_1.png",
+      "bytes": 872219,
+      "mtime_ns": 1793983308331725911,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_1.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_2.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_2.png",
+      "bytes": 701778,
+      "mtime_ns": 1793983308335726353,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_2.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_3.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_3.png",
+      "bytes": 818044,
+      "mtime_ns": 1793983308335726353,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_3.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_4.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_4.png",
+      "bytes": 820488,
+      "mtime_ns": 1793983308335726353,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_4.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_5.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_5.png",
+      "bytes": 853662,
+      "mtime_ns": 1793983308339726796,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_5.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_6.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_6.png",
+      "bytes": 789374,
+      "mtime_ns": 1793983308343727238,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_6.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_7.png": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/views/sf_study_pantry_corner_view_7.png",
+      "bytes": 791532,
+      "mtime_ns": 1793983308343727238,
+      "mode": "copyfile",
+      "kind": "view",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/view_7.png"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/program.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/program.json",
+      "bytes": 22829,
+      "mtime_ns": 1793983308347727680,
+      "mode": "copyfile",
+      "kind": "frozen_capture_program",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/capture/program.json"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_acceptance.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_acceptance.json",
+      "bytes": 20198,
+      "mtime_ns": 1793983308347727680,
+      "mode": "copyfile",
+      "kind": "receipt_copy",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_acceptance.json"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_admission.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_admission.json",
+      "bytes": 16929,
+      "mtime_ns": 1793983308351728123,
+      "mode": "copyfile",
+      "kind": "receipt_copy",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_admission.json"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_brief.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_brief.json",
+      "bytes": 15999,
+      "mtime_ns": 1793983308351728123,
+      "mode": "copyfile",
+      "kind": "receipt_copy",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_brief.json"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_brief_alignment.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_brief_alignment.json",
+      "bytes": 20372,
+      "mtime_ns": 1793983308351728123,
+      "mode": "copyfile",
+      "kind": "receipt_copy",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_brief_alignment.json"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_review.json": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/scene_review.json",
+      "bytes": 37113,
+      "mtime_ns": 1793983308351728123,
+      "mode": "copyfile",
+      "kind": "receipt_copy",
+      "source": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_4cac06cdb58c40d3.scene0/revision_0/scene_review.json"
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/objects.jsonl": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/objects.jsonl",
+      "bytes": 79733,
+      "mtime_ns": 1793983308355728565,
+      "mode": "w",
+      "kind": "jsonl",
+      "what": "objects.jsonl",
+      "records": 31
+    },
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/cameras.jsonl": {
+      "path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/annotations/sf_study_pantry_corner/cameras.jsonl",
+      "bytes": 32641,
+      "mtime_ns": 1793983308355728565,
+      "mode": "w",
+      "kind": "jsonl",
+      "what": "cameras.jsonl",
+      "records": 8
+    }
+  },
+  "gt_policy": "冻结USD可见Mesh顶点/原生解析体精确测量 + SceneProgram authored 参数 + Isaac capture 仿真回执(settled_center/world_aabb/碰撞体/相机标定)；模型预测(depth/segmentation等)不作GT"
+}

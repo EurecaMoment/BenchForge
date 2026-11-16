@@ -1,0 +1,226 @@
+{
+  "section": "pipelines",
+  "items": [
+    {
+      "id": "asset.prepare",
+      "version": 1,
+      "description": "复用、导入或生成资产，保留来源和坐标约定。",
+      "inputs": {
+        "intent": "object",
+        "service_config": "path"
+      },
+      "outputs": {
+        "asset": "AssetBundle"
+      },
+      "steps": [
+        {
+          "id": "asset",
+          "uses": "spatialforge.asset",
+          "arguments": {
+            "intent": "$inputs.intent"
+          }
+        },
+        {
+          "id": "asset_ready",
+          "uses": "spatialforge.observe",
+          "arguments": {
+            "run_id": "$asset.run_id"
+          },
+          "await_terminal": true
+        }
+      ]
+    },
+    {
+      "id": "data.capability",
+      "version": 1,
+      "description": "按指定能力、任务或267模板目录中的多个模板生产协议绑定数据；pipeline_plan将能力或模板选择转换为selections。",
+      "inputs": {
+        "selections": "array of template_ids/count/reason",
+        "evidence": "optional JSONL",
+        "seed": "integer",
+        "split": "train/dev/test/sealed"
+      },
+      "outputs": {
+        "questions": "dataset/report and exact per-template counts",
+        "package": "public/authority/optional training bundle paths"
+      },
+      "steps": [
+        {
+          "id": "questions",
+          "uses": "templates.produce",
+          "arguments": {
+            "selections": "$inputs.selections",
+            "evidence": "$inputs.evidence",
+            "seed": "$inputs.seed",
+            "split": "$inputs.split"
+          }
+        },
+        {
+          "id": "package",
+          "uses": "data.package",
+          "arguments": {
+            "dataset": "$questions.dataset"
+          }
+        }
+      ]
+    },
+    {
+      "id": "data.package",
+      "version": 1,
+      "description": "打包公开题目媒体、私有authority和训练答案，保留协议、分区和数量缺口。",
+      "inputs": {
+        "dataset": "path"
+      },
+      "outputs": {
+        "public_bundle": "path",
+        "authority_bundle": "path",
+        "training_bundle": "optional path"
+      },
+      "steps": [
+        {
+          "id": "package",
+          "uses": "data.package",
+          "arguments": {
+            "dataset": "$inputs.dataset"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene.capture",
+      "version": 1,
+      "description": "采集已有 SceneProgram 的真实图像、深度、实例、姿态和交互，不重复创建场景。",
+      "inputs": {
+        "scene_program_path": "path",
+        "capture_options": "optional object",
+        "service_config": "path"
+      },
+      "outputs": {
+        "capture": "CaptureEvidence"
+      },
+      "steps": [
+        {
+          "id": "capture",
+          "uses": "spatialforge.capture",
+          "arguments": {
+            "scene_program_path": "$inputs.scene_program_path",
+            "capture_options": "$inputs.capture_options"
+          }
+        },
+        {
+          "id": "capture_ready",
+          "uses": "spatialforge.observe",
+          "arguments": {
+            "run_id": "$capture.run_id"
+          },
+          "await_terminal": true
+        }
+      ]
+    },
+    {
+      "id": "scene.create",
+      "version": 1,
+      "description": "提交场景intent并观察完成状态；复用原参考、资产与场景生产流程。",
+      "inputs": {
+        "intents": "array of name/description/split with optional layout/scene_program_path/target_items",
+        "service_config": "path"
+      },
+      "outputs": {
+        "scene": "submitted run_id",
+        "scene_ready": "terminal state with tasks and artifact references"
+      },
+      "steps": [
+        {
+          "id": "scene",
+          "uses": "spatialforge.start",
+          "arguments": {
+            "intents": "$inputs.intents"
+          }
+        },
+        {
+          "id": "scene_ready",
+          "uses": "spatialforge.observe",
+          "arguments": {
+            "run_id": "$scene.run_id"
+          },
+          "await_terminal": true
+        }
+      ],
+      "execution": "existing single desktop Isaac queue"
+    },
+    {
+      "id": "scene.refine",
+      "version": 1,
+      "description": "从已有采集和修改要求生成新版本，保留来源场景和旧证据。",
+      "inputs": {
+        "parent_task_id": "string",
+        "name": "string",
+        "description": "string",
+        "service_config": "path"
+      },
+      "outputs": {
+        "scene": "SceneProgram",
+        "capture": "CaptureEvidence"
+      },
+      "steps": [
+        {
+          "id": "refine",
+          "uses": "spatialforge.refine",
+          "arguments": {
+            "parent_task_id": "$inputs.parent_task_id",
+            "name": "$inputs.name",
+            "description": "$inputs.description"
+          }
+        },
+        {
+          "id": "refine_ready",
+          "uses": "spatialforge.observe",
+          "arguments": {
+            "run_id": "$refine.run_id"
+          },
+          "await_terminal": true
+        }
+      ]
+    }
+  ],
+  "total": 6,
+  "next_offset": null,
+  "source": "89tasks-267templates-v1.0-design",
+  "capability_policy": "Catalog links select candidates; task operation and measurement variant define measured scope.",
+  "question_authoring": {
+    "schema": "benchforge.question-writing/v1",
+    "instructions": "每题提交 question_spec：简短自然题干 stem、公开已知条件 context、必要作答规则 conditions、候选 options、作答说明 response、逐项媒体标题 media_labels，以及与 parameters 完全一致的 parameter_bindings。题干先说看什么和问什么；采集说明、坐标定义、单位和容差分别放在条件中，必要条件不能藏在技术详情。对象称呼必须对应公开图片中的真实名称或编号；禁止凭空命名物体。禁止把内部运行号、路径、相机代码、原始字典或列表拼进题干。中心、采样点、参照轴等若用于作答，必须在公开媒体中提供对应标记或可用条件。保留准确模板的目标、参照系、单位、容差、候选和输出合同；改表达不能改变问题。无需模型判断题目质量。程序检查字段与绑定，并逐模板实际看图检查代表题。",
+    "evidence_field": "question_spec",
+    "required_fields": [
+      "stem",
+      "context",
+      "conditions",
+      "options",
+      "response",
+      "media_labels",
+      "parameter_bindings"
+    ],
+    "example": {
+      "schema": "benchforge.question-writing/v1",
+      "stem": "看图1，标记A的物体在标记B的哪一侧？",
+      "context": [
+        "图中编号用于识别物体。"
+      ],
+      "conditions": [
+        "以画面为参照，按图中中心标记判断方向。"
+      ],
+      "options": [
+        "左侧",
+        "右侧",
+        "上方",
+        "下方"
+      ],
+      "response": "按当前模板的输出合同提交一个方向。",
+      "media_labels": [
+        "图1：场景与物体中心标记"
+      ],
+      "parameter_bindings": "copy the exact evidence parameters object"
+    },
+    "validation_scope": "writing structure and exact source bindings; human answerability requires real media review"
+  }
+}

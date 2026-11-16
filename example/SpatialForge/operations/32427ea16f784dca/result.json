@@ -1,0 +1,1114 @@
+{
+  "section": "templates",
+  "items": [
+    {
+      "id": "C04-T01",
+      "task_id": "C04",
+      "title": "共同锚点最近对象",
+      "prompt_template": "在{media}中，哪个对象距离锚点{anchor}中心最近？候选为{objects}。",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "尺度统一的场景",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "唯一锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "objects",
+          "domain_or_binding": "3至6个候选ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "最近目标必须唯一且与第二名相差超过tie_epsilon。",
+      "output_kind": "choice",
+      "output_schema": {
+        "choice_id": "existing candidate ID or accepted ID set if multi-answer"
+      },
+      "protocol_id": "D89-C04-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。；最近目标必须唯一且与第二名相差超过tie_epsilon。",
+      "effective_oracle": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。；变体要求：最近目标必须唯一且与第二名相差超过tie_epsilon。",
+      "effective_scoring": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "锚点距离比较与排序",
+      "operation": "compare_anchor_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C04-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "锚点距离比较与排序",
+        "input_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "保持对象身份和尺度，改变锚点或距离差；不按像素间距替代三维距离。",
+        "reference_frame_rule": "场景坐标；非朝向关系",
+        "oracle_contract": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。",
+        "scoring_contract": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。",
+        "difficulty_axes": [
+          "候选数量",
+          "距离差",
+          "锚点变化"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C04-T02",
+      "task_id": "C04",
+      "title": "远近全排序",
+      "prompt_template": "根据{media}，将{objects}按到{anchor}中心的距离从近到远排列。",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "空间可辨",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "objects",
+          "domain_or_binding": "3至8个ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "固定锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "严格排序题剔除等距；不要只评分第一名。",
+      "output_kind": "ordered_ids",
+      "output_schema": {
+        "sequence": "entity/frame ID array"
+      },
+      "protocol_id": "D89-C04-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。；严格排序题剔除等距；不要只评分第一名。",
+      "effective_oracle": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。；变体要求：严格排序题剔除等距；不要只评分第一名。",
+      "effective_scoring": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "锚点距离比较与排序",
+      "operation": "compare_anchor_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C04-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "锚点距离比较与排序",
+        "input_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "保持对象身份和尺度，改变锚点或距离差；不按像素间距替代三维距离。",
+        "reference_frame_rule": "场景坐标；非朝向关系",
+        "oracle_contract": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。",
+        "scoring_contract": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。",
+        "difficulty_axes": [
+          "候选数量",
+          "距离差",
+          "锚点变化"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C04-T03",
+      "task_id": "C04",
+      "title": "含等距的距离分组",
+      "prompt_template": "在{media}中，将{objects}按距离锚点{anchor}的档位从近到远分组；档宽为{epsilon}米、原点为0，floor(距离/档宽)相同的对象写在同组。",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "标定场景",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "固定锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "objects",
+          "domain_or_binding": "3至6个ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "epsilon",
+          "domain_or_binding": "题中给定正档宽",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "使用明确量化分箱；距离位于档位边界附近的实例剔除，避免非传递的链式近似相等。",
+      "output_kind": "ordered_groups",
+      "output_schema": {
+        "groups": "ordered array of unordered ID groups"
+      },
+      "protocol_id": "D89-C04-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。；使用明确量化分箱；距离位于档位边界附近的实例剔除，避免非传递的链式近似相等。",
+      "effective_oracle": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。；变体要求：使用明确量化分箱；距离位于档位边界附近的实例剔除，避免非传递的链式近似相等。",
+      "effective_scoring": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "锚点距离比较与排序",
+      "operation": "compare_anchor_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C04-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "锚点距离比较与排序",
+        "input_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "保持对象身份和尺度，改变锚点或距离差；不按像素间距替代三维距离。",
+        "reference_frame_rule": "场景坐标；非朝向关系",
+        "oracle_contract": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。",
+        "scoring_contract": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。",
+        "difficulty_axes": [
+          "候选数量",
+          "距离差",
+          "锚点变化"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C05-T02",
+      "task_id": "C05",
+      "title": "离轴欧氏距离比较",
+      "prompt_template": "在{image}中，{A}和{B}哪个中心到相机光心的直线距离更近？",
+      "parameters": [
+        {
+          "name": "image",
+          "domain_or_binding": "离轴对象及足够几何线索",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "有意包含z排序与范数排序相反的可判定样本。",
+      "output_kind": "choice",
+      "output_schema": {
+        "choice_id": "existing candidate ID or accepted ID set if multi-answer"
+      },
+      "protocol_id": "D89-C05-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "给定观察相机与对象；明确比较光轴z或欧氏中心距离；允许相等时声明容差。；有意包含z排序与范数排序相反的可判定样本。",
+      "effective_oracle": "将对象中心变换到相机坐标；比较z或范数，标签按指定阈值生成。；变体要求：有意包含z排序与范数排序相反的可判定样本。",
+      "effective_scoring": "关系准确率；等距、离轴和大小混淆分别报告。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "相机相对对象深度比较",
+      "operation": "compare_camera_depth",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C05-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机相对对象深度比较",
+        "input_conditions": "给定观察相机与对象；明确比较光轴z或欧氏中心距离；允许相等时声明容差。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "尺度不是排序必需项，但视角和对象身份固定；像素大小反转构成干扰。",
+        "reference_frame_rule": "相机",
+        "oracle_contract": "将对象中心变换到相机坐标；比较z或范数，标签按指定阈值生成。",
+        "scoring_contract": "关系准确率；等距、离轴和大小混淆分别报告。",
+        "difficulty_axes": [
+          "深度差",
+          "离轴角",
+          "透视大小"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C11-T01",
+      "task_id": "C11",
+      "title": "距离范围内计数",
+      "prompt_template": "在{scene}中，除锚点{anchor}外，有多少对象中心到它的距离不超过{radius}米？",
+      "parameters": [
+        {
+          "name": "scene",
+          "domain_or_binding": "标定几何",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "anchor",
+          "domain_or_binding": "唯一锚点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "radius",
+          "domain_or_binding": "正阈值",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "边界≤包含；锚点不计入；本模板不继承现有同类训练题为测试。",
+      "output_kind": "integer",
+      "output_schema": {
+        "value": "nonnegative integer"
+      },
+      "protocol_id": "D89-C11-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "明确计数谓词、对象全集/可见范围、边界规则和跨视图去重；对象ID可在真值中持久。；边界≤包含；锚点不计入；本模板不继承现有同类训练题为测试。",
+      "effective_oracle": "对场景实体ID应用谓词并集合去重；仅可见计数按可见掩码阈值；距离条件按给定几何。；变体要求：边界≤包含；锚点不计入；本模板不继承现有同类训练题为测试。",
+      "effective_scoring": "整数精确率和绝对计数误差；按条件和观测范围分项。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "条件对象计数",
+      "operation": "count_instances",
+      "catalog_capability_links": [
+        {
+          "id": "N07",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N18",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C11-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "条件对象计数",
+        "input_conditions": "明确计数谓词、对象全集/可见范围、边界规则和跨视图去重；对象ID可在真值中持久。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "计数没有独立N节点；关联能力按谓词决定；检测与条件筛选分别诊断。",
+        "reference_frame_rule": "视野、场景或对象内在参照系",
+        "oracle_contract": "对场景实体ID应用谓词并集合去重；仅可见计数按可见掩码阈值；距离条件按给定几何。",
+        "scoring_contract": "整数精确率和绝对计数误差；按条件和观测范围分项。",
+        "difficulty_axes": [
+          "目标数",
+          "遮挡",
+          "相似对象",
+          "谓词复杂度"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C01-T01",
+      "task_id": "C01",
+      "title": "三维中心距离",
+      "prompt_template": "根据{media}，估计标记对象{A}与{B}几何中心之间的直线距离，单位米。",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "带尺度多视图或RGB-D",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "唯一实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "不同唯一实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C01-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "effective_oracle": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。；变体要求：答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "effective_scoring": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "实体间绝对距离估计",
+      "operation": "estimate_metric_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C01-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "实体间绝对距离估计",
+        "input_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定指代、相机和尺度；区分中心、表面最近点与目标位置距离；二维标尺变体单独报告。",
+        "reference_frame_rule": "场景三维坐标；距离定义须声明",
+        "oracle_contract": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。",
+        "scoring_contract": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。",
+        "difficulty_axes": [
+          "距离范围",
+          "表面形状",
+          "遮挡",
+          "尺度线索"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C01-T02",
+      "task_id": "C01",
+      "title": "最近表面间距",
+      "prompt_template": "根据{media}，{A}与{B}表面之间最短的非负间距是多少米？",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "表面可辨且有尺度",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "已知碰撞体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "非穿透碰撞体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "使用表面最近点；接触为0；剔除穿透情形，禁止用中心距离标签。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C01-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；使用表面最近点；接触为0；剔除穿透情形，禁止用中心距离标签。",
+      "effective_oracle": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。；变体要求：使用表面最近点；接触为0；剔除穿透情形，禁止用中心距离标签。",
+      "effective_scoring": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "实体间绝对距离估计",
+      "operation": "estimate_metric_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C01-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "实体间绝对距离估计",
+        "input_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定指代、相机和尺度；区分中心、表面最近点与目标位置距离；二维标尺变体单独报告。",
+        "reference_frame_rule": "场景三维坐标；距离定义须声明",
+        "oracle_contract": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。",
+        "scoring_contract": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。",
+        "difficulty_axes": [
+          "距离范围",
+          "表面形状",
+          "遮挡",
+          "尺度线索"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C01-T03",
+      "task_id": "C01",
+      "title": "对象到指定空间点",
+      "prompt_template": "在{media}中，{A}中心到标记位置{P}的三维直线距离是多少{unit}？",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "尺度可恢复",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "唯一实体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "P",
+          "domain_or_binding": "明确三维标记点",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "unit",
+          "domain_or_binding": "米或厘米",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "点必须三维可定位；换单位按同一真值换算，不把运动路径长度作为答案。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C01-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；点必须三维可定位；换单位按同一真值换算，不把运动路径长度作为答案。",
+      "effective_oracle": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。；变体要求：点必须三维可定位；换单位按同一真值换算，不把运动路径长度作为答案。",
+      "effective_scoring": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "实体间绝对距离估计",
+      "operation": "estimate_metric_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C01-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "实体间绝对距离估计",
+        "input_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定指代、相机和尺度；区分中心、表面最近点与目标位置距离；二维标尺变体单独报告。",
+        "reference_frame_rule": "场景三维坐标；距离定义须声明",
+        "oracle_contract": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。",
+        "scoring_contract": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。",
+        "difficulty_axes": [
+          "距离范围",
+          "表面形状",
+          "遮挡",
+          "尺度线索"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C02-T03",
+      "task_id": "C02",
+      "title": "斜射线距离",
+      "prompt_template": "{image}中标记像素{pixel}的表面点到相机光心的直线距离是多少米？",
+      "parameters": [
+        {
+          "name": "image",
+          "domain_or_binding": "含内参及尺度线索",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "pixel",
+          "domain_or_binding": "偏离主点且有效",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "此模板显式改用射线距离；作为来源定义扩展单列，不与z混评。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C02-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "标定图像、有效深度图和被测像素；声明相机轴及深度有效区域。深度真值仅供验证器。；此模板显式改用射线距离；作为来源定义扩展单列，不与z混评。",
+      "effective_oracle": "读取像素对应可见表面点；z用相机坐标第三分量，射线距离用三维范数；无效像素剔除。；变体要求：此模板显式改用射线距离；作为来源定义扩展单列，不与z混评。",
+      "effective_scoring": "按定义分别报告深度MAE与阈值内正确率；遮挡边界设独立切片。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "指定像素点深度估计",
+      "operation": "estimate_point_depth",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C02-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "指定像素点深度估计",
+        "input_conditions": "标定图像、有效深度图和被测像素；声明相机轴及深度有效区域。深度真值仅供验证器。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "目标像素由题目给定，降低目标检测需求；轴向深度z与射线距离分开。",
+        "reference_frame_rule": "相机深度定义",
+        "oracle_contract": "读取像素对应可见表面点；z用相机坐标第三分量，射线距离用三维范数；无效像素剔除。",
+        "scoring_contract": "按定义分别报告深度MAE与阈值内正确率；遮挡边界设独立切片。",
+        "difficulty_axes": [
+          "深度区间",
+          "表面纹理",
+          "边界位置"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C03-T01",
+      "task_id": "C03",
+      "title": "光心到中心",
+      "prompt_template": "根据{media}，相机光心到{object}几何中心的距离是多少米？",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "标定多视图",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "object",
+          "domain_or_binding": "唯一对象",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "不同离轴角但相同距离配对，排除只读z。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C03-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。；不同离轴角但相同距离配对，排除只读z。",
+      "effective_oracle": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。；变体要求：不同离轴角但相同距离配对，排除只读z。",
+      "effective_scoring": "MAE和相对误差按定义分项；分类候选用准确率。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "相机到对象距离估计",
+      "operation": "estimate_camera_object_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C03-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机到对象距离估计",
+        "input_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定对象识别；声明相机到中心或到最近表面，不能冒充像素点深度。",
+        "reference_frame_rule": "相机坐标",
+        "oracle_contract": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。",
+        "scoring_contract": "MAE和相对误差按定义分项；分类候选用准确率。",
+        "difficulty_axes": [
+          "对象深度",
+          "离轴角",
+          "对象体积"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C03-T02",
+      "task_id": "C03",
+      "title": "光心到表面",
+      "prompt_template": "根据{media}，相机光心到{object}最近可定义表面的距离是多少米？",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "有尺度的对象视图",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "object",
+          "domain_or_binding": "网格或解析实体",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "最近点按完整实体几何计算；若仅测可见表面须在题干标明并单列。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C03-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。；最近点按完整实体几何计算；若仅测可见表面须在题干标明并单列。",
+      "effective_oracle": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。；变体要求：最近点按完整实体几何计算；若仅测可见表面须在题干标明并单列。",
+      "effective_scoring": "MAE和相对误差按定义分项；分类候选用准确率。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "相机到对象距离估计",
+      "operation": "estimate_camera_object_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C03-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机到对象距离估计",
+        "input_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定对象识别；声明相机到中心或到最近表面，不能冒充像素点深度。",
+        "reference_frame_rule": "相机坐标",
+        "oracle_contract": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。",
+        "scoring_contract": "MAE和相对误差按定义分项；分类候选用准确率。",
+        "difficulty_axes": [
+          "对象深度",
+          "离轴角",
+          "对象体积"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    },
+    {
+      "id": "C03-T03",
+      "task_id": "C03",
+      "title": "相机距离候选选择",
+      "prompt_template": "在{media}中，{object}中心到相机的距离属于哪个候选：{options}？",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "含尺度线索",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "object",
+          "domain_or_binding": "唯一对象",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "options",
+          "domain_or_binding": "不重叠距离候选",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "干扰项包括光轴深度和表面距离，所有选项同单位。",
+      "output_kind": "choice",
+      "output_schema": {
+        "choice_id": "existing candidate ID or accepted ID set if multi-answer"
+      },
+      "protocol_id": "D89-C03-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。；干扰项包括光轴深度和表面距离，所有选项同单位。",
+      "effective_oracle": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。；变体要求：干扰项包括光轴深度和表面距离，所有选项同单位。",
+      "effective_scoring": "MAE和相对误差按定义分项；分类候选用准确率。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "相机到对象距离估计",
+      "operation": "estimate_camera_object_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C03-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机到对象距离估计",
+        "input_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定对象识别；声明相机到中心或到最近表面，不能冒充像素点深度。",
+        "reference_frame_rule": "相机坐标",
+        "oracle_contract": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。",
+        "scoring_contract": "MAE和相对误差按定义分项；分类候选用准确率。",
+        "difficulty_axes": [
+          "对象深度",
+          "离轴角",
+          "对象体积"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": false,
+        "evidence_binding": true,
+        "scope": "requires task-specific source evidence and oracle; no generic substitute",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    }
+  ],
+  "total": 32,
+  "next_offset": 12,
+  "source": "89tasks-267templates-v1.0-design",
+  "capability_policy": "Catalog links select candidates; task operation and measurement variant define measured scope.",
+  "question_authoring": {
+    "schema": "benchforge.question-writing/v1",
+    "instructions": "每题提交 question_spec：简短自然题干 stem、公开已知条件 context、必要作答规则 conditions、候选 options、作答说明 response、逐项媒体标题 media_labels，以及与 parameters 完全一致的 parameter_bindings。题干先说看什么和问什么；采集说明、坐标定义、单位和容差分别放在条件中，必要条件不能藏在技术详情。对象称呼必须对应公开图片中的真实名称或编号；禁止凭空命名物体。禁止把内部运行号、路径、相机代码、原始字典或列表拼进题干。中心、采样点、参照轴等若用于作答，必须在公开媒体中提供对应标记或可用条件。保留准确模板的目标、参照系、单位、容差、候选和输出合同；改表达不能改变问题。无需模型判断题目质量。程序检查字段与绑定，并逐模板实际看图检查代表题。",
+    "evidence_field": "question_spec",
+    "required_fields": [
+      "stem",
+      "context",
+      "conditions",
+      "options",
+      "response",
+      "media_labels",
+      "parameter_bindings"
+    ],
+    "example": {
+      "schema": "benchforge.question-writing/v1",
+      "stem": "看图1，标记A的物体在标记B的哪一侧？",
+      "context": [
+        "图中编号用于识别物体。"
+      ],
+      "conditions": [
+        "以画面为参照，按图中中心标记判断方向。"
+      ],
+      "options": [
+        "左侧",
+        "右侧",
+        "上方",
+        "下方"
+      ],
+      "response": "按当前模板的输出合同提交一个方向。",
+      "media_labels": [
+        "图1：场景与物体中心标记"
+      ],
+      "parameter_bindings": "copy the exact evidence parameters object"
+    },
+    "validation_scope": "writing structure and exact source bindings; human answerability requires real media review"
+  }
+}

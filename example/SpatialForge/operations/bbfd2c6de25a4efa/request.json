@@ -1,0 +1,13 @@
+{
+  "tool": "stage_review",
+  "arguments": {
+    "action": "wait",
+    "review_id": 56,
+    "timeout_seconds": 0
+  },
+  "time": "2026-11-06T20:06:02.137496+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "formal-pipeline-review-wait"
+  }
+}

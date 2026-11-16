@@ -1,0 +1,4135 @@
+{
+  "section": "tasks",
+  "items": [
+    {
+      "id": "C01",
+      "name": "实体间绝对距离估计",
+      "origin": "literature_normalized",
+      "family": "度量与比较",
+      "operation": "estimate_metric_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "场景三维坐标；距离定义须声明",
+        "normalized_output": "带单位距离",
+        "oracle_contract": "按来源的最近点/中心距离及容差评分",
+        "variant_boundaries": "最近点与中心距离不可直接混标；单图/多帧、尺度信息及目标平移距离单列"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N01|C01|",
+          "legacy_protocol_id": "P2-N01",
+          "name": "二维标尺点间距离，不覆盖真实三维深度",
+          "scope": "二维标尺点间距离，不覆盖真实三维深度",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|ST-meanrelativeacc|C01|",
+          "legacy_protocol_id": "ST-meanrelativeacc",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        },
+        {
+          "id": "phase2|ST-multichoiceeval|C01|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 1
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C01-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "实体间绝对距离估计",
+        "input_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定指代、相机和尺度；区分中心、表面最近点与目标位置距离；二维标尺变体单独报告。",
+        "reference_frame_rule": "场景三维坐标；距离定义须声明",
+        "oracle_contract": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。",
+        "scoring_contract": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。",
+        "difficulty_axes": [
+          "距离范围",
+          "表面形状",
+          "遮挡",
+          "尺度线索"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C01-T01",
+        "C01-T02",
+        "C01-T03"
+      ]
+    },
+    {
+      "id": "C02",
+      "name": "指定像素点深度估计",
+      "origin": "literature_normalized",
+      "family": "度量与比较",
+      "operation": "estimate_point_depth",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "相机深度定义",
+        "normalized_output": "深度数值",
+        "oracle_contract": "按原数据深度定义与单位评分",
+        "variant_boundaries": "轴向深度与欧氏距离须复核；毫米/米须转换"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-meanrelativeacc|C02|",
+          "legacy_protocol_id": "ST-meanrelativeacc",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C02-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "指定像素点深度估计",
+        "input_conditions": "标定图像、有效深度图和被测像素；声明相机轴及深度有效区域。深度真值仅供验证器。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "目标像素由题目给定，降低目标检测需求；轴向深度z与射线距离分开。",
+        "reference_frame_rule": "相机深度定义",
+        "oracle_contract": "读取像素对应可见表面点；z用相机坐标第三分量，射线距离用三维范数；无效像素剔除。",
+        "scoring_contract": "按定义分别报告深度MAE与阈值内正确率；遮挡边界设独立切片。",
+        "difficulty_axes": [
+          "深度区间",
+          "表面纹理",
+          "边界位置"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C02-T01",
+        "C02-T02",
+        "C02-T03"
+      ]
+    },
+    {
+      "id": "C03",
+      "name": "相机到对象距离估计",
+      "origin": "literature_normalized",
+      "family": "度量与比较",
+      "operation": "estimate_camera_object_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "相机坐标",
+        "normalized_output": "带单位距离",
+        "oracle_contract": "相机到对象最近点或指定几何位置的距离",
+        "variant_boundaries": "不能与像素点深度当作同一标签"
+      },
+      "existing_protocols": [],
+      "new_protocol": {
+        "id": "D89-C03-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机到对象距离估计",
+        "input_conditions": "相机光心与对象几何可确定；输入具有尺度；目标对象唯一。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定对象识别；声明相机到中心或到最近表面，不能冒充像素点深度。",
+        "reference_frame_rule": "相机坐标",
+        "oracle_contract": "将相机中心和对象几何变换到统一世界坐标；中心范数或相机到网格最近点。",
+        "scoring_contract": "MAE和相对误差按定义分项；分类候选用准确率。",
+        "difficulty_axes": [
+          "对象深度",
+          "离轴角",
+          "对象体积"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C03-T01",
+        "C03-T02",
+        "C03-T03"
+      ]
+    },
+    {
+      "id": "C04",
+      "name": "锚点距离比较与排序",
+      "origin": "literature_normalized",
+      "family": "度量与比较",
+      "operation": "compare_anchor_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "场景坐标；非朝向关系",
+        "normalized_output": "最近/最远对象或距离次序",
+        "oracle_contract": "计算到共同锚点的距离并比较",
+        "variant_boundaries": "最近/最远、二选一/多选、最近点/中心、单图/多视图作为变体"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|pilot-sat-static_distance|C04|",
+          "legacy_protocol_id": "pilot-sat-static_distance",
+          "name": "prior pilot subset, development only",
+          "scope": "prior pilot subset, development only",
+          "binding_status": "reviewed_source_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 5
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C04-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "锚点距离比较与排序",
+        "input_conditions": "共同锚点及候选实体明确；统一距离定义和坐标系；显示排序所需的全部目标。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "保持对象身份和尺度，改变锚点或距离差；不按像素间距替代三维距离。",
+        "reference_frame_rule": "场景坐标；非朝向关系",
+        "oracle_contract": "计算全部目标到锚点的指定距离，按冻结tie_epsilon排序或建立等距组。",
+        "scoring_contract": "最近/最远准确率，完全排序正确率与Kendall次序指标；等距组按集合评。",
+        "difficulty_axes": [
+          "候选数量",
+          "距离差",
+          "锚点变化"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C04-T01",
+        "C04-T02",
+        "C04-T03"
+      ]
+    },
+    {
+      "id": "C05",
+      "name": "相机相对对象深度比较",
+      "origin": "literature_normalized",
+      "family": "度量与比较",
+      "operation": "compare_camera_depth",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "相机",
+        "normalized_output": "近远关系或对象次序",
+        "oracle_contract": "按来源定义比较对象相对相机的距离/深度",
+        "variant_boundaries": "是否允许 same；位置距离与深度的口径不得混用"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|pilot-sat-static_depth|C05|",
+          "legacy_protocol_id": "pilot-sat-static_depth",
+          "name": "prior pilot subset, development only",
+          "scope": "prior pilot subset, development only",
+          "binding_status": "reviewed_source_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 10
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C05-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机相对对象深度比较",
+        "input_conditions": "给定观察相机与对象；明确比较光轴z或欧氏中心距离；允许相等时声明容差。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "尺度不是排序必需项，但视角和对象身份固定；像素大小反转构成干扰。",
+        "reference_frame_rule": "相机",
+        "oracle_contract": "将对象中心变换到相机坐标；比较z或范数，标签按指定阈值生成。",
+        "scoring_contract": "关系准确率；等距、离轴和大小混淆分别报告。",
+        "difficulty_axes": [
+          "深度差",
+          "离轴角",
+          "透视大小"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C05-T01",
+        "C05-T02",
+        "C05-T03"
+      ]
+    },
+    {
+      "id": "C06",
+      "name": "多点深度分组排序",
+      "origin": "literature_normalized",
+      "family": "度量与比较",
+      "operation": "rank_point_depth",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "相机",
+        "normalized_output": "含参考点分隔的深度排序",
+        "oracle_contract": "参考点前后分组与顺序完全/分项匹配",
+        "variant_boundaries": "多点排序不可等同二对象比较，保留共同任务族"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C06|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N01",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C06-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "多点深度分组排序",
+        "input_conditions": "同一标定图中多个有效像素点与参考点；各点对应表面可辨。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "像素身份直接给定；深度定义统一为z；只改变目标点数量和前后深度。",
+        "reference_frame_rule": "相机",
+        "oracle_contract": "读取深度图，按参考点z分组，组内排序；等深按epsilon或分箱规则处理。",
+        "scoring_contract": "分组准确率与组内成对顺序准确率，另报完整序列正确率。",
+        "difficulty_axes": [
+          "点数",
+          "深度差",
+          "参考点位置"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C06-T01",
+        "C06-T02",
+        "C06-T03"
+      ]
+    },
+    {
+      "id": "C07",
+      "name": "物体指定维度长度估计",
+      "origin": "literature_normalized",
+      "family": "尺度与几何约束",
+      "operation": "estimate_object_extent",
+      "catalog_capability_links": [
+        {
+          "id": "N02",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "物体几何坐标",
+        "normalized_output": "带单位长度",
+        "oracle_contract": "按指定维度的几何真值与容差评分",
+        "variant_boundaries": "最长边、宽度、厚度不可混标"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-meanrelativeacc|C07|",
+          "legacy_protocol_id": "ST-meanrelativeacc",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N02",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C07-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "物体指定维度长度估计",
+        "input_conditions": "对象局部坐标与指定尺寸轴明确；尺度已标定；遮挡情况下有充分多视图信息。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定定位和单位；局部尺寸、世界轴外接框尺寸和像素长度不可混用。",
+        "reference_frame_rule": "物体几何坐标",
+        "oracle_contract": "读取对象局部几何极值；按轴求max-min；最长边取局部约定尺寸最大值。",
+        "scoring_contract": "每种维度的MAE与相对误差；毫米/厘米/米统一换算后评分。",
+        "difficulty_axes": [
+          "尺寸范围",
+          "姿态",
+          "薄厚差",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C07-T01",
+        "C07-T02",
+        "C07-T03"
+      ]
+    },
+    {
+      "id": "C08",
+      "name": "房间地面面积估计",
+      "origin": "literature_normalized",
+      "family": "尺度与几何约束",
+      "operation": "estimate_floor_area",
+      "catalog_capability_links": [
+        {
+          "id": "N02",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "水平地面",
+        "normalized_output": "平方米面积",
+        "oracle_contract": "区域边界确定后的面积与误差评分",
+        "variant_boundaries": "单房间/合并空间、地面边界需声明"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-meanrelativeacc|C08|",
+          "legacy_protocol_id": "ST-meanrelativeacc",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N02",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C08-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "房间地面面积估计",
+        "input_conditions": "房间水平地面边界与尺度明确；指定是否扣除柱子、凹洞或固定不可用区域。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定边界标注；总地面面积不等于可步行面积，透视像素面积不可直接计分。",
+        "reference_frame_rule": "水平地面",
+        "oracle_contract": "在地面平面上计算多边形面积，必要时扣除显式洞区域；合并区域先做多边形并集。",
+        "scoring_contract": "平方米MAE与相对误差；按总面积/净面积/并集面积分别报告。",
+        "difficulty_axes": [
+          "边界复杂度",
+          "凹形",
+          "遮挡",
+          "尺度"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C08-T01",
+        "C08-T02",
+        "C08-T03"
+      ]
+    },
+    {
+      "id": "C09",
+      "name": "物体真实尺寸比较",
+      "origin": "literature_normalized",
+      "family": "尺度与几何约束",
+      "operation": "compare_object_extent",
+      "catalog_capability_links": [
+        {
+          "id": "N02",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "物体几何坐标",
+        "normalized_output": "较大/较长对象或大小关系",
+        "oracle_contract": "相同维度及单位下比较真实尺寸",
+        "variant_boundaries": "跨视图透视、最长边/宽/厚单列；不能按像素大小代替"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C09|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N02",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C09-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "物体真实尺寸比较",
+        "input_conditions": "对象真实尺度可确定；明确比较同一维度，提供足够尺度线索。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "分别操控相机距离和对象大小；允许像素大小与真实尺寸排序相反。",
+        "reference_frame_rule": "物体几何坐标",
+        "oracle_contract": "对同一几何定义求尺寸后比较；等尺寸容差冻结。",
+        "scoring_contract": "比较/排序准确率；同尺寸、透视冲突分项。",
+        "difficulty_axes": [
+          "大小差",
+          "透视差",
+          "维度"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C09-T01",
+        "C09-T02",
+        "C09-T03"
+      ]
+    },
+    {
+      "id": "C10",
+      "name": "净空、容纳与可达性判断",
+      "origin": "literature_normalized",
+      "family": "尺度与几何约束",
+      "operation": "judge_geometric_fit",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N02",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N16",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "场景与对象尺度",
+        "normalized_output": "能否容纳/通过/够到",
+        "oracle_contract": "依据尺寸、间距、几何约束检查可行性",
+        "variant_boundaries": "区分纯几何净空与含身体/工具约束的可供性"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C10|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N16",
+              "extent": "partial",
+              "role": "primary"
+            },
+            {
+              "capability_id": "N02",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 6
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C10-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "净空、容纳与可达性判断",
+        "input_conditions": "对象/行动者刚体尺寸、孔道净空、运动自由度与安全余量明确；允许的转向或姿态已声明。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "只测几何可行性；动力、摩擦和工具用途未给定时不推断；姿态改变另列。",
+        "reference_frame_rule": "场景与对象尺度",
+        "oracle_contract": "通过和容纳用构型空间碰撞检查；直线够到用声明的最大伸展及无遮挡约束。",
+        "scoring_contract": "可行性准确率、约束违反率；报告距离余量；不等于真实机器人成功率。",
+        "difficulty_axes": [
+          "净空余量",
+          "对象姿态",
+          "障碍数量"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C10-T01",
+        "C10-T02",
+        "C10-T03"
+      ]
+    },
+    {
+      "id": "C11",
+      "name": "条件对象计数",
+      "origin": "literature_normalized",
+      "family": "计数与可见性",
+      "operation": "count_instances",
+      "catalog_capability_links": [
+        {
+          "id": "N07",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N18",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "视野、场景或对象内在参照系",
+        "normalized_output": "整数或计数候选",
+        "oracle_contract": "先声明计数范围与去重口径，再计算误差/准确率",
+        "variant_boundaries": "单帧可见、跨视图去重、整场景、朝向条件分别保存；计数没有严格对应的单独能力节点"
+      },
+      "existing_protocols": [],
+      "new_protocol": {
+        "id": "D89-C11-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "条件对象计数",
+        "input_conditions": "明确计数谓词、对象全集/可见范围、边界规则和跨视图去重；对象ID可在真值中持久。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "计数没有独立N节点；关联能力按谓词决定；检测与条件筛选分别诊断。",
+        "reference_frame_rule": "视野、场景或对象内在参照系",
+        "oracle_contract": "对场景实体ID应用谓词并集合去重；仅可见计数按可见掩码阈值；距离条件按给定几何。",
+        "scoring_contract": "整数精确率和绝对计数误差；按条件和观测范围分项。",
+        "difficulty_axes": [
+          "目标数",
+          "遮挡",
+          "相似对象",
+          "谓词复杂度"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C11-T01",
+        "C11-T02",
+        "C11-T03"
+      ]
+    },
+    {
+      "id": "C12",
+      "name": "3D 检测候选选择",
+      "origin": "literature_normalized",
+      "family": "定位与对应",
+      "operation": "select_3d_detection",
+      "catalog_capability_links": [
+        {
+          "id": "N10",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "来源的三维坐标与框约定",
+        "normalized_output": "类别+3D框候选",
+        "oracle_contract": "匹配类别及框参数候选",
+        "variant_boundaries": "当前证据为选择题，不能等同开放集检测生成"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C12|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N10",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C12-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "3D 检测候选选择",
+        "input_conditions": "3D场景与明确候选框；候选含坐标系、尺寸、姿态和类别；输入足以判断。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "只选已给候选，不生成连续框；把类别识别和框几何分开对照。",
+        "reference_frame_rule": "来源的三维坐标与框约定",
+        "oracle_contract": "将候选和真值统一为OBB或AABB，按冻结3D IoU规则产生唯一合格候选。",
+        "scoring_contract": "候选准确率；类别和位置错误类型单列；不报开放集检测mAP。",
+        "difficulty_axes": [
+          "候选IoU接近度",
+          "遮挡",
+          "类别数"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C12-T01",
+        "C12-T02",
+        "C12-T03"
+      ]
+    },
+    {
+      "id": "C13",
+      "name": "语言指代的3D框定位",
+      "origin": "literature_normalized",
+      "family": "定位与对应",
+      "operation": "ground_referent_3d",
+      "catalog_capability_links": [
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "来源三维框坐标",
+        "normalized_output": "3D框候选",
+        "oracle_contract": "语言实体与三维框匹配",
+        "variant_boundaries": "已给候选框；不证明连续坐标框生成"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C13|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N11",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C13-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "语言指代的3D框定位",
+        "input_conditions": "3D场景、语言指代和候选框；指代应唯一可解析；框约定统一。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "给定候选框降低框回归需求；单属性、关系和多条件指代分列。",
+        "reference_frame_rule": "来源三维框坐标",
+        "oracle_contract": "在结构场景中解析显式谓词至唯一实体ID，再匹配候选框；歧义指代拒收或标为unknown专用变体。",
+        "scoring_contract": "框候选准确率；指代与几何匹配分项诊断。",
+        "difficulty_axes": [
+          "同类对象数",
+          "谓词数",
+          "关系链"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C13-T01",
+        "C13-T02",
+        "C13-T03"
+      ]
+    },
+    {
+      "id": "C14",
+      "name": "语言指代的点或部位定位",
+      "origin": "literature_normalized",
+      "family": "定位与对应",
+      "operation": "ground_referent_point",
+      "catalog_capability_links": [
+        {
+          "id": "N11",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "图像坐标",
+        "normalized_output": "点/区域/指示箭头候选",
+        "oracle_contract": "目标指代与标记位置匹配",
+        "variant_boundaries": "选择已有标记和生成连续坐标为不同变体"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N11|C14|",
+          "legacy_protocol_id": "P2-N11",
+          "name": "二维颜色指代点，非三维框",
+          "scope": "二维颜色指代点，非三维框",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N11",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|ST-multichoiceeval|C14|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N11",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 4
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C14-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "语言指代的点或部位定位",
+        "input_conditions": "图像分辨率和坐标原点明确；语言指代及标记点/区域候选；连续点变体另存。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "候选点与自由坐标分开；部位可见或有足够多视图信息。",
+        "reference_frame_rule": "图像坐标",
+        "oracle_contract": "持久部位标签或语义掩码定位目标，候选命中或规范化坐标生成真值。",
+        "scoring_contract": "候选准确率；连续点用像素/归一化误差和掩码命中率，不直接平均。",
+        "difficulty_axes": [
+          "部位大小",
+          "指代条件",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C14-T01",
+        "C14-T02",
+        "C14-T03"
+      ]
+    },
+    {
+      "id": "C15",
+      "name": "相机自运动辨别",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "infer_egomotion",
+      "catalog_capability_links": [
+        {
+          "id": "N04",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "前后帧及声明的相机轴",
+        "normalized_output": "平移/旋转方向或动作标签",
+        "oracle_contract": "相对位姿或来源候选真值评分",
+        "variant_boundaries": "主导方向与组合运动不能等同完整6DoF恢复"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|pilot-sat-egocentric_movement|C15|",
+          "legacy_protocol_id": "pilot-sat-egocentric_movement",
+          "name": "prior pilot subset, development only",
+          "scope": "prior pilot subset, development only",
+          "binding_status": "reviewed_source_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N04",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 14
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C15-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机自运动辨别",
+        "input_conditions": "静态背景的标定视频/帧对，时间与相机轴明确；存在动态物体时可分离静态地标。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "主导运动分类与组合平移/转向分开；不把有限方向标签当完整6DoF恢复。",
+        "reference_frame_rule": "前后帧及声明的相机轴",
+        "oracle_contract": "由真值相机位姿计算相对变换，在给定轴与阈值上量化动作标签。",
+        "scoring_contract": "方向/动作准确率及组合标签F1；回归角/位移若扩展须分项。",
+        "difficulty_axes": [
+          "平移幅度",
+          "转向角",
+          "地标遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C15-T01",
+        "C15-T02",
+        "C15-T03"
+      ]
+    },
+    {
+      "id": "C16",
+      "name": "外部对象运动辨别",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "infer_object_motion",
+      "catalog_capability_links": [
+        {
+          "id": "N04",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N05",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "指定相机/观察者坐标",
+        "normalized_output": "移动对象与方向",
+        "oracle_contract": "按对象状态变化与相机状态区分运动来源",
+        "variant_boundaries": "静止/运动相机；观察运动与预测运动分开"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N05|C16|",
+          "legacy_protocol_id": "P2-N05",
+          "name": "固定相机二维双帧",
+          "scope": "固定相机二维双帧",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N05",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|pilot-sat-object_movement|C16|",
+          "legacy_protocol_id": "pilot-sat-object_movement",
+          "name": "prior pilot subset, development only",
+          "scope": "prior pilot subset, development only",
+          "binding_status": "reviewed_source_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N05",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 14
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C16-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "外部对象运动辨别",
+        "input_conditions": "对象身份与时序明确；相机固定或提供可估计/给定的相机运动；场景有静态锚点。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "只测观测段运动；动态相机条件单列，未来预测归C47。",
+        "reference_frame_rule": "指定相机/观察者坐标",
+        "oracle_contract": "对象位姿差统一到世界或指定相机帧；先扣相机运动再判断世界运动。",
+        "scoring_contract": "运动实体识别F1和方向准确率；静止误报率独立。",
+        "difficulty_axes": [
+          "动态对象数",
+          "背景运动",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C16-T01",
+        "C16-T02",
+        "C16-T03"
+      ]
+    },
+    {
+      "id": "C17",
+      "name": "重力参照的相机姿态估计",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "estimate_gravity_orientation",
+      "catalog_capability_links": [
+        {
+          "id": "N06",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "重力方向",
+        "normalized_output": "roll/pitch角度",
+        "oracle_contract": "按来源角度误差评分",
+        "variant_boundaries": "与vfov共同输出时按分量拆解；不是相机高度比较"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-gravityeval|C17|",
+          "legacy_protocol_id": "ST-gravityeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_multiple_candidates",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N06",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C17-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "重力参照的相机姿态估计",
+        "input_conditions": "重力方向真值和相机坐标约定；静止环境或IMU；Euler顺序与符号明确。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定重力线索与对象识别；roll/pitch不等于相机高度或vfov。",
+        "reference_frame_rule": "重力方向",
+        "oracle_contract": "从相机旋转和世界重力求roll/pitch，采用固定解算约定；避开Euler奇异位姿。",
+        "scoring_contract": "roll/pitch周期角误差分别报；符号错独立诊断。",
+        "difficulty_axes": [
+          "姿态角",
+          "线索数量",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C17-T01",
+        "C17-T02",
+        "C17-T03"
+      ]
+    },
+    {
+      "id": "C18",
+      "name": "垂直视场角估计",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "estimate_camera_fov",
+      "catalog_capability_links": [
+        {
+          "id": "N06",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "相机内参",
+        "normalized_output": "vfov角度",
+        "oracle_contract": "按视场角误差评分",
+        "variant_boundaries": "属于成像几何校准；27节点没有精确对应项"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-gravityeval|C18|",
+          "legacy_protocol_id": "ST-gravityeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_multiple_candidates",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N06",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C18-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "垂直视场角估计",
+        "input_conditions": "针孔/指定投影模型、有效图像高度与内参或标定观测；畸变和裁剪处理声明。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "属于成像校准；保留能力映射缺口，不勉强解释为重力感知。",
+        "reference_frame_rule": "相机内参",
+        "oracle_contract": "无畸变对称针孔vfov=2 atan(H/(2fy))；非中心主点用上下射线夹角；裁剪重算有效高度。",
+        "scoring_contract": "角度MAE和阈值内准确率；不同投影模型分开。",
+        "difficulty_axes": [
+          "焦距",
+          "裁剪",
+          "投影模型"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C18-T01",
+        "C18-T02",
+        "C18-T03"
+      ]
+    },
+    {
+      "id": "C19",
+      "name": "物体朝向与身体左右识别",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "recognize_intrinsic_orientation",
+      "catalog_capability_links": [
+        {
+          "id": "N07",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "物体内在坐标与观察者",
+        "normalized_output": "朝向/可见侧/左右部位",
+        "oracle_contract": "来源朝向或部位候选匹配",
+        "variant_boundaries": "身体左右、物体朝向作为子变体；姿态识别与换视角关系不同"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N07|C19|",
+          "legacy_protocol_id": "P2-N07",
+          "name": "几何箭头朝向，非语义物体正面",
+          "scope": "几何箭头朝向，非语义物体正面",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N07",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|ST-multichoiceeval|C19|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N07",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 7
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C19-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "物体朝向与身体左右识别",
+        "input_conditions": "对象内在前后/左右轴或身体部位可辨；视图中参照系说明明确。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "将身体左右与图像左右区分；完全对称且无标记的对象朝向不强制唯一。",
+        "reference_frame_rule": "物体内在坐标与观察者",
+        "oracle_contract": "资产本体轴与部位ID投影至观察系；用姿态真值和语义部位标签验证。",
+        "scoring_contract": "朝向分类准确率、部位匹配准确率分别报。",
+        "difficulty_axes": [
+          "对称性",
+          "背面视角",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C19-T01",
+        "C19-T02",
+        "C19-T03"
+      ]
+    },
+    {
+      "id": "C20",
+      "name": "相机间相对位置比较",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "infer_camera_position",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "指定参考相机或重力竖直轴",
+        "normalized_output": "相对方位/高低标签",
+        "oracle_contract": "相机中心相对坐标及高度比较",
+        "variant_boundaries": "SE相机高低是位置分量，不是重力姿态；保留坐标轴、平移/旋转区别"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C20|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N15",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 5
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C20-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机间相对位置比较",
+        "input_conditions": "两个相机的身份、中心和参考坐标系；标定多视图或图示；重力高度轴独立说明。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "只比较相机位置，不将旋转变化或高低当姿态角。",
+        "reference_frame_rule": "指定参考相机或重力竖直轴",
+        "oracle_contract": "相机B中心变换到A参考系；高度沿世界up投影；距离用中心差范数。",
+        "scoring_contract": "方向/高低准确率，三维分量若输出则MAE；参照系分别报告。",
+        "difficulty_axes": [
+          "相对位置",
+          "基线",
+          "参考相机旋转"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C20-T01",
+        "C20-T02",
+        "C20-T03"
+      ]
+    },
+    {
+      "id": "C21",
+      "name": "相机相对姿态变换与夹角",
+      "origin": "literature_normalized",
+      "family": "运动与位姿",
+      "operation": "infer_camera_transform",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "声明的相机坐标轴",
+        "normalized_output": "相对变换/夹角候选",
+        "oracle_contract": "相对位姿变换或朝向夹角匹配",
+        "variant_boundaries": "静态视点关系与时序自运动保留不同标准操作"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C21|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N15",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C21-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "相机相对姿态变换与夹角",
+        "input_conditions": "相机外参/可辨对应观测与轴约定；声明camera-to-world或world-to-camera变换。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "静态相机对之间关系不冒充时序自运动；相对旋转和位置分量单列。",
+        "reference_frame_rule": "声明的相机坐标轴",
+        "oracle_contract": "若TA/TB为相机到世界，则T_A_to_B=inv(TB)TA；夹角由指定前向轴或SO(3)测地距离计算。",
+        "scoring_contract": "变换候选准确率、旋转测地误差和翻译误差分别报；不得混用两种夹角。",
+        "difficulty_axes": [
+          "旋转轴",
+          "平移",
+          "基线",
+          "纹理"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C21-T01",
+        "C21-T02",
+        "C21-T03"
+      ]
+    },
+    {
+      "id": "C22",
+      "name": "跨视角拍摄方位/可见侧判断",
+      "origin": "literature_normalized",
+      "family": "参照系与关系",
+      "operation": "infer_view_side",
+      "catalog_capability_links": [
+        {
+          "id": "N07",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "已知北侧/前侧等锚点",
+        "normalized_output": "另一视图的方向或侧面",
+        "oracle_contract": "参照侧到目标侧的对应",
+        "variant_boundaries": "对象本身朝向识别与观察方位推断分开"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C22|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N15",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C22-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "跨视角拍摄方位/可见侧判断",
+        "input_conditions": "对象/建筑前侧或北侧锚点已知，跨视图实体身份明确；侧面具有可识别特征。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "测拍摄方位/所见侧，不重复测物体本体朝向；已知身份降低对应需求。",
+        "reference_frame_rule": "已知北侧/前侧等锚点",
+        "oracle_contract": "将相机中心-对象中心向量投影到对象或世界参考系，按扇区生成方向/侧面标签。",
+        "scoring_contract": "拍摄方位与可见侧准确率；边界斜角专用切片。",
+        "difficulty_axes": [
+          "视角差",
+          "锚点数",
+          "侧面相似性"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C22-T01",
+        "C22-T02",
+        "C22-T03"
+      ]
+    },
+    {
+      "id": "C23",
+      "name": "建筑同一立面判别",
+      "origin": "literature_normalized",
+      "family": "参照系与关系",
+      "operation": "match_facade",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "建筑表面/视角",
+        "normalized_output": "同侧/不同侧",
+        "oracle_contract": "二元标签匹配",
+        "variant_boundaries": "对应同一侧面；不等于完整视角变换估计"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-judge|C23|",
+          "legacy_protocol_id": "ST-judge",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N09",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C23-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "建筑同一立面判别",
+        "input_conditions": "同一建筑的两视图与可识别面ID；立面定义为资产中的同一平面/面组；遮挡不改变面身份。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "同一立面与同一建筑区分；跨层重复窗户不作为唯一身份线索。",
+        "reference_frame_rule": "建筑表面/视角",
+        "oracle_contract": "根据网格面组持久ID与可见面积确定主立面；混合多立面角视图单列或拒收。",
+        "scoring_contract": "二元准确率、同/异侧平衡准确率；多面视图需集合规则。",
+        "difficulty_axes": [
+          "纹理相似",
+          "遮挡",
+          "视角差"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C23-T01",
+        "C23-T02",
+        "C23-T03"
+      ]
+    },
+    {
+      "id": "C24",
+      "name": "固定参照系空间关系判断",
+      "origin": "literature_normalized",
+      "family": "参照系与关系",
+      "operation": "classify_fixed_frame_relation",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N13",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "当前图像或指定已确定参照系",
+        "normalized_output": "方向/高低/between关系或满足关系的对象",
+        "oracle_contract": "方向轴、关系语义与实体标签匹配",
+        "variant_boundaries": "对象/区域/相机锚点、图像上下/真实高度、关系查询/反查对象分别保存"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N13|C24|",
+          "legacy_protocol_id": "P2-N13",
+          "name": "直接可见左右上下",
+          "scope": "直接可见左右上下",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N13",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|pilot-sat-static_left_right|C24|",
+          "legacy_protocol_id": "pilot-sat-static_left_right",
+          "name": "prior pilot subset, development only",
+          "scope": "prior pilot subset, development only",
+          "binding_status": "reviewed_source_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N13",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 10
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C24-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "固定参照系空间关系判断",
+        "input_conditions": "固定坐标系、对象身份与关系语义明确；几何关系有容差；只问当前已观测场景。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "不改变参照系，不混入多跳推导；图像上下与世界高度单列。",
+        "reference_frame_rule": "当前图像或指定已确定参照系",
+        "oracle_contract": "按参考轴投影坐标差；between按给定线段/容差或明确轴序定义；反查取满足谓词实体集合。",
+        "scoring_contract": "关系准确率与目标集合F1；各关系类别分项。",
+        "difficulty_axes": [
+          "距离边界",
+          "实体数",
+          "关系种类"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C24-T01",
+        "C24-T02",
+        "C24-T03"
+      ]
+    },
+    {
+      "id": "C25",
+      "name": "他者或假设视角的方向判断",
+      "origin": "literature_normalized",
+      "family": "参照系与关系",
+      "operation": "transform_viewpoint_direction",
+      "catalog_capability_links": [
+        {
+          "id": "N07",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N13",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "物体内在朝向/指定位置与朝向",
+        "normalized_output": "转换后的方向或目标",
+        "oracle_contract": "在给定新参照系中计算相对关系",
+        "variant_boundaries": "真实主体、站A面B、X点视点、跨视图指定相机分别标注"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N15|C25|",
+          "legacy_protocol_id": "P2-N15",
+          "name": "俯视观察者左右",
+          "scope": "俯视观察者左右",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N15",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|pilot-sat-perspective|C25|",
+          "legacy_protocol_id": "pilot-sat-perspective",
+          "name": "prior pilot subset, development only",
+          "scope": "prior pilot subset, development only",
+          "binding_status": "reviewed_source_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N15",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 14
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C25-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "他者或假设视角的方向判断",
+        "input_conditions": "新观察位置、朝向与对象身份明确；基础版给坐标，视觉版给足够观测；对象静止。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "单独改变观察者，不引入真实物体运动；坐标给定版与视觉恢复版分开。",
+        "reference_frame_rule": "物体内在朝向/指定位置与朝向",
+        "oracle_contract": "目标减新观察位置，再投影到前/右/up正交基；方向按预定扇区/符号阈值。",
+        "scoring_contract": "转换方向准确率；新坐标误差若输出则分项；相机捷径对照。",
+        "difficulty_axes": [
+          "yaw角",
+          "平移",
+          "主体朝向",
+          "象限"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C25-T01",
+        "C25-T02",
+        "C25-T03"
+      ]
+    },
+    {
+      "id": "C26",
+      "name": "多关系与跨视图方位推导",
+      "origin": "literature_normalized",
+      "family": "参照系与关系",
+      "operation": "compose_spatial_relations",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N13",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N21",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "由多个锚点关系建立的参照系",
+        "normalized_output": "未直接给出的关系或次序",
+        "oracle_contract": "关系约束合成后的结论",
+        "variant_boundaries": "地图+文字、真实多视图、镜像等变体分列"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N21|C26|",
+          "legacy_protocol_id": "P2-N21",
+          "name": "文本多跳左右",
+          "scope": "文本多跳左右",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N21",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|ST-multichoiceeval|C26|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N21",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 12
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C26-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "多关系与跨视图方位推导",
+        "input_conditions": "多条空间约束、身份对应与统一/可转换参照系；直接目标关系未给出；推理结论需可确定。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "给定对应/坐标轴以隔离关系组合；不适用传递性的左右关系不可跨主体直接链式使用。",
+        "reference_frame_rule": "由多个锚点关系建立的参照系",
+        "oracle_contract": "约束求解/满足性枚举；若全部可行模型结论相同才给确定答案；欠定专用题输出unknown。",
+        "scoring_contract": "推论准确率与约束一致性；欠定识别单报。",
+        "difficulty_axes": [
+          "关系链长",
+          "跨视图锚点",
+          "干扰关系"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C26-T01",
+        "C26-T02",
+        "C26-T03"
+      ]
+    },
+    {
+      "id": "C27",
+      "name": "跨视角点、部位或实体对应",
+      "origin": "literature_normalized",
+      "family": "定位与对应",
+      "operation": "match_cross_view_entity",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "两个或多个观察",
+        "normalized_output": "对应坐标/标记/对象候选",
+        "oracle_contract": "匹配同一实体标注",
+        "variant_boundaries": "点、局部结构、实体身份分别标注；不把视觉相似自动当同一实体"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C27|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N09",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 8
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C27-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "跨视角点、部位或实体对应",
+        "input_conditions": "跨视角的同一场景/实体、视图标签和候选标记；对应目标可见且身份可判。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "点、部位、实体身份三类单列；只外观相似不证明同一实体。",
+        "reference_frame_rule": "两个或多个观察",
+        "oracle_contract": "用网格持久顶点/表面点、语义部位及实体ID投影生成对应；遮挡点标不可见或拒收。",
+        "scoring_contract": "配对准确率；连续对应点重投影误差单列，允许部分匹配则报F1。",
+        "difficulty_axes": [
+          "视角差",
+          "重复纹理",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C27-T01",
+        "C27-T02",
+        "C27-T03"
+      ]
+    },
+    {
+      "id": "C28",
+      "name": "对象跨视角可见性比较",
+      "origin": "literature_normalized",
+      "family": "计数与可见性",
+      "operation": "compare_visibility",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N10",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "各拍摄视角",
+        "normalized_output": "image1/image2/same/neither",
+        "oracle_contract": "按来源可见性统计与有效性条件评分",
+        "variant_boundaries": "可见程度不等于检测是否存在；明确定义遮挡、面积或可见点统计"
+      },
+      "existing_protocols": [],
+      "new_protocol": {
+        "id": "D89-C28-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "对象跨视角可见性比较",
+        "input_conditions": "同对象跨视图；声明可见比例、可见点数或像素面积的比较口径，分辨率/缩放控制。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "可见程度不等于是否检测存在；可见比例与投影像素面积分开。",
+        "reference_frame_rule": "各拍摄视角",
+        "oracle_contract": "z-buffer可见掩码或可见表面点生成可见比例；同物体全投影面积作分母；缺席/完全遮挡按规则。",
+        "scoring_contract": "四标签准确率及可见度差误差；same容差预定。",
+        "difficulty_axes": [
+          "遮挡量",
+          "视角",
+          "距离",
+          "轮廓"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C28-T01",
+        "C28-T02",
+        "C28-T03"
+      ]
+    },
+    {
+      "id": "C29",
+      "name": "多视角认知地图构建",
+      "origin": "literature_normalized",
+      "family": "地图与描述",
+      "operation": "construct_cognitive_map",
+      "catalog_capability_links": [
+        {
+          "id": "N09",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N17",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "统一场景网格",
+        "normalized_output": "10×10网格JSON及附加QA",
+        "oracle_contract": "来源cogmapeval与附加问题分别核对",
+        "variant_boundaries": "结构建图与附带QA为联合契约，不当成纯选择题"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-cogmapeval|C29|",
+          "legacy_protocol_id": "ST-cogmapeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N17",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C29-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "多视角认知地图构建",
+        "input_conditions": "多个局部观察、统一网格映射与尺度/原点/轴约定；模型输入不泄露完整地图；允许未知区域。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "身份或位姿给定版和自主估计版分开；地图构建和附加QA分别评分。",
+        "reference_frame_rule": "统一场景网格",
+        "oracle_contract": "将场景实体/占据投影至冻结10×10网格；未知未观测区域不能标空；后续更新用可见证据。",
+        "scoring_contract": "地图占据/实体位置F1、坐标误差和一致性；QA单独报，不替代建图。",
+        "difficulty_axes": [
+          "视图数量",
+          "重叠",
+          "地图覆盖",
+          "回访"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C29-T01",
+        "C29-T02",
+        "C29-T03"
+      ]
+    },
+    {
+      "id": "C30",
+      "name": "目标条件的可供性点定位",
+      "origin": "literature_normalized",
+      "family": "操作与可供性",
+      "operation": "ground_affordance_point",
+      "catalog_capability_links": [
+        {
+          "id": "N11",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N16",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "图像坐标及给定操作目标",
+        "normalized_output": "二维点或点候选",
+        "oracle_contract": "来源掩码命中或标记候选匹配",
+        "variant_boundaries": "实际坐标与标记选择分列；作用取决于目标及夹爪条件"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-affmask|C30|",
+          "legacy_protocol_id": "ST-affmask",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N11",
+              "extent": "direct",
+              "role": "primary"
+            },
+            {
+              "capability_id": "N16",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        },
+        {
+          "id": "phase2|ST-multichoiceeval|C30|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N11",
+              "extent": "direct",
+              "role": "primary"
+            },
+            {
+              "capability_id": "N16",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C30-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "目标条件的可供性点定位",
+        "input_conditions": "图像、明确操作目标及行动者/工具；真实可操作部位标注；点输出坐标约定。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "定位对象与目标条件可供性分开；同一对象不同动作允许不同有效点集。",
+        "reference_frame_rule": "图像坐标及给定操作目标",
+        "oracle_contract": "由语义部位和经过仿真/规则验证的动作条件生成可供性掩码；选择候选或点落有效区域评分。",
+        "scoring_contract": "有效掩码命中率与点距离；不等于完整抓取执行SR。",
+        "difficulty_axes": [
+          "部位大小",
+          "操作目标",
+          "姿态",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C30-T01",
+        "C30-T02",
+        "C30-T03"
+      ]
+    },
+    {
+      "id": "C31",
+      "name": "对象操作可供性判断",
+      "origin": "literature_normalized",
+      "family": "操作与可供性",
+      "operation": "judge_affordance",
+      "catalog_capability_links": [
+        {
+          "id": "N16",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "任务与操作条件",
+        "normalized_output": "可行性/工具/对象候选",
+        "oracle_contract": "按给定行动者和任务条件匹配真值",
+        "variant_boundaries": "几何可达、工具用途、抓取可行性子类分列"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C31|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N16",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 6
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C31-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "对象操作可供性判断",
+        "input_conditions": "对象、目标、行动者尺度/工具和动作条件明确；可供性依赖情境，不仅依赖物体类别。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "几何可达、功能用途、抓取条件分开；不把识别物品等同可操作。",
+        "reference_frame_rule": "任务与操作条件",
+        "oracle_contract": "几何变体用碰撞/IK验证；用途变体用冻结可核查功能属性；抓取变体需接触和稳定性oracle。",
+        "scoring_contract": "条件化可行性准确率，错误约束类型；仿真执行成功单列。",
+        "difficulty_axes": [
+          "行动者尺寸",
+          "工具条件",
+          "对象状态"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C31-T01",
+        "C31-T02",
+        "C31-T03"
+      ]
+    },
+    {
+      "id": "C32",
+      "name": "空间场景描述候选验证",
+      "origin": "literature_normalized",
+      "family": "地图与描述",
+      "operation": "verify_scene_description",
+      "catalog_capability_links": [
+        {
+          "id": "N12",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N13",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N17",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "原题指定参照系",
+        "normalized_output": "结构化/自然语言描述候选",
+        "oracle_contract": "来源完整候选匹配；联合属性不拆成独立准确率",
+        "variant_boundaries": "场景图JSON与多属性陈述属于变体；不是自由描述生成"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C32|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N12",
+              "extent": "proxy",
+              "role": "primary"
+            },
+            {
+              "capability_id": "N13",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 6
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C32-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "空间场景描述候选验证",
+        "input_conditions": "当前场景与完整描述候选；参照系和对象身份明确；候选使用可核查事实。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "验证描述候选而非自由生成；联合事实正确性和子事实诊断分开。",
+        "reference_frame_rule": "原题指定参照系",
+        "oracle_contract": "从真值场景图提取属性/关系，逐项对照候选；全正确候选唯一。",
+        "scoring_contract": "完整候选准确率，事实错误诊断分项；不从联合正确率倒推叶能力。",
+        "difficulty_axes": [
+          "事实数量",
+          "近似关系",
+          "干扰描述"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C32-T01",
+        "C32-T02",
+        "C32-T03"
+      ]
+    },
+    {
+      "id": "C33",
+      "name": "运动或轨迹语义描述/识别",
+      "origin": "literature_normalized",
+      "family": "地图与描述",
+      "operation": "describe_motion_semantics",
+      "catalog_capability_links": [
+        {
+          "id": "N04",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N05",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N12",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N14",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "观察者/场景",
+        "normalized_output": "开放描述或描述候选",
+        "oracle_contract": "开放描述沿用judge；候选沿用选项匹配",
+        "variant_boundaries": "自由生成、候选识别及静态轨迹图必须分列"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C33|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N14",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 4
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C33-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "运动或轨迹语义描述/识别",
+        "input_conditions": "带时间戳视频或明确方向的轨迹图；描述仅限可观察事件，参照系固定。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "观测运动描述不预测未来；候选识别与开放描述评分分开。",
+        "reference_frame_rule": "观察者/场景",
+        "oracle_contract": "轨迹/接触事件真值提取移动方向、速度变化与事件次序；开放文本解析成冻结事实槽。",
+        "scoring_contract": "候选准确率；开放文本的方向/事件/顺序事实F1与幻觉率，judge版本冻结且校准。",
+        "difficulty_axes": [
+          "轨迹转折",
+          "对象数",
+          "速度变化"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C33-T01",
+        "C33-T02",
+        "C33-T03"
+      ]
+    },
+    {
+      "id": "C34",
+      "name": "截面与内部几何判断",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "infer_cross_section",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "物体几何坐标",
+        "normalized_output": "可能/不可能截面候选",
+        "oracle_contract": "几何切割与候选匹配",
+        "variant_boundaries": "指定切面与任意切面存在性区分"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C34|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 6
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C34-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "截面与内部几何判断",
+        "input_conditions": "三维对象几何和切面定义；剖面图候选；指定切面与任意切面存在性分开。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "形状可见/给定以隔离截面运算；切面穿顶点/边的退化情况单列。",
+        "reference_frame_rule": "物体几何坐标",
+        "oracle_contract": "网格与平面求交并重建剖面轮廓；任意切面题使用可证明解析对象和可行性证明。",
+        "scoring_contract": "截面候选准确率或轮廓IoU；任意切面存在性只用可验证题。",
+        "difficulty_axes": [
+          "对象形状",
+          "切面倾角",
+          "内部孔洞"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C34-T01",
+        "C34-T02",
+        "C34-T03"
+      ]
+    },
+    {
+      "id": "C35",
+      "name": "多视图约束下的立方体数量推断",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "infer_hidden_cube_count",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "二维视图到三维",
+        "normalized_output": "可行/最小/最大立方体数量",
+        "oracle_contract": "枚举满足视图约束的三维配置及计数范围",
+        "variant_boundaries": "不是直接可见对象计数"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C35|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C35-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "多视图约束下的立方体数量推断",
+        "input_conditions": "有限立方网格与指定正交视图；遮挡投影或列高定义明确，禁止默认所有隐藏块存在。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "多视图约束数量不是可见计数；最小/最大和唯一总数分开。",
+        "reference_frame_rule": "二维视图到三维",
+        "oracle_contract": "枚举有限格占据集合，匹配所有投影/高度及连接约束；取得可行配置集合与数量上下界。",
+        "scoring_contract": "整数精确率；范围端点分开；唯一题须所有可行配置块数相同。",
+        "difficulty_axes": [
+          "网格边长",
+          "视图数",
+          "隐藏块数"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C35-T01",
+        "C35-T02",
+        "C35-T03"
+      ]
+    },
+    {
+      "id": "C36",
+      "name": "拼接与缺失结构补全",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "complete_shape_assembly",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "几何结构",
+        "normalized_output": "缺失部件/拼接候选",
+        "oracle_contract": "组合结构与目标匹配",
+        "variant_boundaries": "填孔、方块拼接、图形组合为子类"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C36|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 7
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C36-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "拼接与缺失结构补全",
+        "input_conditions": "目标形状、已占据部分、候选零件和允许变换明确；网格/几何精度统一。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "不允许未声明缩放或镜像；零件颜色/数量保持可控。",
+        "reference_frame_rule": "几何结构",
+        "oracle_contract": "对允许的旋转和平移枚举，验证并集恰等于目标且无体积重叠；保存见证摆放。",
+        "scoring_contract": "零件选择准确率、占据集合一致性；多解接受合法集合。",
+        "difficulty_axes": [
+          "零件数",
+          "旋转自由度",
+          "凹凸结构"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C36-T01",
+        "C36-T02",
+        "C36-T03"
+      ]
+    },
+    {
+      "id": "C37",
+      "name": "展开图与折叠对应",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "infer_fold_net",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "面、边及朝向",
+        "normalized_output": "有效展开图/相邻面/对应边",
+        "oracle_contract": "折叠后面边对应检查",
+        "variant_boundaries": "净展开图、对面关系、折叠方向分别标注"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C37|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 6
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C37-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "展开图与折叠对应",
+        "input_conditions": "面ID、边ID、网格尺寸和折叠方向明确；有限铰接展开图。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "区分净展开图有效性、面邻接和边对应；不靠标签排列记忆。",
+        "reference_frame_rule": "面、边及朝向",
+        "oracle_contract": "从面连接图传播刚体90度折叠变换；检查面重叠、自交、闭合和法向关系。",
+        "scoring_contract": "有效性/面关系/边对应准确率分别报；几何退化拒收。",
+        "difficulty_axes": [
+          "净形状",
+          "面标记",
+          "旋转",
+          "折向"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C37-T01",
+        "C37-T02",
+        "C37-T03"
+      ]
+    },
+    {
+      "id": "C38",
+      "name": "折纸打孔/剪切后的展开推断",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "infer_unfold_cut_pattern",
+      "catalog_capability_links": [
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "折痕坐标",
+        "normalized_output": "展开结果或所需剪切候选",
+        "oracle_contract": "折叠/反射和切口传播匹配",
+        "variant_boundaries": "正向展开与逆向切口选择分列"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C38|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 4
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C38-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "折纸打孔/剪切后的展开推断",
+        "input_conditions": "纸张坐标、折痕及有序折叠方向、打孔/剪切形状明确；厚度忽略或明示。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "顺序不可交换时保留；正向展开和逆向切口选择单列。",
+        "reference_frame_rule": "折痕坐标",
+        "oracle_contract": "用平面反射与层片追踪传播孔/切口；逆向候选通过正向模拟验证。",
+        "scoring_contract": "孔集合精确匹配/几何F1、切口形状IoU；候选准确率。",
+        "difficulty_axes": [
+          "折叠次数",
+          "非中线折痕",
+          "孔数"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C38-T01",
+        "C38-T02",
+        "C38-T03"
+      ]
+    },
+    {
+      "id": "C39",
+      "name": "心理旋转匹配",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "match_mental_rotation",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "旋转轴与角度",
+        "normalized_output": "旋转后匹配候选",
+        "oracle_contract": "刚性旋转等价，区分镜像",
+        "variant_boundaries": "2D/3D、指定角度/未知旋转为变体"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|P2-N20|C39|",
+          "legacy_protocol_id": "P2-N20",
+          "name": "二维位图旋转匹配",
+          "scope": "二维位图旋转匹配",
+          "binding_status": "reviewed_restricted_variant",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "procedural_controls_passed",
+          "generator_entrypoint": "experiments/capability_eval_v01_20260927/build_benchmark.py",
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "role": "primary",
+              "extent": "restricted_direct"
+            }
+          ],
+          "split_counts": {
+            "dev": 8,
+            "test": 24,
+            "sealed": 16
+          }
+        },
+        {
+          "id": "phase2|ST-multichoiceeval|C39|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 6
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C39-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "心理旋转匹配",
+        "input_conditions": "明确2D/3D、刚性旋转自由度与是否指定角度；结构标记足以区分镜像。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "保持部件数量、颜色分布等浅线索；镜像不能视为旋转。",
+        "reference_frame_rule": "旋转轴与角度",
+        "oracle_contract": "指定旋转用矩阵作用；未知旋转在允许SO(2)/SO(3)集合匹配，排除反射等价和对称歧义。",
+        "scoring_contract": "旋转匹配准确率；镜像误选率单列。",
+        "difficulty_axes": [
+          "旋转角",
+          "轴数",
+          "对称",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C39-T01",
+        "C39-T02",
+        "C39-T03"
+      ]
+    },
+    {
+      "id": "C40",
+      "name": "指定视图的投影形状判断",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "infer_projection_shape",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N15",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "顶部/正面/指定视角",
+        "normalized_output": "投影形状候选",
+        "oracle_contract": "三维形状在指定视角的投影匹配",
+        "variant_boundaries": "观察到的轮廓识别与需要补全的投影推断区别记录"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C40|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 5
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C40-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "指定视图的投影形状判断",
+        "input_conditions": "三维结构和指定观察方向/相机投影明确；输入足够确定被投影形状。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "正交投影与透视投影分开；当前轮廓识别与未见视图推断分开。",
+        "reference_frame_rule": "顶部/正面/指定视角",
+        "oracle_contract": "投影网格/体素经z-buffer得到轮廓或占据图；按投影模型生成候选。",
+        "scoring_contract": "投影候选准确率或轮廓IoU；视角分项。",
+        "difficulty_axes": [
+          "结构凹凸",
+          "观察轴",
+          "透视",
+          "遮挡"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C40-T01",
+        "C40-T02",
+        "C40-T03"
+      ]
+    },
+    {
+      "id": "C41",
+      "name": "几何量与约束计算",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "solve_geometric_measure",
+      "catalog_capability_links": [
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "平面或立体几何",
+        "normalized_output": "角度/长度/面积/体积关系",
+        "oracle_contract": "几何公式和已知约束核算",
+        "variant_boundaries": "区分图中已给尺寸的计算与从视觉估计实际尺寸"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C41|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C41-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "几何量与约束计算",
+        "input_conditions": "几何量和约束以标记数值或可核查关系给定；尺度、单位与图示不按比例说明。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "给定尺寸的计算与视觉估计分离；题目约束要可满足且答案唯一。",
+        "reference_frame_rule": "平面或立体几何",
+        "oracle_contract": "解析公式/符号约束求解，长度面积体积单位匹配；不以绘图像素量作真值。",
+        "scoring_contract": "绝对/相对数值误差与单位正确率，按量纲分项。",
+        "difficulty_axes": [
+          "约束数量",
+          "维度",
+          "图形复杂度"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C41-T01",
+        "C41-T02",
+        "C41-T03"
+      ]
+    },
+    {
+      "id": "C42",
+      "name": "图形规律补全与异类识别",
+      "origin": "literature_normalized",
+      "family": "几何变换与组合",
+      "operation": "complete_spatial_pattern",
+      "catalog_capability_links": [
+        {
+          "id": "N03",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N20",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "图形排列",
+        "normalized_output": "缺失/异常候选",
+        "oracle_contract": "已知图案变换规则匹配",
+        "variant_boundaries": "纯数字规律需另行审核，不自动归为空间能力"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C42|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N20",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 4
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C42-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "图形规律补全与异类识别",
+        "input_conditions": "空间图形序列/矩阵与预声明生成规则族；候选具有同等低层视觉复杂度。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "只纳入空间变换规律；纯数字序列不自动归入；有限可观察信息必须能排除竞争规则。",
+        "reference_frame_rule": "图形排列",
+        "oracle_contract": "程序规则如旋转、平移、镜像、占据组合产生真值；枚举允许规则族验证答案唯一。",
+        "scoring_contract": "补全/异类准确率；规则族和视觉复杂度分项。",
+        "difficulty_axes": [
+          "规则组合数",
+          "序列长",
+          "镜像干扰"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C42-T01",
+        "C42-T02",
+        "C42-T03"
+      ]
+    },
+    {
+      "id": "C43",
+      "name": "距离—速度—时间推算",
+      "origin": "literature_normalized",
+      "family": "运动后果与状态推演",
+      "operation": "solve_kinematic_quantity",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N02",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N19",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "场景尺度与运动模型",
+        "normalized_output": "速度/时间数值候选",
+        "oracle_contract": "明确运动模型下使用距离与速度时间关系",
+        "variant_boundaries": "只覆盖运动学；未给定运动量和隐含假设需复核"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C43|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N19",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C43-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "距离—速度—时间推算",
+        "input_conditions": "距离、时间和运动模型给定或可由标定视频获取；声明匀速/分段、起止时刻、单位。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "仅测运动学，不隐含加速度/阻力；视觉估计版与数值计算版单列。",
+        "reference_frame_rule": "场景尺度与运动模型",
+        "oracle_contract": "匀速d=vt；分段按时间积分；平均速度与平均速率明确不同。",
+        "scoring_contract": "数值误差和单位正确率；零时间/不可满足条件拒收。",
+        "difficulty_axes": [
+          "单位换算",
+          "分段数",
+          "速度变化"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C43-T01",
+        "C43-T02",
+        "C43-T03"
+      ]
+    },
+    {
+      "id": "C44",
+      "name": "下落时间推算",
+      "origin": "literature_normalized",
+      "family": "运动后果与状态推演",
+      "operation": "infer_fall_time",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "catalog_only_no_current_evaluation"
+        },
+        {
+          "id": "N19",
+          "status": "has_protocol"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "重力坐标",
+        "normalized_output": "时间候选",
+        "oracle_contract": "声明重力、初速度与阻力假设后核算",
+        "variant_boundaries": "当前单图标签；需核对高度和物理假设"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C44|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N19",
+              "extent": "partial",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C44-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "下落时间推算",
+        "input_conditions": "高度、重力、初速度、落地点和空气阻力假设明示；解析落体或固定物理仿真。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "高度视觉估计和公式推算分开；不根据常识猜g/阻力。",
+        "reference_frame_rule": "重力坐标",
+        "oracle_contract": "无阻力从静止t=sqrt(2h/g)；有初速度解h=v_down*t+gt²/2取正根；视频版读取事件时刻。",
+        "scoring_contract": "时间MAE与相对误差；参数和物理模型分项。",
+        "difficulty_axes": [
+          "高度",
+          "初速度",
+          "标尺线索"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C44-T01",
+        "C44-T02",
+        "C44-T03"
+      ]
+    },
+    {
+      "id": "C45",
+      "name": "机构运动传递推断",
+      "origin": "literature_normalized",
+      "family": "运动后果与状态推演",
+      "operation": "infer_mechanism_motion",
+      "catalog_capability_links": [
+        {
+          "id": "N19",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N20",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "capability_link_policy": "沿用目录关联状态，不将所有关联能力自动标为主测；主测为任务操作及模板变体，分离支持条件后方可解释。",
+      "legacy_contract": {
+        "reference_frame": "约束连接与固定部件",
+        "normalized_output": "后续运动方向候选",
+        "oracle_contract": "机构约束下的运动传递结果",
+        "variant_boundaries": "不等于一般接触动力学仿真"
+      },
+      "existing_protocols": [
+        {
+          "id": "phase2|ST-multichoiceeval|C45|",
+          "legacy_protocol_id": "ST-multichoiceeval",
+          "name": "来源变体与题目关联；子项尚未逐题审定",
+          "scope": "来源变体与题目关联；子项尚未逐题审定",
+          "binding_status": "source_declared_task",
+          "generation_status": "existing_frozen_instances",
+          "verification_status": "source_reference_scoring_checked_semantics_not_independent",
+          "generator_entrypoint": null,
+          "verifier_entrypoint": "experiments/capability_eval_v01_20260927/scoring.py:score",
+          "capability_roles": [
+            {
+              "capability_id": "N19",
+              "extent": "direct",
+              "role": "primary"
+            }
+          ],
+          "split_counts": {
+            "dev": 3
+          }
+        }
+      ],
+      "new_protocol": {
+        "id": "D89-C45-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "机构运动传递推断",
+        "input_conditions": "机构连接、固定轴/部件、齿数/半径及驱动条件明确；刚体理想约束和无滑移假设。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "机构传递不等于一般碰撞动力学；外啮合、内啮合、开带/交叉带分开。",
+        "reference_frame_rule": "约束连接与固定部件",
+        "oracle_contract": "机构图按啮合方向/速度比和铰接约束传播；欠约束或干涉卡死实例拒收或单列。",
+        "scoring_contract": "方向准确率与传动比数值误差分别报。",
+        "difficulty_axes": [
+          "连接链长",
+          "齿数比",
+          "约束类型"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "template_ids": [
+        "C45-T01",
+        "C45-T02",
+        "C45-T03"
+      ]
+    }
+  ],
+  "total": 89,
+  "next_offset": 45,
+  "source": "89tasks-267templates-v1.0-design",
+  "capability_policy": "Catalog links select candidates; task operation and measurement variant define measured scope.",
+  "question_authoring": {
+    "schema": "benchforge.question-writing/v1",
+    "instructions": "每题提交 question_spec：简短自然题干 stem、公开已知条件 context、必要作答规则 conditions、候选 options、作答说明 response、逐项媒体标题 media_labels，以及与 parameters 完全一致的 parameter_bindings。题干先说看什么和问什么；采集说明、坐标定义、单位和容差分别放在条件中，必要条件不能藏在技术详情。对象称呼必须对应公开图片中的真实名称或编号；禁止凭空命名物体。禁止把内部运行号、路径、相机代码、原始字典或列表拼进题干。中心、采样点、参照轴等若用于作答，必须在公开媒体中提供对应标记或可用条件。保留准确模板的目标、参照系、单位、容差、候选和输出合同；改表达不能改变问题。无需模型判断题目质量。程序检查字段与绑定，并逐模板实际看图检查代表题。",
+    "evidence_field": "question_spec",
+    "required_fields": [
+      "stem",
+      "context",
+      "conditions",
+      "options",
+      "response",
+      "media_labels",
+      "parameter_bindings"
+    ],
+    "example": {
+      "schema": "benchforge.question-writing/v1",
+      "stem": "看图1，标记A的物体在标记B的哪一侧？",
+      "context": [
+        "图中编号用于识别物体。"
+      ],
+      "conditions": [
+        "以画面为参照，按图中中心标记判断方向。"
+      ],
+      "options": [
+        "左侧",
+        "右侧",
+        "上方",
+        "下方"
+      ],
+      "response": "按当前模板的输出合同提交一个方向。",
+      "media_labels": [
+        "图1：场景与物体中心标记"
+      ],
+      "parameter_bindings": "copy the exact evidence parameters object"
+    },
+    "validation_scope": "writing structure and exact source bindings; human answerability requires real media review"
+  }
+}

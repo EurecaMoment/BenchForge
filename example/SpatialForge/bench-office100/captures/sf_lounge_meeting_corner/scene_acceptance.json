@@ -1,0 +1,312 @@
+{
+  "schema": "spatialforge.scene-acceptance/v1",
+  "enforced": true,
+  "passed": true,
+  "issues": [],
+  "physical_issues": [],
+  "native_relation_checks": [
+    {
+      "index": 3,
+      "type": "supported_by",
+      "source": "coffee_table_b",
+      "target": "rug_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 4,
+      "type": "supported_by",
+      "source": "mug_b1",
+      "target": "coffee_table_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 5,
+      "type": "supported_by",
+      "source": "mug_b2",
+      "target": "coffee_table_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 6,
+      "type": "supported_by",
+      "source": "book_b1",
+      "target": "coffee_table_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 7,
+      "type": "supported_by",
+      "source": "book_b2",
+      "target": "sidecab_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 8,
+      "type": "supported_by",
+      "source": "lamp_b",
+      "target": "sidecab_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 11,
+      "type": "supported_by",
+      "source": "rug_b",
+      "target": "floor_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    },
+    {
+      "index": 14,
+      "type": "mounted_to",
+      "source": "window_s_b",
+      "target": "wall_s_b",
+      "passed": true,
+      "evidence": "capture/evidence.json",
+      "basis": "native world bounds, executed support parts or verified static mount; not visual opinion"
+    }
+  ],
+  "mesh_bound_checks": [],
+  "mesh_versions": {},
+  "scene_id": "sf_lounge_meeting_corner",
+  "capture_token": "attempt_da0aefad41934d8e",
+  "evidence_versions": {
+    "program.json": [
+      17835,
+      1793940055029007559
+    ],
+    "capture/report.json": [
+      64977,
+      1793940116988180903
+    ],
+    "capture/evidence.json": [
+      156053,
+      1793940116632169784
+    ]
+  },
+  "scene_style": "realistic_assets",
+  "geometry_exception": null,
+  "scene_brief": {
+    "id": "design-lounge-meeting",
+    "name": "起居会客角（sf_lounge_meeting_corner）",
+    "purpose": "会客/休息类室内布局，测同一批模板在软体家具主导空间下的表现；承担 dev 分区约 33 题。",
+    "layout": "5.6×4.8×2.8 m 房间；长沙发贴北墙、单人扶手椅两只分列东西两侧均朝向茶几，形成围合谈话区；地毯居中界定活动区，茶几上放两只马克杯与一本合上的书；西墙书柜、东墙边柜（file_cabinet 复用为边柜），台灯在边柜上，盆栽在南窗角，bin 在沙发侧。动线：南侧入口至围合区外缘 ≥1.0 m，椅前留 ≥0.45 m 腿部空间。",
+    "objects": "office_sofa、office_armchair×2、office_coffee_table、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_window、mug×2、office_book×2、bin、rug（织物纹理 composite，厚 1.5 cm）+ 墙体/地板/吊顶。",
+    "cameras": "view_0 全景（自南向北含围合区）、view_1 低机位斜向（强化近远对象透视差，供 C09 反转配对）、view_2 茶几特写、view_3 沙发-书柜侧向近景。",
+    "variation": "对象数 15；软体家具体量相近，制造更难的尺寸比较；锚点候选为茶几中心与沙发。",
+    "artifact": "scenes/sf_lounge_meeting_corner.scene_program.json → captures/sf_lounge_meeting_corner/",
+    "summary": "这是一个供三四人在此交谈、喝茶、取阅书刊的起居会客仿真空间，用于测量模型在软体家具环境中的空间判断。房间 5.6×4.8 米、高 2.8 米，木地板与浅色墙面围合，南墙整幅 3 米模块窗引入天光，与顶面两片面光共同照亮全场。北墙前放双人布艺长沙发，四脚落地、靠墙留出 5 cm 安装余量；东西两侧各一只单人扶手椅，均正面朝向房间中央的长方形茶几，椅前与茶几之间留约 0.45 米腿部距离，构成可围坐谈话的动线。羊毛质感地毯平铺中央，茶几落在地毯上，台面摆放两只马克杯与一本竖放的书，均由台面支撑并等待沉降验证。西墙立书柜（柜格留空以保证支撑可验证）；东墙边柜上放台灯，灯高约 1.85 米在可及范围；南窗东南角放盆栽软化边界；沙发侧边地面放收纳 bin。从南门进入的通行路径绕过围合区外缘，净宽不小于 1 米，任何椅子朝向不与通道矛盾。大件静态，杯书本动态，质量摩擦为合成先验，最终接触与位置以仿真采集回执为准。",
+    "hard_requirements": [
+      "室内场景，真实可辨识资产，禁止几何盒替代家具",
+      "承担 dev 分区约 33 题，GT 仅来自官方/程序/仿真",
+      "围合朝向与通道净空在实拍中可验证；扶手椅必须正立并面向茶几",
+      "公开题目不泄露答案"
+    ],
+    "object_roles": [
+      {
+        "object_id": "floor_b",
+        "role": "地面，支撑全部家具"
+      },
+      {
+        "object_id": "wall_n_b",
+        "role": "北墙，沙发贴靠"
+      },
+      {
+        "object_id": "wall_s_b",
+        "role": "南墙，整幅窗"
+      },
+      {
+        "object_id": "wall_w_b",
+        "role": "西墙，书柜贴靠"
+      },
+      {
+        "object_id": "wall_e_b",
+        "role": "东墙，边柜贴靠"
+      },
+      {
+        "object_id": "ceiling_b",
+        "role": "吊顶，封闭室内体积"
+      },
+      {
+        "object_id": "window_s_b",
+        "role": "南窗，主采光与尺度线索"
+      },
+      {
+        "object_id": "sofa_b",
+        "role": "双人沙发，北墙居中，主要坐具"
+      },
+      {
+        "object_id": "armchair_b1",
+        "role": "扶手椅，西侧面向茶几"
+      },
+      {
+        "object_id": "armchair_b2",
+        "role": "扶手椅，东侧面向茶几，与 b1 成镜像围合"
+      },
+      {
+        "object_id": "coffee_table_b",
+        "role": "茶几，围合中心，台面承载杯与书"
+      },
+      {
+        "object_id": "rug_b",
+        "role": "地毯，界定谈话活动区，1.5 cm 薄片真实厚度"
+      },
+      {
+        "object_id": "mug_b1",
+        "role": "马克杯，茶几台面"
+      },
+      {
+        "object_id": "mug_b2",
+        "role": "马克杯，茶几台面另一侧"
+      },
+      {
+        "object_id": "book_b1",
+        "role": "书，茶几台面竖放"
+      },
+      {
+        "object_id": "bookcase_b",
+        "role": "书柜，贴西墙"
+      },
+      {
+        "object_id": "book_b2",
+        "role": "书组，边柜台面竖放于台灯旁"
+      },
+      {
+        "object_id": "sidecab_b",
+        "role": "边柜（文件柜资产），东墙，柜顶放灯"
+      },
+      {
+        "object_id": "lamp_b",
+        "role": "台灯，边柜顶，会客照明"
+      },
+      {
+        "object_id": "plant_b",
+        "role": "盆栽，南窗角"
+      },
+      {
+        "object_id": "bin_b",
+        "role": "收纳 bin，沙发侧地面"
+      }
+    ],
+    "relations": [
+      {
+        "source": "sofa_b",
+        "type": "near",
+        "target": "wall_n_b",
+        "description": "贴北墙留 5 cm 余量，正面朝南"
+      },
+      {
+        "source": "armchair_b1",
+        "type": "facing",
+        "target": "coffee_table_b",
+        "description": "自西面向茶几，椅前留 0.45 m 腿部空间"
+      },
+      {
+        "source": "armchair_b2",
+        "type": "facing",
+        "target": "coffee_table_b",
+        "description": "自东面向茶几，与 b1 围合"
+      },
+      {
+        "source": "coffee_table_b",
+        "type": "supported_by",
+        "target": "rug_b",
+        "description": "四角落在地毯平面，地毯 1.5 cm 抬升由沉降回执确认"
+      },
+      {
+        "source": "mug_b1",
+        "type": "supported_by",
+        "target": "coffee_table_b",
+        "description": "台面动态件，沉降后接触"
+      },
+      {
+        "source": "mug_b2",
+        "type": "supported_by",
+        "target": "coffee_table_b",
+        "description": "台面另一侧，间距明确"
+      },
+      {
+        "source": "book_b1",
+        "type": "supported_by",
+        "target": "coffee_table_b",
+        "description": "单本书竖放茶几台面，由台面支撑"
+      },
+      {
+        "source": "book_b2",
+        "type": "supported_by",
+        "target": "sidecab_b",
+        "description": "书组竖放边柜顶面，与台灯相邻由柜顶支撑"
+      },
+      {
+        "source": "lamp_b",
+        "type": "supported_by",
+        "target": "sidecab_b",
+        "description": "柜顶放置，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "sidecab_b",
+        "type": "near",
+        "target": "wall_e_b",
+        "description": "贴东墙，抽屉开启方向避开通道"
+      },
+      {
+        "source": "bookcase_b",
+        "type": "near",
+        "target": "wall_w_b",
+        "description": "贴西墙落地，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "rug_b",
+        "type": "supported_by",
+        "target": "floor_b",
+        "description": "平铺地面，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "plant_b",
+        "type": "near",
+        "target": "window_s_b",
+        "description": "窗角绿化，不阻动线"
+      },
+      {
+        "source": "bin_b",
+        "type": "near",
+        "target": "sofa_b",
+        "description": "沙发扶手侧，取用方便"
+      },
+      {
+        "source": "window_s_b",
+        "type": "mounted_to",
+        "target": "wall_s_b",
+        "description": "内嵌南墙，位置与朝向符合声明的使用功能"
+      }
+    ],
+    "physical_assumptions": [
+      "沙发/扶手椅/茶几/柜类静态（原生 USD 碰撞体，mass_kg=0）",
+      "马克杯、书、bin 为动态件（0.3–1.2 kg，摩擦 0.35–0.5 合成先验），以 evidence.json settled_center 验证不悬空不穿透",
+      "地毯为静态薄板，声明真实厚度 1.5 cm，不声称织物形变",
+      "光照为渲染先验：环境 200 lux 级 + 面光 600 intensity 初值，按实拍亮度校准，不声称实测照度"
+    ],
+    "plan_path": "/home/maqiang/GitHub/SpatialForge/operations/5d04e98906734938/plan.json",
+    "plan_version": [
+      80243,
+      1793939068107849058
+    ],
+    "authority": "versioned scene design, not captured physical truth",
+    "iteration_rule": "repair scene to brief; revise omissions from actual evidence; preserve user hard requirements and failed evidence"
+  },
+  "physical_scope": "native settling, conservative world bounds, support gap and collider receipts; uncalibrated material parameters",
+  "life_scope": "per-view model visual judgment, not measured truth or human certification",
+  "on_failure": "retain failed evidence; repair within budget; never export or mark complete"
+}

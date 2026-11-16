@@ -1,0 +1,17 @@
+{
+  "schema": "public-counting-universe/v1",
+  "anchor": "A11",
+  "objects": [
+    "A01",
+    "A02",
+    "A03",
+    "A04",
+    "A05",
+    "A07",
+    "A08",
+    "A10"
+  ],
+  "numbered_non_anchor_count": 8,
+  "radius_m": 0.8,
+  "boundary_rule": "three_dimensional_center_distance <= radius_m"
+}

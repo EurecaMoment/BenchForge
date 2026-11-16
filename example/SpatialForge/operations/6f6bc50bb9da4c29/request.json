@@ -1,0 +1,12 @@
+{
+  "tool": "pipeline_plan",
+  "arguments": {
+    "request_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/camera-repair-20261106/apply-plan.request.json",
+    "validate_only": false
+  },
+  "time": "2026-11-06T11:42:18.974744+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "authorized-camera-scene-repair-20261106"
+  }
+}

@@ -1,0 +1,284 @@
+{
+  "enforced": true,
+  "passed": true,
+  "stage": "before_capture",
+  "scene_style": "realistic_assets",
+  "geometry_exception": null,
+  "scene_brief": {
+    "id": "design-lounge-meeting",
+    "name": "起居会客角",
+    "purpose": "会客/休息类室内布局，测同一批模板在软体家具主导空间下的表现；承担 dev 分区约 33 题。",
+    "layout": "5.6×4.8×2.8 m 房间；长沙发贴北墙、单人扶手椅两只分列东西两侧均朝向茶几，形成围合谈话区；地毯居中界定活动区，茶几上放两只马克杯与一本合上的书；西墙书柜、东墙边柜（file_cabinet 复用为边柜），台灯在边柜上，盆栽在南窗角，bin 在沙发侧。动线：南侧入口至围合区外缘 ≥1.0 m，椅前留 ≥0.45 m 腿部空间。 盆栽移至地面中心 (1.50,-1.55) m，按整株原生尺寸避开东踢脚线、边柜、柜顶书组和座椅；南侧主要通行线保留。",
+    "objects": "office_sofa、office_armchair×2、office_coffee_table、office_bookcase、office_file_cabinet、office_lamp、office_plant、office_window、mug×2、office_book×2、bin、rug（织物纹理 composite，厚 1.5 cm）+ 墙体/地板/吊顶。",
+    "cameras": "保留原8个机位的全部光学参数、位姿与目标点。view_0坐南朝北展示围坐布局与左右外侧杯柄；view_1展示南窗、窗内盆栽和书柜；view_4从侧向展示南窗、两杯与柜顶台灯；其余view_2/view_3/view_5/view_6/view_7保持。以机位联合证据验收全场，南窗无需同时出现在view_0。真实K、米制深度与实例掩码继续由同一次原生捕获记录。",
+    "variation": "对象数 15；软体家具体量相近，制造更难的尺寸比较；锚点候选为茶几中心与沙发。",
+    "artifact": "scenes/sf_lounge_meeting_corner.scene_program.json → captures/sf_lounge_meeting_corner/",
+    "summary": "这是一个供三四人在此交谈、喝茶、取阅书刊的起居会客仿真空间，用于测量模型在软体家具环境中的空间判断。房间 5.6×4.8 米、高 2.8 米，木地板与浅色墙面围合，南墙整幅 3 米模块窗引入天光，与顶面面光共同照亮全场。北墙前放双人深色皮面长沙发，四脚落地、靠墙留出 5 cm 安装余量；东西两侧各一只单人扶手椅，均正面朝向房间中央的长方形茶几，椅前与茶几之间留约 0.45 米腿部距离，构成可围坐谈话的动线。羊毛质感地毯平铺中央，茶几落在地毯上，台面摆放两只马克杯与一本竖放的书，已在前轮原生回执中通过桌面支撑与沉降检查，本轮保持。西墙立书柜（柜格留空以保证支撑可验证）；东墙边柜上放台灯，灯高约 1.85 米在可及范围；南窗内侧偏东 (1.50,-1.55) 米处放盆栽，整株叶片避开东墙踢脚线、边柜及其书组；沙发侧边地面放收纳 bin。会客座椅正面朝向茶几，沙发正面朝南、背靠北墙；围坐区域外侧保留通行路径，净空由新采集与平面布局核对，不将沙发背后的安装余量作为通道。大件静态，杯书本动态，质量摩擦为合成先验，最终接触与位置以仿真采集回执为准。 会客顶面增设两处面光补足座椅暗部；补光必须真实进入生成程序的灯列表，逐图复核曝光与材质可辨识性。 本轮根据真实全景和侧视图补足深色座椅正面的柔和照明，使材质细节和边缘可辨；两只原生有柄马克杯的杯柄分别朝外，在主视角可见。边柜台灯保留原有真实灯具与柜顶支撑，并增加灯罩下方暖色小光源。窗外地面与外墙保持原有结构，采用有对比的哑光纹理；窗玻璃适当透光。家具位置、尺度、动态沉降和原八个机位均保留，效果以新实拍验收为准。 本轮view_0已能同时看见近左杯柄朝画面左、远右杯柄朝画面右，原生最终yaw保持+90/-90度；不改变杯子。南窗由view_1与view_4共同展示，view_0用于围坐布局与杯柄观察，场景要求由8个机位联合验收。深色原生皮面在view_4可辨纹理和高光，保留当前座椅材质及已生效的正面柔光与曝光。窗外已有实际纹理与UV绑定，当前透窗灰雾仍明显；本轮只减小窗玻璃的原生alpha倍率，保留窗框、玻璃shader图和室外几何纹理，效果须新实拍确认。",
+    "hard_requirements": [
+      "室内场景，真实可辨识资产，禁止几何盒替代家具",
+      "承担 dev 分区约 33 题，GT 仅来自官方/程序/仿真",
+      "围合朝向与通道净空在实拍中可验证；扶手椅必须正立并面向茶几",
+      "公开题目不泄露答案"
+    ],
+    "object_roles": [
+      {
+        "object_id": "floor_b",
+        "role": "地面，支撑全部家具"
+      },
+      {
+        "object_id": "wall_n_b",
+        "role": "北墙，沙发贴靠"
+      },
+      {
+        "object_id": "wall_s_b",
+        "role": "南墙，整幅窗"
+      },
+      {
+        "object_id": "wall_w_b",
+        "role": "西墙，书柜贴靠"
+      },
+      {
+        "object_id": "wall_e_b",
+        "role": "东墙，边柜贴靠"
+      },
+      {
+        "object_id": "ceiling_b",
+        "role": "吊顶，封闭室内体积"
+      },
+      {
+        "object_id": "window_s_b",
+        "role": "南窗，主采光与尺度线索；由view_1/view_4观测，保留原窗框和玻璃shader图，仅降低原生alpha倍率以检验透窗对比。"
+      },
+      {
+        "object_id": "sofa_b",
+        "role": "双人沙发，北墙居中，主要坐具"
+      },
+      {
+        "object_id": "armchair_b1",
+        "role": "扶手椅，西侧面向茶几"
+      },
+      {
+        "object_id": "armchair_b2",
+        "role": "扶手椅，东侧面向茶几，与 b1 成镜像围合"
+      },
+      {
+        "object_id": "coffee_table_b",
+        "role": "茶几，围合中心，台面承载杯与书"
+      },
+      {
+        "object_id": "rug_b",
+        "role": "地毯，界定谈话活动区，1.5 cm 薄片真实厚度"
+      },
+      {
+        "object_id": "mug_b1",
+        "role": "马克杯，茶几台面"
+      },
+      {
+        "object_id": "mug_b2",
+        "role": "马克杯，茶几台面另一侧"
+      },
+      {
+        "object_id": "book_b1",
+        "role": "书，茶几台面竖放"
+      },
+      {
+        "object_id": "bookcase_b",
+        "role": "书柜，贴西墙"
+      },
+      {
+        "object_id": "book_b2",
+        "role": "书组，边柜台面竖放于台灯旁"
+      },
+      {
+        "object_id": "sidecab_b",
+        "role": "边柜（文件柜资产），东墙，柜顶放灯"
+      },
+      {
+        "object_id": "lamp_b",
+        "role": "台灯，边柜顶，会客照明"
+      },
+      {
+        "object_id": "plant_b",
+        "role": "盆栽，南窗角"
+      },
+      {
+        "object_id": "bin_b",
+        "role": "收纳 bin，沙发侧地面"
+      }
+    ],
+    "relations": [
+      {
+        "source": "sofa_b",
+        "type": "near",
+        "target": "wall_n_b",
+        "description": "贴北墙留 5 cm 余量，正面朝南"
+      },
+      {
+        "source": "armchair_b1",
+        "type": "facing",
+        "target": "coffee_table_b",
+        "description": "自西面向茶几，椅前留 0.45 m 腿部空间"
+      },
+      {
+        "source": "armchair_b2",
+        "type": "facing",
+        "target": "coffee_table_b",
+        "description": "自东面向茶几，与 b1 围合"
+      },
+      {
+        "source": "coffee_table_b",
+        "type": "supported_by",
+        "target": "rug_b",
+        "description": "四角落在地毯平面，地毯 1.5 cm 抬升由沉降回执确认"
+      },
+      {
+        "source": "mug_b1",
+        "type": "supported_by",
+        "target": "coffee_table_b",
+        "description": "台面动态件，沉降后接触"
+      },
+      {
+        "source": "mug_b2",
+        "type": "supported_by",
+        "target": "coffee_table_b",
+        "description": "台面另一侧，间距明确"
+      },
+      {
+        "source": "book_b1",
+        "type": "supported_by",
+        "target": "coffee_table_b",
+        "description": "单本书竖放茶几台面，由台面支撑"
+      },
+      {
+        "source": "book_b2",
+        "type": "supported_by",
+        "target": "sidecab_b",
+        "description": "书组竖放边柜顶面，与台灯相邻由柜顶支撑"
+      },
+      {
+        "source": "lamp_b",
+        "type": "supported_by",
+        "target": "sidecab_b",
+        "description": "柜顶放置，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "sidecab_b",
+        "type": "near",
+        "target": "wall_e_b",
+        "description": "贴东墙，抽屉开启方向避开通道"
+      },
+      {
+        "source": "bookcase_b",
+        "type": "near",
+        "target": "wall_w_b",
+        "description": "贴西墙落地，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "rug_b",
+        "type": "supported_by",
+        "target": "floor_b",
+        "description": "平铺地面，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "plant_b",
+        "type": "near",
+        "target": "window_s_b",
+        "description": "南窗内侧偏东落地，整株与东踢脚线、边柜和柜顶书组分离；不阻南侧主要动线。"
+      },
+      {
+        "source": "bin_b",
+        "type": "near",
+        "target": "sofa_b",
+        "description": "沙发扶手侧，取用方便"
+      },
+      {
+        "source": "window_s_b",
+        "type": "mounted_to",
+        "target": "wall_s_b",
+        "description": "内嵌南墙，位置与朝向符合声明的使用功能"
+      }
+    ],
+    "physical_assumptions": [
+      "沙发/扶手椅/茶几/柜类静态（原生 USD 碰撞体，mass_kg=0）",
+      "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+      "地毯为静态薄板，声明真实厚度 1.5 cm，不声称织物形变",
+      "光照为渲染先验，按新采集的物体可辨识性调整；不声明实测照度或光学标定。"
+    ],
+    "previous_capture_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_b52f1a5a6f654f17.scene0/revision_0",
+    "revision_history": [
+      {
+        "revision": 1,
+        "changes": [
+          "依据view0深色座椅细节不足增加前部宽柔光与轻微曝光调整，环境下极点与Z-up对齐。",
+          "view4已经证明两杯为真实有柄资产，只旋转杯柄朝外并调整釉面，不替换资产或更改支撑。",
+          "在原台灯灯罩下方加入小光源，改善已有窗外纹理对比及玻璃透光。"
+        ],
+        "unresolved": [
+          "新采集须确认暗部细节、杯柄、台灯光源遮挡与窗外材质对比。"
+        ],
+        "evidence_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_2d06c7ce5893451a.scene0/revision_0",
+        "evidence_refs": [
+          {
+            "path": "capture/view_0.png",
+            "observation": "深色座椅正面细节较暗，两个杯柄在主视角被杯身遮挡。"
+          },
+          {
+            "path": "capture/view_4.png",
+            "observation": "同次侧视图可见两只真实杯柄，柜顶台灯形态和位置可核对。"
+          },
+          {
+            "path": "capture/evidence.json",
+            "observation": "原生采集完成并物理稳定；该轮视觉验收未通过，保留真实失败证据。"
+          }
+        ]
+      },
+      {
+        "revision": 2,
+        "evidence_directory": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/runtime/sf_b52f1a5a6f654f17.scene0/revision_0",
+        "changes": [
+          "view_0真实杯柄朝左右外侧，最终yaw和杯沉降回执证明没有动态回转；两杯与全部支撑保持。",
+          "view_1/view_4实际覆盖南窗，明确场景按多视角联合验收，8机位及全部K保持。",
+          "深色座椅保留原生皮面纹理和法线，已生效的正面柔光与0.9EV保持；同步修正软设计中的布艺描述。",
+          "只将已生效的窗玻璃native_opacity_multiplier由0.45降为0.18，检验降低透窗灰雾的效果，外部纹理与几何保持。"
+        ],
+        "unresolved": [
+          "玻璃alpha减小是否改善室外纹理对比仍须新实拍；玻璃/反射对灰雾的解释尚未经隔离实验确认。"
+        ],
+        "evidence_refs": [
+          {
+            "path": "capture/view_0.png",
+            "observation": "两个杯柄轮廓清楚，近左杯朝画面左、远右杯朝画面右；座椅为深色原生材质。"
+          },
+          {
+            "path": "capture/view_1.png",
+            "observation": "南窗大面积可见，透窗背景仍明显灰雾，室内皮面扶手椅可见高光与纹理。"
+          },
+          {
+            "path": "capture/view_4.png",
+            "observation": "南窗、灯具、两杯和座椅皮面可联合观察；无需改变主机位展示南窗。"
+          },
+          {
+            "path": "capture/evidence.json",
+            "observation": "两杯最终yaw保持+90/-90度，沉降位移极小；0.9EV、12条灯回执、玻璃alpha和室外纹理实际生效。"
+          },
+          {
+            "path": "scene_acceptance.json",
+            "observation": "physical_issues为空，8个原生支撑/挂接关系均通过；整体视觉仍失败，失败回执保留。"
+          },
+          {
+            "path": "capture/scene.usda",
+            "observation": "定点读取确认seat_light_1实际朝[0,.8,-.6]、玻璃Opacity_Multiply=.45，座椅原生纹理与法线保留。"
+          }
+        ]
+      }
+    ],
+    "plan_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/living-light-repair-20261106/lounge-round2-scene-plan.json",
+    "plan_version": [
+      15652,
+      1793978910433449522
+    ],
+    "authority": "versioned scene design, not captured physical truth",
+    "iteration_rule": "repair scene to brief; revise omissions from actual evidence; preserve user hard requirements and failed evidence"
+  },
+  "scope": "assets or declared simplification, scale, support and camera sanity; capture validation still required"
+}

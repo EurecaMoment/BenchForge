@@ -1,0 +1,25 @@
+{
+  "session": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+  "references": [
+    {
+      "run": "sf_cf398a9950d941e8",
+      "type": "tool/result",
+      "seq": 2920,
+      "callId": "chatcmpl-tool-869d92fa3692f464"
+    },
+    {
+      "run": "sf_feebadee63824e46",
+      "type": "tool/call",
+      "seq": 3665,
+      "callId": "chatcmpl-tool-88aeb4fd15d7354b",
+      "name": "spatialforge_wait"
+    },
+    {
+      "run": "sf_4cac06cdb58c40d3",
+      "type": "tool/call",
+      "seq": 3773,
+      "callId": "chatcmpl-tool-9685d801f53a5569",
+      "name": "spatialforge_evidence"
+    }
+  ]
+}

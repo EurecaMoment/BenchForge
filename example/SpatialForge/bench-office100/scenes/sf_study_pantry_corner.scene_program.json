@@ -1,0 +1,1184 @@
+{
+  "schema": "spatialforge.scene/v2",
+  "scene_id": "sf_study_pantry_corner",
+  "title": "阅览茶水角 · 使用参照与书柜补光",
+  "objects": [
+    {
+      "id": "floor_c",
+      "label": "房间地面",
+      "kind": "box",
+      "size": [
+        5.640000000000001,
+        4.84,
+        0.06
+      ],
+      "xy": [
+        0,
+        0
+      ],
+      "support": "ground",
+      "base_z": -0.06,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "texture_id": "wood_laminate",
+        "uv_scale_m": [
+          2.4,
+          1.2
+        ]
+      }
+    },
+    {
+      "id": "wall_n_c",
+      "label": "北墙",
+      "kind": "box",
+      "size": [
+        5.640000000000001,
+        0.12,
+        2.8
+      ],
+      "xy": [
+        0,
+        2.36
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "texture_id": "office_wall",
+        "uv_scale_m": [
+          2.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "id": "wall_w_c",
+      "label": "西墙",
+      "kind": "box",
+      "size": [
+        0.12,
+        4.6,
+        2.8
+      ],
+      "xy": [
+        -2.7600000000000002,
+        0
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "texture_id": "office_wall",
+        "uv_scale_m": [
+          2.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "id": "wall_e_c",
+      "label": "东墙",
+      "kind": "box",
+      "size": [
+        0.12,
+        4.6,
+        2.8
+      ],
+      "xy": [
+        2.7600000000000002,
+        0
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "texture_id": "office_wall",
+        "uv_scale_m": [
+          2.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "id": "ceiling_c",
+      "label": "吊顶",
+      "kind": "box",
+      "size": [
+        5.640000000000001,
+        4.84,
+        0.08
+      ],
+      "xy": [
+        0,
+        0
+      ],
+      "support": "ground",
+      "base_z": 2.8,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "wall_s_c",
+      "label": "南墙（含3米窗洞）",
+      "kind": "composite",
+      "size": [
+        5.640000000000001,
+        0.12,
+        2.8
+      ],
+      "xy": [
+        0,
+        -2.36
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "parts": [
+        {
+          "shape": "box",
+          "size": [
+            1.2000000000000002,
+            0.12,
+            2.8
+          ],
+          "offset": [
+            2.1,
+            0,
+            0
+          ],
+          "color": [
+            0.85,
+            0.85,
+            0.82
+          ]
+        },
+        {
+          "shape": "box",
+          "size": [
+            1.2000000000000002,
+            0.12,
+            2.8
+          ],
+          "offset": [
+            -2.1,
+            0,
+            0
+          ],
+          "color": [
+            0.85,
+            0.85,
+            0.82
+          ]
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.12,
+            0.12,
+            2.8
+          ],
+          "offset": [
+            1.56,
+            0,
+            0
+          ],
+          "color": [
+            0.62,
+            0.62,
+            0.64
+          ]
+        },
+        {
+          "shape": "box",
+          "size": [
+            0.12,
+            0.12,
+            2.8
+          ],
+          "offset": [
+            -1.56,
+            0,
+            0
+          ],
+          "color": [
+            0.62,
+            0.62,
+            0.64
+          ]
+        }
+      ],
+      "appearance": {
+        "texture_id": "office_wall",
+        "uv_scale_m": [
+          2.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "id": "window_s_c",
+      "label": "南窗",
+      "kind": "office_window",
+      "size": [
+        0.12,
+        3.0,
+        2.8
+      ],
+      "xy": [
+        0,
+        -2.36
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 90,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "native_opacity_multiplier": 0.62
+      },
+      "metadata": {
+        "spatial_attachment": {
+          "target": "wall_s_c",
+          "method": "static_mount",
+          "axis": 1,
+          "object_face": "max",
+          "target_face": "min"
+        }
+      }
+    },
+    {
+      "id": "ground_ext_c",
+      "label": "窗外地面",
+      "kind": "box",
+      "size": [
+        16.0,
+        10.0,
+        0.04
+      ],
+      "xy": [
+        0,
+        -7.02
+      ],
+      "support": "ground",
+      "base_z": -0.04,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "texture_id": "sidewalk_concrete",
+        "uv_scale_m": [
+          1.6,
+          1.6
+        ]
+      }
+    },
+    {
+      "id": "wall_ext_c",
+      "label": "窗外邻近建筑墙面",
+      "kind": "box",
+      "size": [
+        14.0,
+        0.15,
+        5.0
+      ],
+      "xy": [
+        0,
+        -3.62
+      ],
+      "support": "ground",
+      "base_z": -0.15,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "appearance": {
+        "texture_id": "office_wall",
+        "uv_scale_m": [
+          2.0,
+          2.0
+        ],
+        "texture_tint": [
+          0.62,
+          0.62,
+          0.66
+        ]
+      }
+    },
+    {
+      "id": "wall_sk_c_n",
+      "label": "北墙踢脚线",
+      "kind": "box",
+      "size": [
+        5.36,
+        0.025,
+        0.09
+      ],
+      "xy": [
+        0,
+        2.2874999999999996
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "wall_sk_c_w",
+      "label": "西墙踢脚线",
+      "kind": "box",
+      "size": [
+        0.025,
+        4.56,
+        0.09
+      ],
+      "xy": [
+        -2.6875,
+        0
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "wall_sk_c_e",
+      "label": "东墙踢脚线",
+      "kind": "box",
+      "size": [
+        0.025,
+        4.56,
+        0.09
+      ],
+      "xy": [
+        2.6875,
+        0
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "wall_sk_c_s1",
+      "label": "南墙踢脚线段一",
+      "kind": "box",
+      "size": [
+        1.08,
+        0.025,
+        0.09
+      ],
+      "xy": [
+        2.16,
+        -2.2874999999999996
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "wall_sk_c_s2",
+      "label": "南墙踢脚线段二",
+      "kind": "box",
+      "size": [
+        1.08,
+        0.025,
+        0.09
+      ],
+      "xy": [
+        -2.16,
+        -2.2874999999999996
+      ],
+      "support": "ground",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "desk_c1",
+      "label": "办公桌1",
+      "kind": "office_desk",
+      "size": [
+        0.9,
+        2.0,
+        0.75986
+      ],
+      "xy": [
+        -1.15,
+        1.8
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 90,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "desk_c2",
+      "label": "办公桌2",
+      "kind": "office_desk",
+      "size": [
+        0.9,
+        2.0,
+        0.75986
+      ],
+      "xy": [
+        1.15,
+        1.8
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 90,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "chair_c1",
+      "label": "转椅1",
+      "kind": "office_chair",
+      "size": [
+        0.63123,
+        0.65126,
+        1.177
+      ],
+      "xy": [
+        -1.15,
+        0.82
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 103.51656810879132,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "metadata": {
+        "functional_facing": {
+          "target_id": "monitor_c",
+          "target_xy": [
+            -1.4,
+            1.86
+          ],
+          "front_axis": "+X",
+          "source_usd": "Environments/Office/Props/SM_ChairOffice.usd",
+          "calibration_reference": "/home/maqiang/GitHub/BenchForgeV2/integrations/spatialforge/native_asset_facing.json",
+          "status": "planned_requires_new_capture"
+        }
+      }
+    },
+    {
+      "id": "chair_c2",
+      "label": "转椅2",
+      "kind": "office_chair",
+      "size": [
+        0.63123,
+        0.65126,
+        1.177
+      ],
+      "xy": [
+        1.15,
+        0.88
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 90.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "metadata": {
+        "functional_facing": {
+          "target_id": "desk_c2",
+          "target_xy": [
+            1.15,
+            1.8
+          ],
+          "front_axis": "+X",
+          "source_usd": "Environments/Office/Props/SM_ChairOffice.usd",
+          "calibration_reference": "/home/maqiang/GitHub/BenchForgeV2/integrations/spatialforge/native_asset_facing.json",
+          "status": "planned_requires_new_capture"
+        }
+      }
+    },
+    {
+      "id": "monitor_c",
+      "label": "显示器",
+      "kind": "office_monitor",
+      "size": [
+        0.205,
+        0.532,
+        0.5299
+      ],
+      "xy": [
+        -1.4,
+        1.86
+      ],
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "yaw_deg": -76.48343189120868,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "metadata": {
+        "functional_facing": {
+          "target_id": "chair_c1",
+          "target_xy": [
+            -1.15,
+            0.82
+          ],
+          "front_axis": "+X",
+          "source_usd": "Environments/Office/Props/SM_MonitorPC.usd",
+          "calibration_reference": "/home/maqiang/GitHub/BenchForgeV2/integrations/spatialforge/native_asset_facing.json",
+          "status": "planned_requires_new_capture"
+        }
+      }
+    },
+    {
+      "id": "mug_c1",
+      "label": "马克杯1",
+      "kind": "mug",
+      "size": [
+        0.0924,
+        0.1272,
+        0.091
+      ],
+      "xy": [
+        -0.72,
+        1.82
+      ],
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": true,
+      "mass_kg": 0.35,
+      "physics": {
+        "static_friction": 0.45,
+        "dynamic_friction": 0.38,
+        "restitution": 0.05,
+        "mass_source": "synthetic_prior"
+      }
+    },
+    {
+      "id": "mug_c2",
+      "label": "马克杯2",
+      "kind": "mug",
+      "size": [
+        0.0924,
+        0.1272,
+        0.091
+      ],
+      "xy": [
+        1.62,
+        1.98
+      ],
+      "support": "desk_c2",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": true,
+      "mass_kg": 0.35,
+      "physics": {
+        "static_friction": 0.45,
+        "dynamic_friction": 0.38,
+        "restitution": 0.05,
+        "mass_source": "synthetic_prior"
+      }
+    },
+    {
+      "id": "books_c1",
+      "label": "桌面书组",
+      "kind": "office_books",
+      "size": [
+        0.18014,
+        0.36323,
+        0.2465
+      ],
+      "xy": [
+        -1.92,
+        1.98
+      ],
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": true,
+      "mass_kg": 2.0,
+      "physics": {
+        "static_friction": 0.45,
+        "dynamic_friction": 0.38,
+        "restitution": 0.05,
+        "mass_source": "synthetic_prior"
+      }
+    },
+    {
+      "id": "books_c2",
+      "label": "桌面2书组",
+      "kind": "office_books",
+      "size": [
+        0.18014,
+        0.36323,
+        0.2465
+      ],
+      "xy": [
+        0.45,
+        2.02
+      ],
+      "support": "desk_c2",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": true,
+      "mass_kg": 2.0,
+      "physics": {
+        "static_friction": 0.45,
+        "dynamic_friction": 0.38,
+        "restitution": 0.05,
+        "mass_source": "synthetic_prior"
+      }
+    },
+    {
+      "id": "bookcase_c1",
+      "label": "书柜1",
+      "kind": "office_bookcase",
+      "size": [
+        0.418,
+        1.84,
+        2.22
+      ],
+      "xy": [
+        2.45,
+        -1.35
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 180,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "bookcase_c2",
+      "label": "书柜2",
+      "kind": "office_bookcase",
+      "size": [
+        0.418,
+        1.84,
+        2.22
+      ],
+      "xy": [
+        2.45,
+        0.6
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 180,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "sidecab_c",
+      "label": "茶水边柜",
+      "kind": "office_file_cabinet",
+      "size": [
+        0.703,
+        0.3921,
+        1.34069
+      ],
+      "xy": [
+        -2.3,
+        0.05
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "bin_c",
+      "label": "台面收纳箱",
+      "kind": "bin",
+      "size": [
+        0.198,
+        0.297,
+        0.1464
+      ],
+      "xy": [
+        -2.3,
+        0.07
+      ],
+      "support": "sidecab_c",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": true,
+      "mass_kg": 0.5,
+      "physics": {
+        "static_friction": 0.45,
+        "dynamic_friction": 0.38,
+        "restitution": 0.05,
+        "mass_source": "synthetic_prior"
+      }
+    },
+    {
+      "id": "lamp_c",
+      "label": "台灯",
+      "kind": "office_lamp",
+      "size": [
+        0.21,
+        0.21,
+        0.50799
+      ],
+      "xy": [
+        -0.65,
+        1.65
+      ],
+      "support": "desk_c1",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "cooler_c",
+      "label": "饮水机",
+      "kind": "office_water_cooler",
+      "size": [
+        0.34,
+        0.41935,
+        1.1
+      ],
+      "xy": [
+        -2.45,
+        1.3
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    },
+    {
+      "id": "armchair_c",
+      "label": "窗边阅读椅",
+      "kind": "office_armchair",
+      "size": [
+        0.82,
+        1.04,
+        0.79
+      ],
+      "xy": [
+        -1.3,
+        -1.55
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 90.0,
+      "dynamic": false,
+      "mass_kg": 0.0,
+      "metadata": {
+        "functional_facing": {
+          "target_id": null,
+          "target_xy": [
+            -1.3,
+            0.0
+          ],
+          "front_axis": "+X",
+          "source_usd": "Environments/Office/Props/SM_Armchair.usd",
+          "calibration_reference": "/home/maqiang/GitHub/BenchForgeV2/integrations/spatialforge/native_asset_facing.json",
+          "status": "planned_requires_new_capture"
+        }
+      }
+    },
+    {
+      "id": "plant_c",
+      "label": "盆栽",
+      "kind": "office_plant",
+      "size": [
+        1.044,
+        1.233,
+        1.404
+      ],
+      "xy": [
+        -0.1,
+        -1.55
+      ],
+      "support": "floor_c",
+      "base_z": 0.0,
+      "yaw_deg": 0.0,
+      "dynamic": false,
+      "mass_kg": 0.0
+    }
+  ],
+  "cameras": [
+    {
+      "id": "view_0",
+      "position": [
+        -1.8,
+        -2.05,
+        1.75
+      ],
+      "target": [
+        -0.25,
+        1.45,
+        0.68
+      ],
+      "focal_length_mm": 22.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_1",
+      "position": [
+        -2.05,
+        1.6,
+        1.85
+      ],
+      "target": [
+        1.1,
+        -0.45,
+        0.55
+      ],
+      "focal_length_mm": 22.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_2",
+      "position": [
+        -0.95,
+        -0.75,
+        1.3
+      ],
+      "target": [
+        -2.3,
+        0.4,
+        1.0
+      ],
+      "focal_length_mm": 32.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_3",
+      "position": [
+        0.9,
+        -0.2,
+        1.35
+      ],
+      "target": [
+        2.42,
+        0.4,
+        1.15
+      ],
+      "focal_length_mm": 26.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_4",
+      "position": [
+        2.08,
+        1.4,
+        1.85
+      ],
+      "target": [
+        -1.1,
+        1.5,
+        0.9
+      ],
+      "focal_length_mm": 24.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_5",
+      "position": [
+        -1.45,
+        -1.9,
+        1.6
+      ],
+      "target": [
+        0.0,
+        1.5,
+        0.8
+      ],
+      "focal_length_mm": 24.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_6",
+      "position": [
+        -1.15,
+        1.5,
+        2.5
+      ],
+      "target": [
+        -1.15,
+        1.8,
+        0.8
+      ],
+      "focal_length_mm": 24.0,
+      "horizontal_aperture_mm": 36.0
+    },
+    {
+      "id": "view_7",
+      "position": [
+        1.15,
+        1.5,
+        2.5
+      ],
+      "target": [
+        1.15,
+        1.8,
+        0.8
+      ],
+      "focal_length_mm": 24.0,
+      "horizontal_aperture_mm": 36.0
+    }
+  ],
+  "lights": [
+    {
+      "id": "env_sky",
+      "kind": "environment",
+      "intensity": 470,
+      "environment_id": "clear_day_sky",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "enabled": true
+    },
+    {
+      "id": "area_a",
+      "kind": "area",
+      "position": [
+        -1.08,
+        -0.9199999999999999,
+        2.6399999999999997
+      ],
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "intensity": 2600,
+      "temperature": 4100,
+      "size": [
+        1.3,
+        0.7
+      ],
+      "cast_shadows": true,
+      "enabled": true
+    },
+    {
+      "id": "area_b",
+      "kind": "area",
+      "position": [
+        1.08,
+        -0.9199999999999999,
+        2.6399999999999997
+      ],
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "intensity": 2800,
+      "temperature": 4100,
+      "size": [
+        1.3,
+        0.7
+      ],
+      "cast_shadows": true,
+      "enabled": true
+    },
+    {
+      "id": "area_c",
+      "kind": "area",
+      "position": [
+        -1.08,
+        0.9199999999999999,
+        2.6399999999999997
+      ],
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "intensity": 2400,
+      "temperature": 4100,
+      "size": [
+        1.3,
+        0.7
+      ],
+      "cast_shadows": true,
+      "enabled": true
+    },
+    {
+      "id": "area_d",
+      "kind": "area",
+      "position": [
+        1.08,
+        0.9199999999999999,
+        2.6399999999999997
+      ],
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "intensity": 2400,
+      "temperature": 4100,
+      "size": [
+        1.3,
+        0.7
+      ],
+      "cast_shadows": true,
+      "enabled": true
+    },
+    {
+      "id": "wash_w",
+      "kind": "point",
+      "position": [
+        -1.8000000000000003,
+        0,
+        2.15
+      ],
+      "intensity": 95,
+      "temperature": 3600,
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "cast_shadows": false,
+      "enabled": true
+    },
+    {
+      "id": "wash_e",
+      "kind": "point",
+      "position": [
+        1.8000000000000003,
+        0,
+        2.15
+      ],
+      "intensity": 95,
+      "temperature": 3600,
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "cast_shadows": false,
+      "enabled": true
+    },
+    {
+      "id": "sun_ext",
+      "kind": "sun",
+      "direction": [
+        0.15,
+        0.6,
+        -0.45
+      ],
+      "intensity": 450,
+      "angle": 3.0,
+      "cast_shadows": true,
+      "enabled": true
+    },
+    {
+      "id": "shelf_0",
+      "kind": "area",
+      "position": [
+        1.7,
+        -1.35,
+        1.4
+      ],
+      "intensity": 2000,
+      "temperature": 4100,
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "cast_shadows": false,
+      "enabled": true,
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "size": [
+        1.8,
+        1.6
+      ]
+    },
+    {
+      "id": "shelf_1",
+      "kind": "area",
+      "position": [
+        1.7,
+        0.6,
+        1.4
+      ],
+      "intensity": 2000,
+      "temperature": 4100,
+      "color": [
+        1,
+        1,
+        1
+      ],
+      "cast_shadows": false,
+      "enabled": true,
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "size": [
+        1.8,
+        1.6
+      ]
+    }
+  ],
+  "render_environment": {
+    "renderer": "PathTracing",
+    "samples_per_pixel": 96,
+    "exposure": 0.6
+  },
+  "semantic_layers": [
+    {
+      "id": "asset_kind",
+      "name": "官方资产类别",
+      "authority": "simulator"
+    }
+  ],
+  "assumptions": [
+    "家具尺寸取自 Isaac 官方资产库 USD 几何界，物理参数未标定。",
+    "马克杯/书/收纳bin 的质量与摩擦为合成先验，沉降与接触以本次仿真回执为准。",
+    "光照为渲染起始设置，不是校准照度；不声称真实测量。"
+  ],
+  "provenance": {
+    "sources": [
+      {
+        "kind": "original_scene",
+        "task_id": "sf_1fabc75f26fa499d.scene0"
+      },
+      {
+        "kind": "scene_plan",
+        "path": "/home/maqiang/GitHub/SpatialForge/bench-office100/work/living-light-repair-20261107/study-final-minimal-scene-plan.json",
+        "scene_design_id": "design-study-pantry"
+      }
+    ],
+    "generator": "bench-office100/scenes/gen_scene_programs.py v2-calibrated-facing",
+    "created_by": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "revision": 4,
+    "notes": "Furniture kinds are official NVIDIA Isaac assets with measured bounding boxes; walls/floor/ceiling/rug are authored architecture, not object proxies. 本轮候选保持全部物体和已通过的灯/杯支撑；桌面前沿按南侧座椅使用者参照，台灯为右侧近人半桌。只调整view_0避开盆栽前景，并把两条书柜补光移至开口外。新原生图与验收尚未执行。 最新sf_1fabc75f26fa499d实拍显示柜格仍暗；仅复用两条书柜灯为开口前竖向宽面补光，木纹使用注册建议重复尺度。原生地板单平面没有拼块台阶。边柜与柜顶箱共同南移0.35m改善局部椅侧瓶颈；台灯/杯/参照/尺寸/全部8机位保持。新捕获和视觉验收尚未执行。"
+  }
+}

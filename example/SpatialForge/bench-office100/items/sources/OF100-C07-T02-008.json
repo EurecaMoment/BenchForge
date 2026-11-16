@@ -1,0 +1,57 @@
+{
+  "id": "OF100-C07-T02-008",
+  "question": "根据图1、图2（阅览茶水角标定实拍），C01（办公桌1）的局部包围盒最长边长度是多少厘米？",
+  "unit": "cm",
+  "parameters": {
+    "media": "图1、图2：阅览茶水角 实拍（对象编号见同机位附件）",
+    "object": "C01（办公桌1）"
+  },
+  "question_spec": {
+    "stem": "观察原始采集图及对应标注附件，估计C01（办公桌1）本体局部包围盒的最长边。",
+    "context": [
+      "图1起为未加标记的原始采集图；同机位带框图片、编号、黄十字标记点和相机尺度卡均在公开附件中，按机位名称一一对应。",
+      "对象在图中以绿框与编号标识；该对象为单个刚体。",
+      "公开相机标定卡见附件；完整数值与深度读取说明见同名附件。",
+      "同源米制光轴深度、有效像素掩码及完整K/相对位姿：见公开附件。",
+      "对象本体局部轴方向见公开附件；没有公开其尺寸或世界坐标。",
+      "绿框及编号只标识对象；三维中心、局部轴和尺寸仍须由公开可见证据确定。"
+    ],
+    "conditions": [
+      "最长边指对象自身局部包围盒三个维度中的最大值（不随摆放旋转改变），单位厘米，保留一位小数。"
+    ],
+    "options": [],
+    "response": "提交 JSON 对象，value 为数值，unit 固定为 cm。",
+    "media_labels": [
+      "图1：view_0 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图2：view_1 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图3：view_2 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图4：view_3 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图5：view_4 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图6：view_5 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图7：view_6 原始RGB观测（对象编号与点标记见同机位标注附件）",
+      "图8：view_7 原始RGB观测（对象编号与点标记见同机位标注附件）"
+    ],
+    "parameter_bindings": {
+      "media": "图1、图2：阅览茶水角 实拍（对象编号见同机位附件）",
+      "object": "C01（办公桌1）"
+    },
+    "schema": "benchforge.question-writing/v1"
+  },
+  "split": "test",
+  "scene_group_id": "scene-v1:sf_study_pantry_corner",
+  "reference_frame": "Scene 世界坐标(米,Z-up)；相机坐标按 T_world_camera_usd 约定；像素原点左上",
+  "output_kind": null,
+  "measurement_variant": "局部包围盒最长边，非世界轴AABB",
+  "non_production": false,
+  "production_eligible": true,
+  "admission": {
+    "protocol_id": "D89-C07-v1",
+    "template_id": "C07-T02",
+    "task_id": "C07",
+    "protocol_version": "1.0.0-design",
+    "information_sufficient": true,
+    "media_consistent": true,
+    "no_answer_leakage": true,
+    "input_conditions": "同源RGB-D、公开K/相对位姿、编号标识与独立公开测量校验；未完整校验的项目保留为草稿。"
+  }
+}

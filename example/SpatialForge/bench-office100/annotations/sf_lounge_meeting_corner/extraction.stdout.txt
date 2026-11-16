@@ -1,0 +1,1 @@
+{"scene_id": "sf_lounge_meeting_corner", "objects": 28, "props": 13, "views": 8, "acceptance": true, "non_production": false, "production_eligible": true, "max_deviation_m": 0.0, "media_pairing_problems": 0, "objects_unobserved_in_views": 0}

@@ -1,0 +1,329 @@
+{
+  "brief": {
+    "id": "design-study-pantry",
+    "name": "阅览茶水角（sf_study_pantry_corner）",
+    "purpose": "学习+茶水混合功能区，提供第三组对象间距分布；承担 test 分区约 33 题（sealed 留待后续冻结）。",
+    "layout": "5.4×4.6×2.8米房间；两张办公桌沿北墙并排，间隔30厘米，各配转椅面向对应工作目标。东墙两组书柜开口朝室内；西墙文件柜作为收纳柜，柜顶只放一个收纳盒，饮水机在柜体北侧约0.9米处。两只马克杯和两组书分别放在两桌上，台灯放左桌右前区域。南窗下阅读椅面朝房内，盆栽在其东侧1.2米中心距离处。侧方与中央安排通行，东侧连续净宽至少0.75米；不把阅读椅背后的安装间隙作为通道。",
+    "objects": "office_desk×2、office_chair×2、office_bookcase×2、office_monitor×1、office_file_cabinet、office_water_cooler、office_lamp、office_plant、office_window、office_armchair（窗边阅读椅）、mug×2、bin×1、office_books×2。",
+    "cameras": "view_0 全景、view_1 对角高机位、view_2 茶水角近景、view_3 书柜墙面近景。",
+    "variation": "对象数 18（最多），双桌双椅同型号对象测试身份去重与计数；柜顶平放书与竖放书混布测厚度/长度维度混淆。",
+    "artifact": "scenes/sf_study_pantry_corner.scene_program.json → captures/sf_study_pantry_corner/",
+    "summary": "这是一间兼具办公、阅览与饮水功能的小型仿真房间，服务两到三人，并为评测提供同型号多实例的计数与身份去重条件。房间5.4×4.6米、高2.8米，木地板与浅色墙，南墙嵌3米模块窗。北墙并排两张办公桌，中间留30厘米缝，每桌配一把转椅并留出腿部空间；左桌转椅面向对应显示器，显示器屏幕面向左桌转椅，右桌转椅面向右桌工作区，朝向按已校准的原生资产正面计算。总共只有两只马克杯，各放在一张桌面的可取用处；两组书也分别放在两桌的左侧，右桌已有书和杯，不以单个视角的遮挡认定为空。台灯放在左桌右前区域，由桌面支撑，与显示器及书组错开。东墙相邻两组书柜，开口朝室内，柜格留空以保证支撑可验证。西墙文件柜用于日常收纳，柜顶只放一个收纳盒，柜顶作为收纳平面，不作为食品操作台；饮水机在柜体北侧约0.9米处贴墙。窗下偏西放一只阅读扶手椅，背部朝南窗、正面朝房内，后方留约0.3米安装余量，通行安排在侧方及房间中央。盆栽移至阅读椅东侧，两者中心相距1.2米，东侧连续通道净宽至少0.75米，并由最终采集检查。大件静态，杯、书和收纳盒带合成质量与摩擦，最终接触、姿态和中心以新仿真沉降回执为准；公开媒体标记与真值同源。",
+    "hard_requirements": [
+      "室内场景，真实可辨识资产，禁止几何盒替代家具",
+      "承担 test 分区约 33 题；同场景题目同分区，禁止跨分区泄漏",
+      "GT 仅来自官方/程序/仿真；双桌双椅同型号必须可按持久 ID 区分",
+      "公开题目不泄露答案"
+    ],
+    "object_roles": [
+      {
+        "object_id": "floor_c",
+        "role": "地面，支撑全部家具并作为高度起算面"
+      },
+      {
+        "object_id": "wall_n_c",
+        "role": "北墙，双桌贴靠"
+      },
+      {
+        "object_id": "wall_s_c",
+        "role": "南墙，窗与阅读椅"
+      },
+      {
+        "object_id": "wall_w_c",
+        "role": "西墙，茶水角"
+      },
+      {
+        "object_id": "wall_e_c",
+        "role": "东墙，双书柜"
+      },
+      {
+        "object_id": "ceiling_c",
+        "role": "吊顶，封闭室内体积"
+      },
+      {
+        "object_id": "window_s_c",
+        "role": "南窗，提供采光与尺度线索"
+      },
+      {
+        "object_id": "desk_c1",
+        "role": "办公桌1，北墙西侧，配显示器"
+      },
+      {
+        "object_id": "desk_c2",
+        "role": "办公桌2，北墙东侧，配马克杯与书组，与 c1 间隔 30 cm"
+      },
+      {
+        "object_id": "chair_c1",
+        "role": "转椅1，正对 desk_c1"
+      },
+      {
+        "object_id": "chair_c2",
+        "role": "转椅2，正对 desk_c2"
+      },
+      {
+        "object_id": "monitor_c",
+        "role": "显示器，desk_c1 桌面"
+      },
+      {
+        "object_id": "mug_c1",
+        "role": "马克杯，desk_c1 桌面"
+      },
+      {
+        "object_id": "mug_c2",
+        "role": "马克杯，desk_c2 桌面"
+      },
+      {
+        "object_id": "bookcase_c1",
+        "role": "书柜1，东墙南侧"
+      },
+      {
+        "object_id": "bookcase_c2",
+        "role": "书柜2，东墙北侧，与 c1 相邻"
+      },
+      {
+        "object_id": "books_c1",
+        "role": "书组，desk_c1 桌面左角竖放"
+      },
+      {
+        "object_id": "books_c2",
+        "role": "书组，办公桌2桌面左角竖放"
+      },
+      {
+        "object_id": "sidecab_c",
+        "role": "西墙文件收纳柜，柜顶只放一个收纳盒，按日常收纳用途使用。"
+      },
+      {
+        "object_id": "bin_c",
+        "role": "bin，边柜台面"
+      },
+      {
+        "object_id": "cooler_c",
+        "role": "饮水机，西墙边柜北侧 0.8 m"
+      },
+      {
+        "object_id": "lamp_c",
+        "role": "台灯，办公桌1桌面右前角，阅读照明"
+      },
+      {
+        "object_id": "plant_c",
+        "role": "窗侧盆栽，位于阅读椅东侧，两者中心相距1.2米，保留东侧连续通道。"
+      },
+      {
+        "object_id": "armchair_c",
+        "role": "单人阅读椅，窗下面朝房内"
+      }
+    ],
+    "relations": [
+      {
+        "source": "desk_c1",
+        "type": "near",
+        "target": "wall_n_c",
+        "description": "贴北墙，桌面工作区"
+      },
+      {
+        "source": "desk_c2",
+        "type": "near",
+        "target": "wall_n_c",
+        "description": "贴北墙与 c1 间隔 30 cm"
+      },
+      {
+        "source": "chair_c1",
+        "type": "facing",
+        "target": "desk_c1",
+        "description": "正对桌面留腿部空间"
+      },
+      {
+        "source": "chair_c2",
+        "type": "facing",
+        "target": "desk_c2",
+        "description": "正对桌面，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "monitor_c",
+        "type": "supported_by",
+        "target": "desk_c1",
+        "description": "底座由左桌支撑，屏幕正面面向左桌转椅，采用已校准的原生资产正面计算朝向。"
+      },
+      {
+        "source": "mug_c1",
+        "type": "supported_by",
+        "target": "desk_c1",
+        "description": "动态件，台面沉降"
+      },
+      {
+        "source": "mug_c2",
+        "type": "supported_by",
+        "target": "desk_c2",
+        "description": "动态件，台面沉降"
+      },
+      {
+        "source": "books_c1",
+        "type": "supported_by",
+        "target": "desk_c1",
+        "description": "书组竖放办公桌1左角，由桌面真实支撑"
+      },
+      {
+        "source": "books_c2",
+        "type": "supported_by",
+        "target": "desk_c2",
+        "description": "书组竖放办公桌2桌面左角，由桌面真实支撑，与办公桌1桌面书组构成同型号双桌区分"
+      },
+      {
+        "source": "sidecab_c",
+        "type": "near",
+        "target": "wall_w_c",
+        "description": "文件柜作为西墙日常收纳柜，柜顶放收纳盒，不作为食品操作台。"
+      },
+      {
+        "source": "bin_c",
+        "type": "supported_by",
+        "target": "sidecab_c",
+        "description": "台面放置，位置与朝向符合声明的使用功能"
+      },
+      {
+        "source": "cooler_c",
+        "type": "near",
+        "target": "sidecab_c",
+        "description": "文件收纳柜北侧约0.9米的贴墙取水点。"
+      },
+      {
+        "source": "armchair_c",
+        "type": "near",
+        "target": "window_s_c",
+        "description": "窗下阅读位，背部朝南窗、正面朝房内，背后留约0.3米安装余量，通行在侧方。"
+      },
+      {
+        "source": "lamp_c",
+        "type": "supported_by",
+        "target": "desk_c1",
+        "description": "台灯底座落在办公桌1桌面右前角，与左角显示器、书组错开，提供有效桌面照明"
+      },
+      {
+        "source": "plant_c",
+        "type": "supported_by",
+        "target": "floor_c",
+        "description": "窗侧地面，界定软分区"
+      },
+      {
+        "source": "window_s_c",
+        "type": "mounted_to",
+        "target": "wall_s_c",
+        "description": "内嵌南墙，位置与朝向符合声明的使用功能"
+      }
+    ],
+    "physical_assumptions": [
+      "桌/椅/柜/窗静态（原生 USD 碰撞体）；双桌双椅同型号但世界坐标与 ID 持久可分",
+      "马克杯0.35 kg、单本书0.4 kg、书组2.0 kg、收纳盒0.5 kg，静摩擦0.45、动摩擦0.38均为合成先验；接触与沉降以本次原生采集回执为准，不声明真实测得。",
+      "台灯为左桌右前区域的静态摆件，底座由办公桌1桌面支撑；不测倾覆。",
+      "窗资产透明度用 native_opacity_multiplier 先验调节，不声称光学实测透射率"
+    ],
+    "plan_path": "/home/maqiang/GitHub/SpatialForge/operations/47803d26fc3e49d7/plan.json",
+    "plan_version": [
+      245898,
+      1793958231932517021
+    ],
+    "authority": "versioned scene design, not captured physical truth",
+    "iteration_rule": "repair scene to brief; revise omissions from actual evidence; preserve user hard requirements and failed evidence"
+  },
+  "observation": {
+    "passed": true,
+    "hard_requirements_preserved": true,
+    "observations": [
+      {
+        "view": "view_0.png",
+        "observation": "展示了北墙双桌布局，左桌有显示器和台灯，右桌有书组，符合摘要描述。"
+      },
+      {
+        "view": "view_1.png",
+        "observation": "展示了东墙双书柜、南窗及窗边阅读椅，盆栽位于椅子东侧，符合空间关系。"
+      },
+      {
+        "view": "view_2.png",
+        "observation": "特写西墙文件柜，柜顶放置收纳箱，旁边是饮水机，符合茶水角功能定义。"
+      },
+      {
+        "view": "view_3.png",
+        "observation": "近距离观察书柜细节，确认柜格留空，无违规物品堆放。"
+      }
+    ],
+    "unresolved": [],
+    "proposed_summary_revision": {
+      "reason": "无",
+      "summary": "无",
+      "changes": []
+    },
+    "requirement_checks": [
+      {
+        "index": 0,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "场景为室内，家具均为真实模型资产，非几何盒替代。"
+      },
+      {
+        "index": 1,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "场景包含完整的办公与阅览设施，满足题目分区需求。"
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "双桌双椅虽同型号，但位置明确区分，符合持久ID区分条件。"
+      },
+      {
+        "index": 3,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "图像仅展示场景，未包含任何答案泄露信息。"
+      }
+    ],
+    "relation_checks": [
+      {
+        "index": 0,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "左侧办公桌紧贴北墙放置。"
+      },
+      {
+        "index": 1,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "右侧办公桌紧贴北墙，与左桌保持明显间隔。"
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "左侧转椅正对左侧办公桌。"
+      },
+      {
+        "index": 3,
+        "passed": true,
+        "view": "view_0.png",
+        "observation": "右侧转椅正对右侧办公桌。"
+      },
+      {
+        "index": 9,
+        "passed": true,
+        "view": "view_2.png",
+        "observation": "文件柜紧贴西墙放置，作为收纳使用。"
+      },
+      {
+        "index": 11,
+        "passed": true,
+        "view": "view_2.png",
+        "observation": "饮水机位于文件柜北侧，两者相邻。"
+      },
+      {
+        "index": 12,
+        "passed": true,
+        "view": "view_1.png",
+        "observation": "阅读椅位于窗下，背对窗户，面向室内。"
+      }
+    ]
+  },
+  "passed": true,
+  "iteration_required": false,
+  "hard_requirements_may_be_relaxed": false
+}

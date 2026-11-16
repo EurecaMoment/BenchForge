@@ -1,0 +1,12 @@
+{
+  "tool": "pipeline_run",
+  "arguments": {
+    "plan": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/operations/2af3311daa404eba/plan.json",
+    "run": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/work/production-rectified-20261116"
+  },
+  "time": "2026-11-16T12:07:49.301781+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "example-rectification-20261116"
+  }
+}

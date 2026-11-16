@@ -1,0 +1,11 @@
+{
+  "state": "needs_plan_revision",
+  "issues": [
+    "assessment.coverage counts must match pipeline selections per template",
+    "assessment.scoring.metrics must cover exactly the selected templates"
+  ],
+  "authoring_sources": {
+    "assessment_path": "/slow_share2/jby/BenchForgeV2/example/SpatialForge/bench-office100/plan/sections/assessment_s1.json"
+  },
+  "next": "Edit only the listed fields in the existing source file. Validate again using the same path; do not regenerate the whole document."
+}

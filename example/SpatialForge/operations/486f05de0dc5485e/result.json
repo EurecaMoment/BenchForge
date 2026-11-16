@@ -1,0 +1,135 @@
+{
+  "section": "templates",
+  "items": [
+    {
+      "id": "C01-T01",
+      "task_id": "C01",
+      "title": "三维中心距离",
+      "prompt_template": "根据{media}，估计标记对象{A}与{B}几何中心之间的直线距离，单位米。",
+      "parameters": [
+        {
+          "name": "media",
+          "domain_or_binding": "带尺度多视图或RGB-D",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "A",
+          "domain_or_binding": "唯一实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        },
+        {
+          "name": "B",
+          "domain_or_binding": "不同唯一实体ID",
+          "binding_type": "runtime_parameter_not_filled_sample"
+        }
+      ],
+      "measurement_variant": "答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "output_kind": "numeric",
+      "output_schema": {
+        "value": "finite number",
+        "unit": "declared unit"
+      },
+      "protocol_id": "D89-C01-v1",
+      "protocol_inheritance": "任务协议+common；变体测量条件与答案定义同时生效",
+      "effective_measurement_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。；答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "effective_oracle": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。；变体要求：答案仅为中心距离；对象尺寸变化不改变中心距离时构造配对题。",
+      "effective_scoring": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。；按output_schema解析，非唯一合法输出由约束验证。",
+      "status": "authored_design_not_instantiated",
+      "generator_implementation": "not_implemented_for_new_template",
+      "oracle_implementation": "specified_not_executed_for_new_template",
+      "task_name": "实体间绝对距离估计",
+      "operation": "estimate_metric_distance",
+      "catalog_capability_links": [
+        {
+          "id": "N01",
+          "status": "has_protocol"
+        },
+        {
+          "id": "N11",
+          "status": "catalog_only_no_current_evaluation"
+        }
+      ],
+      "protocol": {
+        "id": "D89-C01-v1",
+        "version": "1.0.0-design",
+        "status": "design_not_deployed",
+        "measurement_scope": "实体间绝对距离估计",
+        "input_conditions": "标定RGB-D或可恢复尺度的多视图；目标A/B唯一标记；声明米制单位及距离定义。单张无尺度RGB不准入绝对距离测量。",
+        "provided_information_policy": {
+          "model_visible": "只显示具体模板所需的题干、输入媒体/历史、公开标定、规则、候选及接口；确需给坐标的计算版明确单列。",
+          "verifier_private": "完整场景真值、隐藏对象状态、未来帧、答案、oracle内部中间状态、参考策略与封存划分信息。",
+          "conditional_public": "相机位姿、对象ID、局部地图可作为隔离版已给信息；必须记录provided_information，不能与自然视觉恢复版混评。"
+        },
+        "isolation_controls": "固定指代、相机和尺度；区分中心、表面最近点与目标位置距离；二维标尺变体单独报告。",
+        "reference_frame_rule": "场景三维坐标；距离定义须声明",
+        "oracle_contract": "中心距离为三维中心差的L2范数；最近表面距离由网格/解析碰撞体最近点求解；空间位置距离按指定点计算。",
+        "scoring_contract": "主报MAE米和相对误差；阈值由校准集冻结；近零距离只用绝对误差，不混合不同距离定义。",
+        "difficulty_axes": [
+          "距离范围",
+          "表面形状",
+          "遮挡",
+          "尺度线索"
+        ],
+        "interaction_required": false,
+        "history_access_required": false,
+        "interactive_inheritance": null,
+        "history_inheritance": null,
+        "admission_checks": [
+          "公共准入规则全部通过",
+          "任务输入条件全部满足",
+          "变体oracle产出可验证答案/合法集合",
+          "测量精度和阈值冻结",
+          "协议差异与既有来源显式记录"
+        ],
+        "oracle_engine_class": "task_specific_geometry_or_rule_solver",
+        "threshold_binding": "common.proposed_thresholds仅为校准初值；实例需明确tolerance_config，不允许未配置即评分。"
+      },
+      "execution": {
+        "program_generator": true,
+        "evidence_binding": true,
+        "scope": "calibrated synthetic geometry / explicit rules",
+        "validation": "adapter tests and generated artifacts; not real-world validity or training transfer"
+      }
+    }
+  ],
+  "total": 1,
+  "next_offset": null,
+  "source": "89tasks-267templates-v1.0-design",
+  "capability_policy": "Catalog links select candidates; task operation and measurement variant define measured scope.",
+  "question_authoring": {
+    "schema": "benchforge.question-writing/v1",
+    "instructions": "每题提交 question_spec：简短自然题干 stem、公开已知条件 context、必要作答规则 conditions、候选 options、作答说明 response、逐项媒体标题 media_labels，以及与 parameters 完全一致的 parameter_bindings。题干先说看什么和问什么；采集说明、坐标定义、单位和容差分别放在条件中，必要条件不能藏在技术详情。对象称呼必须对应公开图片中的真实名称或编号；禁止凭空命名物体。禁止把内部运行号、路径、相机代码、原始字典或列表拼进题干。中心、采样点、参照轴等若用于作答，必须在公开媒体中提供对应标记或可用条件。保留准确模板的目标、参照系、单位、容差、候选和输出合同；改表达不能改变问题。无需模型判断题目质量。程序检查字段与绑定，并逐模板实际看图检查代表题。",
+    "evidence_field": "question_spec",
+    "required_fields": [
+      "stem",
+      "context",
+      "conditions",
+      "options",
+      "response",
+      "media_labels",
+      "parameter_bindings"
+    ],
+    "example": {
+      "schema": "benchforge.question-writing/v1",
+      "stem": "看图1，标记A的物体在标记B的哪一侧？",
+      "context": [
+        "图中编号用于识别物体。"
+      ],
+      "conditions": [
+        "以画面为参照，按图中中心标记判断方向。"
+      ],
+      "options": [
+        "左侧",
+        "右侧",
+        "上方",
+        "下方"
+      ],
+      "response": "按当前模板的输出合同提交一个方向。",
+      "media_labels": [
+        "图1：场景与物体中心标记"
+      ],
+      "parameter_bindings": "copy the exact evidence parameters object"
+    },
+    "validation_scope": "writing structure and exact source bindings; human answerability requires real media review"
+  }
+}

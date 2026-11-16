@@ -1,0 +1,11 @@
+{
+  "tool": "pipeline_plan",
+  "arguments": {
+    "request_path": "/home/maqiang/GitHub/BenchForgeV2/.deployment/active-plan-file-request-20261105.json"
+  },
+  "time": "2026-11-05T08:54:31.336518+00:00",
+  "context": {
+    "session_id": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+    "call_id": "plan-file-recovery-0add4998-9e92-4c64-bb47-f5d364a47b49"
+  }
+}
