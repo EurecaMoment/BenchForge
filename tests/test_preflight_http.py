@@ -55,10 +55,13 @@ class PreflightHTTPTests(unittest.TestCase):
                     headers = {'Content-Type': 'application/json'}
                     if authorized:
                         headers['Authorization'] = 'Bearer fixture-only'
-                    return Request(base + route, headers=headers, data=json.dumps({
+                    # Authentication rejects before reading a body. Keep this probe empty
+                    # so Windows does not reset a connection with unread request bytes.
+                    body = json.dumps({
                         'scene_program_path': str(source), 'execution_mode': 'exploration',
                         'request_key': 'fixture-request',
-                    }).encode())
+                    }).encode() if authorized else b''
+                    return Request(base + route, headers=headers, data=body)
 
                 try:
                     with self.assertRaises(HTTPError) as denied:
