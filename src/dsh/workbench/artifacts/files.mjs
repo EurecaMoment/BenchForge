@@ -42,6 +42,13 @@ async function locate(ref, roots) {
   return {root, file, stat};
 }
 
+async function canonicalRoots(roots) {
+  return (await Promise.all(roots.map(async (root) => {
+    try { return {...root, path: await fs.realpath(root.path)}; }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  }))).filter(Boolean);
+}
+
 function references(evidence) {
   const files = new Map();
   for (const owner of evidence) for (const ref of owner.files) {
@@ -54,6 +61,7 @@ function references(evidence) {
 }
 
 export async function conversationProducts({sessionId, evidence, roots, maxArtifacts = 300, signal}) {
+  roots = await canonicalRoots(roots);
   const refs = references(evidence), items = [];
   for (const ref of refs.slice(0, maxArtifacts)) {
     signal?.throwIfAborted();
@@ -85,6 +93,7 @@ export async function conversationProducts({sessionId, evidence, roots, maxArtif
 export async function openConversationArtifact(id, {evidence, roots, request}) {
   const ref = references(evidence).find((row) => row.id === id);
   if (!ref) throw new ApiError('This file was not produced or delivered in the current conversation', 404);
+  roots = await canonicalRoots(roots);
   const {file, stat} = await locate(ref, roots);
   const [kind, contentType] = FORMATS[path.extname(file).toLowerCase()] || ['file', 'application/octet-stream'];
   const headers = new Headers({
