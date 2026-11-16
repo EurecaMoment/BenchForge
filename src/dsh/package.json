@@ -37,6 +37,7 @@
     "production/*.d.ts",
     "dist/*.mjs",
     "dist/resources/*.json",
+    "dist/task_support/*",
     "check_config.py",
     "cli.py",
     "client/index.js",

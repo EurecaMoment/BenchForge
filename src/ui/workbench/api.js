@@ -1,8 +1,11 @@
 export function createWorkbenchRequest(remote) {
   return async (params, {body, signal} = {}) => {
     const query = Object.fromEntries(new URLSearchParams(params));
+    const methods = {stage_review: 'stageReview', progress: 'progress', stage_artifacts: 'sceneArtifacts'};
+    const method = methods[query.view];
+    const {view: _view, ...typedQuery} = query;
     const result = body === undefined
-      ? await remote.benchforgeWorkbench.read(query, signal)
+      ? await (method ? remote.benchforgeWorkbench[method](typedQuery, signal) : remote.benchforgeWorkbench.read(query, signal))
       : await remote.benchforgeWorkbench.write(query, body, signal);
     if (!result.ok) {
       signal?.throwIfAborted();

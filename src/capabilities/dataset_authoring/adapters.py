@@ -4,15 +4,8 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-BUILTINS = {f'{task}-T{i:02}' for task in ('C01', 'C04', 'C44', 'P001', 'P002') for i in range(1, 4)} | {'C43-T01', 'C43-T03'}
+from capabilities.task_catalog.execution_support import BUILTINS as BUILTINS, supports as supports
 PALETTE = [(56, 117, 167), (191, 76, 74), (68, 147, 101), (164, 106, 190), (213, 152, 56), (60, 146, 154)]
-
-
-def supports(template_id):
-    return {'program_generator': template_id in BUILTINS,
-            'evidence_binding': True,
-            'scope': 'calibrated synthetic geometry / explicit rules' if template_id in BUILTINS else 'requires task-specific source evidence and oracle; no generic substitute',
-            'validation': 'adapter tests and generated artifacts; not real-world validity or training transfer'}
 
 
 def canvas(path, width=640, height=360):

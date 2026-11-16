@@ -6,33 +6,19 @@ submission instead of silently changing geometry, materials or requested actions
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
+from capabilities.isaac_sim.usd_materials import usd, array, material_usd
+from capabilities.isaac_sim.mesh_materials import author_mesh_materials
+from capabilities.isaac_sim.scene_requirements import UnsupportedScene, validate_scene_requirements
 from capabilities.scene_authoring.catalog.native import ASSETS
 from capabilities.scene_authoring.geometry.mesh import transform_mesh_geometry, transform_mesh_normals
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
 from capabilities.scene_authoring.validation.program import validate_program
 
 
-class UnsupportedScene(ValueError):
-    """An explicit scene requirement has no faithful A100 SceneProgram mapping."""
 
 
-def usd(value):
-    if isinstance(value, str):
-        return json.dumps(value, ensure_ascii=False)
-    if isinstance(value, bool):
-        return str(value).lower()
-    if isinstance(value, (tuple, list)):
-        return '(' + ', '.join(usd(item) for item in value) + ')'
-    if not math.isfinite(float(value)):
-        raise ValueError('USD numbers must be finite')
-    return repr(float(value))
-
-
-def array(values):
-    return '[' + ', '.join(usd(value) for value in values) + ']'
 
 
 def camera_matrix(camera):
@@ -60,25 +46,6 @@ def material(program, obj, parent=None):
             'roughness': settings.get('roughness', .85), 'metallic': settings.get('metallic', 0)}
 
 
-def material_usd(name, settings, *, vertex_color=False):
-    color = ('color3f inputs:diffuseColor.connect = </World/Materials/' + name + '/Color.outputs:result>'
-             if vertex_color else 'color3f inputs:diffuseColor = ' + usd(settings['base_color']))
-    reader = '''def Shader "Color" {
-        uniform token info:id = "UsdPrimvarReader_float3"
-        string inputs:varname = "displayColor"
-        float3 outputs:result
-    }''' if vertex_color else ''
-    return f'''def Material "{name}" {{
-        token outputs:surface.connect = </World/Materials/{name}/Surface.outputs:surface>
-        def Shader "Surface" {{
-            uniform token info:id = "UsdPreviewSurface"
-            {color}
-            float inputs:roughness = {usd(settings['roughness'])}
-            float inputs:metallic = {usd(settings['metallic'])}
-            token outputs:surface
-        }}
-        {reader}
-    }}'''
 
 
 def physics_lines(obj):
@@ -94,6 +61,7 @@ def physics_lines(obj):
 def compile_scene(program, assets_root, settings):
     """Return USD bytes plus declared inputs; only later native receipts are evidence."""
     validate_program(program)
+    validate_scene_requirements(program)
     if any(obj.get('render_representation') == 'gaussian' for obj in program['objects']):
         raise UnsupportedScene('SceneProgram capture requires mesh primary-surface annotations; Gaussian uses the native render API')
     for obj in program['objects']:
@@ -170,8 +138,6 @@ def compile_scene(program, assets_root, settings):
                 raise UnsupportedScene(f'No A100 SceneProgram geometry mapping for {shape}')
             if shape == 'mesh':
                 mesh = load(obj['asset_id'])
-                if mesh.get('materials') or mesh.get('material_textures'):
-                    raise UnsupportedScene('Textured mesh requires native asset import; flattening its materials is not implicit')
                 vertices, transform = transform_mesh_geometry(mesh['vertices'], obj['size'], mesh.get('coordinate_frame'), obj.get('mesh_transform'))
                 triangles = mesh.get('triangles', mesh.get('faces'))
                 if triangles is None:
@@ -180,13 +146,17 @@ def compile_scene(program, assets_root, settings):
                           'int[] faceVertexCounts = ' + '[' + ','.join('3' for _ in triangles) + ']',
                           'int[] faceVertexIndices = [' + ','.join(str(i) for face in triangles for i in face) + ']',
                           'uniform token subdivisionScheme = "none"']
-                colors = mesh.get('vertex_colors', mesh.get('colors'))
-                if colors:
-                    attrs.append('color3f[] primvars:displayColor = ' + array([row[:3] for row in colors]) + ' (interpolation = "vertex")')
+                mesh_attrs, mesh_materials = author_mesh_materials(mesh, mat_name, mat)
+                attrs += mesh_attrs
+                materials.extend(mesh_materials)
                 if mesh.get('normals'):
                     normals = transform_mesh_normals(mesh['normals'], transform['T_local_from_source'])
-                    attrs.append('normal3f[] normals = ' + array(normals.tolist()) + ' (interpolation = "vertex")')
-                materials.append(material_usd(mat_name, mat, vertex_color=bool(colors)))
+                    interpolation = mesh.get('normals_interpolation', 'vertex')
+                    expected = len(vertices) if interpolation == 'vertex' else len(triangles) * 3
+                    if interpolation not in ('vertex', 'faceVarying') or len(normals) != expected:
+                        raise ValueError('Mesh normals do not match their declared interpolation')
+                    attrs.append('normal3f[] normals = ' + array(normals.tolist()) +
+                                 ' (interpolation = "' + interpolation + '")')
                 dims = [1, 1, 1]
                 entity['mesh_transform'] = transform
             else:

@@ -234,7 +234,7 @@
             native task/run 及计划版本，不能用逻辑场景名替代。分别记录写出、公开测量通过、制作条件通过和修复候选计数；正式 Runtime
             接纳且工作台能读取数据集后才记录已发布。
 
-            重复公开 RGB-D 几何测量优先复用随插件发布的 task_support/README.md 中的三文件闭包（源码目录为 src/dsh/task_support），独立公开
+            重复公开 RGB-D 几何测量优先复用随插件发布的 dist/task_support/README.md 中的三文件闭包（源码目录为 src/capabilities/data_acquisition/measurements），独立公开
             worker 同样携带全部依赖。按保存的公开协议调用 PublicReconstruction/public_query：中心和尺寸用 geometry(label)，点数用
             point_count(label)，需要真实点云才调用 points(label)。同批测量共享有界 LRU，避免逐题重复加载、投影相同输入；文件版本、相机参照系与局部轴变化仍使缓存失效。逐题原生比较和原有误差界保持，GT与通过判定不缓存，已通过且未受影响的
             surface 证书直接复用。其它题型保持自己的数学定义。闭包未改算法时复用已有证据，仅做必要导入检查；新题仍执行其正常公开信息与制作验收。
@@ -579,7 +579,7 @@
             native task/run 及计划版本，不能用逻辑场景名替代。分别记录写出、公开测量通过、制作条件通过和修复候选计数；正式 Runtime
             接纳且工作台能读取数据集后才记录已发布。
 
-            重复公开 RGB-D 几何测量优先复用随插件发布的 task_support/README.md 中的三文件闭包（源码目录为 src/dsh/task_support），独立公开
+            重复公开 RGB-D 几何测量优先复用随插件发布的 dist/task_support/README.md 中的三文件闭包（源码目录为 src/capabilities/data_acquisition/measurements），独立公开
             worker 同样携带全部依赖。按保存的公开协议调用 PublicReconstruction/public_query：中心和尺寸用 geometry(label)，点数用
             point_count(label)，需要真实点云才调用 points(label)。同批测量共享有界 LRU，避免逐题重复加载、投影相同输入；文件版本、相机参照系与局部轴变化仍使缓存失效。逐题原生比较和原有误差界保持，GT与通过判定不缓存，已通过且未受影响的
             surface 证书直接复用。其它题型保持自己的数学定义。闭包未改算法时复用已有证据，仅做必要导入检查；新题仍执行其正常公开信息与制作验收。'

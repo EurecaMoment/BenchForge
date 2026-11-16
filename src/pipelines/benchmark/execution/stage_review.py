@@ -2,7 +2,7 @@
 import time
 from pathlib import Path
 
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 from capabilities.benchmark_design.stages import STAGES
 
 

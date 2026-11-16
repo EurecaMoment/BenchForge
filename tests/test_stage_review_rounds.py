@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from pipelines.benchmark.design.plan_versions import activate
-from pipelines.benchmark.execution import review_service
+from pipelines.reviews import service as review_service
 from storage import stage_reviews as ledger
 from storage.artifacts import write
 

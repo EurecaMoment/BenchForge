@@ -6,17 +6,12 @@ import uuid
 from sqlalchemy import Table
 from sqlalchemy import Column
 from sqlalchemy import String
-from sqlalchemy import JSON
 from sqlalchemy import MetaData
 from sqlalchemy import select
-from sqlalchemy import update as sql_update
 from storage.scene_jobs.metadata import Repository
 from storage.scene_jobs.metadata import runs
 from storage.scene_jobs.metadata import tasks
-from storage.files import write_json
 from storage.files import safe_path
-from capabilities.scene_authoring.catalog.native import normalize_native_asset_references
-from capabilities.scene_authoring.program_submission import submission_identity
 from service_access.request_context import RunContext
 from service_access.runtime_config import resolve_database_url
 
@@ -25,7 +20,8 @@ def uid(prefix): return prefix+'_'+uuid.uuid4().hex[:16]
 
 
 class Store:
-    def __init__(self, root, harness=None, database_url=None):
+    def __init__(self, root, harness=None, database_url=None, *, lifecycle):
+        self.lifecycle = lifecycle
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         self.repo=Repository(resolve_database_url(harness,database_url))
         meta=MetaData()
@@ -37,9 +33,6 @@ class Store:
     def submit(self,key,intents,workflow='scene',submitted_programs=None,context=None):
         if workflow == 'dataset':
             raise ValueError('Legacy dataset jobs are retired. Use data.capability or submit a scene with target_items.')
-        from capabilities.scene_authoring.validation.acceptance import policy_for
-        from capabilities.scene_authoring.validation.acceptance import check_references
-        from capabilities.scene_authoring.validation.acceptance import admit_program
         external_context = RunContext.from_request(context)
         if external_context is None:
             external_context = RunContext()
@@ -60,28 +53,7 @@ class Store:
                 session_id=external_context.session_id,
                 parent_run_id=inferred_parent,
             )
-        scene_modes = [intent.get('execution_mode') for intent in intents] if workflow == 'scene' else []
-        policies = {
-            mode: policy_for(self.root, mode)
-            for mode in set(scene_modes)
-        }
-        policy = next((value for value in policies.values() if value), {})
-        if policy:
-            check_references(intents,policy)
-            requires_scene_programs = workflow == 'scene' and any(
-                mode in (None, 'production') for mode in scene_modes
-            )
-            if requires_scene_programs:
-                if not submitted_programs or len(submitted_programs)!=len(intents) or any(not row for row in submitted_programs):
-                    raise ValueError('Realistic production requires complete SceneProgram snapshots; no planner fallback')
-                for intent,submission in zip(intents,submitted_programs):
-                    mode = intent.get('execution_mode')
-                    admission=admit_program(self.root,submission['program'],allow_generated=True,execution_mode=mode)
-                    lineage_task_id=intent.get('refine_task_id') or intent.get('extend_task_id')
-                    if lineage_task_id:
-                        from capabilities.scene_authoring.contracts.scene_design import require_prior_brief
-                        require_prior_brief(admission.get('scene_brief') or {},
-                            self.root/lineage_task_id/('revision_'+str(intent.get('refine_revision',intent.get('extend_revision')))))
+        self.lifecycle.admit(intents, workflow, submitted_programs)
         submitted_programs=submitted_programs or []
         if submitted_programs and (workflow!='scene' or len(submitted_programs)!=len(intents)):
             raise ValueError('SceneProgram snapshots must align with scene intents')
@@ -95,9 +67,9 @@ class Store:
                     prior_context.get(field) == getattr(external_context, field)
                     for field in ('workspace_id', 'session_id', 'parent_run_id')
                 )
-                previous_submissions = list(map(submission_identity, prior['plan'].get('submitted_programs', [])))
+                previous_submissions = list(map(self.lifecycle.submission_identity, prior['plan'].get('submitted_programs', [])))
                 if (prior['plan'].get('intents')!=intents or prior['plan'].get('workflow','scene')!=workflow
-                        or previous_submissions != list(map(submission_identity, submitted_programs)) or not context_matches):
+                        or previous_submissions != list(map(self.lifecycle.submission_identity, submitted_programs)) or not context_matches):
                     raise ValueError('request_key already belongs to a different request')
                 return old['run_id']
             rid=uid('sf')
@@ -135,13 +107,8 @@ class Store:
             if expected_owner is not None and (old['lease_expires_at'] or 0) <= time.time():
                 raise ValueError(f'task {tid} stage lease expired')
             if run['state']=='CANCELED' and fields.get('state')!='CANCELED':return
-            if fields.get('state')=='SUCCEEDED' and old['unit'].get('workflow','scene')=='scene':
-                from capabilities.scene_authoring.validation.acceptance import require_accepted
-                require_accepted(
-                    self.root,
-                    self.directory(tid,old['unit']['revision']),
-                    old['unit'].get('intent', {}).get('execution_mode'),
-                )
+            if fields.get('state') == 'SUCCEEDED':
+                self.lifecycle.require_success(self.directory(tid, old['unit']['revision']), old['unit'])
             if 'unit' in fields:fields['unit']={**old['unit'],**fields['unit']}
             if fields.get('state') not in (None, 'RUNNING'):
                 fields.setdefault('lease_owner', None)
@@ -236,63 +203,8 @@ class Store:
                 raise ValueError('Legacy dataset jobs are retired. Use data.capability or submit a scene with target_items.')
             if run['state'] in {'CANCELED','SUCCEEDED'}:raise ValueError('cannot retry a canceled or successful run')
             if task['state']!='FAILED_FINAL':raise ValueError('only failed tasks need retry')
-            recovery_id=None
-            from capabilities.scene_authoring.validation.acceptance import policy_for
-            if policy_for(self.root) and task['unit'].get('workflow','scene')=='scene':
-                from capabilities.scene_authoring.validation.acceptance import admit_program
-                from capabilities.scene_authoring.contracts.scene_design import capture_retry_directory
-                from capabilities.scene_authoring.contracts.scene_design import review_retry_directory
-                mode = task['unit'].get('intent', {}).get('execution_mode')
-                capture_failure=(task['unit']['phase']=='capture' and
-                    (task.get('failure') or {}).get('stage') in {'capture_transport','capture_execution'} and feedback is None)
-                review_failure=(task['unit']['phase']=='review' and feedback is None and
-                    (task.get('failure') or {}).get('error') in {'TimeoutError','URLError','ConnectionError','OSError','RemoteDisconnected','ConnectionResetError','ConnectionAbortedError'})
-                if not capture_failure and not review_failure:
-                    raise ValueError('Only review transport or capture execution/transport failures can retry; repair scene quality through capture/refine')
-                directory=(capture_retry_directory(self.root,tid,task['unit']['revision']) if capture_failure
-                    else review_retry_directory(self.root,tid))
-                admit_program(self.root,json.loads((directory/'program.json').read_text()),execution_mode=mode)
-                if review_failure and task['unit'].get('review_transport_retries',0)>=2:
-                    marker=self.root/'model_transport_recovery.json'
-                    recovery=json.loads(marker.read_text()) if marker.is_file() and marker.stat().st_size<4096 else {}
-                    recovery_id=recovery.get('recovery_id') if recovery.get('status')=='transport_verified' else None
-                    if not isinstance(recovery_id,str) or not recovery_id or recovery_id==task['unit'].get('review_transport_recovery_id'):
-                        raise ValueError('Review transport recovery budget exhausted')
-            unit=dict(task['unit']);phase=unit['phase'];old=self.directory(tid,unit['revision'])
-            if capture_mode!='auto' and not (phase=='capture' and (task.get('failure') or {}).get('stage') in {'capture_transport','capture_execution'}):
-                raise ValueError('capture_mode applies only to capture execution/transport failures')
-            if recovery_id:
-                unit.update(review_transport_recovery_id=recovery_id,previous_review_transport_retries=unit.get('review_transport_retries',0),review_transport_retries=0)
-            if policy_for(self.root) and phase=='review':unit['review_transport_retries']=unit.get('review_transport_retries',0)+1
-            if phase=='capture' and (task.get('failure') or {}).get('stage') in {'capture_transport','capture_execution'}:
-                from capabilities.isaac_sim.recovery import prepare_retry
-                unit = prepare_retry(self.directory(tid, unit['revision']), unit, capture_mode,
-                    retired_protocol=(task.get('failure') or {}).get('code') == 'CAPTURE_PROTOCOL_MIGRATED')
-            if feedback is not None:
-                if phase!='plan':raise ValueError('retry feedback requires a failed planning stage; use refine for captured scenes')
-                unit['operator_feedback']=feedback
-            if phase=='plan':
-                # Failed structural proposals and model traces remain immutable.
-                # A repaired planner must not replay cached invalid responses.
-                if unit.get('quality_repairs'):
-                    unit.setdefault('quality_source_revision',unit['revision']-1)
-                if (old/'repair_seed.json').exists():
-                    import shutil
-                    shutil.copy2(old/'repair_seed.json',self.directory(tid,unit['revision']+1)/'repair_seed.json')
-                else:
-                    seeds=sorted(old.glob('model_calls/scene_plan_*/validation_error.json'),key=lambda p:int(p.parent.name.rsplit('_',1)[-1]),reverse=True)
-                    for seed_path in seeds:
-                        seed=json.loads(seed_path.read_text())
-                        if isinstance(seed.get('proposal'),dict):
-                            write_json(self.directory(tid,unit['revision']+1)/'repair_seed.json',seed);break
-                unit.update(revision=unit['revision']+1,engineering_retry=True)
-            if phase=='review' and (old/'capture'/'report.json').exists():
-                report=json.loads((old/'capture'/'report.json').read_text())
-                if report['status']!='captured':
-                    unit.update(revision=unit['revision']+1,phase='capture',engineering_retry=True)
-                    import shutil
-                    shutil.copy2(old/'program.json',self.directory(tid,unit['revision'])/'program.json')
-                    unit.pop('capture_token',None)
+            unit = self.lifecycle.retry(task, feedback, capture_mode, self.directory)
+            phase = task['unit']['phase']
             c.execute(runs.update().where(runs.c.id==run['id']).values(state='PENDING'))
             c.execute(tasks.update().where(tasks.c.id==tid).values(state='READY',unit=unit,failure=None,result=None,ready_at=0,lease_owner=None,lease_expires_at=None))
             self.repo.event(c,run['id'],tid,'benchforge.retry',{'phase':unit['phase'],'revision':unit['revision'],'operator_feedback':feedback})

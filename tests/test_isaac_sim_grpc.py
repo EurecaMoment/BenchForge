@@ -1,5 +1,4 @@
 import hashlib
-import json
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing import get_context
 from pathlib import Path
@@ -244,6 +243,8 @@ class GrpcContractTests(unittest.TestCase):
                 self.simulator.jobs[identity] = pb.Job(job_id=identity, operation=operation,
                     state=pb.SUCCEEDED, artifacts=[pb.Artifact(artifact_id='dataset', name='dataset.zip',
                                                               size_bytes=len(self.simulator.blobs['dataset']))])
+                from storage.native_jobs import NativeJobs
+                NativeJobs(self.root).remember(self.client.endpoint, self.simulator.jobs[identity], 'local-cli')
                 result = execute({'action': 'download', 'job_id': identity},
                                  self.root / 'operations' / identity, self.config)
                 artifact = result['artifacts'][0]
@@ -259,6 +260,49 @@ class GrpcContractTests(unittest.TestCase):
         result = self.client.upload(source)
         self.assertEqual(result['sha256'], hashlib.sha256(source.read_bytes()).hexdigest())
         self.assertEqual(int(result['size_bytes']), source.stat().st_size)
+
+    def test_tools_scope_native_jobs_to_session_and_endpoint_before_rpc(self):
+        owner = {'session_id': 'session-owner', 'call_id': 'call-one'}
+        request = {'action':'submit', 'request_id':'same-key', 'request':{'snapshot':{}}, '_dsh_context':owner}
+        first = execute(request, self.root / 'operations' / 'one', self.config)
+        repeated = execute(request, self.root / 'operations' / 'again', self.config)
+        self.assertEqual(first['job']['job_id'], repeated['job']['job_id'])
+        other = {'session_id':'session-other', 'call_id':'call-two'}
+        second = execute({**request, '_dsh_context':other}, self.root / 'operations' / 'two', self.config)
+        self.assertNotEqual(first['job']['job_id'], second['job']['job_id'])
+        for action in ('status', 'wait', 'cancel', 'download'):
+            with self.subTest(action=action), self.assertRaises(PermissionError):
+                execute({'action':action,'job_id':first['job']['job_id'],'_dsh_context':other},
+                        self.root / 'operations' / action, self.config)
+        self.assertEqual(self.simulator.cancels, 0)
+        status = execute({'action':'status','job_id':first['job']['job_id'],'_dsh_context':owner},
+                         self.root / 'operations' / 'status-owner', self.config)
+        self.assertEqual(status['job']['job_id'], first['job']['job_id'])
+
+    def test_legacy_submit_reuses_verified_receipt_without_another_submission(self):
+        from storage.native_jobs import NativeJobs
+        key, payload = 'old-key', {'snapshot': {}}
+        requests = DurableTasks(self.client, self.root / '.benchforge/isaac_sim', str(self.root))
+        old = requests.submit(hashlib.sha256(key.encode()).hexdigest(), payload)
+        NativeJobs(self.root).remember(self.client.endpoint, old, 'session-owner')
+        arguments = {'action': 'submit', 'request_id': key, 'request': payload,
+                     '_dsh_context': {'session_id': 'session-owner', 'call_id': 'call-retry'}}
+        repeated = execute(arguments, self.root / 'operations/retry', self.config)
+        self.assertEqual(repeated['job']['job_id'], old.job_id)
+        self.assertEqual(self.simulator.submissions, 1)
+        with self.assertRaisesRegex(ValueError, 'request changed'):
+            execute({**arguments, 'request': {'snapshot': {'size': 64}}},
+                    self.root / 'operations/changed', self.config)
+
+    def test_unresolved_legacy_submission_does_not_create_another_job(self):
+        key = 'lost-legacy-reply'
+        folder = self.root / '.benchforge/isaac_sim' / hashlib.sha256(key.encode()).hexdigest()
+        folder.mkdir(parents=True)
+        (folder / 'request.json').write_text('{}')
+        with self.assertRaisesRegex(ValueError, 'no receipt'):
+            execute({'action': 'submit', 'request_id': key, 'request': {'snapshot': {}}},
+                    self.root / 'operations/retry', self.config)
+        self.assertEqual(self.simulator.submissions, 0)
 
 
 if __name__ == '__main__':

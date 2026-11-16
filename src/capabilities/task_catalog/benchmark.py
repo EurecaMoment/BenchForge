@@ -100,7 +100,7 @@ def catalog(args):
             for task in document()['tasks']
         ]
     elif section == 'templates':
-        from capabilities.dataset_authoring.adapters import supports
+        from capabilities.task_catalog.execution_support import supports
         rows = [{**row, 'execution': supports(row['id'])} for row in selected_templates(args)]
     else:
         raise ValueError('section must be capabilities, tasks, templates or protocol')

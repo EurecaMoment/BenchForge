@@ -325,7 +325,7 @@ def public_media(config, row):
             if re.fullmatch(r'view_\d+\.png', frame.name) and frame.is_file() and not frame.is_symlink():
                 frames.append({'file': 'capture/' + frame.name, 'bytes': frame.stat().st_size,
                                'kind': 'image', 'task_id': row['task_id'], 'revision': row['revision'], 'scene_name': row['name']})
-    from capabilities.scene_library.scene_preview_video import cached_preview
+    from capabilities.scene_library.preview_manifest import cached_preview
     saved = cached_preview(config, row['task_id'], row['revision'])
     video = {key: saved[key] for key in ('file', 'bytes', 'purpose', 'frame_count', 'source_path')} if saved else None
     if video:

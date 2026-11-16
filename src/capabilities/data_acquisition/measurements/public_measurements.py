@@ -5,15 +5,16 @@ native USD, annotation JSONL or the private point-world coordinate.
 """
 from pathlib import Path
 import json
-import math
 import re
 import numpy as np
 from PIL import Image
-from capabilities.data_acquisition.measurements.public_sensor_cache import _BoundedCache
-from capabilities.data_acquisition.measurements.public_sensor_cache import _file_version
-from capabilities.data_acquisition.measurements.public_geometry_cache import PUBLIC_GEOMETRY_RESULTS
-from capabilities.data_acquisition.measurements.public_geometry_cache import public_geometry_key
-from capabilities.data_acquisition.measurements.public_geometry_cache import freeze_geometry
+if __package__:
+    from .public_sensor_cache import _BoundedCache, _file_version
+    from .public_geometry_cache import PUBLIC_GEOMETRY_RESULTS, public_geometry_key, freeze_geometry
+else:
+    # The documented three-file public bundle also runs without BenchForge installed.
+    from public_sensor_cache import _BoundedCache, _file_version
+    from public_geometry_cache import PUBLIC_GEOMETRY_RESULTS, public_geometry_key, freeze_geometry
 
 
 class PublicMeasurementError(ValueError):

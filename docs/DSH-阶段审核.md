@@ -13,7 +13,8 @@ S1–S5 各自保留一个后端审核记录。每轮重新检查真实保存的
 | `src/storage/review_progress.py` | 三轮状态转换，不读取业务产物 |
 | `src/storage/stage_reviews.py` | SQLite 持久化、版本迁移、检查结果的条件提交 |
 | `src/pipelines/benchmark/execution/review_checks.py` | 验证当前计划、可执行合同、各阶段实际完成回执及采集源版本 |
-| `src/pipelines/benchmark/execution/review_service.py` | 工具、执行器、网页和定时器共用的后端入口 |
+| `src/pipelines/reviews/service.py` | 工具、执行器、网页和定时器共用的后端入口 |
+| `src/pipelines/reviews/checks.py` | 组合评测和场景修复的领域检查，避免流程互相回调 |
 | `src/dsh/host/stage_reviews.mjs` | 通过公开 subprocess 服务调用后端，随插件卸载终止调用 |
 | `src/dsh/production/lifecycle.mjs` | 按会话安排定时器，通过公开 `steer` / `followup` 续跑，去重并保留用户取消 |
 | `src/dsh/production/reviews.mjs`、`review_policy.mjs` | 同步只读快照和公开工具守卫，不凭浏览器或 JS 时钟放行 |

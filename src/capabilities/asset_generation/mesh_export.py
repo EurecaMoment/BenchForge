@@ -123,7 +123,13 @@ def export_mesh(source, output, glb_output=None, source_frame='sam3d_camera'):
         if materials[-1]['textures'] and not source_uv_present:
             raise ValueError(f'geometry {name!r} has texture images but no valid source UVs; refusing fabricated texture coordinates')
         visual = source_visual.to_color() if source_visual.kind == 'texture' else source_visual
+        # TextureVisuals.to_color() already applies baseColorFactor. Keep that
+        # fact with each material so downstream USD does not apply it twice.
+        materials[-1]['vertex_colors_include_base_factor'] = source_visual.kind == 'texture'
         color = np.asarray(visual.vertex_colors)
+        if source_visual.kind == 'texture' and not materials[-1]['textures']:
+            color = np.tile(np.asarray(materials[-1]['base_color_factor']) * 255,
+                            (len(mesh.vertices), 1))
         if len(color) != len(mesh.vertices):
             color = np.tile([180, 180, 180, 255], (len(mesh.vertices), 1))
         vertices.append(np.asarray(mesh.vertices)); faces.append(np.asarray(mesh.faces) + offset)

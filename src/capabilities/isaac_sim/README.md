@@ -13,6 +13,9 @@ BenchForge capture daemon, device lock, callback endpoint or local Kit runtime i
 | `grpc/receipts.py` | Per-request and per-download ownership across subprocesses |
 | `tool_api.py` | Workspace operation behind the DSH `benchforge_isaac_sim` tool |
 | `authoring.py` | Portable SceneProgram-to-USD authoring |
+| `mesh_materials.py`, `usd_materials.py` | Untextured PBR factors, face materials and USD literals |
+| `native_geometry.py` | Measured bounds and enabled colliders from the simulator's USD export |
+| `scene_requirements.py` | Adapter capability validation before queue admission |
 | `capture_stage.py` | Import, simulate, inspect, capture and publish |
 | `evidence.py` | Native artifact and annotation conversion |
 | `recovery.py` | Explicit resume or new-attempt policy |
@@ -29,6 +32,16 @@ The DSH tool reads the live catalog and uses native submit/invoke, status/wait,
 cancel, upload and download operations. Submission is not completion. Reusing
 a request identity requires the same payload. Disconnecting a wait does not
 cancel the simulator job; cancellation must be confirmed by the service.
+Job ownership is persisted by workspace, session and simulator endpoint in
+`storage/native_jobs.py`. Status, wait, cancel and download verify that ownership
+before contacting the simulator. Historical jobs require matching session
+operation records and frozen receipts.
+
+Native asset bounds use the CPU-only `usd-core` reader from the production extra.
+The adapter measures exported points/transforms and enabled colliders, records
+the export digest, and keeps that file with the capture evidence. Catalog sizes
+do not certify the native bounds. This does not replace contact/support checks
+or visual acceptance on the actual simulator.
 
 Independent scenes can advance concurrently, with configurable bounded capture
 admission. Multiple cameras use native batches of up to 32; additional authored

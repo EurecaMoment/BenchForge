@@ -1,12 +1,11 @@
 """Instantiate exact document templates from program worlds or recorded evidence."""
+from storage.dataset_partitions import claim_partition
+from capabilities.task_catalog.allocation import counts_for
 import json
 import os
-import re
 import shutil
-import sqlite3
 import zipfile
 from collections import Counter
-from contextlib import closing
 from pathlib import Path
 from service_access.tool_names import NAMES
 from storage.artifacts import read
@@ -214,16 +213,6 @@ def partition_counts(items):
     return {split: counts[split] for split in PARTITIONS if counts[split]}
 
 
-def counts_for(selections):
-    counts = Counter()
-    for selection in selections:
-        ids, count = selection['template_ids'], selection['count']
-        if not ids or type(count) is not int or count < len(ids):
-            raise ValueError('Each selection count must cover its explicitly selected templates at least once')
-        for i, tid in enumerate(ids):
-            counts[tid] += count//len(ids) + (i < count % len(ids))
-    return counts
-
 
 def _require_production_evidence(value):
     # Old records may omit these flags. An explicit preparation/smoke marker
@@ -358,13 +347,7 @@ def produce(args, directory, config=None):
             validate_choice(template, sample['oracle'], presentation)
             question = question_text(presentation)
             # Workspace ledger prevents train/test reassignment across resumed or separate plans.
-            ledger = Path(args['_workspace'])/'pipeline-groups.sqlite'
-            with closing(sqlite3.connect(ledger)) as db, db:
-                db.execute('CREATE TABLE IF NOT EXISTS groups (id TEXT PRIMARY KEY, split TEXT)')
-                old = db.execute('SELECT split FROM groups WHERE id=?', (group,)).fetchone()
-                if old and old[0] != item_split:
-                    raise ValueError(f'Scene group {group} already belongs to {old[0]}; derivatives cannot cross splits')
-                db.execute('INSERT OR IGNORE INTO groups VALUES (?,?)', (group, item_split))
+            claim_partition(args['_workspace'], group, item_split)
             media = []
             media_dir.mkdir(parents=True, exist_ok=True)
             source_media_files = validate_public_media(

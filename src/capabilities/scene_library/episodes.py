@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def native_episodes(directory, receipt):
-    directory = Path(directory)
+    directory = Path(directory).resolve()
     evidence = json.loads((directory / 'capture/evidence.json').read_text(encoding='utf-8'))
     episodes = []
     for action in evidence.get('interaction', {}).get('action_results', []):
@@ -20,7 +20,8 @@ def native_episodes(directory, receipt):
         # Older captures remain usable as static scenes, but cannot certify episodes.
         if version is None:
             continue
-        if (not file.is_file() or file.resolve() != file or file.stat().st_size > 32 * 1024 * 1024
+        if (not file.is_file() or file.is_symlink() or not file.resolve().is_relative_to(directory)
+                or (directory / 'capture').is_symlink() or file.stat().st_size > 32 * 1024 * 1024
                 or version != [file.stat().st_size, file.stat().st_mtime_ns]):
             raise ValueError('Service-accepted trajectory changed; recapture the episode')
         value = json.loads(file.read_text(encoding='utf-8'))

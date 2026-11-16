@@ -13,10 +13,9 @@ from urllib.parse import quote
 from urllib.parse import urlparse
 from urllib.parse import unquote
 from storage.files import safe_path
-from storage.scene_jobs.store import Store
+from pipelines.scene_production.service import create_store
 from pipelines.scene_production.engine import coordinate
 from capabilities.asset_generation.generation import GenerationTools
-from capabilities.scene_authoring.catalog.capabilities import scene_contract_capabilities
 from capabilities.scene_authoring.program_submission import read_program_submission
 from capabilities.asset_generation.layout import start_design_request
 from capabilities.asset_generation.layout import require_prior_reference
@@ -94,9 +93,10 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--config',required=True);args=parser.parse_args()
     faulthandler.enable()
     if hasattr(signal,'SIGUSR1'):faulthandler.register(signal.SIGUSR1)
-    from service_access.runtime_config import load_service_config
+    from service_access.runtime_config import load_service_config, apply_runtime_environment
     config=load_service_config(args.config)
-    store=Store(config['artifacts'],config.get('harness'),config.get('database_url'))
+    apply_runtime_environment(config)
+    store=create_store(config['artifacts'],config.get('harness'),config.get('database_url'))
     from storage.scene_jobs.migrate_capture import migrate_capture
     logging.getLogger(__name__).info('Capture protocol migration: %s', migrate_capture(store))
     stop=threading.Event()
@@ -122,7 +122,10 @@ def main():
         def binary(self,data,mime='application/zip'):
             self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
         def do_GET(self):
-            # Localhost gallery exposes only generated public imagery, never secrets or GT.
+            # Gallery and image routes share the operator authentication boundary.
+            if not hmac.compare_digest(self.headers.get('Authorization', ''), 'Bearer ' + config['operator_token']):
+                self.reply({'error': 'unauthorized'}, 401)
+                return
             try:
                 path=unquote(urlparse(self.path).path)
                 if path.startswith('/image/'):
@@ -161,7 +164,7 @@ def main():
                 value=json.loads(raw or b'{}')
                 self.request_run_id = value.get('run_id') if isinstance(value, dict) else None
                 self.request_task_id = value.get('task_id') if isinstance(value, dict) else None
-                from capabilities.scene_authoring.validation.acceptance import check_request
+                from capabilities.scene_authoring.validation.request_admission import check_request
                 check_request(store.root,self.path,value)
                 if self.path in WORKBENCH_QUERIES:
                     with read_connection(store.repo.engine) as connection:

@@ -374,7 +374,7 @@ asset_id/relative_path，不能自动以简化几何代替机器人。A100 没�
 
 版本 4 的本地配置由 `sync` 迁移到版本 5，先保存旧配置副本再统一提供方拼写，移除旧采集连接配置。
 数据库历史、会话和产物保留。旧的设备租约需运行一次
-`python -m storage.scene_jobs.migrate_capture --config config/generated/benchforge-server.local.json`，
+`python -m server.migrate_capture --config config/generated/benchforge-server.local.json`，
 它保存迁移前快照并将未完成的旧采集记录标记为需要显式恢复，不推测旧作业是否完成。
 
 ### 9. 停止、重启和更新

@@ -1,7 +1,4 @@
 """Retire the old capture queue protocol without replaying or losing old work."""
-import argparse
-import json
-from pathlib import Path
 import time
 import uuid
 
@@ -73,21 +70,3 @@ def migrate_capture(store):
     store.settle_runs()
     return {'migration': MIGRATION, 'already_applied': False, 'retired_tasks': len(affected),
             'backup_path': str(backup) if backup else None}
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, required=True)
-    args = parser.parse_args()
-    from service_access.runtime_config import load_service_config
-    from storage.scene_jobs.store import Store
-    config = load_service_config(args.config)
-    store = Store(config['artifacts'], config.get('harness'), config.get('database_url'))
-    try:
-        print(json.dumps(migrate_capture(store), ensure_ascii=False))
-    finally:
-        store.repo.engine.dispose()
-
-
-if __name__ == '__main__':
-    main()

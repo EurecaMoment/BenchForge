@@ -322,7 +322,7 @@ def _validate_scene_extensions(p):
                 if 'camera_path' in action['recording']:
                     require(action['recording']['camera_path'][-1]['step'] <= action['duration_steps'], 'camera path exceeds trajectory duration')
             if action['action'] == 'robot_push' and (field == 'interactions' or 'interactions' not in p):
-                from capabilities.isaac_sim.capture_requests.robot_contact import validate_robot_action
+                from capabilities.scene_authoring.contracts.robot_actions import validate_robot_action
                 validate_robot_action(action, objects)
                 ident(action['robot_id'])
                 for waypoint in action['waypoints']: ident(waypoint['id'])
@@ -335,7 +335,7 @@ def _validate_scene_extensions(p):
     executable = [action for action in p.get('interactions', p.get('affordances', [])) if action['action'] == 'apply_force']
     require(len(executable) <= 16, 'too many executable interactions')
     require(sum(action.get('duration_steps', 30) + action.get('observe_steps', 90) for action in executable) <= 10000, 'interaction step budget exceeded')
-    from capabilities.isaac_sim.capture_requests.robot_contact import robot_step_count
+    from capabilities.scene_authoring.contracts.robot_actions import robot_step_count
     robot_actions=[a for a in p.get('interactions',p.get('affordances',[])) if a['action']=='robot_push']
     camera_steps = sum(a['duration_steps'] for a in p.get('interactions',p.get('affordances',[])) if a['action']=='record_trajectory')
     require(camera_steps+sum(robot_step_count(a) for a in robot_actions)+sum(a.get('duration_steps',30)+a.get('observe_steps',90) for a in executable)<=10000,'interaction step budget exceeded')

@@ -9,7 +9,7 @@ from storage.artifacts import read_json as read
 from server.operations_runtime import Runtime
 from pipelines.benchmark.design.plan_input import resolve_request
 from pipelines.benchmark.design.plan_versions import current
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 
 def submit(workspace, session, request_path):
     if not re.fullmatch(r'[\w-]{1,160}', session):

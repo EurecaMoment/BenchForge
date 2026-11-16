@@ -1,7 +1,7 @@
 """Portable Parquet export: public observations and private authority stay separate."""
 import json
 from pathlib import Path
-from capabilities.evaluation.spatial.evaluation import read_rows
+from storage.artifacts import read_jsonl as read_rows
 from capabilities.dataset_authoring.spatial.generation import PARTITIONS
 from capabilities.dataset_authoring.spatial.generation import write_json
 

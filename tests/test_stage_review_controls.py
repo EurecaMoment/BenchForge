@@ -5,7 +5,7 @@ import unittest
 from pipelines.benchmark.execution.stage_review import call
 from pipelines.benchmark.design.plan_versions import activate
 from storage.artifacts import write
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 
 
 class StageReviewControlTests(unittest.TestCase):

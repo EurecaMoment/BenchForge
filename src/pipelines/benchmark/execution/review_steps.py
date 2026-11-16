@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from storage.artifacts import read_json as read
-from pipelines.benchmark.execution.stage_review import STAGES
+from capabilities.benchmark_design.stages import STAGES
 from pipelines.benchmark.execution.artifact_graph import binding_roots
 from capabilities.benchmark_design.stages import stage_of
 

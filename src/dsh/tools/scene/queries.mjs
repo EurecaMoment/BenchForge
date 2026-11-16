@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import path from 'node:path';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {executePython} from '../../host/python_process.mjs';
 import {Readable} from 'node:stream';
 import {ApiError, assertSessionDirectory, inside, readJson, resolveToken, scopeOf} from '../../host/session_scope.mjs';
 
-const execute = promisify(execFile);
+const execute = (config, args, options) =>
+  (config._executePython || executePython)(config.productionPython, args, options);
 
 export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
   function previewMediaKey(config, roots, url) {
@@ -33,7 +33,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     const job = previous.catch(() => {}).then(async () => {
       if (action === 'list' && signal?.aborted) throw new DOMException('Aborted', 'AbortError');
       // Finish atomic index/selection writes even if a search query or tab is replaced.
-      const {stdout} = await execute(config.productionPython, args, {timeout: 20000, maxBuffer: 3 * 1024 * 1024});
+      const {stdout} = await execute(config, args, {timeout: 20000, maxBuffer: 3 * 1024 * 1024});
       const result = JSON.parse(stdout);
       if (result.error) throw new ApiError(result.error, result.status_code || 503);
       return result;
@@ -75,7 +75,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
       // One CPU encoder at a time, started by the production observation rather than a preview click.
       config._previewQueue = config._previewQueue.then(async () => {
         const helper = 'capabilities.scene_library.scene_preview_video';
-        const {stdout} = await execute(config.productionPython, ['-B', '-m',helper, '--config', config.productionConfig,
+        const {stdout} = await execute(config, ['-B', '-m',helper, '--config', config.productionConfig,
           '--session', session, '--scene', scene.run_id, '--run-ids', JSON.stringify(runIds)],
         {timeout: 60000, maxBuffer: 2 * 1024 * 1024});
         const value = JSON.parse(stdout);
@@ -121,7 +121,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     }
     if (media || library) args.push('--task', url.searchParams.get('task') || '', '--revision', url.searchParams.get('revision') || '');
     if (media) args.push('--file', url.searchParams.get('file') || '');
-    const {stdout} = await execute(config.productionPython, args, {signal, timeout: 12000, maxBuffer: 2 * 1024 * 1024});
+    const {stdout} = await execute(config, args, {signal, timeout: 12000, maxBuffer: 2 * 1024 * 1024});
     const result = JSON.parse(stdout);
     if (result.error) throw new ApiError(result.error, result.status_code || 503);
     if (media) return result;

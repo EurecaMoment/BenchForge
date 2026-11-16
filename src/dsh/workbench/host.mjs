@@ -2,10 +2,9 @@ import {createSceneQueries} from '../tools/scene/queries.mjs';
 import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {createInterface} from 'node:readline';
-import {DatabaseSync} from 'node:sqlite';
+import {workspaceOperations} from './operations.mjs';
 import path from 'node:path';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
+import {executePython, createPythonProcessScope} from '../host/python_process.mjs';
 import z from '@deepseek-ai/schemastery';
 import {sessionFamilyReader} from '../host/session_family.mjs';
 import {createPreparationProducts} from './projections/preparation_products.mjs';
@@ -37,7 +36,8 @@ export const Config = z.object({
 const STATUSES = ['draft', 'candidate', 'verified', 'rejected', 'superseded'];
 const pick = (row, fields) => Object.fromEntries(fields.filter((key) => key in row).map((key) => [key, row[key]]));
 const counts = () => Object.fromEntries(STATUSES.map((key) => [key, 0]));
-const execute = promisify(execFile);
+const execute = (config, args, options) =>
+  (config._executePython || executePython)(config.productionPython, args, options);
 const STAGE_OPERATIONS = [
   ['S1', /^(plan|pipeline_plan|brief|design|literature)/],
   ['S2', /^(capture|scene|asset|reference|(?:benchforge|spatialforge)\.(start|capture|asset|refine))/],
@@ -140,12 +140,10 @@ async function productionProgress(roots, config, url, signal) {
   for (const root of roots) {
     const database = path.join(root.path, 'runs.sqlite');
     if (!await exists(database)) {sources.push({workspace: root.title, status: 'no_index'}); continue;}
-    let db, rows;
+    let rows;
     try {
-      db = new DatabaseSync(database, {readOnly: true});
-      rows = db.prepare('SELECT id,tool,state,artifact,error FROM operations ORDER BY rowid DESC LIMIT ?').all(config.maxRuns);
+      rows = await workspaceOperations(config, root, scope, {limit: config.maxRuns, signal});
     } catch (error) {sources.push({workspace: root.title, status: 'index_error', error: error.message}); continue;}
-    finally {db?.close();}
     sources.push({workspace: root.title, status: 'indexed', limit: config.maxRuns});
     for (const row of rows) {
       signal?.throwIfAborted();
@@ -199,7 +197,7 @@ async function productionProgress(roots, config, url, signal) {
   if (config.productionConfig && roots.length && /^session-[a-zA-Z0-9-]+$/.test(session)) {
     try {
       const helper = 'pipelines.benchmark.progress.production_observer';
-      const {stdout} = await execute(config.productionPython, ['-B', '-m',helper, '--config', config.productionConfig,
+      const {stdout} = await execute(config, ['-B', '-m',helper, '--config', config.productionConfig,
         '--session', session, '--sessions', JSON.stringify(config._sessionIds || []),
         '--workspace', roots[0].path,
         '--run-ids', JSON.stringify([...remoteIds].slice(0, 12))],
@@ -330,13 +328,13 @@ async function discover(roots, config, signal, scope) {
     signal?.throwIfAborted();
     const database = path.join(root.path, 'runs.sqlite');
     if (!await exists(database)) { sources.push({workspace: root.title, status: 'no_index'}); continue; }
-    let db, operations;
+    let operations;
     try {
-      db = new DatabaseSync(database, {readOnly: true});
-      operations = db.prepare("SELECT id,tool,state,artifact,error FROM operations WHERE tool IN ('pipeline_plan','plan','pipeline_run','pipeline_status','pipeline_artifacts','pipeline_repair_plan','build') ORDER BY rowid DESC LIMIT ?").all(config.maxRuns + 1);
+      operations = await workspaceOperations(config, root, scope, {limit: config.maxRuns + 1, signal,
+        tools: ['pipeline_plan','plan','pipeline_run','pipeline_status','pipeline_artifacts','pipeline_repair_plan','build']});
     } catch (error) {
       sources.push({workspace: root.title, status: 'index_error', error: error.message}); continue;
-    } finally { db?.close(); }
+    }
     sources.push({workspace: root.title, status: 'indexed', limit: config.maxRuns, truncated: operations.length > config.maxRuns});
     for (const operation of operations.slice(0, config.maxRuns)) {
       try {
@@ -535,7 +533,7 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       const file=await inside(roots[0],edit.plan_path);
       await assertSessionDirectory(roots[0],path.dirname(file),parentScope);
       const helper='server.plan_edit_cli';
-      const process=execute(limits.productionPython,['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--plan',file],
+      const process=execute(limits,['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--plan',file],
         {signal:request.signal,timeout:20000,maxBuffer:256000});
       process.child.stdin.on('error',()=>{});
       process.child.stdin.end(JSON.stringify({assessment:edit.assessment,markdown:edit.markdown,
@@ -549,7 +547,7 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       const body = request.method === 'POST' ? await request.text() : '{}';
       if (body.length > 16000) throw new ApiError('Stage instruction is too large',413);
       const helper = 'server.stage_review_cli';
-      const result = await execute(limits.productionPython,['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--request',body],
+      const result = await execute(limits,['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--request',body],
         {signal:request.signal,timeout:12000,maxBuffer:128000});
       value = JSON.parse(result.stdout);
     }
@@ -601,6 +599,9 @@ export function createWorkbenchHandler(config, registered = () => [], family = a
 }
 
 export async function apply(ctx, config) {
+  const processes = createPythonProcessScope();
+  ctx.effect(() => () => processes.dispose(), 'benchforge-workbench: Python process lifecycle');
+  config = {...config, _executePython: processes.execute};
   const {execution, preparation} = ctx.benchforgeSessions;
   const {associations} = ctx.benchforgeCapture;
   const readEvidence = createArtifactEvidenceReader(ctx.get('sessionQuery'));

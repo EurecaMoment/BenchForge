@@ -14,7 +14,7 @@ import base64
 import urllib.request
 import urllib.error
 
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 
 
 def author_completion(prompt, directory, images, max_tokens=14000):
@@ -71,7 +71,6 @@ def repair_baseline(row, folder, attempt=0, feedback=None):
 def revise(config, row, folder, attempt=0, feedback=None):
     from pipelines.scene_production.planning import apply_scene_replacements
     from capabilities.scene_authoring.catalog.native import ASSETS
-    from capabilities.scene_authoring.contracts.scene_program import SCENE_SCHEMA_DESCRIPTION
     from capabilities.scene_authoring.validation.program import validate_program
     from capabilities.scene_authoring.validation.acceptance import admit_program
     from capabilities.scene_authoring.contracts.scene_design import validate_scene_brief
@@ -169,8 +168,8 @@ def main():
     parser.add_argument('--directory', required=True);parser.add_argument('--action', choices=('plan', 'execute'), required=True)
     parser.add_argument('--session', required=True)
     parser.add_argument('--ids', nargs='*');args = parser.parse_args()
-    from service_access.runtime_config import load_service_config
-    config = load_service_config(args.config);workspace = Path(args.workspace);root = Path(args.directory)
+    from service_access.runtime_config import load_service_config, apply_runtime_environment
+    config = load_service_config(args.config);apply_runtime_environment(config);workspace = Path(args.workspace);root = Path(args.directory)
     config['_workspace'] = str(workspace);config['_session'] = args.session
     root.mkdir(parents=True, exist_ok=True)
     targets_file = root / 'targets.json'

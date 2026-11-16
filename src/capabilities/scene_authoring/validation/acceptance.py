@@ -4,6 +4,7 @@ Native measurements and visual opinions remain separate. Conservative bound
 overlaps are unresolved, not proof of penetration; unresolved scenes cannot ship.
 """
 import json
+import hashlib
 import math
 from pathlib import Path
 import re
@@ -21,7 +22,6 @@ from capabilities.scene_authoring.geometry.relations import supported_by_native_
 from capabilities.scene_authoring.geometry.relations import overlap_unresolved
 from capabilities.scene_authoring.geometry.relations import transported_mesh_bounds
 from capabilities.scene_authoring.validation.policy import check_references
-from capabilities.scene_authoring.validation.policy import check_request
 from capabilities.scene_authoring.validation.policy import policy_for
 
 STRUCTURE = re.compile(r'^(?:floor|ceiling|wall(?:_|$)|ground|terrain|pavement|asphalt|roof|road(?:_|$)|bay_line|rug|carpet|window|door(?:_|$))', re.I)
@@ -316,6 +316,22 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
     if review.get('acceptable') is not True or review.get('visual_realism', {}).get('status') != expected_status:
         issues.append('Captured views failed appearance/semantic acceptance')
     files = [Path(capture).parent/'program.json',Path(capture)/'report.json',Path(capture)/'evidence.json']
+    for entity in entities.values():
+        geometry = entity.get('geometry_evidence') or {}
+        if geometry.get('source') != 'native_flattened_usd':
+            continue
+        name = geometry.get('file')
+        if not isinstance(name, str) or Path(name).name != name:
+            issues.append('Native geometry receipt needs a capture-local export')
+            continue
+        file = Path(capture) / name
+        if not file.is_file() or file.is_symlink():
+            issues.append('Native geometry export is missing')
+            continue
+        with file.open('rb') as stream:
+            if hashlib.file_digest(stream, 'sha256').hexdigest() != geometry.get('sha256'):
+                issues.append('Native geometry export changed after measurement')
+        files.append(file)
     for frame in evidence.get('frames', []):
         if isinstance(frame, dict) and isinstance(frame.get('frame_id'), str) and Path(frame['frame_id']).name == frame['frame_id']:
             files.extend(Path(capture)/(frame['frame_id']+suffix)

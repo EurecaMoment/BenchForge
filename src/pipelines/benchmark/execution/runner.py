@@ -9,20 +9,21 @@ from pipelines.benchmark.execution.repair import create_plan
 from capabilities.dataset_authoring.production import produce
 from capabilities.dataset_authoring.production import package
 from pipelines.benchmark.execution.stage_review import STAGES
-from pipelines.benchmark.execution.review_service import gate, review
+from pipelines.reviews.service import gate, review
 from pipelines.benchmark.design.plan_versions import current as active_plan
 from capabilities.scene_library.source_policy import check_source
 from capabilities.scene_library.source_policy import load_policy
 from storage.execution_lock import exclusive_run
 from pipelines.benchmark.execution.bindings import MissingBinding
 from pipelines.benchmark.execution.bindings import bind
-from pipelines.benchmark.execution.review_steps import stage_of
 from pipelines.benchmark.execution.review_steps import review_scope
 from pipelines.benchmark.execution.review_steps import completed_stage
 from service_access.scene_service import service_call
 from pipelines.benchmark.design.production_steps import validate_production_steps
-from service_access.tool_names import qualify
 from capabilities.benchmark_design.stages import COLLECTION_OPERATIONS
+from capabilities.task_catalog.allocation import counts_for
+from pipelines.benchmark.design.production_allocation import step_allocations
+from pipelines.benchmark.execution.delivery_contract import verify_delivery
 
 SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture',
                   'benchforge.asset': '/asset', 'benchforge.refine': '/refine', 'benchforge.extend': '/extend',
@@ -54,6 +55,9 @@ def execute_step(step, arguments, directory, environment, client):
                     '_dsh_context': environment.get('_dsh_context', {}), '_review_nested':True,
                     '_review_scope': environment.get('_review_scope')}, directory, client=client)
     if operation == 'templates.produce':
+        expected = environment.get('_allocations', {}).get(step['id'])
+        if expected is not None and dict(counts_for(arguments.get('selections', []))) != expected:
+            raise ValueError('Resolved S4 inputs changed the saved plan allocation')
         return produce({**arguments, '_workspace': environment['_workspace'],
                         '_require_native_episode': (environment.get('_assessment') or {}).get('annotations', {}).get('require_native_episode', False),
                         '_service_config': environment['inputs'].get('service_config')}, directory)
@@ -119,12 +123,15 @@ def _run_locked(args, directory, config, client):
         return {'run': str(run_root.resolve()), **state}
     if execution_mode == 'production' and plan.get('assessment'):
         try:
-            validate_production_steps(plan['steps'])
+            validate_production_steps(plan['steps'], plan['inputs'].get('selections', []))
         except ValueError as error:
             state.update(state='needs_plan_revision', error=str(error),
                          next='Use benchforge_pipeline_plan to compile S1-S5 and retain existing artifacts. This old plan cannot skip S2/S3.')
             write(state_path, state)
             return {'run': str(run_root.resolve()), **state}
+    if execution_mode == 'production' and plan.get('assessment'):
+        if inputs.get('selections') != plan['inputs'].get('selections'):
+            raise ValueError('Production bindings cannot change the saved plan allocation')
     context = args.get('_dsh_context', {})
     session = context.get('session_id')
     scope = args.get('_review_scope') or (review_scope(plan, run_root, plan_path) if session else None)
@@ -140,6 +147,8 @@ def _run_locked(args, directory, config, client):
     environment = {'inputs': inputs, '_workspace': args['_workspace'], '_dsh_context': context,
                    '_run_key': 'pipeline:'+run_root.as_posix(), '_review_scope': scope,
                    '_assessment': plan.get('assessment'), '_plan_path': str(plan_path)}
+    if execution_mode == 'production' and plan.get('assessment'):
+        environment['_allocations'] = step_allocations(plan['steps'], plan['inputs']['selections'])
     def plan_guard():
         owner_plan = scope['plan'] if scope else str(plan_path)
         active=active_plan(args['_workspace'],session) if session else None
@@ -179,6 +188,8 @@ def _run_locked(args, directory, config, client):
             outputs = completed_stage(scope, stage)
             if outputs is None:
                 return None
+            if plan.get('assessment') and stage in ('S4', 'S5'):
+                verify_delivery(plan, outputs, stage)
             artifact_path = Path(scope['run'])/'reviews'/(stage+'.json')
             artifact = {'schema': 'benchforge.stage-review/v1', 'stage': stage,
                         'plan': scope['plan'], 'outputs': outputs}
@@ -275,6 +286,17 @@ def _run_locked(args, directory, config, client):
             state['steps'][step['id']] = {'state': 'failed', 'error': str(error), 'artifact': artifact, 'repair': repair}
             state['state'] = 'failed'
             state['error'] = str(error)
+            write(state_path, state)
+            raise
+    if execution_mode == 'production' and plan.get('assessment'):
+        outputs = [{'uses': step['uses'], 'result': state['steps'][step['id']]['result']}
+                   for step in plan['steps']]
+        try:
+            verify_delivery(plan, outputs, 'S4')
+            verify_delivery(plan, outputs, 'S5')
+        except (ValueError, OSError, KeyError, TypeError) as error:
+            state.update(state='failed', error=str(error),
+                         next='Repair the delivered datasets to match the saved S1 allocation, then resume this run.')
             write(state_path, state)
             raise
     state['state'] = 'completed'

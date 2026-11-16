@@ -23,8 +23,11 @@ def complete_production_steps(steps):
     return steps
 
 
-def validate_production_steps(steps):
+def validate_production_steps(steps, selections=None):
     """Only semantic operations establish stages; review_stage cannot relabel them."""
+    if selections is not None:
+        from pipelines.benchmark.design.production_allocation import step_allocations
+        step_allocations(steps, selections)
     seen, accepted, collected, datasets = set(), set(), set(), set()
     packaged = False
     for step in steps:

@@ -1,5 +1,9 @@
 # Public reconstruction support for task builders
 
+The source of truth is this directory. The DSH bundle copies this README and
+the three Python helpers into `dist/task_support/` during its normal build.
+Installed presets reference that packaged path; no second source copy is maintained.
+
 Copy `public_sensor_cache.py`, `public_geometry_cache.py` and `public_measurements.py` together into the task's code directory or isolated public worker directory. They import each other by filename and contain no machine paths. Runtime dependencies are NumPy and Pillow; only the existing C01-T02 point-distance predictor additionally imports SciPy.
 
 Use `PublicReconstruction(public_calibration_card)` from `public_measurements`. For a measurement matching the saved public protocol, call `geometry(label)` for the center/size and `point_count(label)` for the diagnostic sample count. Use `points(label)` when the actual point cloud is required. The supplied `predict`/`public_query` bindings cover their existing frozen templates; preserve other templates' definitions and exact public bindings when composing their measurement from these primitives.

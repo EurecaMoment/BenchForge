@@ -28,28 +28,30 @@ def check_artifact(workspace, session, row):
     if not file.is_relative_to(root) or not file.is_file():
         raise ValueError('Stage review requires an existing receipt inside this workspace')
     before = file.read_bytes()
-    if row['key'].startswith('scene-repair:'):
-        from pipelines.scene_production.review_checks import check_repair_artifact
-        checks = check_repair_artifact(file, row['stage'])
+    key = require_stage_artifact(workspace, session, row['stage'], str(file))
+    if key != row['key']:
+        raise ValueError('The saved review identity no longer matches its current artifact')
+    checks = ['current_plan_and_stage_identity']
+    value = read(file)
+    if row['stage'] == 'S1':
+        if value.get('schema') != 'benchforge.pipeline/v1' or not isinstance(value.get('steps'), list):
+            raise ValueError('S1 requires a saved executable pipeline plan')
+        if value.get('assessment') is not None:
+            from capabilities.benchmark_design.assessment import validate_assessment
+            from pipelines.benchmark.design.production_steps import validate_production_steps
+            validate_assessment(value['assessment'], value.get('selections', []), value.get('inputs', {}))
+            validate_production_steps(value['steps'], value['inputs'].get('selections', []))
+            checks.append('assessment_and_production_contract')
+        checks.append('saved_executable_plan')
     else:
-        key = require_stage_artifact(workspace, session, row['stage'], str(file))
-        if key != row['key']:
-            raise ValueError('The saved review identity no longer matches its current artifact')
-        checks = ['current_plan_and_stage_identity']
-        value = read(file)
-        if row['stage'] == 'S1':
-            if value.get('schema') != 'benchforge.pipeline/v1' or not isinstance(value.get('steps'), list):
-                raise ValueError('S1 requires a saved executable pipeline plan')
-            if value.get('assessment') is not None:
-                from capabilities.benchmark_design.assessment import validate_assessment
-                from pipelines.benchmark.design.production_steps import validate_production_steps
-                validate_assessment(value['assessment'], value.get('selections', []), value.get('inputs', {}))
-                validate_production_steps(value['steps'])
-                checks.append('assessment_and_production_contract')
-            checks.append('saved_executable_plan')
-        else:
-            checks.append('all_planned_stage_members_completed')
-            checks.append(f'unchanged_collection_sources:{_source_versions(value["outputs"])}')
+        if row['stage'] in ('S4', 'S5'):
+            from pipelines.benchmark.execution.delivery_contract import verify_delivery
+            plan = read(value['plan'])
+            if plan.get('assessment'):
+                verify_delivery(plan, value['outputs'], row['stage'])
+                checks.append('delivered_items_match_plan_allocation')
+        checks.append('all_planned_stage_members_completed')
+        checks.append(f'unchanged_collection_sources:{_source_versions(value["outputs"])}')
     if file.read_bytes() != before:
         raise ValueError('Stage artifact changed during its self-check; retry against the saved revision')
     return {'artifact': str(file), 'digest': sha256(before).hexdigest(), 'checks': checks}

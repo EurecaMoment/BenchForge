@@ -12,7 +12,7 @@ from capabilities.task_catalog.benchmark import all_templates
 from pipelines.benchmark.design.production_steps import complete_production_steps
 from pipelines.benchmark.execution.runner import run
 from storage.artifacts import write, jsonl
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 from pipelines.benchmark.design.plan_versions import activate
 
 

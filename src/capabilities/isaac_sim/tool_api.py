@@ -6,6 +6,30 @@ import json
 from capabilities.isaac_sim.grpc.tasks import DurableTasks
 from capabilities.isaac_sim.grpc.transport import A100Client, RemoteJobFailed, document
 from storage.files import safe_path, write_json
+from storage.native_jobs import NativeJobs
+
+
+def _legacy_submission(workspace, key, payload, feature, client, owners, session):
+    """Reuse a pre-ownership receipt only after its session has been verified."""
+    identity = hashlib.sha256(key.encode()).hexdigest()
+    receipt = workspace / '.benchforge' / 'isaac_sim' / identity / 'receipt.json'
+    if not receipt.is_file():
+        if receipt.with_name('request.json').is_file():
+            raise ValueError('Legacy submission has no receipt; recover its frozen request before retrying')
+        return None
+    saved = json.loads(receipt.read_text(encoding='utf-8'))
+    try:
+        request_id = owners.require(client.endpoint, saved['job_id'], session)
+    except PermissionError:
+        raise PermissionError('Legacy request ownership cannot be verified; use a new request_id for new work') from None
+    frozen = json.loads(receipt.with_name('request.json').read_text(encoding='utf-8'))
+    if (frozen.get('endpoint') != client.endpoint or frozen.get('payload') != payload
+            or frozen.get('feature') != feature or frozen.get('request_id') != request_id):
+        raise ValueError('Isaac Sim request changed; preserve its receipt and submit a new identity')
+    job = client.get(saved['job_id'])
+    if job.request_id != request_id:
+        raise PermissionError('Native job request identity changed')
+    return job, receipt
 
 
 def execute(args, directory, config):
@@ -14,6 +38,8 @@ def execute(args, directory, config):
     workspace = directory.parents[1]
     action = args.get('action', 'capabilities')
     client = A100Client(config)
+    session = (args.get('_dsh_context') or {}).get('session_id') or 'local-cli'
+    owners = NativeJobs(workspace)
     try:
         if action in ('capabilities', 'catalog', 'assets'):
             result = document(client.call({'capabilities': 'GetCapabilities',
@@ -44,15 +70,26 @@ def execute(args, directory, config):
                 payload = {'feature_id': args['feature_id'], 'arguments': payload}
             if 'request_id' in payload:
                 raise ValueError('request_id belongs at the tool request root')
-            identity = hashlib.sha256(key.encode()).hexdigest()
-            requests = DurableTasks(client, workspace / '.benchforge' / 'isaac_sim', str(workspace))
+            previous = _legacy_submission(workspace, key, payload, action == 'invoke', client, owners, session)
+            if previous:
+                job, receipt = previous
+                return {'action': action, 'job': document(job), 'receipt_path': str(receipt),
+                        'next_action': 'wait', 'accepted_is_complete': False}
+            identity = hashlib.sha256((session + '\0' + key).encode()).hexdigest()
+            requests = DurableTasks(client, workspace / '.benchforge' / 'isaac_sim',
+                                    str(workspace.resolve()) + '\0' + session)
             job = requests.submit(identity, payload, feature=action == 'invoke')
+            owners.remember(client.endpoint, job, session)
             return {'action': action, 'job': document(job),
                     'receipt_path': str(requests.directory / identity / 'receipt.json'),
                     'next_action': 'wait', 'accepted_is_complete': False}
         if action in ('status', 'wait', 'cancel', 'download'):
             job_id = args['job_id']
-            job = client.cancel(job_id) if action == 'cancel' else client.get(job_id)
+            request_id = owners.require(client.endpoint, job_id, session)
+            observed = client.get(job_id)
+            if observed.request_id != request_id:
+                raise PermissionError('Native job request identity changed')
+            job = client.cancel(job_id) if action == 'cancel' else observed
             if action == 'wait':
                 timeout = args.get('timeout_seconds', 30)
                 if type(timeout) not in (int, float) or not 0 < timeout <= 60:

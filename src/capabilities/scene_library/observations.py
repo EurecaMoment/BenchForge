@@ -5,7 +5,6 @@ from pathlib import Path
 from urllib.error import HTTPError
 from service_access.scene_service import service_read
 from service_access.scene_service import session_runs
-from service_access.scene_service import production_observation
 
 def bounded_json(path, limit=2 * 1024 * 1024):
     with Path(path).open('rb') as handle:
@@ -87,7 +86,7 @@ def stage_artifacts(config, session, scene, task_id=None, revision=None, file=No
         if not task_id or not task_id.startswith(scene + '.') or not preview_kind(file):
             return {'error': 'File is not a public stage preview', 'status_code': 403}
         if file == 'preview/scene.mp4':
-            from capabilities.scene_library.scene_preview_video import cached_preview
+            from capabilities.scene_library.preview_manifest import cached_preview
             observed = service_read(config, '/inspect', {'run_id': scene})
             task = next((row for row in observed['tasks'] if row['id'] == task_id), None)
             if not task or task['unit']['revision'] != revision:
@@ -135,7 +134,7 @@ def stage_artifacts(config, session, scene, task_id=None, revision=None, file=No
             stage, kind, _ = preview_kind(row['file'])
             items.append({**row, 'stage': stage, 'kind': kind, 'title': Path(row['file']).name,
                           'task_id': task['id'], 'revision': rev})
-        from capabilities.scene_library.scene_preview_video import cached_preview
+        from capabilities.scene_library.preview_manifest import cached_preview
         saved = cached_preview(config, task['id'], rev)
         if saved:
             items.append({key: saved[key] for key in ('file', 'task_id', 'revision', 'bytes', 'frame_count', 'purpose', 'source_path', 'content_type')})

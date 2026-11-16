@@ -11,7 +11,7 @@ from capabilities.task_catalog.benchmark import capability_id
 from capabilities.task_catalog.benchmark import selected_templates
 from pipelines.catalog import pipeline_files
 from capabilities.task_catalog.benchmark import relevance
-from capabilities.dataset_authoring.adapters import supports
+from capabilities.task_catalog.execution_support import supports
 from capabilities.benchmark_design.assessment import assessment_with_current_schema
 from capabilities.benchmark_design.assessment import validate_assessment
 from pipelines.benchmark.design.plan_versions import current
@@ -22,7 +22,7 @@ from pipelines.benchmark.design.plan_input import FIELDS
 from pipelines.benchmark.design.plan_review import revision_review
 from pipelines.benchmark.design.production_steps import complete_production_steps, validate_production_steps
 from storage.execution_lock import exclusive_run, RunBusyError
-from pipelines.benchmark.execution.review_service import gate, review as review_status
+from pipelines.reviews.service import gate, review as review_status
 from service_access.tool_names import qualify
 from service_access.scene_service import environment_value
 
@@ -115,6 +115,7 @@ def _plan(args, directory, config=None):
                 value['steps'] = complete_production_steps(value['steps'])
             else:
                 validate_production_steps(value['steps'])
+            validate_production_steps(value['steps'], inputs['selections'])
             value['production_contract'] = 'benchforge.production-stages/v1'
         except ValueError as error:
             if not authoring_sources:

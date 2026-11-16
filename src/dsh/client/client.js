@@ -1680,7 +1680,10 @@ var benchforgeClient = (() => {
   function createWorkbenchRequest(remote) {
     return async (params, { body, signal } = {}) => {
       const query = Object.fromEntries(new URLSearchParams(params));
-      const result = body === void 0 ? await remote.benchforgeWorkbench.read(query, signal) : await remote.benchforgeWorkbench.write(query, body, signal);
+      const methods = { stage_review: "stageReview", progress: "progress", stage_artifacts: "sceneArtifacts" };
+      const method = methods[query.view];
+      const { view: _view, ...typedQuery } = query;
+      const result = body === void 0 ? await (method ? remote.benchforgeWorkbench[method](typedQuery, signal) : remote.benchforgeWorkbench.read(query, signal)) : await remote.benchforgeWorkbench.write(query, body, signal);
       if (!result.ok) {
         signal?.throwIfAborted();
         throw new Error(result.error.message);
@@ -4258,6 +4261,12 @@ var benchforgeClient = (() => {
   var JsonValueRemoteCodec$schema2 = () => JsonValueRemoteCodec$schema2$value ??= import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema2())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema2()))]);
   var JsonValueRemoteCodec$schema3$value;
   var JsonValueRemoteCodec$schema3 = () => JsonValueRemoteCodec$schema3$value ??= import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema3())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema3()))]);
+  var JsonValueRemoteCodec$schema4$value;
+  var JsonValueRemoteCodec$schema4 = () => JsonValueRemoteCodec$schema4$value ??= import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema4())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema4()))]);
+  var JsonValueRemoteCodec$schema5$value;
+  var JsonValueRemoteCodec$schema5 = () => JsonValueRemoteCodec$schema5$value ??= import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))]);
+  var JsonValueRemoteCodec$schema6$value;
+  var JsonValueRemoteCodec$schema6 = () => JsonValueRemoteCodec$schema6$value ??= import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema6())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema6()))]);
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_products_parameter_0$schema$value;
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_products_parameter_0$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_products_parameter_0$schema$value ??= import_zod.z.object({
     "session_id": import_zod.z.string(),
@@ -4285,12 +4294,87 @@ var benchforgeClient = (() => {
     "total": import_zod.z.number(),
     "truncated": import_zod.z.boolean()
   });
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0$schema$value ??= import_zod.z.object({
+    "scope": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal("workspace")]).optional(),
+    "session_id": import_zod.z.string(),
+    "workspace_path": import_zod.z.string()
+  });
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_result$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_result$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_result$schema$value ??= import_zod.z.object({
+    "operations": import_zod.z.array(import_zod.z.object({
+      "id": import_zod.z.string(),
+      "tool": import_zod.z.string(),
+      "state": import_zod.z.string(),
+      "stage": import_zod.z.union([import_zod.z.literal(null), import_zod.z.literal("S1"), import_zod.z.literal("S2"), import_zod.z.literal("S3"), import_zod.z.literal("S4"), import_zod.z.literal("S5")]),
+      "session_id": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+      "error": import_zod.z.union([import_zod.z.literal(null), import_zod.z.string()]),
+      "workspace": import_zod.z.string(),
+      "started_at": import_zod.z.union([import_zod.z.literal(null), import_zod.z.string()])
+    })),
+    "pipelines": import_zod.z.array(import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))])),
+    "scenes": import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))]),
+    "current_collection": import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))]),
+    "generation": import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))]),
+    "parallel_tasks": import_zod.z.array(import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))])),
+    "sources": import_zod.z.array(import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema5())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema5()))])),
+    "snapshot_at": import_zod.z.string(),
+    "scope": import_zod.z.union([import_zod.z.literal("explicit_workspace_history"), import_zod.z.literal("current_conversation_only")]),
+    "association": import_zod.z.string(),
+    "unassociated_records": import_zod.z.number()
+  });
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_parameter_0$schema$value;
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_parameter_0$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_parameter_0$schema$value ??= import_zod.z.intersection(import_zod.z.object({
     "view": import_zod.z.union([import_zod.z.literal("runtime"), import_zod.z.literal("summary"), import_zod.z.literal("progress"), import_zod.z.literal("run"), import_zod.z.literal("stage_artifacts"), import_zod.z.literal("catalog"), import_zod.z.literal("dataset"), import_zod.z.literal("scene_library"), import_zod.z.literal("scene_selection"), import_zod.z.literal("stage_review"), import_zod.z.literal("plan_template"), import_zod.z.literal("execution_status"), import_zod.z.literal("synthesis_status"), import_zod.z.literal("products")])
   }), import_zod.z.record(import_zod.z.string(), import_zod.z.string()));
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_result$schema$value;
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_result$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_result$schema$value ??= import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema()))]);
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0$schema$value ??= import_zod.z.object({
+    "scene": import_zod.z.string(),
+    "run": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "task": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "revision": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "library": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal("1")]).optional(),
+    "session_id": import_zod.z.string(),
+    "workspace_path": import_zod.z.string()
+  });
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_result$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_result$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_result$schema$value ??= import_zod.z.intersection(import_zod.z.object({
+    "items": import_zod.z.array(import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema6())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema6()))]))
+  }), import_zod.z.record(import_zod.z.string(), import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema6())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema6()))])));
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0$schema$value ??= import_zod.z.object({
+    "session_id": import_zod.z.string(),
+    "workspace_path": import_zod.z.string()
+  });
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_result$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_result$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_result$schema$value ??= import_zod.z.object({
+    "state": import_zod.z.union([import_zod.z.literal("none"), import_zod.z.literal("waiting_user"), import_zod.z.literal("paused"), import_zod.z.literal("needs_input"), import_zod.z.literal("check_failed"), import_zod.z.literal("elapsed"), import_zod.z.literal("continued"), import_zod.z.literal("superseded")]),
+    "can_continue": import_zod.z.boolean(),
+    "review_id": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "stage": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal("S1"), import_zod.z.literal("S2"), import_zod.z.literal("S3"), import_zod.z.literal("S4"), import_zod.z.literal("S5")]).optional(),
+    "artifact": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "deadline": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "server_time": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "session": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "key": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "started": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "instruction": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal(null), import_zod.z.string()]).optional(),
+    "policy_version": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "revision": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "rounds_required": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "round_number": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "wait_seconds": import_zod.z.number(),
+    "remaining_seconds": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "rounds": import_zod.z.union([import_zod.z.undefined(), import_zod.z.array(import_zod.z.union([import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema4())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema4()))]))]).optional(),
+    "check_pending": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal(false), import_zod.z.literal(true)]).optional(),
+    "last_check": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema4())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema4()))]).optional(),
+    "check_failure": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal(null), import_zod.z.string(), import_zod.z.number(), import_zod.z.literal(false), import_zod.z.literal(true), import_zod.z.array(import_zod.z.lazy(() => JsonValueRemoteCodec$schema4())), import_zod.z.record(import_zod.z.string(), import_zod.z.lazy(() => JsonValueRemoteCodec$schema4()))]).optional(),
+    "checks_completed": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "waits_completed": import_zod.z.union([import_zod.z.undefined(), import_zod.z.number()]).optional(),
+    "next": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional()
+  });
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_parameter_0$schema$value;
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_parameter_0$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_parameter_0$schema$value ??= import_zod.z.intersection(import_zod.z.object({
     "view": import_zod.z.union([import_zod.z.literal("scene_selection"), import_zod.z.literal("stage_review"), import_zod.z.literal("plan_edit"), import_zod.z.literal("execution_control"), import_zod.z.literal("synthesis_start")])
@@ -4306,10 +4390,31 @@ var benchforgeClient = (() => {
     "session_id": import_zod.z.string(),
     "workspace_path": import_zod.z.string()
   });
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0_strict$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0_strict$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0_strict$schema$value ??= import_zod.z.strictObject({
+    "scope": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal("workspace")]).optional(),
+    "session_id": import_zod.z.string(),
+    "workspace_path": import_zod.z.string()
+  });
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_parameter_0_strict$schema$value;
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_parameter_0_strict$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_parameter_0_strict$schema$value ??= import_zod.z.object({
     "view": import_zod.z.union([import_zod.z.intersection(import_zod.z.literal("runtime"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("summary"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("progress"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("run"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("stage_artifacts"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("catalog"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("dataset"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("scene_library"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("scene_selection"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("stage_review"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("plan_template"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("execution_status"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("synthesis_status"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("products"), import_zod.z.string())])
   }).catchall(import_zod.z.string());
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0_strict$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0_strict$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0_strict$schema$value ??= import_zod.z.strictObject({
+    "scene": import_zod.z.string(),
+    "run": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "task": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "revision": import_zod.z.union([import_zod.z.undefined(), import_zod.z.string()]).optional(),
+    "library": import_zod.z.union([import_zod.z.undefined(), import_zod.z.literal("1")]).optional(),
+    "session_id": import_zod.z.string(),
+    "workspace_path": import_zod.z.string()
+  });
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0_strict$schema$value;
+  var _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0_strict$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0_strict$schema$value ??= import_zod.z.strictObject({
+    "session_id": import_zod.z.string(),
+    "workspace_path": import_zod.z.string()
+  });
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_parameter_0_strict$schema$value;
   var _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_parameter_0_strict$schema = () => _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_parameter_0_strict$schema$value ??= import_zod.z.object({
     "view": import_zod.z.union([import_zod.z.intersection(import_zod.z.literal("scene_selection"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("stage_review"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("plan_edit"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("execution_control"), import_zod.z.string()), import_zod.z.intersection(import_zod.z.literal("synthesis_start"), import_zod.z.string())])
@@ -4347,7 +4452,37 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_products_result$schema,
           jsonSchema: { "type": "object", "properties": { "session_id": { "type": "string" }, "workspace_path": { "oneOf": [{ "type": "null", "const": null }, { "type": "string" }] }, "revision": { "type": "string" }, "items": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "title": { "type": "string" }, "stage": { "oneOf": [{ "type": "null", "const": null }, { "type": "string", "enum": ["S1", "S2", "S3", "S4", "S5"] }] }, "kind": { "type": "string", "enum": ["image", "video", "audio", "json", "text", "file"] }, "content_type": { "type": "string" }, "source": { "type": "string", "enum": ["tool", "mutation", "present"] }, "session_id": { "type": "string" }, "status": { "type": "string", "enum": ["available", "missing", "excluded", "unavailable"] }, "bytes": { "oneOf": [{ "type": "null", "const": null }, { "type": "number" }] }, "updated_at": { "oneOf": [{ "type": "null", "const": null }, { "type": "string" }] }, "url": { "oneOf": [{ "type": "null", "const": null }, { "type": "string" }] } }, "required": ["id", "name", "title", "stage", "kind", "content_type", "source", "session_id", "status", "bytes", "updated_at", "url"], "additionalProperties": true } }, "total": { "type": "number" }, "truncated": { "type": "boolean" } }, "required": ["session_id", "workspace_path", "revision", "items", "total", "truncated"], "additionalProperties": true }
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 39, "column": 9 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 41, "column": 9 }
+      },
+      "benchforgeWorkbench/progress": {
+        service: "benchforgeWorkbench",
+        invocation: { kind: "direct" },
+        parameters: [
+          {
+            name: "query",
+            source: "json",
+            codec: {
+              mode: "strict",
+              typeSymbol: "@eurecamoment/benchforge-workbench/types#ProgressQuery",
+              create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0$schema,
+              jsonSchema: { "type": "object", "properties": { "scope": { "type": "string", "const": "workspace" }, "session_id": { "type": "string" }, "workspace_path": { "type": "string" } }, "required": ["session_id", "workspace_path"], "additionalProperties": true }
+            },
+            strictCodec: {
+              mode: "strict",
+              typeSymbol: "@eurecamoment/benchforge-workbench/types#ProgressQuery",
+              create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_parameter_0_strict$schema,
+              jsonSchema: { "type": "object", "properties": { "scope": { "type": "string", "const": "workspace" }, "session_id": { "type": "string" }, "workspace_path": { "type": "string" } }, "required": ["session_id", "workspace_path"], "additionalProperties": false }
+            }
+          }
+        ],
+        cancellation: { parameter: "signal" },
+        result: {
+          mode: "strict",
+          typeSymbol: "@eurecamoment/benchforge-workbench/types#ProgressResult",
+          create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_result$schema,
+          jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
+        },
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 56, "column": 9 }
       },
       "benchforgeWorkbench/read": {
         service: "benchforgeWorkbench",
@@ -4377,7 +4512,67 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 29, "column": 3 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 31, "column": 3 }
+      },
+      "benchforgeWorkbench/sceneArtifacts": {
+        service: "benchforgeWorkbench",
+        invocation: { kind: "direct" },
+        parameters: [
+          {
+            name: "query",
+            source: "json",
+            codec: {
+              mode: "strict",
+              typeSymbol: "@eurecamoment/benchforge-workbench/types#SceneArtifactsQuery",
+              create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0$schema,
+              jsonSchema: { "type": "object", "properties": { "scene": { "type": "string" }, "run": { "type": "string" }, "task": { "type": "string" }, "revision": { "type": "string" }, "library": { "type": "string", "const": "1" }, "session_id": { "type": "string" }, "workspace_path": { "type": "string" } }, "required": ["scene", "session_id", "workspace_path"], "additionalProperties": true }
+            },
+            strictCodec: {
+              mode: "strict",
+              typeSymbol: "@eurecamoment/benchforge-workbench/types#SceneArtifactsQuery",
+              create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_parameter_0_strict$schema,
+              jsonSchema: { "type": "object", "properties": { "scene": { "type": "string" }, "run": { "type": "string" }, "task": { "type": "string" }, "revision": { "type": "string" }, "library": { "type": "string", "const": "1" }, "session_id": { "type": "string" }, "workspace_path": { "type": "string" } }, "required": ["scene", "session_id", "workspace_path"], "additionalProperties": false }
+            }
+          }
+        ],
+        cancellation: { parameter: "signal" },
+        result: {
+          mode: "strict",
+          typeSymbol: "@eurecamoment/benchforge-workbench/types#SceneArtifactsResult",
+          create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_result$schema,
+          jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
+        },
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 66, "column": 9 }
+      },
+      "benchforgeWorkbench/stageReview": {
+        service: "benchforgeWorkbench",
+        invocation: { kind: "direct" },
+        parameters: [
+          {
+            name: "query",
+            source: "json",
+            codec: {
+              mode: "strict",
+              typeSymbol: "@eurecamoment/benchforge-workbench/types#StageReviewQuery",
+              create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0$schema,
+              jsonSchema: { "type": "object", "properties": { "session_id": { "type": "string" }, "workspace_path": { "type": "string" } }, "required": ["session_id", "workspace_path"], "additionalProperties": true }
+            },
+            strictCodec: {
+              mode: "strict",
+              typeSymbol: "@eurecamoment/benchforge-workbench/types#StageReviewQuery",
+              create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_parameter_0_strict$schema,
+              jsonSchema: { "type": "object", "properties": { "session_id": { "type": "string" }, "workspace_path": { "type": "string" } }, "required": ["session_id", "workspace_path"], "additionalProperties": false }
+            }
+          }
+        ],
+        cancellation: { parameter: "signal" },
+        result: {
+          mode: "strict",
+          typeSymbol: "@eurecamoment/benchforge-workbench/types#StageReviewResult",
+          create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_result$schema,
+          jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
+        },
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 46, "column": 9 }
       },
       "benchforgeWorkbench/write": {
         service: "benchforgeWorkbench",
@@ -4423,7 +4618,7 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 34, "column": 3 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 36, "column": 3 }
       }
     }
   }, import_zod.z);

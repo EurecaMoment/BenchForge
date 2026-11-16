@@ -2,6 +2,8 @@ import {Service, type Context} from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-api-gateway';
 import {Remote, RemoteError, bindTypertRemote} from '@deepseek-ai/dsh-typert-protocol';
 import type {ConversationProducts, JsonValue, ProductsQuery, ReadQuery, WriteQuery} from './types.js';
+import type {StageReviewQuery, StageReviewResult, ProgressQuery, ProgressResult,
+  SceneArtifactsQuery, SceneArtifactsResult} from './types.js';
 
 type WorkbenchDispatch = (url: URL, input: {
   method: 'GET' | 'POST';
@@ -38,6 +40,35 @@ export class WorkbenchRemote {
   @Remote
   async products(query: ProductsQuery, signal: AbortSignal): Promise<ConversationProducts> {
     return await this.call('GET', {view: 'products', ...query}, undefined, signal) as unknown as ConversationProducts;
+  }
+
+  @Remote
+  async stageReview(query: StageReviewQuery, signal: AbortSignal): Promise<StageReviewResult> {
+    const result = await this.call('GET', {view: 'stage_review', ...query}, undefined, signal);
+    if (!result || typeof result !== 'object' || Array.isArray(result) ||
+        typeof result.state !== 'string' || typeof result.can_continue !== 'boolean') {
+      throw new Error('Invalid stage review response');
+    }
+    return result as unknown as StageReviewResult;
+  }
+
+  @Remote
+  async progress(query: ProgressQuery, signal: AbortSignal): Promise<ProgressResult> {
+    const result = await this.call('GET', {view: 'progress', ...query}, undefined, signal);
+    if (!result || typeof result !== 'object' || Array.isArray(result) ||
+        !Array.isArray(result.operations) || !Array.isArray(result.pipelines) || typeof result.snapshot_at !== 'string') {
+      throw new Error('Invalid progress response');
+    }
+    return result as unknown as ProgressResult;
+  }
+
+  @Remote
+  async sceneArtifacts(query: SceneArtifactsQuery, signal: AbortSignal): Promise<SceneArtifactsResult> {
+    const result = await this.call('GET', {view: 'stage_artifacts', ...query}, undefined, signal);
+    if (!result || typeof result !== 'object' || Array.isArray(result) || !Array.isArray(result.items)) {
+      throw new Error('Invalid scene artifact response');
+    }
+    return result as unknown as SceneArtifactsResult;
   }
 
   private async call(method: 'GET' | 'POST', query: Record<string, string>, body: JsonValue | undefined, signal: AbortSignal) {

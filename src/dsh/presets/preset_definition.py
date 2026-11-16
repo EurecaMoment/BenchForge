@@ -74,7 +74,7 @@ QUESTION_QUALITY_CONSTRAINTS = """\n中心距离题先用公开深度、标定�
 PERSONA += QUESTION_QUALITY_CONSTRAINTS
 SYNTHESIS_WORKER_PERSONA += QUESTION_QUALITY_CONSTRAINTS
 
-PUBLIC_GEOMETRY_REUSE_CONSTRAINTS = """\n重复公开 RGB-D 几何测量优先复用随插件发布的 task_support/README.md 中的三文件闭包（源码目录为 src/dsh/task_support），独立公开 worker 同样携带全部依赖。按保存的公开协议调用 PublicReconstruction/public_query：中心和尺寸用 geometry(label)，点数用 point_count(label)，需要真实点云才调用 points(label)。同批测量共享有界 LRU，避免逐题重复加载、投影相同输入；文件版本、相机参照系与局部轴变化仍使缓存失效。逐题原生比较和原有误差界保持，GT与通过判定不缓存，已通过且未受影响的 surface 证书直接复用。其它题型保持自己的数学定义。闭包未改算法时复用已有证据，仅做必要导入检查；新题仍执行其正常公开信息与制作验收。"""
+PUBLIC_GEOMETRY_REUSE_CONSTRAINTS = """\n重复公开 RGB-D 几何测量优先复用随插件发布的 dist/task_support/README.md 中的三文件闭包（源码目录为 src/capabilities/data_acquisition/measurements），独立公开 worker 同样携带全部依赖。按保存的公开协议调用 PublicReconstruction/public_query：中心和尺寸用 geometry(label)，点数用 point_count(label)，需要真实点云才调用 points(label)。同批测量共享有界 LRU，避免逐题重复加载、投影相同输入；文件版本、相机参照系与局部轴变化仍使缓存失效。逐题原生比较和原有误差界保持，GT与通过判定不缓存，已通过且未受影响的 surface 证书直接复用。其它题型保持自己的数学定义。闭包未改算法时复用已有证据，仅做必要导入检查；新题仍执行其正常公开信息与制作验收。"""
 PERSONA += PUBLIC_GEOMETRY_REUSE_CONSTRAINTS
 SYNTHESIS_WORKER_PERSONA += PUBLIC_GEOMETRY_REUSE_CONSTRAINTS
 

@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from sqlalchemy import Column, JSON, MetaData, String, Table, inspect, select
+from sqlalchemy import Column, JSON, MetaData, String, Table, inspect
 
 import deployment_config
 from capabilities.isaac_sim.recovery import prepare_retry
@@ -15,7 +15,7 @@ from service_access.config_migration import migrate_configuration
 from storage.files import write_json
 from storage.scene_jobs.metadata import tasks
 from storage.scene_jobs.migrate_capture import migrate_capture
-from storage.scene_jobs.store import Store
+from pipelines.scene_production.service import create_store
 
 
 class CaptureStoreTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class CaptureStoreTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.env = patch.dict(os.environ, {'BENCHFORGE_EXECUTION_MODE': 'exploration'})
         self.env.start()
-        self.store = Store(self.root / 'artifacts', database_url='sqlite:///' + str(self.root / 'queue.sqlite'))
+        self.store = create_store(self.root / 'artifacts', database_url='sqlite:///' + str(self.root / 'queue.sqlite'))
 
     def tearDown(self):
         self.store.repo.engine.dispose()

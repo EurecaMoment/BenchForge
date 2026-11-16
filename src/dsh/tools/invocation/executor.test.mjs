@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
 import test from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,8 +14,8 @@ import {reviewDenial} from '../../production/review_policy.mjs';
 // Resolve the services from the installed SDK's own dependency graph so these
 // tests exercise the same scoped registry and pipeline as the deployment.
 const sdk = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
-const {default: SystemPrompt} = await import(sdk.resolve('@deepseek-ai/dsh-system-prompt'));
-const {createScope} = await import(sdk.resolve('@deepseek-ai/dsh-scope'));
+const {default: SystemPrompt} = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-system-prompt')));
+const {createScope} = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-scope')));
 
 async function runtime(t) {
   const ctx = new Context();

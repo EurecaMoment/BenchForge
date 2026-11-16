@@ -3,7 +3,6 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from copy import deepcopy
 from hashlib import sha256
-import json
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -14,7 +13,7 @@ from pipelines.benchmark.design.planner import plan
 from pipelines.benchmark.design.plan_versions import current
 from storage.artifacts import read, write
 from storage.execution_lock import exclusive_run
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 
 
 class PlanReviewRevisionTests(unittest.TestCase):

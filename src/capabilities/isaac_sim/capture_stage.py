@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import shutil
 import uuid
 
 from capabilities.capture.capture_scope import capture_scope
 from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
 from capabilities.isaac_sim.evidence import measured_entities, physics_summary, resolve_artifact, save_frame
+from capabilities.isaac_sim.native_geometry import exported_entities
+from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
 from capabilities.isaac_sim.grpc.transport import A100Client, document
@@ -86,12 +87,7 @@ def execute_capture(store, task, stop, *, config, client=None):
         program = json.loads((directory / 'program.json').read_text())
         settings = isaac_config(config)
         scope = capture_scope(program, unit['intent'].get('capture_options'))
-        executable = [action for action in program.get('interactions', program.get('affordances', []))
-                      if action.get('action') in ('apply_force', 'robot_push', 'record_trajectory')]
-        if executable:
-            raise UnsupportedScene('This SceneProgram action needs explicit native session commands and '
-                'world.collect receipts. Use benchforge_isaac_sim with the live catalog; '
-                'the adapter will not silently replace robot/contact/trajectory execution.')
+        validate_scene_requirements(program)
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
                   'protocol': 'a100sim.v1.Simulator', 'capture_token': token}
         frozen_path = attempt / 'capture.json'
@@ -112,6 +108,10 @@ def execute_capture(store, task, stop, *, config, client=None):
             capability = document(client.call('GetCapabilities'))
             required = {'extension.asset.import', 'extension.physics.step',
                         'extension.scene.inspect', 'extension.scene.capture', 'extension.world.observe'}
+            if compiled['imports'] or scope['scene_export_requested']:
+                required.add('extension.scene.export')
+            if compiled['imports']:
+                required.add('extension.scene.edit')
             available = {item['name'] for item in capability['capabilities'] if item['availability'] == 'AVAILABLE'}
             if missing := required - available:
                 raise UnsupportedScene('Isaac Sim service lacks required operations: ' + ', '.join(sorted(missing)))
@@ -129,10 +129,18 @@ def execute_capture(store, task, stop, *, config, client=None):
                 {'session_id': identity, 'bodies': body_paths, 'imu': False, 'contacts': False})
             physics = physics_summary(observed, steps, dt)
             prims = _inspect(requests, identity)
-            entities = measured_entities(compiled, prims)
             incoming = attempt / 'capture'
             incoming.mkdir(exist_ok=True)
             frames, native_jobs = [], [physics_job.job_id]
+            entities = measured_entities(compiled, prims)
+            native = {key: value for key, value in compiled['entities'].items() if not value.get('geometry_parts')}
+            if native:
+                job, exported = requests.extension('geometry', 'scene.export', {'session_id': identity, 'format': 'usd'})
+                files = requests.download('geometry', job)
+                source_geometry = incoming / 'native_geometry.usdc'
+                shutil.copyfile(resolve_artifact(exported['scene'], files), source_geometry)
+                entities.update(exported_entities(source_geometry, native))
+                native_jobs.append(job.job_id)
             views = scope['view_indices']
             # The service batches up to 32 cameras per request; retain every
             # authored view, split without reducing the user's camera count.

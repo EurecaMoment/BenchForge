@@ -93,7 +93,7 @@ def _token(config, name, required):
     config[name + '_token'] = value or ''
 
 
-def _apply_model_environment(config):
+def _resolve_model_settings(config):
     reference = config.get('models_config')
     if not reference:
         return
@@ -105,14 +105,12 @@ def _apply_model_environment(config):
     ):
         if spec.get(source):
             config[target] = spec[source]
-            os.environ[variable] = spec[source]
         else:
             config.pop(target, None)
-            os.environ.pop(variable, None)
 
 
 def load_service_config(path, *, required_tokens=('operator',)):
-    """Load server configuration, resolve paths, and set its runtime environment."""
+    """Resolve one configuration without mutating process-wide environment."""
     path = Path(path).expanduser().resolve()
     config = read_json(path)
     if not isinstance(config, dict):
@@ -137,7 +135,6 @@ def load_service_config(path, *, required_tokens=('operator',)):
     if mode not in ('production', 'exploration'):
         raise ValueError('execution_mode must be production or exploration')
     config['execution_mode'] = mode
-    os.environ['BENCHFORGE_EXECUTION_MODE'] = mode
 
     for key, env_name in _PATH_ENVIRONMENT.items():
         resolved = _resolve_environment_value(config, key, env_name, path)
@@ -183,14 +180,12 @@ def load_service_config(path, *, required_tokens=('operator',)):
         if mode == 'production' and (policy.get('enabled') is not True or policy.get('enforce_realism') is not True):
             raise ValueError('production execution requires an enabled scene policy with enforce_realism=true')
         config['scene_policy_path'] = str(policy_path)
-        os.environ['BENCHFORGE_SCENE_POLICY'] = str(policy_path)
     else:
         config.pop('scene_policy_path', None)
-        os.environ.pop('BENCHFORGE_SCENE_POLICY', None)
     if mode == 'production' and policy_path is None:
         raise ValueError('execution_mode=production requires scene_policy_path pointing to an existing policy.json')
 
-    _apply_model_environment(config)
+    _resolve_model_settings(config)
 
     environment_values = (
         ('model_url', 'BENCHFORGE_MODEL_URL'),
@@ -202,9 +197,16 @@ def load_service_config(path, *, required_tokens=('operator',)):
         if value is not None:
             resolved = expand_environment(str(value))
             config[key] = resolved
-            os.environ[env_name] = resolved
-    for key in ('models_config', 'task_root'):
-        env_name = _PATH_ENVIRONMENT[key]
-        if key in config:
-            os.environ[env_name] = config[key]
     return config
+
+
+def apply_runtime_environment(config):
+    """Install one service's legacy environment at its executable startup boundary."""
+    mapping = {**_PATH_ENVIRONMENT, 'execution_mode': 'BENCHFORGE_EXECUTION_MODE',
+               'model_url': 'BENCHFORGE_MODEL_URL', 'model_id': 'BENCHFORGE_MODEL_ID',
+               'model_api_key_env': 'BENCHFORGE_MODEL_API_KEY_ENV'}
+    for key, variable in mapping.items():
+        if key in config:
+            os.environ[variable] = str(config[key])
+        else:
+            os.environ.pop(variable, None)

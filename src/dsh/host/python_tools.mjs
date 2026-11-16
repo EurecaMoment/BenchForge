@@ -4,6 +4,7 @@ import {defineTool} from '@deepseek-ai/dsh-tools';
 import Schema from '@deepseek-ai/schemastery';
 import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
 import {toolName, qualifyToolNames, qualifyDescriptions} from '../tools/benchmark/names.mjs';
+import {configuredProviders, providerEnvironment} from './tool_credentials.mjs';
 import {presentOperationCatalog} from '../tools/benchmark/catalog.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
@@ -64,19 +65,11 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
     render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]};
   const operationOutput = {...output,schema:{type:'object',properties:{operation_id:{type:'string',required:true},artifact_dir:{type:'string',required:true}},additionalProperties:true}};
   const statusOutput = {...output,schema:{type:'object',properties:{operations:{type:'array',required:true,items:{type:'object',properties:{id:{type:'string',required:true},tool:{type:'string',required:true},state:{type:'string',required:true}},additionalProperties:true}}},additionalProperties:true}};
-  let annotation;
-  if (definitions.model_infer && config.configPath && (!config.includeTools || config.includeTools.includes('model_infer'))) {
-    try {
-      const settings = JSON.parse(await fs.readFile(path.resolve(config.configPath), 'utf8'));
-      const llm = settings.providers?.DSpark4A100;
-      annotation = {...llm, ...llm?.roles?.annotation};
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-  }
-  const annotationToken = annotation?.token_env;
-  const credential = annotationToken ? snapshot.get(annotationToken)?.value : undefined;
-  const annotationEnvironment = credential === undefined ? environment : {...environment, [annotationToken]:credential};
+  const providers = await configuredProviders(config.configPath);
+  const llm = providers.DSpark4A100;
+  const annotation = llm ? {...llm, ...llm.roles?.annotation} : undefined;
+  const annotationEnvironment = providerEnvironment(environment, snapshot, annotation?.token_env);
+  const isaacEnvironment = providerEnvironment(environment, snapshot, providers.IsaacSim4A100?.grpc?.token_env);
   for (const [tool, description] of Object.entries(definitions)) {
     if (config.includeTools && !config.includeTools.includes(tool)) continue;
     if (tool === 'model_infer' && !annotation?.url) continue;
@@ -87,7 +80,7 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
         if (exec.agent?.session?.header?.cwd && await fs.realpath(workspace) !== await fs.realpath(exec.agent.session.header.cwd)) {
           throw new Error('Use this conversation workspace: ' + exec.agent.session.header.cwd + '. Save task files in its tasks/ subdirectory.');
         }
-        const scoped = tool === 'model_infer' ? annotationEnvironment : environment;
+        const scoped = tool === 'model_infer' ? annotationEnvironment : tool === 'isaac_sim' ? isaacEnvironment : environment;
         const sessionEnvironment = {...scoped, BENCHFORGE_DSH_SESSION_ID: exec.agent?.session?.id || '', BENCHFORGE_DSH_CALL_ID: exec.callId || ''};
         const result = await invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module});
         return tool === 'catalog' && result.workflow

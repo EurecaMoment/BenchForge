@@ -2,7 +2,7 @@
 import argparse
 import json
 
-from pipelines.benchmark.execution.review_service import review
+from pipelines.reviews.service import review
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--workspace',required=True)
