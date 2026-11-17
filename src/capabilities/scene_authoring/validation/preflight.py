@@ -226,8 +226,9 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
 
     def mesh(asset_id):
         if asset_id not in cache:
-            path = (assets_root / asset_id / 'mesh.json').resolve()
-            if not path.is_relative_to(assets_root):
+            path = assets_root / asset_id / 'mesh.json'
+            resolved_path = path.resolve()
+            if not resolved_path.is_relative_to(assets_root):
                 raise ValueError('asset path escapes registry')
             try:
                 value = json.loads(path.read_text(encoding='utf-8'))
