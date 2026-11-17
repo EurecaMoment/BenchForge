@@ -42,7 +42,9 @@ jobs:
         run: |
           $env:PYTHONPATH = 'src'
           $output = & python -m unittest discover -s tests -v 2>&1 | Out-String
-          $message = $output.Substring([Math]::Max(0, $output.Length - 12000))
+          $lines = $output -split "`r?`n"
+          $selected = $lines | Where-Object { $_ -match '(^ERROR:|^FAIL:|^Traceback|AssertionError|Exception|^FAILED|^Ran )' }
+          $message = (($selected -join "`n") + "`n" + $output.Substring([Math]::Max(0, $output.Length - 1000)))
           $message = $message.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
           Write-Output "::error title=Python behavior contracts::$message"
           exit 1
