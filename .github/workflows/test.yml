@@ -1,3 +1,4 @@
+# Keep Windows checkout compatible with the example asset paths.
 name: Build and verify
 on: [push, pull_request]
 jobs:
