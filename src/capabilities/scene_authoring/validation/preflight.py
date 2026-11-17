@@ -221,14 +221,15 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
 def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
                           policy, allow_generated, diagnostics):
     cache = {}
-    assets_root = (Path(root) / 'generated_assets').resolve()
+    assets_root = Path(root) / 'generated_assets'
+    resolved_assets_root = assets_root.resolve()
     simplified_assets = {obj.get('asset_id') for obj in objects if obj['id'] in simplified}
 
     def mesh(asset_id):
         if asset_id not in cache:
             path = assets_root / asset_id / 'mesh.json'
             resolved_path = path.resolve()
-            if not resolved_path.is_relative_to(assets_root):
+            if not resolved_path.is_relative_to(resolved_assets_root):
                 raise ValueError('asset path escapes registry')
             try:
                 value = json.loads(path.read_text(encoding='utf-8'))
