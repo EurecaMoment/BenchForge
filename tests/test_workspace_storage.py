@@ -1,11 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import closing
 import json
 from pathlib import Path
-import sqlite3
 from tempfile import TemporaryDirectory
 from threading import Barrier
 import unittest
+
+from tests.database_fixtures import use_postgres
+
+from database.engine import engine_for, workspace_id
+from database.schema import operations
 
 from storage.dataset_partitions import claim_partition
 from storage.operation_index import query_operations
@@ -14,6 +17,7 @@ from storage.native_jobs import NativeJobs
 
 class WorkspaceStorageTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
@@ -33,21 +37,12 @@ class WorkspaceStorageTests(unittest.TestCase):
         self.assertEqual(len({x for x in results if x}), 1)
         self.assertEqual(results.count(None), 4)
 
-    def test_legacy_index_filters_session_before_limit(self):
-        with closing(sqlite3.connect(self.root / "runs.sqlite")) as db, db:
-            db.execute(
-                "CREATE TABLE operations(id TEXT,tool TEXT,state TEXT,artifact TEXT,error TEXT)"
-            )
+    def test_index_filters_session_before_limit(self):
+        with engine_for(self.database_url).begin() as db:
             for i in range(10):
-                folder = self.root / "operations" / str(i)
-                folder.mkdir(parents=True)
-                (folder / "request.json").write_text(
-                    json.dumps({"context": {"session_id": "a" if i == 0 else "b"}})
-                )
-                db.execute(
-                    "INSERT INTO operations VALUES (?,?,?,?,?)",
-                    (str(i), "plan", "completed", str(folder), None),
-                )
+                db.execute(operations.insert().values(workspace_id=workspace_id(self.root),
+                    id=str(i), tool='plan', state='completed', artifact='operations/' + str(i),
+                    session_id='a' if i == 0 else 'b'))
         self.assertEqual(
             [row["id"] for row in query_operations(self.root, sessions=["a"], limit=2)], ["0"]
         )
@@ -71,14 +66,9 @@ class WorkspaceStorageTests(unittest.TestCase):
         (operation / "result.json").write_text(
             json.dumps({"job": {"job_id": "job-old"}, "receipt_path": str(receipt)})
         )
-        with closing(sqlite3.connect(self.root / "runs.sqlite")) as db, db:
-            db.execute(
-                "CREATE TABLE operations(id TEXT,tool TEXT,state TEXT,artifact TEXT,error TEXT)"
-            )
-            db.execute(
-                "INSERT INTO operations VALUES (?,?,?,?,?)",
-                ("old", "isaac_sim", "completed", str(operation), None),
-            )
+        with engine_for(self.database_url).begin() as db:
+            db.execute(operations.insert().values(workspace_id=workspace_id(self.root),
+                id='old', tool='isaac_sim', state='completed', artifact=str(operation), session_id='session-owner'))
         owners = NativeJobs(self.root)
         with self.assertRaises(PermissionError):
             owners.require("sim:50051", "job-old", "session-other")

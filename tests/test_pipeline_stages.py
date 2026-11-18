@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+
+from tests.database_fixtures import use_postgres
 from unittest.mock import patch
 
 from capabilities.dataset_authoring.adapters import generate
@@ -18,6 +20,7 @@ from pipelines.benchmark.design.plan_versions import activate
 
 class PipelineStageTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.addCleanup(self.temp.cleanup)

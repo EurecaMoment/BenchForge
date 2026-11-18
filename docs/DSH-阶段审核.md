@@ -11,7 +11,7 @@ S1–S5 各自保留一个后端审核记录。每轮重新检查真实保存的
 | 位置 | 职责 |
 | --- | --- |
 | `src/storage/review_progress.py` | 三轮状态转换，不读取业务产物 |
-| `src/storage/stage_reviews.py` | SQLite 持久化、版本迁移、检查结果的条件提交 |
+| `src/storage/stage_reviews.py` | PostgreSQL 持久化、版本迁移、检查结果的条件提交 |
 | `src/pipelines/benchmark/execution/review_checks.py` | 验证当前计划、可执行合同、各阶段实际完成回执及采集源版本 |
 | `src/pipelines/reviews/service.py` | 工具、执行器、网页和定时器共用的后端入口 |
 | `src/pipelines/reviews/checks.py` | 组合评测和场景修复的领域检查，避免流程互相回调 |
@@ -24,9 +24,9 @@ S1–S5 各自保留一个后端审核记录。每轮重新检查真实保存的
 
 ## 并发与恢复
 
-检查使用每个审核独立的操作系统锁，SQLite 仅在读写记录时持有短事务。多个工具、浏览器或 Host 同时观察不会增加轮数。检查期间到达的暂停、指令、计划修订或新阶段使旧检查结果失效。进程退出释放检查锁；重启读取已保存轮次。停机期间不能伪造检查，也不倒填尚未执行的等待。
+检查使用每个审核独立的操作系统锁，PostgreSQL 事务只在提交审核状态时持有行级锁。多个工具、浏览器或 Host 同时观察不会增加轮数。检查期间到达的暂停、指令、计划修订或新阶段使旧检查结果失效。进程退出释放检查锁；重启读取已保存轮次。停机期间不能伪造检查，也不倒填尚未执行的等待。
 
-Host 读取审核遇到 SQLite 写锁时异步重试，单次读取默认最多 10 秒、重试间隔 25 毫秒；等待期间仍响应用户停止。`reviewReadTimeoutMs` 和 `reviewRetryIntervalMs` 在生产、采集和审核策略插件的 `Config` 中配置。持续占锁报告 `BENCHFORGE_REVIEW_STORAGE_BUSY`，不使用过期放行状态、不重放写请求，也不把存储故障误报为等待用户确认。审核策略在公开 `tools/execute` 扩展点异步读取最新记录，DSH 同步 `tools.guard` 不承载异步查询。
+Host 通过已认证的 `/stage-review/read` 读取 PostgreSQL 已提交快照，不持有审核写锁，不缓存放行结果；单次读取默认最多 10 秒，并响应用户停止。`reviewReadTimeoutMs` 由生产、采集和审核策略插件配置。后端不可用报告 `BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE`，不把存储故障误报为等待用户确认。审核策略在公开 `tools/execute` 扩展点异步读取最新记录，DSH 同步 `tools.guard` 不承载异步查询。
 
 旧的已放行记录保留原结果；旧的未完成审核在第一次后端访问时迁移，从真实自检开始，不伪造历史检查次数。发布前备份审核数据库、会话存储和本地配置。浏览器关闭或模型结束本轮后，Host 定时器仍可推进当前审核。
 

@@ -3,7 +3,6 @@ import test from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {DatabaseSync} from 'node:sqlite';
 import {setImmediate as nextTick} from 'node:timers/promises';
 import {createStageReviewReader} from '../../../production/reviews.mjs';
 import {createCaptureContinuation} from './continuation.mjs';
@@ -70,14 +69,9 @@ test('concurrent registrations observe one run once and preserve independent run
   await h.dispose();
 });
 
-test('capture reconciliation and stopping can be cancelled while the review ledger is locked',async t=>{
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'benchforge-capture-lock-'));
-  const db=new DatabaseSync(path.join(root,'stage-reviews.sqlite'));
-  db.exec('CREATE TABLE reviews(id INTEGER PRIMARY KEY,session TEXT,state TEXT,deadline REAL,progress TEXT)');
-  db.exec('BEGIN EXCLUSIVE');
-  t.after(async()=>{db.close();await fs.rm(root,{recursive:true,force:true});});
-  const reader=createStageReviewReader({reviewReadTimeoutMs:1000,reviewRetryIntervalMs:5});
-  const h=harness({review:reader.latest});h.agent.session.header.cwd=root;h.plan();h.capture();
+test('capture reconciliation and stopping can be cancelled during a stalled backend read',async t=>{
+  const reader=createStageReviewReader({service:()=>new Promise(()=>{})});
+  const h=harness({review:reader.latest});h.plan();h.capture();
   t.after(()=>h.dispose());
   for(const operation of ['reconcile','stopping']){
     const controller=new AbortController();
@@ -87,7 +81,6 @@ test('capture reconciliation and stopping can be cancelled while the review ledg
     await nextTick();controller.abort();await rejected;
     assert.equal(h.requests.length,0);assert.equal(h.sent.length,0);assert.equal(h.data.size,0);
   }
-  db.exec('COMMIT');
 });
 
 test('a review read delayed past cancellation, completion or a new task cannot deliver an old capture',async()=>{

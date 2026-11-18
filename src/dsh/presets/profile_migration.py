@@ -1,5 +1,6 @@
 """Install the generated BenchForge declarations in a DSH profile."""
 from copy import deepcopy
+from pathlib import Path
 
 if __package__:
     from dsh.presets import build_preset as base
@@ -9,7 +10,8 @@ else:
     import preset_definition as definition
 
 
-HOST_IDS = {base.WORKBENCH_PLUGIN_ID, base.CAPTURE_PLUGIN_ID, base.SESSION_OPERATIONS_PLUGIN_ID}
+HOST_IDS = {base.WORKBENCH_PLUGIN_ID, base.CAPTURE_PLUGIN_ID, base.SESSION_OPERATIONS_PLUGIN_ID,
+            base.EXAMPLES_PLUGIN_ID, base.SESSION_QUERY_PLUGIN_ID}
 
 
 def insert_host_dependencies(profile):
@@ -17,10 +19,19 @@ def insert_host_dependencies(profile):
     rows = [row for patch in profile for row in patch.get('insert', [])]
     ids = {row.get('id') for row in rows}
     entries = []
+    if base.EXAMPLES_PLUGIN_ID not in ids and any(base.preset_id(row) in base.PRESETS for row in rows):
+        entries.append(definition.examples_entry())
     workbench = next((row for row in rows if row.get('id') == base.WORKBENCH_PLUGIN_ID), None)
+    if workbench and base.SESSION_QUERY_PLUGIN_ID not in ids:
+        entries.append(definition.session_query_entry(Path(workbench['config']['productionConfig'])))
+        profile.append({'id': 'session-query-sqlite', 'disabled': True})
     if base.SESSION_OPERATIONS_PLUGIN_ID not in ids and any(base.preset_id(row) in base.PRESETS for row in rows):
         python = (workbench or {}).get('config', {}).get('productionPython', 'python3')
-        entries.append(definition.session_operations_entry(python=python))
+        service_config = (workbench or {}).get('config', {}).get('productionConfig')
+        entry = definition.session_operations_entry(python=python)
+        if service_config:
+            entry['config']['productionConfig'] = service_config
+        entries.append(entry)
     if workbench and base.CAPTURE_PLUGIN_ID not in ids:
         entries.append(definition.capture_entry(workbench))
     if entries:
@@ -96,6 +107,8 @@ def migrate_profile(profile, generated, revision=None):
                 new['config'] = {**old_config, **defaults}
                 if old_config.get('workspacePaths'):
                     new['config']['workspacePaths'] = old_config['workspacePaths']
+                if key == base.EXAMPLES_PLUGIN_ID and 'sourceDirectory' in old_config:
+                    new['config']['sourceDirectory'] = old_config['sourceDirectory']
             rows.append(new)
             installed[key] = new
         patch['insert'] = rows
@@ -106,6 +119,9 @@ def migrate_profile(profile, generated, revision=None):
     workbench = next(row for row in rows if row.get('id') == base.WORKBENCH_PLUGIN_ID)
     capture = next(row for row in rows if row.get('id') == base.CAPTURE_PLUGIN_ID)
     capture['config'].update(definition.capture_entry(workbench)['config'])
+    sessions = next(row for row in rows if row.get('id') == base.SESSION_OPERATIONS_PLUGIN_ID)
+    sessions['config']['productionConfig'] = workbench['config'].get('productionConfig', '')
+    next(row for row in rows if row.get('id') == base.SESSION_QUERY_PLUGIN_ID)['config']['productionConfig'] = workbench['config'].get('productionConfig', '')
     if revision is not None:
         workbench['config']['uiRevision'] = revision
         capture['config']['revision'] = revision
@@ -113,5 +129,10 @@ def migrate_profile(profile, generated, revision=None):
         for row in rows:
             if base.preset_id(row) in base.PRESETS:
                 row['config']['description'] += ', runtime revision ' + revision
-    base.refresh_host_models(profile, [patch for patch in generated if 'insert' not in patch])
+    overrides = [patch for patch in generated if 'insert' not in patch]
+    for override in overrides:
+        if 'disabled' in override:
+            profile[:] = [patch for patch in profile if patch.get('id') != override['id']]
+            profile.append(override)
+    base.refresh_host_models(profile, [patch for patch in overrides if 'config' in patch])
     return profile

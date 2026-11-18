@@ -10,6 +10,7 @@ from server.operations_runtime import Runtime
 from pipelines.benchmark.design.plan_input import resolve_request
 from pipelines.benchmark.design.plan_versions import current
 from pipelines.reviews.service import review
+from server.database_scope import command_database
 
 def submit(workspace, session, request_path):
     if not re.fullmatch(r'[\w-]{1,160}', session):
@@ -40,11 +41,13 @@ def main():
     sys.stdout.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser()
     parser.add_argument('--workspace', required=True)
+    parser.add_argument('--config')
     parser.add_argument('--session', required=True)
     parser.add_argument('--request', required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(submit(args.workspace, args.session, args.request), ensure_ascii=False))
+        with command_database(args.config):
+            print(json.dumps(submit(args.workspace, args.session, args.request), ensure_ascii=False))
     except (ValueError, KeyError, TypeError) as error:
         print(json.dumps({'error': str(error), 'status_code': 400}, ensure_ascii=False))
         raise SystemExit(1)

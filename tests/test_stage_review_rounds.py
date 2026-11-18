@@ -1,11 +1,14 @@
 """Real receipts and controlled clocks, never a model-supplied pass counter."""
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import closing
 from pathlib import Path
-import sqlite3
 import tempfile
 import threading
 import unittest
+
+from tests.database_fixtures import use_postgres
+from database.engine import engine_for, workspace_id
+from database.schema import reviews
+from sqlalchemy import select, text
 from unittest.mock import patch
 
 from pipelines.benchmark.design.plan_versions import activate
@@ -16,6 +19,7 @@ from storage.artifacts import write
 
 class ReviewRoundTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
@@ -136,21 +140,23 @@ class ReviewRoundTests(unittest.TestCase):
         self.assertFalse(value['can_continue'])
         self.assertIn('Plan needs corrections', value['check_failure']['error'])
 
-    def test_old_database_columns_are_migrated_without_rewriting_other_sessions(self):
+    def test_old_policy_is_migrated_without_rewriting_other_sessions(self):
         legacy = self.root / 'legacy'
         plan = legacy / 'plan.json'
         write(plan, {'schema': 'benchforge.pipeline/v1', 'steps': []})
         activate(legacy, self.session, str(plan))
-        with closing(sqlite3.connect(legacy / 'stage-reviews.sqlite')) as db, db:
-            db.execute('CREATE TABLE reviews (id INTEGER PRIMARY KEY, session TEXT, key TEXT, stage TEXT, artifact TEXT, started REAL, deadline REAL, state TEXT, instruction TEXT, UNIQUE(session,key,stage))')
-            db.execute('INSERT INTO reviews VALUES(1,?,?,?,?,?,?,?,?)',
-                       (self.session, str(plan.resolve()), 'S1', str(plan), 100, 400, 'waiting_user', ''))
-            db.execute('INSERT INTO reviews VALUES(2,?,?,?,?,?,?,?,?)',
-                       ('another-session', 'another-plan', 'S1', 'elsewhere.json', 100, 400, 'paused', 'Keep paused'))
+        with engine_for(self.database_url).begin() as db:
+            db.execute(reviews.insert(), [
+                dict(workspace_id=workspace_id(legacy), session=self.session, key=str(plan.resolve()),
+                     stage='S1', artifact=str(plan), started=100, deadline=400, state='waiting_user', instruction=''),
+                dict(workspace_id=workspace_id(legacy), session='another-session', key='another-plan',
+                     stage='S1', artifact='elsewhere.json', started=100, deadline=400, state='paused', instruction='Keep paused')])
         value = review_service.review(legacy, self.session, now=1000)
         self.assertEqual((value['checks_completed'], value['waits_completed'], value['deadline']), (1, 0, 1060))
-        with closing(sqlite3.connect(legacy / 'stage-reviews.sqlite')) as db:
-            self.assertEqual(db.execute('SELECT state,instruction FROM reviews WHERE id=2').fetchone(), ('paused', 'Keep paused'))
+        with engine_for(self.database_url).connect() as db:
+            self.assertEqual(tuple(db.execute(select(reviews.c.state,reviews.c.instruction).where(
+                reviews.c.session=='another-session')).one()), ('paused', 'Keep paused'))
+
 
     def test_superseded_receipt_never_wakes_or_mutates_current_review(self):
         old = self.first['review_id']
@@ -161,15 +167,15 @@ class ReviewRoundTests(unittest.TestCase):
         self.assertEqual(self.call(now=1031)['review_id'], newer['review_id'])
 
     def test_migrate_legacy_pending_without_inventing_rounds_and_keep_finished_history(self):
-        with closing(sqlite3.connect(self.root / 'stage-reviews.sqlite')) as db, db:
-            db.execute("UPDATE reviews SET policy_version=0,progress='{}',deadline=900")
+        with engine_for(self.database_url).begin() as db:
+            db.execute(text("UPDATE reviews SET policy_version=0,progress='{}',deadline=900"))
         value = self.call(now=2000)
         self.assertEqual(value['state'], 'waiting_user')
         self.assertEqual(value['waits_completed'], 0)
         self.assertEqual(value['checks_completed'], 1)
         self.assertEqual(value['deadline'], 2060)
-        with closing(sqlite3.connect(self.root / 'stage-reviews.sqlite')) as db, db:
-            db.execute("UPDATE reviews SET policy_version=0,progress='{}',state='elapsed'")
+        with engine_for(self.database_url).begin() as db:
+            db.execute(text("UPDATE reviews SET policy_version=0,progress='{}',state='elapsed'"))
         self.assertTrue(self.call(now=2001)['can_continue'])
 
 

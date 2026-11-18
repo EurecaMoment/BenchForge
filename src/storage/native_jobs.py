@@ -1,77 +1,66 @@
-"""Local session ownership of native jobs; remote credentials remain service-owned."""
+"""Session ownership for remote Isaac Sim jobs in the shared database."""
 
-from contextlib import closing
 import json
 from pathlib import Path
-import sqlite3
 from types import SimpleNamespace
-from storage.operation_index import ensure_schema
+
+from sqlalchemy import select
+
+from database.config import resolve_workspace_url
+from database.engine import engine_for, workspace_id
+from database.migrations import initialize_schema
+from database.schema import native_jobs
+from database.transactions import insert_missing, transaction
+from storage.operation_index import query_operations
 
 
 class NativeJobs:
     def __init__(self, workspace):
         self.root = Path(workspace).resolve()
-        self.file = self.root / ".benchforge" / "isaac_sim" / "ownership.sqlite"
-        self.file.parent.mkdir(parents=True, exist_ok=True)
-        with closing(self.connect()) as db, db:
-            db.execute(
-                "CREATE TABLE IF NOT EXISTS jobs "
-                "(endpoint TEXT, job_id TEXT, session_id TEXT NOT NULL, request_id TEXT NOT NULL, "
-                "PRIMARY KEY(endpoint,job_id))"
-            )
-
-    def connect(self):
-        return sqlite3.connect(self.file, timeout=30)
+        self.file = self.root / ".benchforge" / "isaac_sim" / "receipts"
+        self.file.mkdir(parents=True, exist_ok=True)
+        self.engine = engine_for(resolve_workspace_url(self.root))
+        initialize_schema(self.engine)
+        self.workspace_id = workspace_id(self.root)
 
     def remember(self, endpoint, job, session):
-        with closing(self.connect()) as db, db:
-            db.execute(
-                "INSERT OR IGNORE INTO jobs VALUES (?,?,?,?)",
-                (endpoint, job.job_id, session, job.request_id),
-            )
-            row = db.execute(
-                "SELECT session_id,request_id FROM jobs WHERE endpoint=? AND job_id=?",
-                (endpoint, job.job_id),
-            ).fetchone()
+        values = {"workspace_id": self.workspace_id, "endpoint": endpoint, "job_id": job.job_id,
+                  "session_id": session, "request_id": job.request_id}
+        with transaction(self.engine) as connection:
+            insert_missing(connection, native_jobs, values, ["workspace_id", "endpoint", "job_id"])
+            row = connection.execute(select(native_jobs.c.session_id, native_jobs.c.request_id).where(
+                native_jobs.c.workspace_id == self.workspace_id, native_jobs.c.endpoint == endpoint,
+                native_jobs.c.job_id == job.job_id)).first()
             if row != (session, job.request_id):
-                raise PermissionError(
-                    "Native job is already associated with another session or request"
-                )
+                raise PermissionError("Native job is already associated with another session or request")
 
     def require(self, endpoint, job_id, session):
-        with closing(self.connect()) as db:
-            row = db.execute(
-                "SELECT session_id,request_id FROM jobs WHERE endpoint=? AND job_id=?",
-                (endpoint, job_id),
-            ).fetchone()
+        with self.engine.connect() as connection:
+            row = connection.execute(select(native_jobs.c.session_id, native_jobs.c.request_id).where(
+                native_jobs.c.workspace_id == self.workspace_id, native_jobs.c.endpoint == endpoint,
+                native_jobs.c.job_id == job_id)).first()
         if not row:
             row = self._recover_receipt(endpoint, job_id, session)
         if not row or row[0] != session:
-            raise PermissionError(
-                "Native job is not registered to this session and simulator endpoint"
-            )
+            raise PermissionError("Native job is not registered to this session and simulator endpoint")
         return row[1]
 
     def _recover_receipt(self, endpoint, job_id, session):
-        """Migrate old jobs only from matching session operations and frozen receipts."""
-        index = self.root / "runs.sqlite"
-        if not index.is_file():
-            return None
-        with closing(sqlite3.connect(index, timeout=30)) as db:
-            ensure_schema(db, self.root)
-            folders = db.execute(
-                "SELECT artifact FROM operations WHERE tool='isaac_sim' AND session_id=?",
-                ("" if session == "local-cli" else session,),
-            ).fetchall()
-        for (folder,) in folders:
+        """Recover an old ownership receipt only after checking its immutable request."""
+        expected_session = "" if session == "local-cli" else session
+        folders = query_operations(self.root, sessions=[expected_session] if expected_session else [],
+                                   history=not bool(expected_session), tools=["isaac_sim"], limit=201,
+                                   database_url=self.engine.url.render_as_string(hide_password=False))
+        for row in folders:
             try:
-                operation = (self.root / folder).resolve()
+                operation = (self.root / row["artifact"]).resolve()
                 if not operation.is_relative_to(self.root):
                     continue
+                if any(not (operation / name).resolve().is_relative_to(self.root)
+                       for name in ("request.json", "result.json")):
+                    continue
                 request = json.loads((operation / "request.json").read_text(encoding="utf-8"))
-                if (request.get("context") or {}).get("session_id", "") != (
-                    "" if session == "local-cli" else session
-                ):
+                if (request.get("context") or {}).get("session_id", "") != expected_session:
                     continue
                 if request.get("arguments", {}).get("action") not in ("submit", "invoke"):
                     continue
@@ -83,18 +72,10 @@ class NativeJobs:
                     continue
                 frozen = json.loads(receipt.with_name("request.json").read_text(encoding="utf-8"))
                 saved = json.loads(receipt.read_text(encoding="utf-8"))
-                if (
-                    frozen.get("endpoint") != endpoint
-                    or saved.get("job_id") != job_id
-                    or not saved.get("request_id")
-                    or frozen.get("request_id") != saved["request_id"]
-                ):
+                if (frozen.get("endpoint") != endpoint or saved.get("job_id") != job_id or
+                        not saved.get("request_id") or frozen.get("request_id") != saved["request_id"]):
                     continue
-                self.remember(
-                    endpoint,
-                    SimpleNamespace(job_id=job_id, request_id=saved["request_id"]),
-                    session,
-                )
+                self.remember(endpoint, SimpleNamespace(job_id=job_id, request_id=saved["request_id"]), session)
                 return session, saved["request_id"]
             except (OSError, ValueError, KeyError, TypeError):
                 continue

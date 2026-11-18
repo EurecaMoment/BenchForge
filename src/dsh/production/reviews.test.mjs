@@ -1,64 +1,46 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import {setImmediate as nextTick} from 'node:timers/promises';
-import {DatabaseSync} from 'node:sqlite';
 import {createStageReviewReader} from './reviews.mjs';
 import {createReviewPolicy} from './review_policy.mjs';
 
-async function ledger(t) {
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'benchforge-review-lock-'));
-  const db=new DatabaseSync(path.join(root,'stage-reviews.sqlite'));
-  t.after(async()=>{db.close();await fs.rm(root,{recursive:true,force:true});});
-  db.exec('CREATE TABLE reviews(id INTEGER PRIMARY KEY,session TEXT,state TEXT,deadline REAL,progress TEXT)');
-  db.prepare('INSERT INTO reviews VALUES(?,?,?,?,?)').run(1,'session-test','continued',0,'{}');
-  return {root,db,reader:createStageReviewReader({reviewReadTimeoutMs:1000,reviewRetryIntervalMs:5})};
-}
-
-test('a real exclusive writer no longer aborts review reads or blocks the event loop',async t=>{
-  const {root,db,reader}=await ledger(t);
-  db.exec("BEGIN EXCLUSIVE; UPDATE reviews SET state='paused'");
-  let settled=false;
-  const reading=reader.byId(root,'session-test',1).then(value=>{settled=true;return value;});
-  await nextTick();assert.equal(settled,false);
-  db.exec('COMMIT');
-  assert.equal((await reading).state,'paused');
-  assert.equal((await reader.latest(root,'session-test')).state,'paused');
+test('each dispatch sees committed backend state, without caching prior approval',async()=>{
+  const requests=[];let state='continued';
+  const reader=createStageReviewReader({service:async(route,args)=>{
+    requests.push({route,args});return {review_id:12,state,deadline:0};
+  }});
+  assert.equal((await reader.byId('/workspace','session-test',1)).review_id,12);
+  state='paused';
+  const policy=createReviewPolicy({readReview:reader.latest});
+  assert.ok(await policy({name:'bash',agent:{id:'session-test',session:{header:{cwd:'/workspace'}}}}));
+  assert.deepEqual(requests.map(value=>value.route),['/stage-review/read','/stage-review/read']);
+  assert.deepEqual(requests[0].args,{workspace:'/workspace',session:'session-test',review_id:1});
 });
 
-test('cancelling one locked reader leaves another reader and the writer intact',async t=>{
-  const {root,db,reader}=await ledger(t),controller=new AbortController();
-  db.exec('BEGIN EXCLUSIVE');
-  const canceled=reader.latest(root,'session-test',Date.now(),controller.signal);
-  const rejected=assert.rejects(canceled,{name:'AbortError'});
-  const independent=reader.latest(root,'session-test');
-  controller.abort(new DOMException('Stopped','AbortError'));
-  await rejected;
-  db.exec('COMMIT');
-  assert.equal((await independent).state,'continued');
+test('one stalled reader can be stopped without delaying an independent conversation',async()=>{
+  const reader=createStageReviewReader({service:async(_route,args)=>args.session==='blocked'
+    ? new Promise(()=>{}) : {state:'none'}}),controller=new AbortController();
+  const reading=reader.latest('/workspace','blocked',0,controller.signal);
+  const rejected=assert.rejects(reading,{name:'AbortError'});
+  assert.equal(await reader.latest('/workspace','other'),null);
+  await nextTick();controller.abort();await rejected;
 });
 
-test('persistent contention fails closed with a storage error instead of requesting user approval',async t=>{
-  const {root,db}=await ledger(t);
-  const reader=createStageReviewReader({reviewReadTimeoutMs:15,reviewRetryIntervalMs:2});
-  db.exec('BEGIN EXCLUSIVE');
-  await assert.rejects(reader.byId(root,'session-test',1),{code:'BENCHFORGE_REVIEW_STORAGE_BUSY'});
-  const guard=createReviewPolicy({readReview:reader.latest});
-  const agent={id:'session-test',session:{header:{cwd:root}}};
-  const denial=await guard({name:'bash',agent});
-  assert.equal(denial.info.code,'BENCHFORGE_REVIEW_STORAGE_BUSY');
-  assert.doesNotMatch(denial.reason,/用户指令|waiting_user/);
-  assert.equal(await guard({name:'read',agent}),undefined);
-  db.exec('COMMIT');
+test('unavailable or invalid backend state fails closed but inspection remains available',async()=>{
+  for(const service of [async()=>{throw Error('offline');},async()=>null]){
+    const reader=createStageReviewReader({service}),policy=createReviewPolicy({readReview:reader.latest});
+    const agent={id:'session-test',session:{header:{cwd:'/workspace'}}};
+    const denial=await policy({name:'bash',agent});
+    assert.equal(denial.info.code,'BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE');
+    assert.equal(await policy({name:'read',agent}),undefined);
+  }
 });
 
-test('the reader retains supersession and reports damaged storage without lock retries',async t=>{
-  const {root,db,reader}=await ledger(t);
-  db.prepare('INSERT INTO reviews VALUES(?,?,?,?,?)').run(2,'session-test','waiting_user',0,'{}');
-  assert.equal((await reader.byId(root,'session-test',1)).state,'superseded');
-  await assert.rejects(reader.byId(root,'unrelated',1),/does not belong/);
-  db.exec('DROP TABLE reviews');
-  await assert.rejects(reader.latest(root,'session-test'),/no such table/);
+test('the reader never turns an expired deadline into approval and enforces its timeout',async()=>{
+  const reader=createStageReviewReader({service:async()=>({review_id:1,state:'waiting_user',deadline:0})});
+  assert.equal((await reader.latest('/workspace','session',9999999)).state,'waiting_user');
+  const blocked=createStageReviewReader({service:()=>new Promise(()=>{}),reviewReadTimeoutMs:10});
+  const keepAlive=setTimeout(()=>{},1000);
+  try{await assert.rejects(blocked.latest('/workspace','session'),{name:'TimeoutError'});}
+  finally{clearTimeout(keepAlive);}
 });

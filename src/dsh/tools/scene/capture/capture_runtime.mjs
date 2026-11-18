@@ -42,7 +42,7 @@ export async function apply(ctx, config) {
   const service = createServiceClient(loaded);
   const continuation = createCaptureContinuation({table:domain.table('runs'),artifacts:loaded.config.artifacts,
     read:(route,args,signal)=>service(route,args,AbortSignal.any([signal,AbortSignal.timeout(route==='/wait'?75000:15000)])),
-    signal:controller.signal,readReview:createStageReviewReader(config).latest,
+    signal:controller.signal,readReview:createStageReviewReader({...config,service}).latest,
     createMessage:createUserMessage,onError:error=>ctx.logger(name).error(error),
     resolveAgent:async id=>{
       const result = await ctx.sessionController.resolveAgent(id);

@@ -8,6 +8,7 @@ import {configuredProviders, modelRole, providerEnvironment} from './tool_creden
 import {presentOperationCatalog} from '../tools/benchmark/catalog.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 import {releaseProcess, releaseProcesses} from './process_cleanup.mjs';
+import {databaseEnvironment} from './database_environment.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
 export const Config = Schema.object({
@@ -66,6 +67,7 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   const snapshot = launchEnvironmentOf(ctx);
   const environment = Object.fromEntries((config.forwardEnvironment || []).map(key => [key,snapshot.get(key)?.value]).filter(([,value])=>value!==undefined));
   Object.assign(environment,config.environment);
+  Object.assign(environment,await databaseEnvironment(config.serviceConfig,snapshot,environment));
   if (config.serviceConfig) environment.BENCHFORGE_SERVICE_CONFIG = path.resolve(config.serviceConfig);
   const output = {schema:{type:'object',properties:{},additionalProperties:true},
     render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]};

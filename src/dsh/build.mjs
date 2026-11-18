@@ -101,6 +101,8 @@ await build({
     'scene-tools': 'dsh/tools/scene/tools.mjs',
     'capture-runtime': 'dsh/tools/scene/capture/capture_runtime.mjs',
     'session-operations': 'dsh/host/session_operations.mjs',
+    examples: 'dsh/examples/host.mjs',
+    'session-query': 'dsh/database/session_query.mjs',
     'subagent-policy': 'dsh/presets/subagent_policy.mjs',
     invocation: 'dsh/tools/invocation/executor.mjs',
     'review-policy': 'dsh/production/review_policy.mjs',

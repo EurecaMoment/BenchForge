@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+
+from tests.database_fixtures import use_postgres
 from unittest.mock import patch
 
 from capabilities.scene_library.acceptance import accepted_scenes
@@ -43,6 +45,7 @@ class ProductionContractTests(unittest.TestCase):
             validate_asset_requirements(scenes,robot_locomotion=True)
 
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.addCleanup(self.temp.cleanup)

@@ -7,7 +7,7 @@ import unittest
 
 from dsh.presets import build_preset as base
 from dsh.presets.build_presets import build
-from dsh.presets.profile_migration import migrate_profile
+from dsh.presets.profile_migration import insert_host_dependencies, migrate_profile
 from capabilities.benchmark_design.assessment import assessment_template
 from service_access.tool_names import NAMES
 
@@ -30,6 +30,13 @@ def persona(profile):
 
 
 class DshPresetTests(unittest.TestCase):
+    def test_host_review_timer_uses_the_workbench_database_configuration(self):
+        for portable in (False, True):
+            generated = self.generated(portable)
+            entries = {row['id']: row for patch in generated for row in patch.get('insert', [])}
+            self.assertEqual(entries[base.SESSION_OPERATIONS_PLUGIN_ID]['config']['productionConfig'],
+                             entries[base.WORKBENCH_PLUGIN_ID]['config']['productionConfig'])
+
     def generated(self, portable=False):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / 'missing-config.json'
@@ -91,6 +98,33 @@ class DshPresetTests(unittest.TestCase):
         self.assertIn(NAMES['pipeline_plan'], template['scene_binding'])
         for field in ('instructions', 'scene_binding'):
             self.assertNotRegex(template[field], r'\b(' + '|'.join(NAMES) + r')\b')
+
+    def test_example_import_is_installed_once_for_fresh_and_existing_profiles(self):
+        generated = self.generated()
+        for profile in (generated, [{'insert': [row for patch in generated for row in patch.get('insert', [])
+                                               if row.get('id') != base.EXAMPLES_PLUGIN_ID]}]):
+            insert_host_dependencies(profile)
+            insert_host_dependencies(profile)
+            rows = [row for patch in profile for row in patch.get('insert', [])
+                    if row.get('id') == base.EXAMPLES_PLUGIN_ID]
+            self.assertEqual(len(rows), 1)
+            self.assertTrue(Path(rows[0]['config']['sourceDirectory']).is_absolute())
+        disabled = self.generated()
+        row = next(row for patch in disabled for row in patch.get('insert', [])
+                   if row.get('id') == base.EXAMPLES_PLUGIN_ID)
+        row['config']['enabled'] = False
+        row['config']['sourceDirectory'] = '/custom/example'
+        merged = migrate_profile(disabled, self.generated())
+        example = next(row for patch in merged for row in patch.get('insert', [])
+                       if row.get('id') == base.EXAMPLES_PLUGIN_ID)
+        self.assertFalse(example['config']['enabled'])
+        self.assertEqual(example['config']['sourceDirectory'], '/custom/example')
+
+    def test_package_example_source_is_explicit_and_portable(self):
+        row = next(row for patch in self.generated(True) for row in patch.get('insert', [])
+                   if row.get('id') == base.EXAMPLES_PLUGIN_ID)
+        self.assertEqual(row['config']['sourceDirectory'], '')
+        self.assertEqual(row['name'], '@eurecamoment/benchforge-dsh/examples')
 
     def test_portable_persona_and_invocation_match_the_generator(self):
         file = Path(__file__).parents[1] / 'src/dsh/cordis.patch.yml'

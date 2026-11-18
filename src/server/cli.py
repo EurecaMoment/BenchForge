@@ -6,6 +6,7 @@ from pathlib import Path
 from storage.artifacts import read
 from server.operations_runtime import Runtime
 from server.operations import OPERATIONS
+from server.operation_config import load_operation_config
 
 
 def main():
@@ -17,7 +18,7 @@ def main():
     parser.add_argument("--input", help="JSON request file; '-' reads stdin")
     args = parser.parse_args()
     request = json.load(sys.stdin) if args.input == "-" else read(args.input) if args.input else {}
-    runtime = Runtime(args.workspace, read(args.config) if args.config else None)
+    runtime = Runtime(args.workspace, load_operation_config(args.config))
     try:
         print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))
     except (ValueError, KeyError, OSError, RuntimeError, subprocess.TimeoutExpired) as error:

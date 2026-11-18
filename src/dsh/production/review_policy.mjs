@@ -1,5 +1,6 @@
 import path from 'node:path';
-import {readLatestStageReview,createStageReviewReader,reviewReadConfig} from './reviews.mjs';
+import {createStageReviewReader,reviewReadConfig} from './reviews.mjs';
+import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
 import Schema from '@deepseek-ai/schemastery';
 import {HarnessError} from '@deepseek-ai/dsh-error';
 import {stageName} from './stages.mjs';
@@ -51,7 +52,7 @@ export function reviewDenial(exec, review, workspace) {
   };
 }
 
-export function createReviewPolicy({readReview = readLatestStageReview, agents, sessions} = {}) {
+export function createReviewPolicy({readReview, agents, sessions} = {}) {
   return async exec => {
     let agent = exec.agent;
     if (!agent?.session?.header?.cwd) return;
@@ -82,7 +83,9 @@ export function createReviewPolicy({readReview = readLatestStageReview, agents, 
 }
 
 export function apply(ctx,config) {
-  const review=createReviewPolicy({readReview:createStageReviewReader(config).latest,agents:ctx.get('agents'),sessions:ctx.get('sessions')});
+  const environment=launchEnvironmentOf(ctx);
+  const reader=createStageReviewReader({...config,getEnvironmentValue:name=>environment.get(name)?.value});
+  const review=createReviewPolicy({readReview:reader.latest,agents:ctx.get('agents'),sessions:ctx.get('sessions')});
   // Tool guards are synchronous. Read at the async dispatch boundary, after
   // approval, so a paused review cannot be bypassed by a cached decision.
   ctx.on('tools/execute',async(exec,next)=>{

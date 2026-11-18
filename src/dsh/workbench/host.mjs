@@ -20,6 +20,9 @@ import {createArtifactEvidenceReader, resolveArtifactRoots} from './artifacts/sc
 import {conversationProducts, openConversationArtifact} from './artifacts/files.mjs';
 import {stageOfStep} from '../production/stages.mjs';
 import {collectionSummary} from '../production/collection.mjs';
+import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
+import {databaseEnvironment} from '../host/database_environment.mjs';
+import {createExampleWorkbench} from '../examples/workbench.mjs';
 
 export const name = 'benchforge-ui';
 export const inject = ['connection', 'typert', 'workspaceRegistry', 'benchforgeCapture', 'benchforgeSessions',
@@ -138,13 +141,11 @@ async function productionProgress(roots, config, url, signal) {
   const scope = scopeOf(url, config._sessionIds);
   const seen = new Set();
   for (const root of roots) {
-    const database = path.join(root.path, 'runs.sqlite');
-    if (!await exists(database)) {sources.push({workspace: root.title, status: 'no_index'}); continue;}
     let rows;
     try {
       rows = await workspaceOperations(config, root, scope, {limit: config.maxRuns, signal});
-    } catch (error) {sources.push({workspace: root.title, status: 'index_error', error: error.message}); continue;}
-    sources.push({workspace: root.title, status: 'indexed', limit: config.maxRuns});
+    } catch (error) {sources.push({workspace: root.title, status: 'database_error', error: error.message}); continue;}
+    sources.push({workspace: root.title, status: 'indexed', backend: 'postgresql', limit: config.maxRuns});
     for (const row of rows) {
       signal?.throwIfAborted();
       try {
@@ -326,16 +327,14 @@ async function discover(roots, config, signal, scope) {
   };
   for (const root of roots) {
     signal?.throwIfAborted();
-    const database = path.join(root.path, 'runs.sqlite');
-    if (!await exists(database)) { sources.push({workspace: root.title, status: 'no_index'}); continue; }
     let operations;
     try {
       operations = await workspaceOperations(config, root, scope, {limit: config.maxRuns + 1, signal,
         tools: ['pipeline_plan','plan','pipeline_run','pipeline_status','pipeline_artifacts','pipeline_repair_plan','build']});
     } catch (error) {
-      sources.push({workspace: root.title, status: 'index_error', error: error.message}); continue;
+      sources.push({workspace: root.title, status: 'database_error', error: error.message}); continue;
     }
-    sources.push({workspace: root.title, status: 'indexed', limit: config.maxRuns, truncated: operations.length > config.maxRuns});
+    sources.push({workspace: root.title, status: 'indexed', backend: 'postgresql', limit: config.maxRuns, truncated: operations.length > config.maxRuns});
     for (const operation of operations.slice(0, config.maxRuns)) {
       try {
         const artifact = await inside(root, operation.artifact);
@@ -439,6 +438,7 @@ function pipelineSceneIds(state) {
 }
 
 function createWorkbenchDispatcher(config, registered, family, synthesisFactory, execution, associations, readEvidence) {
+  const exampleWorkbench = createExampleWorkbench({publicPlan});
   const limits = {maxRuns: 60, maxArtifacts: 300, productionPython:process.env.PYTHON || (process.platform==='win32' ? 'python' : 'python3'), ...config};
   limits._previewJobs = new Map(); limits._previewQueue = Promise.resolve(); limits._previewMedia = new Map();
   limits._libraryCache = new Map(); limits._libraryQueue = new Map();
@@ -461,6 +461,8 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       : await workspaceRoots(limits, registered(), url.searchParams.get('workspace_path') || '');
     const sessions = related.map((row) => row.id);
     const scope = scopeOf(url, sessions), scoped = {...limits, _sessionIds: sessions, _family: related};
+    const example = await exampleWorkbench({roots, scope, url, request});
+    if (example) return example.value;
     if (view === 'products') {
       if (request.method !== 'GET') throw new ApiError('Conversation products require GET', 405);
       if (!scope.session_id || scope.history || !evidence.length) throw new ApiError('Conversation products are unavailable', 403);
@@ -533,7 +535,9 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       const file=await inside(roots[0],edit.plan_path);
       await assertSessionDirectory(roots[0],path.dirname(file),parentScope);
       const helper='server.plan_edit_cli';
-      const process=execute(limits,['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--plan',file],
+      const args=['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--plan',file];
+      if (config.productionConfig) args.push('--config',config.productionConfig);
+      const process=execute(limits,args,
         {signal:request.signal,timeout:20000,maxBuffer:256000});
       process.child.stdin.on('error',()=>{});
       process.child.stdin.end(JSON.stringify({assessment:edit.assessment,markdown:edit.markdown,
@@ -547,7 +551,9 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       const body = request.method === 'POST' ? await request.text() : '{}';
       if (body.length > 16000) throw new ApiError('Stage instruction is too large',413);
       const helper = 'server.stage_review_cli';
-      const result = await execute(limits,['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--request',body],
+      const args=['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--request',body];
+      if (config.productionConfig) args.push('--config',config.productionConfig);
+      const result = await execute(limits,args,
         {signal:request.signal,timeout:12000,maxBuffer:128000});
       value = JSON.parse(result.stdout);
     }
@@ -599,9 +605,12 @@ export function createWorkbenchHandler(config, registered = () => [], family = a
 }
 
 export async function apply(ctx, config) {
+  const environment = await databaseEnvironment(config.productionConfig, launchEnvironmentOf(ctx));
   const processes = createPythonProcessScope();
   ctx.effect(() => () => processes.dispose(), 'benchforge-workbench: Python process lifecycle');
-  config = {...config, _executePython: processes.execute};
+  config = {...config, productionConfig: config.productionConfig ? path.resolve(config.productionConfig) : '',
+    _executePython: (python, args, options = {}) => processes.execute(python, args,
+      {...options, env: {...environment, ...options.env}})};
   const {execution, preparation} = ctx.benchforgeSessions;
   const {associations} = ctx.benchforgeCapture;
   const readEvidence = createArtifactEvidenceReader(ctx.get('sessionQuery'));

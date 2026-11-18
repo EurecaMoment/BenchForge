@@ -338,11 +338,24 @@ docker ps --filter "label=com.docker.compose.project=$project" --filter 'label=c
 再确认网页能够登录、只有一个 BenchForge 预设，且工作台开关可展开、收起，没有加载错误。
 页面验收使用 **`BenchForge`** 会话、绑定本实例的独立工作区并展开工作台，确认
 “S1 计划、S2 场景选取或新建、S3 采集（包含标注）、S4 出题、S5 质检与交付”五个阶段可以打开。S2 按服务验收的场景身份计数；S3 按真实采集与标注合同验收，预览样本不代表整批完成。
-只看到 DSH 默认 Standard 对话页面，不能算工作台安装成功。新实例应显示空的生产状态，
-不应读取其他实例的历史任务；原有样板对话在各自实例中继续保留原工作区和产物关联。
+只看到 DSH 默认 Standard 对话页面，不能算工作台安装成功。仓库部署首次启动时自动导入
+**“样板 · SpatialForge”** 并置顶，归入独立的 **“BenchForge 示例”** 工作区。
+该工作区位于本实例 `DSH_HOME/examples/SpatialForge`，默认是
+`.benchforge/dsh-home/examples/SpatialForge`；示例产物复制到其中的 `example/SpatialForge/`，
+右侧工作台可读取示例清单、场景程序和采集图。导入不调用模型或仿真服务，不自动执行历史任务。
+示例保留完整历史，但公开资产仅覆盖 3 个场景、10 条采集记录、25 道题；旧历史提到的已删产物不代表仍然存在。
+新建生产对话仍显示空状态，不混入示例或其他实例的任务。重复启动不重复导入、不覆盖用户修改，
+用户归档或删除示例后不会自动恢复。缺少示例包或文件损坏时，启动明确报错；稀疏检出须包含 `example/SpatialForge`。
+仅安装 npm 预设包不附带这份大型资产；可在 Host 行 `benchforge-examples` 的 `sourceDirectory` 配置完整示例目录。
+如需关闭自动导入，在同一 Host 行设置 `config.enabled: false`。
 这些结果验证基础部署；Isaac 画面、生成模型质量和真实生产吞吐需要分别验收。
 
 ### 8. 配置自己需要的模型和仿真能力
+
+业务数据库统一使用 PostgreSQL，配置与迁移入口见
+[数据库说明](src/database/README.md)。升级旧部署时先停止 DSH 和后端、备份工作区，
+先将旧账本导出为 `database-import/<table>.jsonl`，再对每个旧工作区执行 `python -m server.database_migration --workspace /绝对工作区路径 --config config/generated/benchforge-server.local.json`，
+核对导入计数后再启动。迁移不删除历史源文件，也不改写 DSH 原生对话归档和产物。
 
 在 **`config/benchforge.local.json`** 编辑提供方设置。新实例从
 [`config/benchforge.example.json`](config/benchforge.example.json) 初始化，模板中的

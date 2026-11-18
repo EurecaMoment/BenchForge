@@ -2,6 +2,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from tests.database_fixtures import use_postgres
+
 from pipelines.benchmark.execution.stage_review import call
 from pipelines.benchmark.design.plan_versions import activate
 from storage.artifacts import write
@@ -10,6 +12,7 @@ from pipelines.reviews.service import review
 
 class StageReviewControlTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)

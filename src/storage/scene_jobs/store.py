@@ -3,11 +3,9 @@ import json
 from pathlib import Path
 import time
 import uuid
-from sqlalchemy import Table
-from sqlalchemy import Column
-from sqlalchemy import String
-from sqlalchemy import MetaData
 from sqlalchemy import select
+from database.transactions import lock_entity
+from database.schema import request_keys
 from storage.scene_jobs.metadata import Repository
 from storage.scene_jobs.metadata import runs
 from storage.scene_jobs.metadata import tasks
@@ -24,11 +22,7 @@ class Store:
         self.lifecycle = lifecycle
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         self.repo=Repository(resolve_database_url(harness,database_url))
-        meta=MetaData()
-        self.keys=Table('benchforge_request_keys',meta,Column('id',String,primary_key=True),Column('run_id',String))
-        with self.repo.transaction() as conn:
-            self.repo.lock_queue(conn)
-            meta.create_all(conn)
+        self.keys=request_keys
 
     def submit(self,key,intents,workflow='scene',submitted_programs=None,context=None):
         if workflow == 'dataset':
@@ -58,7 +52,7 @@ class Store:
         if submitted_programs and (workflow!='scene' or len(submitted_programs)!=len(intents)):
             raise ValueError('SceneProgram snapshots must align with scene intents')
         with self.repo.transaction() as c:
-            self.repo.lock_queue(c)
+            lock_entity(c, 'scene-request', key)
             old=c.execute(select(self.keys).where(self.keys.c.id==key)).mappings().first()
             if old:
                 prior=c.execute(select(runs).where(runs.c.id==old['run_id'])).mappings().one()
@@ -196,7 +190,6 @@ class Store:
         if feedback is not None and (not isinstance(feedback,str) or not 1<=len(feedback)<=12000):
             raise ValueError('retry feedback must be 1..12000 characters')
         with self.repo.transaction() as c:
-            self.repo.lock_queue(c)
             task=c.execute(select(tasks).where(tasks.c.id==tid).with_for_update()).mappings().one()
             run=c.execute(select(runs).where(runs.c.id==task['run_id']).with_for_update()).mappings().one()
             if task['unit'].get('phase') == 'dataset':
@@ -247,19 +240,36 @@ class Store:
                             {'report': report, 'protocol': 'a100sim.v1.Simulator'})
 
     def settle_runs(self):
-        with self.repo.transaction() as c:
-            for r in c.execute(select(runs).where(runs.c.code_revision=='benchforge-0.2.0')).mappings():
-                if r['state'] in {'CANCELED','SUCCEEDED','FAILED_FINAL'}:continue
-                work=list(c.execute(select(tasks).where(tasks.c.run_id==r['id'])).mappings())
-                if all(w['state'] in {'SUCCEEDED','FAILED_FINAL','CANCELED'} for w in work):
-                    state='SUCCEEDED' if all(w['state']=='SUCCEEDED' for w in work) else 'FAILED_FINAL'
-                    c.execute(runs.update().where(runs.c.id==r['id']).values(state=state))
-                elif any(w['state']=='RUNNING' for w in work) and r['state']!='RUNNING':
-                    c.execute(runs.update().where(runs.c.id==r['id']).values(state='RUNNING'))
+        terminal = {'CANCELED', 'SUCCEEDED', 'FAILED_FINAL'}
+        with self.repo.engine.connect() as c:
+            active = list(c.execute(select(runs.c.id).where(
+                runs.c.code_revision == 'benchforge-0.2.0', runs.c.state.notin_(terminal))).scalars())
+        for rid in active:
+            with self.repo.transaction() as c:
+                # Match retry/cancel lock ordering and commit each run separately.
+                # A retry can change tasks while leaving the run state unchanged;
+                # comparing only the previous run state would lose that retry.
+                states = list(c.execute(select(tasks.c.state).where(tasks.c.run_id == rid)
+                                        .order_by(tasks.c.id).with_for_update()).scalars())
+                previous = c.execute(select(runs.c.state).where(runs.c.id == rid)
+                                     .with_for_update()).scalar_one()
+                if previous in terminal:
+                    continue
+                if all(state in terminal for state in states):
+                    state = 'SUCCEEDED' if all(state == 'SUCCEEDED' for state in states) else 'FAILED_FINAL'
+                elif 'RUNNING' in states:
+                    state = 'RUNNING'
+                else:
+                    continue
+                if state != previous:
+                    c.execute(runs.update().where(runs.c.id == rid).values(state=state))
 
     def cancel(self,rid):
         self.snapshot(rid)
         with self.repo.transaction() as c:
+            # Other queue writers take task locks before run locks too.
+            list(c.execute(select(tasks.c.id).where(tasks.c.run_id == rid)
+                           .order_by(tasks.c.id).with_for_update()))
             c.execute(runs.update().where(runs.c.id==rid).values(state='CANCELED'))
             c.execute(tasks.update().where(tasks.c.run_id == rid,
                 tasks.c.state.in_(['PENDING', 'READY'])).values(state='CANCELED', lease_owner=None, lease_expires_at=None))

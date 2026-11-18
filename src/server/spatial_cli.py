@@ -32,7 +32,8 @@ def main():
     parser.add_argument('--input')
     args = parser.parse_args()
     request = json.load(sys.stdin) if args.input == '-' else json.loads(Path(args.input).read_text(encoding='utf8')) if args.input else {}
-    config = json.loads(Path(args.config).read_text(encoding='utf8')) if args.config else {}
+    from server.operation_config import load_operation_config
+    config = load_operation_config(args.config)
     runtime = Runtime(args.workspace, config)
     try:
         print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))

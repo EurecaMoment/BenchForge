@@ -1,12 +1,14 @@
 """Regression: scene repairs must not restart a released S1 window."""
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import closing
 from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
-import sqlite3
 import tempfile
 import unittest
+
+from tests.database_fixtures import use_postgres
+from database.engine import engine_for
+from sqlalchemy import text
 from unittest.mock import patch
 
 from pipelines.benchmark.design.planner import plan
@@ -18,6 +20,7 @@ from pipelines.reviews.service import review
 
 class PlanReviewRevisionTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root, self.session, self.index = Path(temporary.name), 'revision-session', 0
@@ -227,8 +230,8 @@ class PlanReviewRevisionTests(unittest.TestCase):
             results = list(pool.map(save, range(10)))
         self.assertTrue(any(results))
         self.assertEqual(review(self.root, self.session)['artifact'], current(self.root, self.session)['plan'])
-        with closing(sqlite3.connect(self.root / 'stage-reviews.sqlite')) as db:
-            self.assertEqual(db.execute('SELECT COUNT(*) FROM reviews WHERE session=?', (self.session,)).fetchone()[0], 1)
+        with engine_for(self.database_url).connect() as db:
+            self.assertEqual(db.execute(text('SELECT COUNT(*) FROM reviews WHERE session=:session'), {'session':self.session}).scalar_one(), 1)
 
     def test_plan_save_lock_does_not_block_another_conversation(self):
         lock = self.root / 'plan-locks' / sha256(self.session.encode()).hexdigest()

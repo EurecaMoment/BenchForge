@@ -56,7 +56,7 @@ S4 分片分配与 S5 实际交付分别由评测的 `production_allocation.py` 
 
 `storage/operation_index.py` 负责工作区索引迁移与会话筛选，
 `storage/native_jobs.py` 负责原生仿真作业归属，`file_lock.py` 提供跨进程文件锁。
-查询入口在 `server/workspace_operations.py`；DSH Host 不直接读取 SQLite 表结构。
+查询入口在 `server/workspace_operations.py`；DSH Host 通过服务接口读取领域数据，不直接访问数据库表。
 配置读取保持无副作用，只有可执行服务入口调用 `apply_runtime_environment`。
 
 按 [DSH 开发规范](../docs/DSH-预设能力与编写规范.md)，预设继续通过

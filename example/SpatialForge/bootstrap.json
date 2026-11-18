@@ -1,0 +1,55 @@
+{
+  "schema": "benchforge.example-bootstrap/v1",
+  "id": "spatialforge-v1",
+  "sessionId": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12",
+  "title": "样板 · SpatialForge",
+  "conversation": "session-13742859-5f94-4ca8-ab53-2ffc86ae2e12/session.v4.jsonl.zstd",
+  "pathRoots": [
+    "/home/maqiang/GitHub/SpatialForge",
+    "/var/local/maqiang/spatialforge-20260927",
+    "/slow_share2/jby/BenchForgeV2/example/SpatialForge"
+  ],
+  "artifacts": [
+    {
+      "path": "README.md",
+      "title": "示例说明与保留范围"
+    },
+    {
+      "path": "sample-manifest.json",
+      "title": "3 个场景、10 条采集记录、25 道题的示例清单"
+    },
+    {
+      "path": "bench-office100/scenes/sf_office_work_area.scene_program.json",
+      "title": "办公区域场景程序"
+    },
+    {
+      "path": "bench-office100/scenes/sf_lounge_meeting_corner.scene_program.json",
+      "title": "休闲会议角场景程序"
+    },
+    {
+      "path": "bench-office100/scenes/sf_study_pantry_corner.scene_program.json",
+      "title": "书房茶水角场景程序"
+    },
+    {
+      "path": "bench-office100/captures/sf_office_work_area/sf_office_work_area_view_0.png",
+      "title": "办公区域采集图"
+    },
+    {
+      "path": "bench-office100/captures/sf_lounge_meeting_corner/sf_lounge_meeting_corner_view_0.png",
+      "title": "休闲会议角采集图"
+    },
+    {
+      "path": "bench-office100/captures/sf_study_pantry_corner/sf_study_pantry_corner_view_0.png",
+      "title": "书房茶水角采集图"
+    },
+    {
+      "path": "bench-office100/evidence/evidence.calibrated-20261106.jsonl",
+      "title": "示例采集记录"
+    }
+  ],
+  "workbench": {
+    "plan": "operations/6f6bc50bb9da4c29/plan.json",
+    "dataset": "bench-office100/work/production-rectified-20261116/steps/questions/dataset",
+    "evidence": "bench-office100/evidence/evidence.calibrated-20261106.jsonl"
+  }
+}

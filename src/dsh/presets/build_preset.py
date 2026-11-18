@@ -36,6 +36,8 @@ SCENE_PLUGIN_ID = 'benchforge-scene-tools'
 WORKBENCH_PLUGIN_ID = 'benchforge-workbench-ui'
 CAPTURE_PLUGIN_ID = 'benchforge-capture'
 SESSION_OPERATIONS_PLUGIN_ID = 'benchforge-session-operations'
+EXAMPLES_PLUGIN_ID = 'benchforge-examples'
+SESSION_QUERY_PLUGIN_ID = 'benchforge-session-query'
 PRESETS = {
     BENCHFORGE_ID: {
         'name': 'BenchForge', 'order': -2,

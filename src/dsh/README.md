@@ -115,7 +115,7 @@ have a `reviewTimeoutMs` deadline of 15000. Unknown cleanup returns
 A timeout never certifies process exit or approves a stage. These settings belong
 to the corresponding Host plugin's `Config`.
 
-Review reads use short, consistent read-only snapshots. SQLite lock contention
+Review reads use short, consistent read-only snapshots. Local database lock contention
 retries asynchronously for `reviewReadTimeoutMs` (default 10000), at
 `reviewRetryIntervalMs` intervals (default 25), without blocking Stop. Persistent
 contention reports `BENCHFORGE_REVIEW_STORAGE_BUSY`; it never approves a stage or

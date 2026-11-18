@@ -7,6 +7,8 @@ from threading import Event, Lock
 import time
 import unittest
 
+from tests.database_fixtures import use_postgres
+
 import grpc
 from google.protobuf.empty_pb2 import Empty
 
@@ -103,6 +105,7 @@ class Simulator(SimulatorServicer):
 
 class GrpcContractTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temporary = TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.simulator = Simulator()

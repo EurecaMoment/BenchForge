@@ -172,8 +172,10 @@ def main():
             try:
                 length=int(self.headers.get('Content-Length','0'))
                 limit=2*1024*1024
-                if self.path in WORKBENCH_QUERIES:
+                if self.path in WORKBENCH_QUERIES or self.path == '/stage-review/read':
                     limit = 4096
+                if self.path == '/session-search/replace':
+                    limit = 32*1024*1024
                 if length<0 or length>limit:raise ValueError('request size exceeds endpoint limit')
                 raw=self.rfile.read(length)
                 if len(raw)!=length:raise ValueError('incomplete request body')
@@ -182,7 +184,13 @@ def main():
                 self.request_task_id = value.get('task_id') if isinstance(value, dict) else None
                 from capabilities.scene_authoring.validation.request_admission import check_request
                 check_request(store.root,self.path,value)
-                if self.path in WORKBENCH_QUERIES:
+                if self.path in ('/session-search/replace', '/session-search/query'):
+                    from storage.session_search import session_search
+                    self.reply(session_search(store.repo.engine, self.path.rsplit('/', 1)[1], value))
+                elif self.path == '/stage-review/read':
+                    from server.stage_review_queries import read_review_request
+                    self.reply(read_review_request(config, value))
+                elif self.path in WORKBENCH_QUERIES:
                     with read_connection(store.repo.engine) as connection:
                         result = WORKBENCH_QUERIES[self.path](connection, value)
                     self.reply(result)

@@ -27,7 +27,7 @@ benchforge = "server.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["capabilities*", "pipelines*", "server*", "storage*", "service_access*", "ui*"]
+include = ["capabilities*", "database*", "pipelines*", "server*", "storage*", "service_access*", "ui*"]
 namespaces = false
 
 [tool.setuptools.package-data]

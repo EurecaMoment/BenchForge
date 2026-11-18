@@ -2,7 +2,9 @@
 import time
 import uuid
 
-from sqlalchemy import Column, MetaData, String, Table, inspect, select
+from sqlalchemy import MetaData, Table, inspect, select
+
+from database.schema import domain_migrations as migrations
 
 from storage.files import write_json
 from storage.scene_jobs.metadata import runs, tasks
@@ -18,13 +20,8 @@ def migrate_capture(store):
     the original rows intact and an extra backup, never a false completion marker.
     Historical captures and all task directories remain readable.
     """
-    metadata = MetaData()
-    migrations = Table('benchforge_migrations', metadata,
-                       Column('id', String, primary_key=True),
-                       Column('backup_path', String), Column('applied_at', String))
     with store.repo.transaction() as connection:
         store.repo.lock_queue(connection)
-        metadata.create_all(connection)
         prior = connection.execute(select(migrations).where(migrations.c.id == MIGRATION)).mappings().first()
         if prior:
             return {'migration': MIGRATION, 'already_applied': True, 'backup_path': prior['backup_path']}

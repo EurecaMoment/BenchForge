@@ -52,6 +52,17 @@ function harness() {
     cold:()=>live=false,restores:()=>restored};
 }
 
+test('restored production notices adopt migrated review IDs without rewriting session events', async () => {
+  const h = harness(), runtime = h.create();
+  h.plan();
+  h.setReview({review_id: 42, state: 'waiting_user', deadline: 400, stage: 'S1'});
+  await h.preStep(runtime);
+  assert.equal(h.records.get('session-test').review.review_id, 42);
+  assert.equal(h.records.get('session-test').key, 'session-test:42');
+  assert.equal(h.view().review.review_id, 1);
+  await runtime.dispose();
+});
+
 test('capture submissions and terminal notices project distinct production states without approving scenes',()=>{
   const h=harness();h.plan();
   h.receipt('benchforge_capture',{run_id:'sf_capture',state:'submitted',scene_acceptance:'pending'});

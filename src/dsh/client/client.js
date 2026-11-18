@@ -3148,9 +3148,10 @@ var benchforgeClient = (() => {
       const receiptsRevision = revision + ":" + productionProductsRevision(progress.value);
       const summary = useRecord(workspacePath ? { view: "summary", workspace_path: workspacePath, session_id: sessionId } : null, receiptsRevision, 3e4, visible);
       const rows = summary.value?.runs || [];
+      const example = summary.value?.example || progress.value?.example;
       const pipelines = progress.value?.pipelines || [];
       const explicitRunId = rows.find((row) => row.id === route.run)?.id || pipelines.find((row) => row.id === route.run)?.id;
-      const selectedRunId = route.production && !route.run ? "" : explicitRunId || pipelineForStage(route.stage, pipelines)?.id || (["S2", "S3"].includes(route.stage) ? "" : rows[0]?.id || pipelines[0]?.id || "");
+      const selectedRunId = example ? rows[0]?.id || "" : route.production && !route.run ? "" : explicitRunId || pipelineForStage(route.stage, pipelines)?.id || (["S2", "S3"].includes(route.stage) ? "" : rows[0]?.id || pipelines[0]?.id || "");
       const datasetRunId = route.production && !route.run ? "" : explicitRunId || pipelineForStage("S4", pipelines)?.id || selectedRunId;
       const datasets = (summary.value?.datasets || []).filter((row) => datasetRunId ? row.run_id === datasetRunId : !row.run_id);
       const selectedDataset = datasets.find((row) => row.id === route.dataset);
@@ -3261,7 +3262,7 @@ var benchforgeClient = (() => {
       const allStageFiles = [
         ...sourceScene ? [] : run.value?.stage_artifacts || [],
         ...sceneArtifacts.value?.items || [],
-        ...conversationProductItems
+        ...example ? [] : conversationProductItems
       ];
       const stageFiles = allStageFiles.filter((row) => row.stage === stage.id).map((row) => ({
         ...row,
@@ -3559,7 +3560,7 @@ var benchforgeClient = (() => {
       const plannedItems = plan?.selections?.length ? plan.selections.reduce((total, row) => total + row.count, 0) : plan?.inputs?.target_items;
       const filesError = sceneArtifacts.error || run.error;
       const productFiles = stageFiles.filter((row) => (row.url || row.data) && !(separatePlan && (row.title === "\u8BC4\u6D4B\u8BA1\u5212" && row.stage === "S1" || row.title === "\u8BC4\u6D4B\u914D\u7F6E" && row.stage === "S4")));
-      const navigationState = (id) => stageState(
+      const navigationState = (id) => example?.stages?.[id] || stageState(
         id,
         navigationPipeline(id),
         progressSceneForStage(id, navigationScene(id), sceneJobs),
@@ -3590,9 +3591,9 @@ var benchforgeClient = (() => {
           source: conversationPlan || !selectedRunId ? summary.value?.plan_source : run.value?.plan_source,
           artifacts: productFiles,
           preview: setPreview,
-          request: prepare,
-          save: savePlan,
-          applyEdit: applyPlanEdit,
+          request: example ? void 0 : prepare,
+          save: example ? void 0 : savePlan,
+          applyEdit: example ? void 0 : applyPlanEdit,
           scenes: uniqueScenes,
           t
         }),
@@ -3609,7 +3610,7 @@ var benchforgeClient = (() => {
         }),
         runHistory
       );
-      else if (stage.id === "S2" && (sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading)) product = h(SceneLibrary, {
+      else if (!example && stage.id === "S2" && (sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading)) product = h(SceneLibrary, {
         record: sceneLibraryView,
         selection: currentSceneSelection,
         saving: sceneSaving || sending,
@@ -3747,7 +3748,7 @@ var benchforgeClient = (() => {
             )
           )
         ))),
-        h(StageProgress, {
+        example ? h("div", { className: "bfw-hint", "data-example-summary": true }, h("strong", null, example.title), h("p", null, example.description)) : h(StageProgress, {
           stage: liveProgressStage,
           pipeline: liveProgressPipeline,
           scene: liveProgressScene,

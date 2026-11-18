@@ -15,7 +15,8 @@ yaml = base.yaml
 def build(standard, python, config_path, service_config, *, package_imports=False):
     entries = definition.build(standard, python, service_config, config_path=config_path,
                                package_imports=package_imports)
-    return [{'insert': entries},
+    # This is the upstream Loader identity, disabled before our Host provider mounts.
+    return [{'id': 'session-query-sqlite', 'disabled': True}, {'insert': entries},
             *([] if package_imports else base.model_patches(config_path))]
 
 

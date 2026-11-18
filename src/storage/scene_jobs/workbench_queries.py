@@ -14,9 +14,8 @@ SCENE_PAGE_SIZE = 200
 @contextmanager
 def read_connection(engine):
     with engine.connect() as connection:
-        if engine.dialect.name == 'postgresql':
-            connection.exec_driver_sql('SET TRANSACTION READ ONLY')
-            connection.exec_driver_sql("SET LOCAL statement_timeout = '2000ms'")
+        connection.exec_driver_sql('SET TRANSACTION READ ONLY')
+        connection.exec_driver_sql("SET LOCAL statement_timeout = '2000ms'")
         yield connection
 
 

@@ -37,9 +37,10 @@ class RuntimeConfigTests(unittest.TestCase):
             initial = dict(os.environ)
             for mode in ("production", "exploration"):
                 file = self.root / (mode + ".json")
-                file.write_text(
-                    json.dumps({"execution_mode": mode, "scene_policy_path": str(policy)})
-                )
+                value = {"execution_mode": mode, "scene_policy_path": str(policy)}
+                if mode == "production":
+                    value["database_url"] = "postgresql+psycopg://benchforge:test@127.0.0.1/benchforge"
+                file.write_text(json.dumps(value))
                 self.assertEqual(
                     load_service_config(file, required_tokens=())["execution_mode"], mode
                 )

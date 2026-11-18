@@ -9,7 +9,7 @@ class SourceBoundaryTests(unittest.TestCase):
     def test_modules_follow_layering_without_import_cycles(self):
         root = Path(__file__).resolve().parents[1] / "src"
         modules = {}
-        for base in ("capabilities", "storage", "service_access", "pipelines", "server"):
+        for base in ("capabilities", "database", "storage", "service_access", "pipelines", "server"):
             for file in (root / base).rglob("*.py"):
                 name = ".".join(file.relative_to(root).with_suffix("").parts)
                 modules[name.removesuffix(".__init__")] = file
@@ -33,6 +33,11 @@ class SourceBoundaryTests(unittest.TestCase):
                 graph[name].update(
                     target for target in targets if target in modules and target != name
                 )
+                if name.startswith("database.") and name != "database.__main__":
+                    self.assertFalse(any(target.split(".")[0] in {
+                        "storage", "capabilities", "pipelines", "server", "dsh", "ui",
+                        "service_access",
+                    } for target in targets), f"Domain dependency in database infrastructure: {name}")
                 if name.startswith("storage."):
                     self.assertFalse(any(target.startswith("capabilities.") for target in targets),
                                      f"Business rule imported into persistence: {name}")

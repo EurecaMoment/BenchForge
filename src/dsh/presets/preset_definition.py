@@ -170,12 +170,36 @@ def capture_entry(workbench, *, package_imports=False, revision=None):
     }
 
 
-def session_operations_entry(*, python='python3', package_imports=False, revision=None):
+def session_operations_entry(*, python='python3', service_config=None, package_imports=False, revision=None):
     return {
         'id': base.SESSION_OPERATIONS_PLUGIN_ID,
         'name': '@eurecamoment/benchforge-dsh/session-operations' if package_imports
                 else (DSH / 'dist/session-operations.mjs').as_uri(),
-        'config': {'python': str(python), **({'revision': revision} if revision is not None else {})},
+        'config': {'python': str(python),
+                   **({'productionConfig': base.config_reference(service_config, package_imports)}
+                      if service_config else {}),
+                   **({'revision': revision} if revision is not None else {})},
+    }
+
+
+def session_query_entry(service_config, *, package_imports=False):
+    return {
+        'id': base.SESSION_QUERY_PLUGIN_ID,
+        'name': '@eurecamoment/benchforge-dsh/session-query' if package_imports
+                else (DSH / 'dist/session-query.mjs').as_uri(),
+        'config': {'productionConfig': base.config_reference(service_config, package_imports)},
+    }
+
+
+def examples_entry(*, package_imports=False):
+    """A repository deployment imports its bundled example once per DSH home."""
+    return {
+        'id': base.EXAMPLES_PLUGIN_ID,
+        'name': '@eurecamoment/benchforge-dsh/examples' if package_imports
+                else (DSH / 'dist/examples.mjs').as_uri(),
+        # The npm bundle does not include the repository's large example assets.
+        'config': {'sourceDirectory': '' if package_imports
+                   else str(DSH.parent.parent / 'example/SpatialForge')},
     }
 
 
@@ -194,7 +218,8 @@ def build(standard, python, service_config, *, config_path=None,
                             else (DSH / 'dist/invocation.mjs').as_uri()})
     plugins.append({'id': 'benchforge-review-policy',
                     'name': '@eurecamoment/benchforge-dsh/review-policy' if package_imports
-                            else (DSH / 'dist/review-policy.mjs').as_uri()})
+                            else (DSH / 'dist/review-policy.mjs').as_uri(),
+                    'config': {'productionConfig': base.config_reference(service_config, package_imports)}})
     model_tools = base.model_tools(config_path, portable=package_imports)
     for plugin_id, entry, tools in (
         ('benchforge-tools', 'benchmark-tools', [*BENCHMARK_TOOLS, *model_tools]),
@@ -220,7 +245,10 @@ def build(standard, python, service_config, *, config_path=None,
         'config': {'persona': SYNTHESIS_WORKER_PERSONA, 'parentTools': sorted(configured_synthesis_tools(plugins))},
     })
     workbench = workbench_entry(python, service_config, package_imports=package_imports)
-    entries = [session_operations_entry(python=python, package_imports=package_imports), preset,
+    entries = [session_query_entry(service_config, package_imports=package_imports),
+               examples_entry(package_imports=package_imports),
+               session_operations_entry(python=python, service_config=service_config,
+                                        package_imports=package_imports), preset,
                capture_entry(workbench, package_imports=package_imports), workbench]
     configure_synthesis_delegation(plugins)
     return entries

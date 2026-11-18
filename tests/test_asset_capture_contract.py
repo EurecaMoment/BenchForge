@@ -6,6 +6,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
+from tests.database_fixtures import use_postgres
+
 import numpy as np
 import trimesh
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
@@ -18,6 +20,7 @@ from test_isaac_sim_evidence import scene_program
 
 class AssetCaptureContractTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -119,7 +122,7 @@ class AssetCaptureContractTests(unittest.TestCase):
             exported_entities(file, declared)
 
     def test_unsupported_scene_actions_are_rejected_before_queueing(self):
-        store = create_store(self.root, database_url="sqlite:///" + str(self.root / "queue.sqlite"))
+        store = create_store(self.root, database_url=self.database_url)
         self.addCleanup(store.repo.engine.dispose)
         with patch.dict(os.environ, {"BENCHFORGE_EXECUTION_MODE": "exploration"}):
             with self.assertRaisesRegex(ValueError, "native session"):

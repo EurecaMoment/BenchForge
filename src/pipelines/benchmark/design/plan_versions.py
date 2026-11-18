@@ -2,42 +2,10 @@
 import json
 import difflib
 import re
-import sqlite3
-from contextlib import closing
 from pathlib import Path
+from storage.plan_versions import activate, current
 from capabilities.benchmark_design.assessment import assessment_with_current_schema
 from capabilities.benchmark_design.assessment import validate_assessment
-
-
-def connection(workspace):
-    db=sqlite3.connect(Path(workspace)/'plan-revisions.sqlite',timeout=10)
-    db.row_factory=sqlite3.Row
-    db.execute('CREATE TABLE IF NOT EXISTS active_plans (session TEXT PRIMARY KEY, plan TEXT, previous TEXT, version INTEGER, pending INTEGER, changes TEXT)')
-    return db
-
-
-def current(workspace,session):
-    if not (Path(workspace)/'plan-revisions.sqlite').exists():return None
-    with closing(connection(workspace)) as db:
-        row=db.execute('SELECT * FROM active_plans WHERE session=?',(session,)).fetchone()
-    if not row:return None
-    value=dict(row);value['changes']=json.loads(value['changes']);value['pending']=bool(value['pending'])
-    return value
-
-
-def activate(workspace,session,plan,*,expected=None,pending=False,changes=()):
-    with closing(connection(workspace)) as db:
-        db.execute('BEGIN IMMEDIATE')
-        old=db.execute('SELECT * FROM active_plans WHERE session=?',(session,)).fetchone()
-        if expected and old and old['plan']!=expected:
-            raise ValueError('The plan changed in another operation. Refresh before saving.')
-        if old and old['pending'] and expected!=old['plan']:
-            raise ValueError('Read and apply the user-edited plan before replacing it.')
-        version=old['version']+1 if old else 1
-        db.execute('INSERT OR REPLACE INTO active_plans VALUES(?,?,?,?,?,?)',
-                   (session,str(plan),old['plan'] if old else expected,version,int(pending),json.dumps(list(changes))))
-        db.commit()
-    return current(workspace,session)
 
 
 def _same(left,right):

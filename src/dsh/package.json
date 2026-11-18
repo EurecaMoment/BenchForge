@@ -19,13 +19,15 @@
     "./benchforge-ui": "./client/index.js",
     "./capture-runtime": "./dist/capture-runtime.mjs",
     "./session-operations": "./dist/session-operations.mjs",
+    "./examples": "./dist/examples.mjs",
     "./production/types": "./production/types.d.ts",
     "./subagent-policy": "./dist/subagent-policy.mjs",
     "./invocation": "./dist/invocation.mjs",
     "./review-policy": "./dist/review-policy.mjs",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
-    "./spatial-tools": "./dist/spatial-tools.mjs"
+    "./spatial-tools": "./dist/spatial-tools.mjs",
+    "./session-query": "./dist/session-query.mjs"
   },
   "scripts": {
     "build:benchforge-ui": "node ./build.mjs",
@@ -60,9 +62,12 @@
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
     "@deepseek-ai/dsh-subprocess": "0.2.2-rc.3",
     "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-session-persistence": "0.2.2-rc.3",
     "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.3",
     "@deepseek-ai/dsh-web-app": "0.2.2-rc.3",
-    "zod": "4.6.6"
+    "zod": "4.6.6",
+    "@deepseek-ai/dsh-session-query": "0.2.2-rc.3"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-error": "0.2.2-rc.3",
@@ -73,11 +78,14 @@
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
     "@deepseek-ai/dsh-subprocess": "0.2.2-rc.3",
     "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-session-persistence": "0.2.2-rc.3",
     "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.3",
     "@deepseek-ai/dsh-web-app": "0.2.2-rc.3",
     "@deepseek-ai/dsh-typert-generator": "0.2.2-rc.3",
     "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.3",
     "esbuild": "0.25.12",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@deepseek-ai/dsh-session-query": "0.2.2-rc.3"
   }
 }

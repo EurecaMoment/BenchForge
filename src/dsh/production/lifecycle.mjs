@@ -60,11 +60,11 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     if(!view.active || agent.session.header?.origin==='subagent')return;
     await serialized(agent.id,async()=>{
       const prior=table.get(agent.id);
-      const key=view.review ? `${agent.id}:${view.review.review_id}` : '';
       const current=view.review ? await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal) : null;
       signal?.throwIfAborted();
-      const review=current ? {...view.review,deadline:current.deadline,state:current.state,
+      const review=current ? {...view.review,review_id:current.review_id ?? view.review.review_id,deadline:current.deadline,state:current.state,
         artifact:current.artifact || view.review.artifact} : view.review;
+      const key=review ? `${agent.id}:${review.review_id}` : '';
       const record={sessionId:agent.id,workspace:view.workspace,plan:view.plan,run:view.run,
         revision:view.revision,review,key,suspended:false};
       // Tool-result projections can predate a backend round or user control.

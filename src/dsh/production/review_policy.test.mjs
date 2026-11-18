@@ -1,10 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import {DatabaseSync} from 'node:sqlite';
-import {readLatestStageReview} from './reviews.mjs';
 import {createReviewPolicy, reviewDenial} from './review_policy.mjs';
 
 const pending = {stage: 'S1', state: 'waiting_user'};
@@ -26,7 +21,7 @@ test('reads, status, previews, validated plans and bounded draft edits remain us
   }
   assert.equal(reviewDenial({name: 'benchforge_isaac_sim', arguments: {action: 'capabilities'}}, pending, '/workspace'), undefined);
   assert.equal(reviewDenial({name: 'write', arguments: {file_path: 'tasks/scene/draft.py'}}, pending, '/workspace'), undefined);
-  for (const file of ['stage-reviews.sqlite', 'operations/run/steps/collection/result.json', 'tasks/../../stage-reviews.sqlite']) {
+  for (const file of ['config/service.json', 'operations/run/steps/collection/result.json', 'tasks/../../config/service.json']) {
     assert.ok(reviewDenial({name: 'write', arguments: {file_path: file}}, pending, '/workspace'));
   }
 });
@@ -53,26 +48,4 @@ test('an unloaded parent cannot hide its review behind a child working directory
   const agent = {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}};
   assert.ok(await guard({name: 'bash', agent}));
   assert.equal(await guard({name: 'read', agent}), undefined);
-});
-
-test('durable review reader never grants approval from a deadline, including legacy rows', async t => {
-  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-review-'));
-  assert.equal(await readLatestStageReview(folder, 's1'), null);
-  const file = path.join(folder, 'stage-reviews.sqlite'), db = new DatabaseSync(file);
-  t.after(async () => {db.close(); await fs.rm(folder, {recursive: true, force: true});});
-  db.exec('CREATE TABLE reviews (id INTEGER PRIMARY KEY, session TEXT, key TEXT, stage TEXT, artifact TEXT, deadline REAL, state TEXT, instruction TEXT)');
-  db.prepare('INSERT INTO reviews VALUES(?,?,?,?,?,?,?,?)').run(1, 's1', 'a', 'S1', '/plan.json', 100, 'waiting_user', '');
-  db.prepare('INSERT INTO reviews VALUES(?,?,?,?,?,?,?,?)').run(2, 'other', 'b', 'S2', '/other.json', 100, 'paused', '');
-  assert.equal((await readLatestStageReview(folder, 's1', 99999)).state, 'waiting_user');
-  assert.equal((await readLatestStageReview(folder, 's1', 100000)).state, 'waiting_user');
-  assert.equal(db.prepare('SELECT state FROM reviews WHERE id=1').get().state, 'waiting_user');
-  assert.equal(await readLatestStageReview(folder, 'unrelated'), null);
-  db.exec("ALTER TABLE reviews ADD COLUMN policy_version INTEGER DEFAULT 1; ALTER TABLE reviews ADD COLUMN progress TEXT DEFAULT '{}'");
-  db.prepare('UPDATE reviews SET progress=? WHERE id=1').run(JSON.stringify({rounds:[{number:1,check:{passed:true}}]}));
-  assert.equal((await readLatestStageReview(folder, 's1', 9999999)).state, 'waiting_user');
-  db.prepare('UPDATE reviews SET state=? WHERE id=1').run('check_failed');
-  assert.ok(reviewDenial({name:'bash'},await readLatestStageReview(folder,'s1',9999999),folder));
-  assert.equal(reviewDenial({name:'benchforge_stage_review',arguments:{action:'retry'}},await readLatestStageReview(folder,'s1'),folder),undefined);
-  db.prepare('UPDATE reviews SET state=? WHERE id=1').run('elapsed');
-  assert.equal((await readLatestStageReview(folder,'s1')).state,'elapsed');
 });

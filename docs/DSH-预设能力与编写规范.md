@@ -1232,7 +1232,9 @@ export default class SessionRuns extends Service {
 
 S1 的审核身份由 `src/pipelines/benchmark/design/plan_review.py` 根据当前会话的有效计划确定，不以每次保存生成的文件名建立新窗口。重复保存、角色含义不变的一一对象改名、产物绑定更新、缩小已有几何例外的对象集合，保留原审核编号、截止时间、暂停状态及用户指令；新文件仍保存为独立版本。目标、数量、原生采集要求、评分规则、场景硬性要求和扩大的几何例外仍参与合同比较，变更记录在 `review_revision.changed_fields`。不同请求文件或显式 `new_task=true` 开始独立任务。已经验证应用的工作台用户编辑沿用其原窗口，不能伪造 `applies_edit` 来继承放行。保存、版本激活和审核发布按会话串行，其他会话可并行。模型打开阶段窗口时，审核键取自当前计划或执行器回执；不能靠换键反复重开同一审核。已放行状态不再提示等待，执行失败必须作为执行问题报告，不能退回“等待用户确认”。
 
-回归入口为 `python -m unittest discover -s tests -v` 和 `node --test src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs`。受控服务回执用于验证流程，不代表真实模型或仿真能力验收。
+业务持久化统一通过 `src/database/` 的连接与事务入口，领域查询位于 `src/storage/`。DSH Host 的审核计时器、工作台操作与 Python 工具必须使用同一个服务配置；数据库凭据只通过宿主环境传递，Client 不接触 SQL 或连接信息。连接池属于进程，不能由单次工具调用释放；计划与审核按工作区和会话加锁。历史 JSONL 账本导入是显式停写迁移，保留工作区与会话作用域下的历史审核 ID 映射；历史 DSH Session 事件格式保持不变。配置、迁移与真实 PostgreSQL 验证见 [数据库边界说明](../src/database/README.md)。
+
+数据库回归统一使用独立 PostgreSQL 测试库，设置 `BENCHFORGE_TEST_POSTGRES_URL` 后运行 `python -m unittest discover -s tests -v`；每项测试使用独立 schema，结束后清理。前端回归入口为 `node --test src/dsh/production/lifecycle.test.mjs src/dsh/workbench/artifacts/artifacts.test.mjs`。受控服务回执用于验证流程，不代表真实模型或仿真能力验收。
 
 ## Web 界面、业务 RPC 与会话状态
 

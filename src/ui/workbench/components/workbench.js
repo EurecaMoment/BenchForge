@@ -56,9 +56,10 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const receiptsRevision = revision + ':' + productionProductsRevision(progress.value);
     const summary = useRecord(workspacePath ? {view: 'summary', workspace_path: workspacePath, session_id: sessionId} : null, receiptsRevision, 30000, visible);
     const rows = summary.value?.runs || [];
+    const example = summary.value?.example || progress.value?.example;
     const pipelines = progress.value?.pipelines || [];
     const explicitRunId = rows.find((row) => row.id === route.run)?.id || pipelines.find((row) => row.id === route.run)?.id;
-    const selectedRunId = route.production && !route.run ? '' : explicitRunId ||
+    const selectedRunId = example ? rows[0]?.id || '' : route.production && !route.run ? '' : explicitRunId ||
       pipelineForStage(route.stage, pipelines)?.id || (['S2', 'S3'].includes(route.stage) ? '' : rows[0]?.id || pipelines[0]?.id || '');
     const datasetRunId = route.production && !route.run ? '' : explicitRunId || pipelineForStage('S4', pipelines)?.id || selectedRunId;
     const datasets = (summary.value?.datasets || []).filter((row) => datasetRunId ? row.run_id === datasetRunId : !row.run_id);
@@ -135,7 +136,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const stage = STAGES.find((step) => step.id === route.stage) || STAGES[0];
     const pipeline = pipelines.find((row) => row.id === selectedRunId);
     const allStageFiles = [...(sourceScene ? [] : run.value?.stage_artifacts || []), ...(sceneArtifacts.value?.items || []),
-      ...conversationProductItems];
+      ...(example ? [] : conversationProductItems)];
     const stageFiles = allStageFiles.filter((row) => row.stage === stage.id).map((row) => ({...row,
       image_url: row.stage === 'S3' && row.kind === 'json' ? allStageFiles.find((image) => image.kind === 'image' &&
         image.task_id === row.task_id && image.revision === row.revision && image.file === row.file?.replace(/\.json$/, '.png'))?.url : undefined}));
@@ -302,7 +303,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       const filesError = sceneArtifacts.error || run.error;
       const productFiles = stageFiles.filter((row) => (row.url || row.data) && !(separatePlan &&
         (row.title === '评测计划' && row.stage === 'S1' || row.title === '评测配置' && row.stage === 'S4')));
-      const navigationState = (id) => stageState(id, navigationPipeline(id), progressSceneForStage(id, navigationScene(id), sceneJobs), progress.value?.operations,
+      const navigationState = (id) => example?.stages?.[id] || stageState(id, navigationPipeline(id), progressSceneForStage(id, navigationScene(id), sceneJobs), progress.value?.operations,
         planReceipt, navigationScene(id)?.run_id === artifactScene ? sceneArtifacts.value?.items || [] :
           navigationPipeline(id)?.id === selectedRunId ? allStageFiles : [],
         id === 'S2' && (collectionPlan?.assessment?.scenes || collectionPlan?.inputs?.target_scene_count || progress.value?.current_collection)
@@ -324,12 +325,13 @@ export function createWorkbenchComponent({React, helpers, components}) {
       let product;
       if (stage.id === 'S1') product = h(React.Fragment, null,
         h(PlanProduct, {plan, source: conversationPlan || !selectedRunId ? summary.value?.plan_source : run.value?.plan_source,
-          artifacts: productFiles, preview: setPreview, request: prepare, save:savePlan,applyEdit:applyPlanEdit,
+          artifacts: productFiles, preview: setPreview, request: example ? undefined : prepare,
+          save: example ? undefined : savePlan, applyEdit: example ? undefined : applyPlanEdit,
           scenes:uniqueScenes,t}),
         h(TemplateCatalog, {catalog, catalogQuery, setCatalogQuery, catalogPage, setCatalogPage,
           capability, setCapability, retry: () => setRevision((value) => value + 1), t}),
         runHistory);
-      else if (stage.id === 'S2' && (sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading)) product = h(SceneLibrary, {record: sceneLibraryView,
+      else if (!example && stage.id === 'S2' && (sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading)) product = h(SceneLibrary, {record: sceneLibraryView,
         selection: currentSceneSelection, saving: sceneSaving || sending, error: sceneError, choose: chooseScenes,
         query: sceneQuery, search: (query) => {setSceneQuery(query); setScenePage(1);}, origin: sceneOrigin,
         filter: (origin) => {setSceneOrigin(origin); setScenePage(1);}, page: setScenePage,
@@ -386,7 +388,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         h('span', {className: 'bfw-stage-copy'}, h('strong', {title: t(step.key)}, t(step.key + 'Nav')),
         h('span', {className: 'bfw-stage-state', 'data-stage-state': navigationState(step.id)},
           t(navigationState(step.id) === 'completed' ? 'stageDone' : navigationState(step.id))))))),
-      h(StageProgress, {stage: liveProgressStage, pipeline: liveProgressPipeline, scene: liveProgressScene, record: progress,
+      example ? h('div',{className:'bfw-hint','data-example-summary':true},h('strong',null,example.title),h('p',null,example.description)) : h(StageProgress, {stage: liveProgressStage, pipeline: liveProgressPipeline, scene: liveProgressScene, record: progress,
         activity:productionActivity, planReceipt, collectionPlan, artifacts: allStageFiles, conversationRunning,
         completedStages: Object.values(progressStates).filter((state) => state === 'completed').length, t}),
       h(StageReviewPanel,{value:reviewRecord.value,t,change:() => prepare(''),act:async (action) => {

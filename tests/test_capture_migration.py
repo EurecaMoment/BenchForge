@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+
+from tests.database_fixtures import use_postgres
 from unittest.mock import patch
 
 from sqlalchemy import Column, JSON, MetaData, String, Table, inspect
@@ -20,11 +22,12 @@ from pipelines.scene_production.service import create_store
 
 class CaptureStoreTests(unittest.TestCase):
     def setUp(self):
+        self.database_url = use_postgres(self)
         self.temporary = TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.env = patch.dict(os.environ, {'BENCHFORGE_EXECUTION_MODE': 'exploration'})
         self.env.start()
-        self.store = create_store(self.root / 'artifacts', database_url='sqlite:///' + str(self.root / 'queue.sqlite'))
+        self.store = create_store(self.root / 'artifacts', database_url=self.database_url)
 
     def tearDown(self):
         self.store.repo.engine.dispose()
