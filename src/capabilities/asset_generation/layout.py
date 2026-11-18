@@ -142,7 +142,7 @@ def start_design_request(store, value):
 
 def execute_design(store, task, stop):
     directory = store.directory(task['id'], task['unit']['revision'])
-    prepare_layout(GenerationTools(store.root), task['unit']['intent'], directory, stop)
+    prepare_layout(GenerationTools(store.root, engine=store.repo.engine, task_id=task['id']), task['unit']['intent'], directory, stop)
     receipt = json.loads((directory / 'layout_reference.json').read_text())
     result = {'role': 'design_reference_only', 'gt_source': False, 'simulator_capture': False,
               'reference': {'tool': 'benchforge_scene_evidence', 'task_id': task['id'], 'file': 'layout/reference.png'},

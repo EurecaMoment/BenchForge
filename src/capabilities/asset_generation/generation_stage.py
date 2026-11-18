@@ -80,7 +80,7 @@ def _published(tools, spec, work, source, frame, provenance, status, image=None,
 
 
 def execute_generation_stage(store, task, stop):
-    tools = GenerationTools(store.root)
+    tools = GenerationTools(store.root, engine=store.repo.engine, task_id=task['id'])
     intent = task['unit']['intent']
     name = intent['tool']
     value = validate_generation_request(tools, name, intent['parameters'])
@@ -124,7 +124,12 @@ def execute_generation_stage(store, task, stop):
         result['assets'] = []
         for asset in worker['assets']:
             source = output / asset['asset']
-            result['assets'].append({**asset, 'source_path': str(source), 'metric_reconstruction': False})
+            spec = next(item for item in value['objects'] if item['object_id'] == asset['object_id'])
+            registration = _published(tools, {**spec, 'label': spec.get('label', asset['object_id'])},
+                work / 'registered' / asset['object_id'], source, asset['source_frame'],
+                {'tools': [asset.get('model', 'trellis')], 'input': _file_record(source)}, 'generated')
+            result['assets'].append({**asset, 'source_path': str(source), 'metric_reconstruction': False,
+                                     'asset_id': registration['asset_id'], 'registration': registration})
     else:
         if stop.is_set():
             raise RuntimeError('mesh import canceled')

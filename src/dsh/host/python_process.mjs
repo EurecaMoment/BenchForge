@@ -1,12 +1,13 @@
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {pythonHostDirectory, pythonHostEnvironment} from './python_environment.mjs';
 
 const execute = promisify(execFile);
 
 // The process boundary owns JSON encoding, independent of the host locale.
 export function executePython(python, args, options = {}) {
-  return execute(python, args, {...options, encoding: 'utf8',
-    env: {...process.env, ...options.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1'}});
+  return execute(python, args, {...options, cwd: pythonHostDirectory, encoding: 'utf8',
+    env: pythonHostEnvironment({...process.env, ...options.env})});
 }
 
 // Foreground queries and preview encoders belong to the Host activation too.

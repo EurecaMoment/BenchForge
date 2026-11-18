@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createStageReviewClient} from './stage_reviews.mjs';
 import path from 'node:path';
+import {pythonHostDirectory} from './python_environment.mjs';
 
 test('host review calls the shared CLI through the subprocess seam and releases its handle',async()=>{
   let spec,terminated=0,reaped=0;
@@ -13,7 +14,8 @@ test('host review calls the shared CLI through the subprocess seam and releases 
   const client=createStageReviewClient(subprocess,{python:'/env/bin/python'});
   const result=await client.advance('/workspace with spaces','session-test',3);
   assert.equal(result.waits_completed,1);
-  assert.equal(spec.cwd,'/workspace with spaces');
+  assert.equal(spec.cwd,pythonHostDirectory);
+  assert.equal(spec.argv[spec.argv.indexOf('--workspace') + 1],'/workspace with spaces');
   assert.ok(spec.argv.includes('server.stage_review_cli'));
   assert.deepEqual(JSON.parse(spec.argv.at(-1)),{action:'status',review_id:3});
   assert.equal(terminated,1);assert.equal(reaped,1);

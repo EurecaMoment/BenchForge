@@ -228,6 +228,7 @@ ss -ltnp | grep -E ':(3092|3858|55548)\b' || true
 | `providers` | 六个 `third_party/` 提供方。包括 OpenAI 对话模型、四个 HTTP 工具和 Isaac 采集。 |
 
 `init` 和 `sync` 生成 `config/generated/` 下的服务端、客户端和 Compose 配置。
+启动服务会自动建立并验证独立的 PostgreSQL 只读角色，凭据保存在本机私有配置中。复用外部数据库时，服务账号需要 `CREATEROLE`，或在 `database.reader_url_env` 指定已有受限只读连接的环境变量名；缺少权限会明确停止，不会使用管理员连接代替模型查询。
 `dsh-setup` 生成 DSH 预设。配置中的相对路径以 `config/benchforge.local.json` 所在目录为基准。
 例如将 `web.default_workspace` 设为 `../workspaces/benchforge`，重启后 Web 在没有已选工作区时使用该目录。
 已有部署更新 DSH 子模块版本后，先运行 `python benchforge_app.py dsh-setup` 构建锁定的 DSH，再启动 Web。

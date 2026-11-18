@@ -58,7 +58,13 @@ def create_plan(*, run: str | Path, artifact: dict[str, Any] | None = None,
 
 
 def repair_plan(args, directory=None, config=None):
-    graph = ArtifactGraph(args["run"])
+    from storage.operation_outputs import persistent_outputs, logical_value
+    with persistent_outputs(args['run'], config) as root:
+        return logical_value(_repair_plan({**args, 'run': str(root)}))
+
+
+def _repair_plan(args):
+    graph = ArtifactGraph(args['run'])
     rows = graph.find(args.get("artifact_id"))
     artifact = rows[-1] if rows else None
     if args.get("artifact_id") and artifact is None:

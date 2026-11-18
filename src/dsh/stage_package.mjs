@@ -1,4 +1,6 @@
 import {copyFile, mkdir} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {stageExample} from './stage_example.mjs';
 
 const sourceRoot = new URL('..', import.meta.url);
 const packageRoot = new URL('.', import.meta.url);
@@ -16,3 +18,6 @@ for (const [source, destination] of files) {
   await mkdir(new URL('.', target), {recursive: true});
   await copyFile(new URL(source, sourceRoot), target);
 }
+
+await stageExample(fileURLToPath(new URL('../../example/SpatialForge/', import.meta.url)),
+  fileURLToPath(new URL('dist/example/SpatialForge/', import.meta.url)));

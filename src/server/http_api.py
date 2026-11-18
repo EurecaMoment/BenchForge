@@ -134,6 +134,12 @@ def main():
             self.reply(request_error_payload(exc, status), status)
 
         def reply(self,value,status=200):
+            if status < 300 and isinstance(value, dict) and value.get('run_id'):
+                from service_access.access_scope import current_access
+                access = current_access()
+                if access is not None:
+                    from storage.access_identity import bind_run_scope
+                    bind_run_scope(store.repo.engine, access.scope, value['run_id'])
             data=json.dumps(value,ensure_ascii=False,default=str).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
         def binary(self,data,mime='application/zip'):
             self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
@@ -164,6 +170,16 @@ def main():
             except Exception as exc:self.fail(exc)
         def do_POST(self):
             if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+config['operator_token']):self.reply({'error':'unauthorized'},401);return
+            from service_access.access_scope import access_context, resolve_ticket
+            try:
+                ticket = self.headers.get('X-BenchForge-Scope')
+                access = resolve_ticket(store.repo.engine, ticket, config['operator_token']) if ticket else None
+                with access_context(access):
+                    self.dispatch_post()
+            except Exception as exc:
+                self.fail(exc)
+
+        def dispatch_post(self):
             if self.path == '/dataset':
                 self.reply({
                     'error':'Legacy dataset jobs are retired. Use data.capability or POST /start with target_items.',
@@ -180,6 +196,8 @@ def main():
                 raw=self.rfile.read(length)
                 if len(raw)!=length:raise ValueError('incomplete request body')
                 value=json.loads(raw or b'{}')
+                from server.access_requests import authorize_request
+                value = authorize_request(store, self.path, value)
                 self.request_run_id = value.get('run_id') if isinstance(value, dict) else None
                 self.request_task_id = value.get('task_id') if isinstance(value, dict) else None
                 from capabilities.scene_authoring.validation.request_admission import check_request
@@ -187,6 +205,27 @@ def main():
                 if self.path in ('/session-search/replace', '/session-search/query'):
                     from storage.session_search import session_search
                     self.reply(session_search(store.repo.engine, self.path.rsplit('/', 1)[1], value))
+                elif self.path == '/records':
+                    from service_access.access_scope import current_access
+                    from service_access.runtime_config import environment_value
+                    from database.engine import engine_for
+                    from storage.access_queries import query_records
+                    access = current_access()
+                    if access is None:
+                        raise PermissionError('Database reads require a verified conversation')
+                    reader_url = environment_value(config.get('reader_database_url_env', 'BENCHFORGE_READER_DATABASE_URL'))
+                    if not reader_url:
+                        raise RuntimeError('Configure the dedicated PostgreSQL reader role')
+                    after = value.get('after')
+                    if after is not None and value['resource'] in ('events', 'operations', 'reviews'):
+                        if not isinstance(after, str) or not after.isdecimal():
+                            raise ValueError('Invalid query cursor')
+                        after = int(after)
+                    records = query_records(engine_for(reader_url), access.scope, value['resource'],
+                                            limit=value.get('limit', 30), after=after)
+                    if records['next'] is not None:
+                        records['next'] = str(records['next'])
+                    self.reply(records)
                 elif self.path == '/stage-review/read':
                     from server.stage_review_queries import read_review_request
                     self.reply(read_review_request(config, value))

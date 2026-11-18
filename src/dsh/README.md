@@ -8,6 +8,7 @@ start with the workbench closed.
 | Location | Responsibility |
 | --- | --- |
 | `presets/` | Compose the official standard preset, generate and install the profile |
+| `skills/` | Packaged component usage guides discovered through the native DSH Skill provider |
 | `host/` | Shared session scope, native session operations, handoffs and Python tool runner |
 | `client/` | Browser manifest and generated bundle; editable views live in `../ui/` |
 | `tools/` | Register reusable operations and built-in pipeline entry points |
@@ -72,6 +73,21 @@ runtime context, not a `cwd` persona variable. Verify a new session's first mode
 turn after changing a preset, in addition to loading existing conversations.
 
 ## Runtime boundaries
+
+Component guides live in `skills/<component>/SKILL.md`, with detailed references
+inside that component directory. The preset contributes the `benchforge-components`
+filesystem provider through `customSkillDirs`; the native `skill` tool loads only
+the requested guide. Both source overlays and the npm bundle include these files.
+The provider does not scan additional user/project roots or watch the repository.
+This limits this provider's discovery, not the permissions of other Host providers.
+
+Guides describe public BenchForge tools, input/output contracts and limitations.
+They contain no deployment credentials or machine-specific service addresses.
+Service readiness and simulator operation schemas come from live discovery;
+the existence of a guide never certifies that its service is running. Agents do
+not need access to `third_party` source to use these guides. A confined execution
+profile must expose the packaged guide resources read-only or serve them through
+the trusted Skill provider; documentation alone does not enforce filesystem access.
 
 - Scene tools call the configured HTTP service. FLUX, SAM3, DA3 and TRELLIS inference
   servers and weights belong to third-party deployments.
@@ -218,3 +234,61 @@ npm run prepare --prefix src/dsh
 
 These tests use controlled receipts to verify lifecycle and validation behavior;
 they do not certify simulator controllers or generated benchmark data.
+
+### Migrate an existing conversation workspace
+
+New BenchForge conversations receive an independent Host-owned workspace. An old
+conversation without a binding remains readable, but its tools require migration.
+The owner administration entry is the existing `benchforgeWorkbench` Remote with
+`view: "workspace_migration"`. It is not a model tool or a file-fetch route.
+
+Stop the source conversation first. In the signed-in DSH browser's developer
+console, call the authenticated native Remote endpoint to preview candidates:
+
+```js
+async function migrationCall(method, query, body) {
+  const endpoint = 'benchforgeWorkbench/' + method;
+  const response = await fetch('/api/' + endpoint, {
+    method: 'POST', credentials: 'same-origin',
+    headers: {'content-type': 'application/json'},
+    body: JSON.stringify({type: 'client-request', rpcId: crypto.randomUUID(),
+      method: endpoint, payload: {args: {query, ...(body === undefined ? {} : {body})}}}),
+  });
+  if (!response.ok) throw new Error('Migration request failed: ' + response.status);
+  const reply = await response.json();
+  if (!reply.result?.ok) throw new Error(JSON.stringify(reply.result));
+  return reply.result.value;
+}
+const query = {view: 'workspace_migration', session_id: 'session-REPLACE_WITH_SOURCE_ID'};
+const preview = await migrationCall('read', query);
+console.table(preview.candidates.map(({id, relativePath, kind}) => ({id, relativePath, kind})));
+console.table(preview.omitted);
+```
+
+Select the exact candidate IDs to retain, then apply that preview revision:
+
+```js
+const selected = []; // Paste the reviewed candidate IDs; [] creates a clean workspace.
+const migrated = await migrationCall('write', query, {
+  source_revision: preview.source_revision, selected,
+});
+console.log(migrated); // Open migrated.session_id using the ordinary conversation list.
+```
+
+The Host derives candidates from DSH's registered artifact projection and the
+PostgreSQL operation index. Successful native writes under `tasks/` can be copied
+as editable drafts. Formal evidence must also belong to a completed operation of
+the exact source session and is copied to a read-only resource snapshot. Only
+regular files explicitly listed in the preview are copied; missing, unowned,
+external, symlinked or directory references are reported, not recursively scanned.
+The preview covers the latest 201 operations and up to 500 native file references;
+`truncated_operations` reports the operation limit. Old history and files remain
+available through the original conversation. Backend evidence outside the source
+workspace remains there and does not become a writable draft.
+
+Selection uses candidate IDs, not operator-supplied paths. A changed session
+revision or selected file requires a fresh preview. The Host uses native idle
+maintenance while copying an attached source; it creates the destination through
+`sessionController.create` and logs a migration-origin notice in its native inbox
+without starting a model turn. Migration copies no task control, stage approval
+or production ownership. The old session header and history are never rewritten.

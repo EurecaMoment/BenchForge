@@ -1,66 +1,94 @@
-"""Run task-authored Python with writable task files and read-only Harness code."""
+"""Execute task Python in its Host-owned conversation workspace."""
+
 import json
 import os
 from pathlib import Path
-import re
 import shutil
-import signal
+import stat
 import subprocess
-import sys
+import tempfile
 import time
 import uuid
 
+from service_access.task_paths import task_directory
+from service_access.access_scope import current_access
+from service_access.processes import terminate_process_tree
+from server.task_runtime import python_command
+from storage.confined_files import copy_output, open_directory, open_write
 
-def run_task_code(artifact_root,workspace_id,code,timeout_seconds=60):
-    if not isinstance(workspace_id,str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}',workspace_id):raise ValueError('invalid workspace_id')
-    if not isinstance(code,str) or not 1<=len(code)<=1024*1024:raise ValueError('code must be 1..1048576 characters')
-    if type(timeout_seconds) is not int or not 1<=timeout_seconds<=300:raise ValueError('timeout_seconds must be 1..300')
-    # Resolve on the service PATH before stripping its environment from task code.
-    runner = shutil.which('bwrap')
-    if runner is None:
-        raise RuntimeError(
-            'Task-code sandbox requires bubblewrap (bwrap) on the backend service PATH. '
-            'Install it and restart the backend; unconfined execution is not supported.'
-        )
-    runner = str(Path(runner).absolute())
-    root=Path(artifact_root).resolve();base=root/'operator_workspaces';base.mkdir(exist_ok=True)
-    (root/'generated_assets').mkdir(exist_ok=True)
-    workspace=base/workspace_id;workspace.mkdir(exist_ok=True)
-    if workspace.resolve().parent!=base.resolve() or workspace.is_symlink():raise ValueError('workspace must remain inside operator_workspaces')
-    call_id='code_'+uuid.uuid4().hex[:12]
-    script=workspace/(call_id+'.py');script.write_text(code,encoding='utf8')
-    stdout=workspace/(call_id+'.stdout');stderr=workspace/(call_id+'.stderr')
-    cmd=[runner,'--die-with-parent','--unshare-all','--new-session',
-         '--ro-bind','/usr','/usr','--ro-bind','/lib','/lib','--ro-bind','/lib64','/lib64',
-         '--symlink','usr/bin','/bin','--tmpfs','/tmp','--proc','/proc','--dev','/dev',
-         '--ro-bind',sys.prefix,sys.prefix]
-    if sys.base_prefix!=sys.prefix:cmd+=['--ro-bind',sys.base_prefix,sys.base_prefix]
-    source = Path(__file__).resolve().parents[1]
-    cmd += ['--dir', '/harness']
-    for package in ('capabilities', 'pipelines', 'server', 'storage', 'service_access'):
-        cmd += ['--ro-bind', str(source/package), '/harness/'+package]
-    cmd+=[
-          '--ro-bind',str(root/'generated_assets'),'/assets',
-          '--bind',str(workspace),'/workspace','--chdir','/workspace',
-          '--setenv','HOME','/workspace','--setenv','PYTHONPATH','/harness',
-          '--setenv','PYTHONIOENCODING','utf8',sys.executable,'/workspace/'+script.name]
-    started=time.time();timed_out=False
-    with stdout.open('wb') as out,stderr.open('wb') as err:
-        process=subprocess.Popen(cmd,stdout=out,stderr=err,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},start_new_session=True)
-        try:process.wait(timeout=timeout_seconds)
+
+def _artifacts(workspace_fd, workspace, started, call_id):
+    """List draft metadata through the pinned directory without opening contents."""
+    artifacts = []
+    inspected = 0
+    for directory, folders, files, descriptor in os.fwalk('.', dir_fd=workspace_fd, follow_symlinks=False):
+        inspected += len(folders) + len(files)
+        if inspected > 10000:
+            break
+        for name in files:
+            if name.startswith(call_id):
+                continue
+            try:
+                value = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            if stat.S_ISREG(value.st_mode) and value.st_mtime >= started:
+                relative = Path(directory) / name
+                artifacts.append({'file': relative.as_posix(), 'source_path': str(workspace / relative),
+                                  'bytes': value.st_size})
+                if len(artifacts) >= 50:
+                    return artifacts
+    return artifacts
+
+
+def _publish(workspace_fd, name, stream):
+    stream.flush()
+    stream.seek(0)
+    copy_output(workspace_fd, stream, name)
+
+
+def run_task_code(artifact_root, workspace_id, code, timeout_seconds=60):
+    if not isinstance(code, str) or not 1 <= len(code) <= 1024 * 1024:
+        raise ValueError("code must be 1..1048576 characters")
+    if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 300:
+        raise ValueError("timeout_seconds must be 1..300")
+    if not shutil.which("bwrap"):
+        raise RuntimeError("Task-code sandbox requires bubblewrap (bwrap) on the backend service PATH")
+    workspace = task_directory(workspace_id)
+    call_id = "code_" + uuid.uuid4().hex[:12]
+    script = workspace / (call_id + ".py")
+    # Keep code and process output private until execution ends. Task-controlled
+    # names cannot replace interpreter input or cause us to read host secrets.
+    with (open_directory(current_access().root_path, workspace) as workspace_fd,
+          tempfile.TemporaryFile() as source, tempfile.TemporaryFile() as out,
+          tempfile.TemporaryFile() as err):
+        source.write(code.encode('utf8'))
+        _publish(workspace_fd, script.name, source)
+        source.seek(0)
+        command = python_command(workspace, script, workspace_fd=workspace_fd, script_fd=source.fileno())
+        started, timed_out = time.time(), False
+        process = subprocess.Popen(command, stdout=out, stderr=err,
+            stdin=subprocess.DEVNULL, env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
+            start_new_session=True, pass_fds=(workspace_fd, source.fileno()))
+        try:
+            process.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
-            timed_out=True;os.killpg(process.pid,signal.SIGKILL);process.wait()
-    artifacts=[]
-    for path in workspace.rglob('*'):
-        if path.is_file() and not path.is_symlink() and path.resolve().is_relative_to(workspace.resolve()):
-            if path.stat().st_mtime>=started and not path.name.startswith(call_id):
-                artifacts.append({'file':path.relative_to(workspace).as_posix(),'source_path':str(path),'bytes':path.stat().st_size})
-                if len(artifacts)>=50:break
-    result={'workspace_id':workspace_id,'call_id':call_id,'returncode':process.returncode,'timed_out':timed_out,
-            'stdout':stdout.read_bytes()[:12000].decode('utf8',errors='replace'),
-            'stderr':stderr.read_bytes()[:6000].decode('utf8',errors='replace'),'artifacts':artifacts,
-            'permissions':{'task_workspace':'read_write','harness_source':'read_only','generated_assets':'read_only',
-                           'authority_gt':'not_mounted','host_network':'unavailable; use production tools','gpu':'use production tools'},
-            'artifact_scope':'task-authored intermediate data; never simulator or official GT'}
-    (workspace/(call_id+'.receipt.json')).write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf8')
+            timed_out = True
+            terminate_process_tree(process)
+            process.wait(timeout=10)
+        _publish(workspace_fd, call_id + '.stdout', out)
+        _publish(workspace_fd, call_id + '.stderr', err)
+        out.seek(0)
+        err.seek(0)
+        result = {"workspace_id": workspace_id, "workspace_path": str(workspace), "call_id": call_id,
+              "returncode": process.returncode, "timed_out": timed_out,
+              "stdout": out.read(12000).decode("utf8", errors="replace"),
+              "stderr": err.read(6000).decode("utf8", errors="replace"),
+              "artifacts": _artifacts(workspace_fd, workspace, started, call_id),
+              "permissions": {"task_workspace": "read_write", "service_source": "not_mounted",
+                              "shared_assets": "authorized task copies only", "host_network": "unavailable; use production tools",
+                              "gpu": "use production tools"},
+              "artifact_scope": "task-authored intermediate data; never simulator or official GT"}
+        with open_write(workspace_fd, call_id + '.receipt.json') as receipt:
+            receipt.write(json.dumps(result, ensure_ascii=False, indent=2).encode('utf8'))
     return result

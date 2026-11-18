@@ -143,7 +143,19 @@ class ConfigurationMigrationTests(unittest.TestCase):
             self.assertTrue((state / 'retired-capture-config/worker.local.json.json').exists())
             self.assertEqual(json.loads((state / 'configuration-before-v5.json').read_text())['config_version'], 4)
             credentials = json.loads((state / 'credentials.local.json').read_text())
-            self.assertEqual(credentials, {'operator_token': 'same-operator', 'database_password': 'same-database'})
+            self.assertEqual({key: credentials[key] for key in ('operator_token', 'database_password')},
+                             {'operator_token': 'same-operator', 'database_password': 'same-database'})
+            self.assertNotIn('worker_token', credentials)
+            self.assertTrue(credentials['database_reader_role'].startswith('benchforge_reader_'))
+            self.assertNotEqual(credentials['database_reader_password'], credentials['database_password'])
+            self.assertTrue(credentials['database_reader_password'])
+            for file in (config / 'benchforge.local.json', generated / deployment_config.SERVER_CONFIG,
+                         generated / deployment_config.CLIENT_CONFIG):
+                public_config = file.read_text()
+                self.assertNotIn(credentials['database_reader_password'], public_config)
+                self.assertNotIn(credentials['database_reader_role'], public_config)
+            deployment_config.sync_configuration(config, generated, generated / deployment_config.SERVER_CONFIG, state)
+            self.assertEqual(json.loads((state / 'credentials.local.json').read_text()), credentials)
             self.assertNotIn('worker_token', json.loads((generated / deployment_config.SERVER_CONFIG).read_text()))
 
 

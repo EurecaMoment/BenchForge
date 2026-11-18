@@ -9,12 +9,13 @@ import time
 from sqlalchemy import select, text, update
 
 from database.config import resolve_workspace_url
-from database.engine import engine_for, workspace_id
+from database.engine import engine_for
 from database.migrations import initialize_schema
 from database.schema import reviews, legacy_review_ids
 from database.transactions import insert_missing, lock_entity, transaction
 from service_access.tool_names import qualify
 from storage.review_progress import POLICY_VERSION, WAIT_SECONDS, RELEASED, checked, public_progress
+from storage.access_identity import workspace_namespace
 
 
 def _engine(workspace):
@@ -26,7 +27,7 @@ def _database(workspace, session):
     root = Path(workspace).resolve()
     engine = _engine(root)
     initialize_schema(engine)
-    namespace = workspace_id(root)
+    namespace = workspace_namespace(engine, root, session_id=session)
     with transaction(engine) as connection:
         lock_entity(connection, "stage-review", namespace, session)
         yield connection, namespace
@@ -65,7 +66,7 @@ def read_current(workspace, session, review_id=None, *, now=None):
         raise ValueError("review_id must be a positive integer")
     engine = _engine(workspace)
     initialize_schema(engine)
-    namespace = workspace_id(workspace)
+    namespace = workspace_namespace(engine, workspace, session_id=session)
     options = {"isolation_level": "REPEATABLE READ"}
     with engine.connect().execution_options(**options) as connection:
         connection.execute(text("SET TRANSACTION READ ONLY"))

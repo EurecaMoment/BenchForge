@@ -21,7 +21,8 @@ export function apply(ctx, config) {
     tasks:{type:'array',required:true,items:{type:'object',additionalProperties:false,properties:{
       key:{type:'string',required:true},label:{type:'string',required:true},
       prompt:{type:'string',required:true,description:'Self-contained goal, frozen inputs, requirements and deliverables.'},
-      outputDirectory:{type:'string',required:true,description:'Existing dedicated write directory inside the workspace; workers must not overlap.'},
+      outputDirectory:{type:'string',required:true,description:'Existing parent handoff directory. The child writes in its own workspace; the Host copies its declared deliverables here.'},
+      inputFiles:{type:'array',items:{type:'string'},description:'Parent workspace files the Host snapshots as read-only inputs for this child.'},
     }}},
   },output,execute:createPreparationHandler(workspace =>
     ctx.benchforgeSessions.preparation(workspace, 3))}));

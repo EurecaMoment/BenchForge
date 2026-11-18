@@ -2,7 +2,6 @@
 import json
 from pathlib import Path
 import re
-import shutil
 
 PUBLIC_RELEASE_FILES = {'release/'+name for name in (
     'complete.json', 'collection_report.json', 'data_selection.json', 'item_reviews.json',
@@ -84,14 +83,16 @@ def evidence(store,task_id,revision=None,file=None,workspace_id=None):
                                for obj in frame['objects']]}
     if workspace_id is not None:
         if not isinstance(workspace_id,str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}',workspace_id):raise ValueError('invalid workspace_id')
-        workspaces=store.root/'operator_workspaces';workspaces.mkdir(exist_ok=True)
-        workspace=workspaces/workspace_id;workspace.mkdir(exist_ok=True)
-        if workspace.is_symlink() or workspace.resolve().parent!=workspaces.resolve():raise ValueError('invalid workspace path')
+        from service_access.task_paths import task_directory
+        workspace = task_directory(workspace_id)
         # Unique copy names keep earlier evidence snapshots and generated task files intact.
         import uuid
         target=workspace/('evidence_'+uuid.uuid4().hex[:8]+'_'+source.name)
-        shutil.copyfile(source,target)
-        result.update(workspace_file='/workspace/'+target.name,source_path=str(target),copy_scope='task copy; original production evidence remains unchanged')
+        from storage.confined_files import copy_output
+        from service_access.access_scope import current_access
+        with source.open('rb') as stream:
+            copy_output(current_access().root_path, stream, target)
+        result.update(workspace_file=str(target),source_path=str(target),copy_scope='task copy; original production evidence remains unchanged')
     elif source.suffix=='.json':
         if source.stat().st_size>512*1024:raise ValueError('large JSON: provide workspace_id and inspect the task copy')
         result['data']=json.loads(source.read_text(encoding='utf8'))

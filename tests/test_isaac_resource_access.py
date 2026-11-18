@@ -1,0 +1,34 @@
+"""Jobs do not confer ownership of another conversation's simulator world."""
+
+from unittest import TestCase
+from unittest.mock import patch
+from capabilities.isaac_sim.resource_access import NativeResources
+from database.access import AccessScope
+from service_access.access_scope import TrustedAccess, access_context
+
+
+class NativeResourceAccessTests(TestCase):
+    def test_other_world_is_denied_and_owned_session_is_allowed(self):
+        access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')
+        with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'), \
+                patch('capabilities.isaac_sim.resource_access.read_document', return_value=None):
+            resources = NativeResources('127.0.0.1:50051')
+            with self.assertRaises(PermissionError):
+                resources.check({'extension': {'operation': 'scene.capture', 'arguments': {'session_id': 'other'}}})
+            with patch.object(resources, 'owns', return_value=True):
+                resources.check({'extension': {'operation': 'scene.capture', 'arguments': {'session_id': 'mine', 'cameras': [{'path': '/World/Camera'}]}}})
+
+    def test_global_world_mutation_and_local_source_paths_are_rejected(self):
+        access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')
+        with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'):
+            resources = NativeResources('127.0.0.1:50051')
+            with self.assertRaises(PermissionError):
+                resources.check({'step': {'count': 10}})
+            with self.assertRaises(PermissionError):
+                resources.check({'extension': {'operation': 'asset.import', 'arguments': {'source': '/service/secret.usd'}}})
+
+    def test_usd_prim_paths_are_not_host_paths(self):
+        from service_access.input_policy import check_arguments
+        access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')
+        with access_context(access):
+            check_arguments({'request': {'path': '/World/Robot', 'config': {'stiffness': 10}}})

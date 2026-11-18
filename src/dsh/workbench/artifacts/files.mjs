@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises';
-import {createReadStream} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
 import path from 'node:path';
 import {ApiError, inside, readJson} from '../../host/session_scope.mjs';
+import {openOwnedFile} from '../../host/owned_file.mjs';
 
 const FORMATS = {
   '.png': ['image', 'image/png'], '.jpg': ['image', 'image/jpeg'], '.jpeg': ['image', 'image/jpeg'],
@@ -94,7 +94,9 @@ export async function openConversationArtifact(id, {evidence, roots, request}) {
   const ref = references(evidence).find((row) => row.id === id);
   if (!ref) throw new ApiError('This file was not produced or delivered in the current conversation', 404);
   roots = await canonicalRoots(roots);
-  const {file, stat} = await locate(ref, roots);
+  const {file, root} = await locate(ref, roots);
+  const {handle, stat} = await openOwnedFile(root.path, file, request.signal);
+  try {
   const [kind, contentType] = FORMATS[path.extname(file).toLowerCase()] || ['file', 'application/octet-stream'];
   const headers = new Headers({
     'content-type': contentType, 'cache-control': 'private, no-cache', 'x-content-type-options': 'nosniff',
@@ -105,16 +107,19 @@ export async function openConversationArtifact(id, {evidence, roots, request}) {
   const range = request.headers.get('range');
   if (range) {
     const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-    if (!match || !match[1] && !match[2]) return rangeFailure(headers, stat.size);
+    if (!match || !match[1] && !match[2]) { await handle.close(); return rangeFailure(headers, stat.size); }
     start = match[1] ? Number(match[1]) : Math.max(0, stat.size - Number(match[2]));
     end = match[1] && match[2] ? Math.min(Number(match[2]), end) : end;
-    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= stat.size || start < 0)
-      return rangeFailure(headers, stat.size);
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= stat.size || start < 0) {
+      await handle.close(); return rangeFailure(headers, stat.size);
+    }
     headers.set('content-range', `bytes ${start}-${end}/${stat.size}`); status = 206;
   }
   headers.set('content-length', String(Math.max(0, end - start + 1)));
-  const body = stat.size ? Readable.toWeb(createReadStream(file, {start, end, signal: request.signal})) : null;
+  const body = stat.size ? Readable.toWeb(handle.createReadStream({start, end, signal: request.signal})) : null;
+  if (!stat.size) await handle.close();
   return new Response(body, {status, headers});
+  } catch (error) { await handle.close(); throw error; }
 }
 
 function rangeFailure(headers, size) {

@@ -25,6 +25,7 @@ from storage.execution_lock import exclusive_run, RunBusyError
 from pipelines.reviews.service import gate, review as review_status
 from service_access.tool_names import qualify
 from service_access.scene_service import environment_value
+from storage.operation_outputs import operation_workspace, logical_path, publish_current
 
 
 def plan(args, directory, config=None):
@@ -33,7 +34,7 @@ def plan(args, directory, config=None):
         return _plan(args, directory, config)
     # Serialize only saves in this conversation, including activation and gate
     # publication. Parallel conversations and read-only validation remain free.
-    lock = Path(directory).parents[1] / 'plan-locks' / sha256(session.encode()).hexdigest()
+    lock = operation_workspace(directory) / 'plan-locks' / sha256(session.encode()).hexdigest()
     try:
         with exclusive_run(lock):
             return _plan(args, directory, config)
@@ -42,7 +43,7 @@ def plan(args, directory, config=None):
 
 
 def _plan(args, directory, config=None):
-    args, authoring_sources = resolve_request(args, Path(directory).parents[1])
+    args, authoring_sources = resolve_request(args, operation_workspace(directory))
     if type(args.get('new_task', False)) is not bool:
         raise ValueError('new_task must be a boolean')
     catalog = {t['id']: t for t in all_templates()}
@@ -136,7 +137,7 @@ def _plan(args, directory, config=None):
     if authoring_sources:
         value['authoring_sources'] = authoring_sources
     session = args.get('_dsh_context', {}).get('session_id')
-    workspace=Path(directory).parents[1]
+    workspace=operation_workspace(directory)
     active=current(workspace,session) if session else None
     edit=args.get('_plan_edit')
     application_resolution=None
@@ -169,7 +170,7 @@ def _plan(args, directory, config=None):
     base_plan = value.get('edit_revision', {}).get('base_plan') if applied_edit else active['plan'] if active else None
     previous = read(base_plan) if base_plan else None
     value['stage_review_key'], value['review_revision'] = revision_review(
-        value, target, previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit,
+        value, logical_path(target), previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit,
         draft_edit=bool(edit))
     if session and not edit:
         pending = review_status(workspace, session)
@@ -177,14 +178,15 @@ def _plan(args, directory, config=None):
                 and (pending.get('stage'), pending.get('key')) != ('S1', value['stage_review_key'])):
             raise ValueError('Resolve the paused review or saved user instruction before replacing its production contract.')
     write(target, value)
+    publish_current()
     if session:
-        activate(workspace,session,str(target.resolve()),expected=edit['base_plan'] if edit else active['plan'] if active else None,
+        activate(workspace,session,str(logical_path(target)),expected=edit['base_plan'] if edit else active['plan'] if active else None,
                  pending=bool(edit),changes=edit['changes'] if edit else ())
     review = None
     # A saved edit still needs executable application. Its final applied plan
     # owns S1; opening a draft window here would make the user wait twice.
     if session and not edit:
-        review = gate(workspace, session, 'S1', value['stage_review_key'], str(target.resolve()))
+        review = gate(workspace, session, 'S1', value['stage_review_key'], str(logical_path(target)))
     unsupported = [t['id'] for t in value['template_contracts'] if not t['execution']['program_generator']]
     return {'state': 'planned', 'plan': str(target.resolve()), 'pipeline_id': recipe,
             'production_contract': value.get('production_contract'), 'total_steps': len(value['steps']),

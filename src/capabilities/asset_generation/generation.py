@@ -52,12 +52,27 @@ def generation_defaults(name):
 
 
 class GenerationTools:
-    def __init__(self, artifact_root):
+    def __init__(self, artifact_root, *, engine=None, task_id=None):
         self.root = Path(artifact_root).resolve()
         self.assets = self.root / 'generated_assets'
         self.assets.mkdir(parents=True, exist_ok=True)
+        from service_access.access_scope import current_access
+        self.access, self.engine, self.run_id = current_access(), engine, None
+        if task_id is not None:
+            self.bind_task(task_id)
+
+    def bind_task(self, task_id):
+        from database.engine import engine_for
+        from capabilities.asset_generation.shared_library import task_access
+        self.engine = self.engine or engine_for()
+        self.access = task_access(self.engine, task_id)
+        self.run_id = task_id.split('.')[0]
+        return self
 
     def catalog(self, asset_ids=None):
+        if self.access is not None:
+            from capabilities.asset_generation.shared_library import catalog
+            return catalog(self.root, self.access, asset_ids, engine=self.engine)
         records = []
         for path in sorted(self.assets.glob('*/asset.json')):
             if asset_ids is not None and path.parent.name not in asset_ids:
@@ -86,6 +101,9 @@ class GenerationTools:
     def asset_path(self, asset_id, filename='asset.json'):
         if not isinstance(asset_id, str) or not re.fullmatch(r'asset_[a-f0-9]{16}', asset_id):
             raise ValueError('invalid registered asset ID')
+        if self.access is not None:
+            from capabilities.asset_generation.shared_library import asset_file
+            return asset_file(self.root, self.access, asset_id, filename, engine=self.engine)
         root = self.assets / asset_id
         path = (root / filename).resolve()
         if not _inside(path, root) or not path.is_file():
@@ -94,6 +112,37 @@ class GenerationTools:
 
     def source_path(self, value):
         """Only operator-configured import roots can supply production inputs."""
+        if self.access is not None:
+            from service_access.access_scope import access_context, workspace_path
+            with access_context(self.access):
+                try:
+                    path = workspace_path(value)
+                    if path.is_file():
+                        from capabilities.asset_generation.shared_library import snapshot_input
+                        return snapshot_input(self.root, self.access, path)
+                except (PermissionError, FileNotFoundError):
+                    pass
+            # The service may consume an owned production image/mesh, never an
+            # arbitrary global artifact path or private evaluation authority.
+            path = Path(value).expanduser().resolve(strict=True)
+            if path.is_file() and path.is_relative_to(self.root):
+                relative = path.relative_to(self.root)
+                if (len(relative.parts) >= 4 and relative.parts[0] == '.generation-inputs'
+                        and relative.parts[1] == self.access.scope.workspace_id
+                        and re.fullmatch('[a-f0-9]{64}', relative.parts[2])):
+                    return path  # Descriptor-copied, service-private input snapshot.
+                if relative.parts and relative.parts[0] == '.shared-assets':
+                    from capabilities.asset_generation.shared_library import authorized_source
+                    return authorized_source(self.root, self.access, path, engine=self.engine)
+                if (relative.parts and relative.parts[0] not in {'generated_assets', '.shared-assets'}
+                        and not any(part in {'authority', 'private', 'answers', 'gold'} for part in relative.parts)
+                        and path.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp', '.glb', '.gltf', '.obj', '.ply', '.stl', '.npz', '.npy'}):
+                    from database.engine import engine_for
+                    from capabilities.asset_generation.shared_library import task_access
+                    owner = task_access(self.engine or engine_for(), relative.parts[0])
+                    if owner is not None and owner.scope == self.access.scope:
+                        return path
+            raise PermissionError('Source is outside this conversation and its production artifacts')
         path = Path(value).expanduser().resolve()
         roots = [self.root, Path(environment_value('BENCHFORGE_TASK_ROOT', self.root / 'operator_workspaces')).resolve(),
                  *(Path(p).expanduser().resolve() for p in environment_value('BENCHFORGE_IMPORT_ROOTS', '').split(os.pathsep) if p)]
@@ -159,6 +208,8 @@ class GenerationTools:
         return result
 
     def _convert(self, source, work, frame):
+        from capabilities.asset_generation.shared_library import verify_reference_closure
+        verify_reference_closure(source)
         conversion, glb = work / 'mesh_data.json', work / 'portable.glb'
         command = [sys.executable, '-m', 'capabilities.asset_generation.mesh_export', '--source', str(source), '--output', str(conversion), '--glb-output', str(glb), '--source-frame', frame]
         env = {**os.environ, 'PYTHONPATH': str(Path(__file__).resolve().parents[2])}
@@ -210,6 +261,11 @@ class GenerationTools:
         if 'camera_coordinates' in mesh:record['geometry']['camera_coordinates']=mesh['camera_coordinates']
         if 'source_camera' in mesh:record['geometry']['source_camera']=mesh['source_camera']
         write_json(dest / 'asset.json', record)
+        if self.access is not None:
+            from capabilities.asset_generation.shared_library import publish_generated
+            publication = publish_generated(self.root, self.access, dest, record,
+                engine=self.engine, run_id=self.run_id)
+            record.update(publication)
         write_json(work / 'asset_ref.json', record)
         return record
 

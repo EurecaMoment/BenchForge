@@ -3,10 +3,22 @@ import json
 import math
 from pathlib import Path
 import re
+from service_access.resource_files import (
+    owned_resource_version, read_owned_resource, resolve_owned_resource,
+)
 
 _UNRESOLVED_DESIGN = object()
 
 DETAIL_FIELDS = ('purpose', 'reason', 'simplifications', 'retained_constraints', 'excluded_claims')
+
+
+def _document(path, root=None):
+    raw, version = read_owned_resource(path, limit=2 * 1024 * 1024, artifact_root=root)
+    return json.loads(raw.decode('utf-8-sig')), version
+
+
+def _resource(path, root=None, *, must_exist=True):
+    return resolve_owned_resource(None, root, path, must_exist=must_exist)
 
 
 def path_is_excluded(path, policy):
@@ -71,11 +83,11 @@ def saved_design(program, policy=None):
     if not isinstance(reference.get('path'), str):
         raise ValueError('Scene plan needs its saved absolute path')
     path = Path(reference['path'])
-    if not path.is_absolute() or not path.is_file() or path.stat().st_size > 2 * 1024 * 1024:
+    if not path.is_absolute():
         raise ValueError('Scene plan must be an existing saved JSON document')
     if policy and path_is_excluded(path, policy):
         raise ValueError('Removed scene plans cannot declare a new geometry exception')
-    plan = json.loads(path.read_text(encoding='utf-8-sig'))
+    plan, _ = _document(path)
     if not isinstance(plan, dict):
         raise ValueError('Reference a saved assessment scene plan')
     assessment = plan.get('assessment', plan)
@@ -101,7 +113,7 @@ def geometry_exception(program, policy=None, *, resolved_design=_UNRESOLVED_DESI
     value = matched[0]
     if not set(value['object_ids']) <= {obj['id'] for obj in program['objects']}:
         raise ValueError('Geometry exception must name the exact simplified objects in this scene')
-    return {**value, 'plan_path': str(path.resolve()), 'plan_version': [path.stat().st_size, path.stat().st_mtime_ns],
+    return {**value, 'plan_path': str(path.resolve()), 'plan_version': owned_resource_version(path),
             'scene_style': 'simplified_geometry', 'authority': 'model-declared experimental design, not physical evidence'}
 
 
@@ -226,7 +238,7 @@ def validate_scene_brief(design, object_ids=None):
     return design
 
 
-def validate_brief_revision(design, path):
+def validate_brief_revision(design, path, root=None):
     """A declared revision inherits hard requirements from frozen production.
 
     Soft design can change in both directions; original production evidence is
@@ -245,11 +257,13 @@ def validate_brief_revision(design, path):
         directory=Path(history[-1].get('evidence_directory',''))
     else:
         directory=Path(previous)
-    if not directory.is_absolute() or not directory.is_dir():raise ValueError('Brief revision needs its prior captured evidence directory')
+    if not directory.is_absolute():raise ValueError('Brief revision needs its prior captured evidence directory')
+    directory=_resource(directory,root)
+    if not directory.is_dir():raise ValueError('Brief revision needs its prior captured evidence directory')
     file=directory/'scene_brief.json'
     previous_history=[]
     if file.is_file():
-        frozen=json.loads(file.read_text(encoding='utf-8'))
+        frozen,_=_document(file,root)
         if not set(frozen.get('hard_requirements',[])) <= set(design['hard_requirements']):
             raise ValueError('Scene brief revision must preserve every original hard requirement')
         previous_history=frozen.get('revision_history',[])
@@ -283,8 +297,7 @@ def validate_brief_revision(design, path):
         if evidence_path.is_absolute() or '..' in evidence_path.parts:
             raise ValueError('Scene brief evidence references must stay inside the prior capture')
         source=directory/evidence_path
-        if source.is_symlink() or not source.is_file() or not source.resolve().is_relative_to(directory.resolve()):
-            raise ValueError('Scene brief evidence reference does not point to a saved prior artifact')
+        owned_resource_version(source,artifact_root=root)
         resolved.append(evidence_path.as_posix())
     if not any(re.fullmatch(r'capture/view_\d+\.png',name) for name in resolved):
         raise ValueError('Scene brief revision must cite an actual captured view')
@@ -293,9 +306,9 @@ def validate_brief_revision(design, path):
     if directory.resolve()==path.parent.resolve():raise ValueError('Preserve prior capture evidence in a separate revision')
 
 
-def require_prior_brief(brief, directory):
+def require_prior_brief(brief, directory, root=None):
     """A known captured parent cannot be detached by omitting revision metadata."""
-    directory=Path(directory)
+    directory=_resource(directory,root,must_exist=False)
     if not (directory/'scene_brief.json').is_file():return
     previous=brief.get('previous_capture_directory')
     if not previous or Path(previous).resolve()!=directory.resolve():
@@ -306,14 +319,15 @@ def capture_retry_directory(root, task_id, revision=None):
     """Admitted frozen input can be recovered before any capture exists."""
     if not re.fullmatch(r'sf_[a-zA-Z0-9_-]+\.scene\d+',str(task_id)):
         raise ValueError('Unreviewed scene retries require a valid scene task')
-    folders=[p for p in (Path(root)/task_id).glob('revision_*') if p.is_dir() and p.name[9:].isdigit()]
+    task_directory=_resource(Path(root)/task_id,root)
+    folders=[p for p in task_directory.glob('revision_*') if p.is_dir() and p.name[9:].isdigit()]
     if revision is not None:
         folders=[p for p in folders if p.name=='revision_'+str(revision)]
     if not folders:raise ValueError('Unreviewed scene retries have no frozen admitted program')
     directory=max(folders,key=lambda p:int(p.name[9:]))
     admission=directory/'scene_admission.json'
     if (not (directory/'program.json').is_file() or not admission.is_file() or
-            json.loads(admission.read_text()).get('passed') is not True):
+            _document(admission,root)[0].get('passed') is not True):
         raise ValueError('Unreviewed scene retries require an admitted frozen program')
     return directory
 
@@ -321,7 +335,7 @@ def capture_retry_directory(root, task_id, revision=None):
 def review_retry_directory(root, task_id):
     directory=capture_retry_directory(root,task_id)
     report=directory/'capture/report.json'
-    if not report.is_file() or json.loads(report.read_text()).get('status')!='captured':
+    if not report.is_file() or _document(report,root)[0].get('status')!='captured':
         raise ValueError('Unreviewed scene retries require an admitted native capture')
     return directory
 
@@ -335,11 +349,9 @@ def plan_declaration_current(declaration):
     """
     try:
         path = Path(declaration['plan_path'])
-        if not path.is_file() or path.stat().st_size > 2 * 1024 * 1024:
-            return False
-        if declaration.get('plan_version') == [path.stat().st_size, path.stat().st_mtime_ns]:
+        if declaration.get('plan_version') == owned_resource_version(path):
             return True
-        plan = json.loads(path.read_text(encoding='utf-8-sig'))
+        plan, _ = _document(path)
         scenes = plan.get('assessment', plan).get('scenes', {})
         if 'scene_design_id' in declaration:
             values = scenes.get('geometry_exceptions', [])
@@ -368,8 +380,8 @@ def scene_brief(program, policy=None, root=None, *, resolved_design=_UNRESOLVED_
             if not isinstance(source,dict) or source.get('kind')!='original_scene':continue
             task=source.get('task_id','');revision=source.get('revision',0)
             if re.fullmatch(r'sf_[a-zA-Z0-9_-]+\.scene\d+',str(task)) and type(revision) is int and revision>=0:
-                require_prior_brief(design,Path(root)/task/('revision_'+str(revision)))
-    validate_brief_revision(design,path)
-    return {**design, 'plan_path': str(path.resolve()), 'plan_version': [path.stat().st_size, path.stat().st_mtime_ns],
+                require_prior_brief(design,Path(root)/task/('revision_'+str(revision)),root)
+    validate_brief_revision(design,path,root)
+    return {**design, 'plan_path': str(path.resolve()), 'plan_version': owned_resource_version(path,artifact_root=root),
             'authority': 'versioned scene design, not captured physical truth',
             'iteration_rule': 'repair scene to brief; revise omissions from actual evidence; preserve user hard requirements and failed evidence'}

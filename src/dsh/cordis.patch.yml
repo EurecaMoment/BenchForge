@@ -2,6 +2,13 @@
 - id: session-query-sqlite
   disabled: true
 - insert:
+  - id: benchforge-access
+    name: '@eurecamoment/benchforge-dsh/access'
+    config:
+      workspaceRoot: !!js 'process.getBuiltinModule(''node:path'').join(process.env.DSH_HOME
+        || (() => {throw new Error(''DSH_HOME is required'')})(), ''workspaces'')'
+      resourceRoot: !!js 'process.getBuiltinModule(''node:path'').join(process.env.DSH_HOME
+        || (() => {throw new Error(''DSH_HOME is required'')})(), ''resources'')'
   - id: benchforge-session-query
     name: '@eurecamoment/benchforge-dsh/session-query'
     config:
@@ -9,7 +16,8 @@
   - id: benchforge-examples
     name: '@eurecamoment/benchforge-dsh/examples'
     config:
-      sourceDirectory: ''
+      sourceDirectory: !!js 'process.getBuiltinModule(''node:path'').join(process.getBuiltinModule(''node:path'').dirname(process.getBuiltinModule(''node:module'').createRequire(baseUrl).resolve(''@eurecamoment/benchforge-dsh/package.json'')),
+        ''dist/example/SpatialForge'')'
   - id: benchforge-session-operations
     name: '@eurecamoment/benchforge-dsh/session-operations'
     config:
@@ -472,6 +480,8 @@
       - id: tool-plugin-market
         name: '@deepseek-ai/dsh-plugin-market/tools'
         disabled: true
+      - id: benchforge-skill-files
+        name: '@eurecamoment/benchforge-dsh/component-skills'
       - id: benchforge-invocation
         name: '@eurecamoment/benchforge-dsh/invocation'
       - id: benchforge-review-policy

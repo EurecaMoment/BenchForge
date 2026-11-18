@@ -20,6 +20,8 @@
     "./capture-runtime": "./dist/capture-runtime.mjs",
     "./session-operations": "./dist/session-operations.mjs",
     "./examples": "./dist/examples.mjs",
+    "./access": "./dist/access.mjs",
+    "./component-skills": "./dist/component-skills.mjs",
     "./production/types": "./production/types.d.ts",
     "./subagent-policy": "./dist/subagent-policy.mjs",
     "./invocation": "./dist/invocation.mjs",
@@ -36,10 +38,12 @@
   },
   "files": [
     "presets/*.py",
+    "skills/",
     "production/*.d.ts",
     "dist/*.mjs",
     "dist/resources/*.json",
     "dist/task_support/*",
+    "dist/example/",
     "check_config.py",
     "cli.py",
     "client/index.js",
@@ -54,6 +58,8 @@
     }
   },
   "peerDependencies": {
+    "@deepseek-ai/dsh-skill-filesystem": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-util-ripgrep": "0.2.2-rc.3",
     "@deepseek-ai/dsh-error": "0.2.2-rc.3",
     "@deepseek-ai/cordis": "4.1.0",
     "@deepseek-ai/schemastery": "3.19.0",

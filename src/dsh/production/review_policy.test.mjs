@@ -19,7 +19,12 @@ test('reads, status, previews, validated plans and bounded draft edits remain us
     'benchforge_scene_evidence', 'benchforge_wait', 'benchforge_pipeline_plan']) {
     assert.equal(reviewDenial({name}, pending, '/workspace'), undefined, name);
   }
-  assert.equal(reviewDenial({name: 'benchforge_isaac_sim', arguments: {action: 'capabilities'}}, pending, '/workspace'), undefined);
+  for (const action of ['guide', 'capabilities', 'catalog', 'assets', 'status', 'wait', 'download']) {
+    assert.equal(reviewDenial({name: 'benchforge_isaac_sim', arguments: {action}}, pending, '/workspace'), undefined);
+  }
+  for (const action of ['healthz', 'api_catalog', 'get_job', 'watch_job', 'download_artifact']) {
+    assert.ok(reviewDenial({name: 'benchforge_isaac_sim', arguments: {action}}, pending, '/workspace'));
+  }
   assert.equal(reviewDenial({name: 'write', arguments: {file_path: 'tasks/scene/draft.py'}}, pending, '/workspace'), undefined);
   for (const file of ['config/service.json', 'operations/run/steps/collection/result.json', 'tasks/../../config/service.json']) {
     assert.ok(reviewDenial({name: 'write', arguments: {file_path: file}}, pending, '/workspace'));
@@ -48,4 +53,15 @@ test('an unloaded parent cannot hide its review behind a child working directory
   const agent = {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}};
   assert.ok(await guard({name: 'bash', agent}));
   assert.equal(await guard({name: 'read', agent}), undefined);
+});
+
+test('independent child drafts use the child root while production reads the parent review', async () => {
+  const observed = [], parent = {id: 'parent', session: {header: {cwd: '/managed/parent'}}};
+  const guard = createReviewPolicy({agents: new Map([['parent', parent]]),
+    readReview: (workspace, id) => {observed.push([workspace, id]); return pending;}});
+  const agent = {id: 'child', session: {header: {cwd: '/managed/child', parentSession: 'parent'}}};
+  assert.equal(await guard({name: 'write', arguments: {file_path: '/managed/child/tasks/draft.py'}, agent}), undefined);
+  assert.ok(await guard({name: 'write', arguments: {file_path: '/managed/parent/tasks/plan.py'}, agent}));
+  assert.ok(await guard({name: 'benchforge_capture', agent}));
+  assert.deepEqual(observed, [['/managed/parent', 'parent'], ['/managed/parent', 'parent']]);
 });

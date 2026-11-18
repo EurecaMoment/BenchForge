@@ -3,10 +3,11 @@
 from sqlalchemy import select
 
 from database.config import resolve_workspace_url
-from database.engine import engine_for, workspace_id
+from database.engine import engine_for
 from database.migrations import initialize_schema
 from database.schema import active_plans
 from database.transactions import insert_statement, lock_entity, transaction
+from storage.access_identity import workspace_namespace
 
 
 def _engine(workspace):
@@ -21,14 +22,17 @@ def _query(namespace, session):
 
 
 def current(workspace, session):
-    with _engine(workspace).connect() as connection:
-        row = connection.execute(_query(workspace_id(workspace), session)).mappings().first()
+    engine = _engine(workspace)
+    namespace = workspace_namespace(engine, workspace, session_id=session)
+    with engine.connect() as connection:
+        row = connection.execute(_query(namespace, session)).mappings().first()
         return dict(row) if row else None
 
 
 def activate(workspace, session, plan, *, expected=None, pending=False, changes=()):
-    namespace = workspace_id(workspace)
-    with transaction(_engine(workspace)) as connection:
+    engine = _engine(workspace)
+    namespace = workspace_namespace(engine, workspace, session_id=session)
+    with transaction(engine) as connection:
         lock_entity(connection, "active-plan", namespace, session)
         old = connection.execute(_query(namespace, session).with_for_update()).mappings().first()
         if expected and old and old["plan"] != expected:

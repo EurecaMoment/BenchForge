@@ -17,8 +17,7 @@ const reads = new Set(['read', 'read_image', 'read_file', 'list_directory', 'lis
   'benchforge_scene_status', 'benchforge_scene_evidence', 'benchforge_wait', 'benchforge_scene_catalog',
   'benchforge_scene_preflight']);
 const writes = new Set(['write', 'edit', 'str_replace_editor']);
-const inspections = new Set(['capabilities', 'health', 'healthz', 'status', 'catalog', 'api_catalog',
-  'get_job', 'watch_job', 'download_artifact', 'assets', 'wait', 'download']);
+const inspections = new Set(['guide', 'capabilities', 'status', 'catalog', 'assets', 'wait', 'download']);
 
 function draftWrite(exec, workspace) {
   if (!writes.has(exec.name)) return false;
@@ -56,6 +55,9 @@ export function createReviewPolicy({readReview, agents, sessions} = {}) {
   return async exec => {
     let agent = exec.agent;
     if (!agent?.session?.header?.cwd) return;
+    // Draft ownership follows the executing child; stage approval follows its
+    // parent chain. Independent child roots need not be nested in that parent.
+    const executionWorkspace = agent.session.header.cwd;
     const seen = new Set();
     let owner = agent.id;
     while (agent?.session?.header?.parentSession && !seen.has(owner)) {
@@ -63,19 +65,19 @@ export function createReviewPolicy({readReview, agents, sessions} = {}) {
       owner = agent.session.header.parentSession;
       const parent = agents?.get(owner), session = parent?.session || sessions?.get(owner);
       if (!session?.header?.cwd) {
-        const denial = reviewDenial(exec, {stage: '', state: 'needs_input'}, agent.session.header.cwd);
+        const denial = reviewDenial(exec, {stage: '', state: 'needs_input'}, executionWorkspace);
         return denial && {...denial, reason: 'The parent review owner is not loaded. Resume the parent conversation to confirm the production stage; reads and draft edits remain available.'};
       }
       agent = parent || {id: owner, session};
     }
     const workspace = agent.session.header.cwd;
-    if(!reviewDenial(exec,{stage:'',state:'needs_input'},workspace))return;
-    try {return reviewDenial(exec, await readReview(workspace, owner, Date.now(), exec.signal), workspace);}
+    if(!reviewDenial(exec,{stage:'',state:'needs_input'},executionWorkspace))return;
+    try {return reviewDenial(exec, await readReview(workspace, owner, Date.now(), exec.signal), executionWorkspace);}
     catch (error) {
       exec.signal?.throwIfAborted();
       // Allow inspection when storage is unavailable, but do not bypass a
       // potentially active review for a submission or shell.
-      const denial=reviewDenial(exec, {stage: '', state: 'needs_input'}, workspace);
+      const denial=reviewDenial(exec, {stage: '', state: 'needs_input'}, executionWorkspace);
       return denial && {...denial,reason:`Cannot verify the current stage review: ${error.message}. Production stays stopped until the stored review can be read; inspection remains available.`,
         info:{name:'StageReviewStorageError',code:error.code||'BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE'}};
     }

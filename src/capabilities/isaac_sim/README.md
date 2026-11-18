@@ -12,6 +12,7 @@ BenchForge capture daemon, device lock, callback endpoint or local Kit runtime i
 | `grpc/tasks.py` | Durable request IDs, frozen payloads and job receipts |
 | `grpc/receipts.py` | Per-request and per-download ownership across subprocesses |
 | `tool_api.py` | Workspace operation behind the DSH `benchforge_isaac_sim` tool |
+| `guide.py` | Model-readable usage joined with the live service's discovery responses |
 | `authoring.py` | Portable SceneProgram-to-USD authoring |
 | `mesh_materials.py`, `usd_materials.py` | Untextured PBR factors, face materials and USD literals |
 | `native_geometry.py` | Measured bounds and enabled colliders from the simulator's USD export |
@@ -28,6 +29,15 @@ and backing up retired settings. On first backend start, the old queue is
 backed up and unfinished old-protocol captures require an explicit retry.
 That retry creates a new scene revision and leaves previous capture paths intact.
 
+Start with `benchforge_isaac_sim({"action":"guide"})`; use
+`{"action":"guide","operation":"extension.asset.import"}` to read one operation's
+published scope and schema, or `feature_id` for one catalog feature. These are
+live service reads, not Git version checks or deployment-directory discovery.
+A generic object schema does not describe supported fields. `AVAILABLE` means
+current readiness, not task acceptance; the actual job result and artifacts remain
+necessary. See [DSH–Isaac Sim interface map](../../../docs/DSH-IsaacSim-接口对照.md)
+for calls, source locations and the separate deployment acceptance record.
+
 The DSH tool reads the live catalog and uses native submit/invoke, status/wait,
 cancel, upload and download operations. Submission is not completion. Reusing
 a request identity requires the same payload. Disconnecting a wait does not
@@ -43,10 +53,11 @@ the export digest, and keeps that file with the capture evidence. Catalog sizes
 do not certify the native bounds. This does not replace contact/support checks
 or visual acceptance on the actual simulator.
 
-Independent scenes can advance concurrently, with configurable bounded capture
-admission. Multiple cameras use native batches of up to 32; additional authored
-views are split into further batches without dropping views. The simulator
-owns synchronization inside each world.
+Independent scenes support concurrent submission and observation, with
+configurable bounded capture admission. Actual simulation and rendering
+parallelism depends on the selected backend. Multiple cameras use native batches
+of up to 32; additional authored views are split into further batches without
+dropping views. The simulator owns synchronization inside each world.
 
 SceneProgram capture supports portable geometry and the A100 renderer's
 supported materials, lights and annotations. Read the capability catalog for

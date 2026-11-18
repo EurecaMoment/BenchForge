@@ -1,0 +1,203 @@
+/** Keyless Host integration: real controllers, AgentLoop, filesystem and bwrap. */
+import {mkdtemp, readFile, realpath, rm, symlink, writeFile} from 'node:fs/promises'
+import {homedir} from 'node:os'
+import {join} from 'node:path'
+import {randomUUID} from 'node:crypto'
+import {fileURLToPath} from 'node:url'
+import {Context} from '@deepseek-ai/cordis'
+import Loader from '@deepseek-ai/cordis-plugin-loader'
+import Group from '@deepseek-ai/cordis-plugin-group'
+import {mountAgentLoopTestDependencies, mountAgentLoopTestHarness} from '@deepseek-ai/dsh-agent-loop-testkit'
+import AgentPresets from '@deepseek-ai/dsh-agent-preset-registry'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
+import * as SessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
+import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
+import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
+import Skills from '@deepseek-ai/dsh-skill'
+import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
+import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
+import * as ToolBash from '@deepseek-ai/dsh-tool-bash'
+import * as ShellEnv from '@deepseek-ai/dsh-shell-env'
+import LocalSubprocess from '@deepseek-ai/dsh-subprocess-local'
+import {LocalSandboxProvider} from '@deepseek-ai/dsh-sandbox-local'
+import {SandboxBashExecutor} from '@deepseek-ai/dsh-bash-sandbox'
+import {defineTool} from '@deepseek-ai/dsh-tools'
+import {describe, expect, it, onTestFinished} from 'vitest'
+import {createSessionTestController} from '../../third_party/deepseek-harness4BenchForge/packages/api/session-controller/tests/test-remote.ts'
+import * as AccessHost from '../../src/dsh/access/host.mjs'
+import * as ComponentSkills from '../../src/dsh/access/skills.mjs'
+import {currentAccessScope} from '../../src/dsh/access/context.mjs'
+
+const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'"
+const text = (result: any) => result.content.filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n')
+
+async function boot(existingRoot?: string) {
+  const root = existingRoot || await realpath(await mkdtemp(join(process.env.BENCHFORGE_HOST_TEST_ROOT || homedir(), '.benchforge-host-test-')))
+  const ctx = new Context()
+  onTestFinished(async () => {
+    try {await ctx.fiber.dispose()} finally {await rm(root, {recursive: true, force: true})}
+  })
+  ctx.baseUrl = new URL('../../third_party/deepseek-harness4BenchForge/', import.meta.url).href
+  await ctx.plugin(Loader)
+  ctx.loader.builtins.group = Group
+  await mountAgentLoopTestDependencies(ctx)
+  await ctx.plugin(Storage)
+  await ctx.plugin(StorageJson, {root: join(root, 'host-storage')})
+  await ctx.plugin(StorageDomain, {backend: 'json'})
+  await ctx.plugin(SessionPersistence, {root: join(root, 'sessions')})
+  await ctx.plugin(WorkspaceRegistry)
+  await ctx.plugin(SandboxPolicy, {mode: 'workspace-write', workspaceRoot: root})
+  await ctx.plugin(SandboxedFileSystem, {cwd: root})
+  await ctx.plugin(WorkingDirectory)
+  await ctx.plugin(AccessHost, {workspaceRoot: join(root, 'workspaces'), resourceRoot: join(root, 'resources'),
+    skillsSource: fileURLToPath(new URL('../../src/dsh/skills/', import.meta.url))})
+  await ctx.plugin(Skills)
+  await ctx.plugin(ComponentSkills)
+  await ctx.plugin(ToolSkill)
+  await ctx.plugin(ToolFs, {readImage: false})
+  await ctx.plugin(LocalSubprocess)
+  await ctx.plugin(LocalSandboxProvider)
+  await ctx.plugin(SandboxBashExecutor, {timeoutMs: 10000, graceMs: 100, cwd: root})
+  await ctx.plugin(ShellEnv, {dshHome: join(root, 'host-home')})
+  await ctx.plugin(ToolBash, {enableRunInBackground: false})
+  await mountAgentLoopTestHarness(ctx)
+  await ctx.plugin(AgentPresets, {default: 'benchforge'})
+  const unregisterPreset = await ctx.agentPresets.register({id: 'benchforge', plugins: []})
+  ctx.effect(() => unregisterPreset)
+  ctx.provide('typertGateway', {getPendingRemoteEvents: () => []} as never)
+  const controller = await createSessionTestController(ctx, {
+    cwd: root, defaultModelSelection: () => ({provider: 'unused', model: 'no-model-call'}),
+  })
+  const create = async () => {
+    const result = await controller.create({agentPreset: 'benchforge'})
+    const agent = ctx.agents.get(result.sessionId)
+    if (!agent) throw new Error('Native controller did not publish its Agent')
+    return agent
+  }
+  const call = async (agent: any, name: string, args: object) => {
+    const batch = await ctx.tools.execute({agent, signal: new AbortController().signal,
+      calls: [{type: 'tool-call', id: randomUUID() as never, name, arguments: JSON.stringify(args)}]})
+    return batch.results[0]!.result
+  }
+  return {ctx, root, controller, create, call}
+}
+
+describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host services', () => {
+  it('creates isolated native sessions and enforces files, bash, skills and trusted tool scope', async () => {
+    const {ctx, root, controller, create, call} = await boot()
+    const [a, b] = await Promise.all([create(), create()])
+    const aRoot = a.session.header.cwd!, bRoot = b.session.header.cwd!
+    expect(aRoot).not.toBe(root)
+    expect(aRoot).not.toBe(bRoot)
+    expect(a.session.header.agentPreset).toBe('benchforge')
+    expect(ctx.workspaceRegistry.list().some(row => row.path === aRoot)).toBe(true)
+    expect(ctx.benchforgeAccess.scope(a.session).session_id).toBe(a.id)
+    expect((await controller.resolveAgent(a.id)).agent).toBe(a)
+    const observation = await ctx.sessionQuery.observeSession(a.id)
+    try {expect(observation.header.cwd).toBe(aRoot)} finally {observation[Symbol.dispose]()}
+    const secret = join(bRoot, 'tasks', 'secret.txt')
+    await writeFile(secret, 'OTHER_SESSION_PRIVATE')
+    await symlink(bRoot, join(aRoot, 'escape'))
+
+    const written = await call(a, 'write', {file_path: 'tasks/owned.txt', content: 'OWNED'})
+    expect(written.isError, text(written)).toBe(false)
+    expect(await readFile(join(aRoot, 'tasks', 'owned.txt'), 'utf8')).toBe('OWNED')
+    const ownRead = await call(a, 'read', {file_path: 'tasks/owned.txt'})
+    expect(ownRead.isError, text(ownRead)).toBe(false)
+    expect(text(ownRead)).toContain('OWNED')
+    for (const file of [secret, join(aRoot, 'escape', 'tasks', 'secret.txt')]) {
+      const denied = await call(a, 'read', {file_path: file})
+      expect(denied.isError, text(denied)).toBe(true)
+      expect(text(denied)).not.toContain('OTHER_SESSION_PRIVATE')
+    }
+    await expect(ctx.fs.resolve(secret, {sandboxPolicy: ctx.sandboxPolicy.resolve({session: a.session})}))
+      .rejects.toMatchObject({code: 'FS_SANDBOX_DENIED'})
+
+    const catalog = await ctx.skills.list({cwd: aRoot, scope: a})
+    expect(catalog.map(row => row.name).sort()).toEqual([
+      'dspark', 'fast-da3', 'fast-flux', 'fast-qwen', 'fast-sam3', 'fast-trellis', 'isaac-sim',
+    ])
+    const skill = await call(a, 'skill', {name: 'isaac-sim'})
+    expect(skill.isError, text(skill)).toBe(false)
+    expect(text(skill)).toContain('Isaac')
+
+    ctx.tools.register(defineTool({name: 'access_probe', description: 'Return Host-owned identity for this test',
+      parameters: {session_id: {type: 'string'}}, isConcurrencySafe: () => true,
+      output: {schema: {type: 'string'}, render: (_args, value) => [{type: 'text', text: value}]},
+      async execute() {await Promise.resolve(); return JSON.stringify(currentAccessScope())},
+    }))
+    const [aScope, bScope] = await Promise.all([
+      call(a, 'access_probe', {session_id: b.id}), call(b, 'access_probe', {session_id: a.id}),
+    ])
+    expect(JSON.parse(text(aScope)).session_id).toBe(a.id)
+    expect(JSON.parse(text(bScope)).session_id).toBe(b.id)
+    expect(currentAccessScope()).toBeUndefined()
+
+    // No skip when bwrap is missing: this suite is a release acceptance gate.
+    const shell = await call(a, 'bash', {description: 'Check real per-conversation process isolation',
+      command: 'cat tasks/owned.txt && test ! -e ' + quote(secret) +
+        ' && test ! -e escape/tasks/secret.txt && printf ok > tasks/from-bash.txt'})
+    expect(shell.isError, text(shell)).toBe(false)
+    expect(text(shell)).toContain('OWNED')
+    expect(text(shell)).not.toContain('OTHER_SESSION_PRIVATE')
+    expect(await readFile(join(aRoot, 'tasks', 'from-bash.txt'), 'utf8')).toBe('ok')
+    expect(await readFile(secret, 'utf8')).toBe('OTHER_SESSION_PRIVATE')
+    expect(a.status).toBe('idle')
+    expect(b.status).toBe('idle')
+    expect(await ctx.sessions.flush(a.session), 'Native durability checkpoint must have a persistence listener').toBe(true)
+    expect(await ctx.sessions.flush(b.session)).toBe(true)
+    const stored = await ctx.sessionPersistence.list()
+    for (const agent of [a, b]) {
+      const record = stored.find(row => row.header.id === agent.id)
+      expect(record, 'Session must be in physical persistence').toBeDefined()
+      expect(String(record!.revision)).not.toMatch(/^memory:/)
+    }
+  })
+
+  it('flushes JSONL and resumes the same workspace from a fresh Host Context', async () => {
+    const first = await boot()
+    const a = await first.create(), b = await first.create()
+    const originalScope = first.ctx.benchforgeAccess.scope(a.session)
+    // The native JSONL header contract materializes this optional live default.
+    // Preserve exact comparison of every identity, path and lineage field.
+    const originalHeader = {...a.session.header, delegationDepth: a.session.header.delegationDepth ?? 0}
+    const file = 'tasks/persisted-draft.txt'
+    const written = await first.call(a, 'write', {file_path: file, content: 'PERSISTED_DRAFT'})
+    expect(written.isError, text(written)).toBe(false)
+    const secret = join(b.session.header.cwd!, 'tasks', 'private.txt')
+    await writeFile(secret, 'OTHER_SESSION_PRIVATE')
+    expect(await first.ctx.sessions.flush(a.session)).toBe(true)
+    expect(await first.ctx.sessions.flush(b.session)).toBe(true)
+    const before = (await first.ctx.sessionPersistence.list()).find(row => row.header.id === a.id)
+    expect(before).toBeDefined()
+    expect(String(before!.revision)).not.toMatch(/^memory:/)
+    await first.ctx.fiber.dispose()
+
+    // A different Context recreates every service; it cannot observe old live maps.
+    const second = await boot(first.root)
+    try {
+      expect(second.ctx.agents.get(a.id)).toBeUndefined()
+      const durable = (await second.ctx.sessionPersistence.list()).find(row => row.header.id === a.id)
+      expect(durable).toBeDefined()
+      expect(String(durable!.revision)).not.toMatch(/^memory:/)
+      expect(durable!.header).toEqual(originalHeader)
+      const resumed = await second.controller.resolveAgent(a.id)
+      if ('error' in resumed) throw resumed.error
+      expect(resumed.agent).not.toBe(a)
+      expect(resumed.agent.session.header).toEqual(originalHeader)
+      expect(resumed.agent.session.header.cwd).toBe(originalScope.root_path)
+      expect(second.ctx.benchforgeAccess.scope(resumed.agent.session)).toEqual(originalScope)
+      const read = await second.call(resumed.agent, 'read', {file_path: file})
+      expect(read.isError, text(read)).toBe(false)
+      expect(text(read)).toContain('PERSISTED_DRAFT')
+      const denied = await second.call(resumed.agent, 'read', {file_path: secret})
+      expect(denied.isError, text(denied)).toBe(true)
+      expect(text(denied)).not.toContain('OTHER_SESSION_PRIVATE')
+      expect(await second.ctx.sessions.flush(resumed.agent.session)).toBe(true)
+    } finally {await second.ctx.fiber.dispose()}
+  })
+})

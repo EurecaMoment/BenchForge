@@ -11,7 +11,7 @@ else:
 
 
 HOST_IDS = {base.WORKBENCH_PLUGIN_ID, base.CAPTURE_PLUGIN_ID, base.SESSION_OPERATIONS_PLUGIN_ID,
-            base.EXAMPLES_PLUGIN_ID, base.SESSION_QUERY_PLUGIN_ID}
+            base.EXAMPLES_PLUGIN_ID, base.SESSION_QUERY_PLUGIN_ID, 'benchforge-access'}
 
 
 def insert_host_dependencies(profile):
@@ -19,6 +19,8 @@ def insert_host_dependencies(profile):
     rows = [row for patch in profile for row in patch.get('insert', [])]
     ids = {row.get('id') for row in rows}
     entries = []
+    if 'benchforge-access' not in ids and any(base.preset_id(row) in base.PRESETS for row in rows):
+        entries.append(definition.access_entry())
     if base.EXAMPLES_PLUGIN_ID not in ids and any(base.preset_id(row) in base.PRESETS for row in rows):
         entries.append(definition.examples_entry())
     workbench = next((row for row in rows if row.get('id') == base.WORKBENCH_PLUGIN_ID), None)
@@ -109,6 +111,8 @@ def migrate_profile(profile, generated, revision=None):
                     new['config']['workspacePaths'] = old_config['workspacePaths']
                 if key == base.EXAMPLES_PLUGIN_ID and 'sourceDirectory' in old_config:
                     new['config']['sourceDirectory'] = old_config['sourceDirectory']
+                if key == 'benchforge-access':
+                    new['config'] = {**defaults, **old_config}
             rows.append(new)
             installed[key] = new
         patch['insert'] = rows

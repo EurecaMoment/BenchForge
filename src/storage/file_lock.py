@@ -7,6 +7,28 @@ from pathlib import Path
 import time
 
 
+@contextmanager
+def _marker(path):
+    from service_access.access_scope import current_access
+    access = current_access()
+    candidate = path if path.is_absolute() else Path(access.root_path) / path if access else path
+    if access and candidate.is_relative_to(Path(access.root_path)):
+        from storage.confined_files import open_directory
+        with open_directory(access.root_path, candidate.parent, create=True) as parent:
+            descriptor = os.open(candidate.name, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                 0o600, dir_fd=parent)
+            import stat
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                os.close(descriptor)
+                raise PermissionError('Lock marker must be a regular file')
+            with os.fdopen(descriptor, 'r+b', buffering=0) as stream:
+                yield stream
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a+b', buffering=0) as stream:
+        yield stream
+
+
 class LockBusyError(RuntimeError):
     """Another process owns the requested marker."""
 
@@ -19,8 +41,7 @@ def file_lock(path, *, blocking=True):
     after release also prevents two callers from locking different files.
     """
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+b", buffering=0) as stream:
+    with _marker(path) as stream:
         if os.name == "nt":
             import msvcrt
 

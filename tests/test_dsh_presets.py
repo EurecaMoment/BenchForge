@@ -30,6 +30,20 @@ def persona(profile):
 
 
 class DshPresetTests(unittest.TestCase):
+    def test_component_skills_survive_profile_merge_and_remain_preset_scoped(self):
+        for portable in (False, True):
+            generated = self.generated(portable)
+            merged = migrate_profile(generated, generated)
+            rows = [row for row in plugins(merged) if row['id'] == 'benchforge-skill-files']
+            self.assertEqual(len(rows), 1)
+            if portable:
+                self.assertEqual(rows[0]['name'], '@eurecamoment/benchforge-dsh/component-skills')
+            else:
+                self.assertTrue(rows[0]['name'].endswith('/dist/component-skills.mjs'))
+            host_rows = [row for patch in merged for row in patch.get('insert', [])]
+            self.assertFalse(any(row.get('id') == 'benchforge-skill-files' for row in host_rows))
+            self.assertEqual(len([row for row in host_rows if row.get('id') == 'benchforge-access']), 1)
+
     def test_host_review_timer_uses_the_workbench_database_configuration(self):
         for portable in (False, True):
             generated = self.generated(portable)
@@ -123,7 +137,7 @@ class DshPresetTests(unittest.TestCase):
     def test_package_example_source_is_explicit_and_portable(self):
         row = next(row for patch in self.generated(True) for row in patch.get('insert', [])
                    if row.get('id') == base.EXAMPLES_PLUGIN_ID)
-        self.assertEqual(row['config']['sourceDirectory'], '')
+        self.assertIn('dist/example/SpatialForge', row['config']['sourceDirectory'])
         self.assertEqual(row['name'], '@eurecamoment/benchforge-dsh/examples')
 
     def test_portable_persona_and_invocation_match_the_generator(self):

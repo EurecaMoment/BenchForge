@@ -10,7 +10,7 @@ import secrets
 import shlex
 import tempfile
 import base64
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from service_access.configuration import validate_providers
 from service_access.runtime_config import expand_environment, read_json
@@ -34,6 +34,7 @@ SERVER_CONFIG = 'benchforge-server.local.json'
 CLIENT_CONFIG = 'benchforge-client.local.json'
 MANAGED_MARKER = 'BENCHFORGE_DATABASE_MANAGED'
 MANAGED_URL = 'BENCHFORGE_DATABASE_URL'
+READER_URL = 'BENCHFORGE_READER_DATABASE_URL'
 DATABASE_SETTINGS = ('COMPOSE_PROJECT_NAME', 'POSTGRES_PORT', 'POSTGRES_USER', 'POSTGRES_DB', 'POSTGRES_PASSWORD')
 DEFAULT_POLICY = {
     'enabled': True,
@@ -290,6 +291,29 @@ def _database_projection(database, environment, credentials):
             f'postgresql+psycopg://{quote(user, safe="")}:{quote(password, safe="")}@127.0.0.1:'
             f"{database['port']}/{quote(db_name, safe='')}"
         )
+    reader_env = database.get('reader_url_env')
+    if reader_env:
+        resolved['reader_database_url_env'] = env_name(reader_env, 'database.reader_url_env')
+        if reader_env == resolved.get('database_url_env'):
+            raise ValueError('database.reader_url_env must name a separate reader connection')
+        resolved['reader_provision'] = False
+    else:
+        if not credentials.get('database_reader_role'):
+            credentials['database_reader_role'] = 'benchforge_reader_' + secrets.token_hex(8)
+        role = text_value(credentials['database_reader_role'], 'reader role')
+        password = _secret(credentials, 'database_reader_password', 32)
+        service = env.get(MANAGED_URL) or url or environment.get(name or '')
+        if not service:
+            raise ValueError('Set database.url_env before generating the dedicated reader connection')
+        parsed = urlsplit(service)
+        if parsed.scheme not in ('postgres', 'postgresql', 'postgresql+psycopg'):
+            raise ValueError('The reader requires the same PostgreSQL service database')
+        authority = parsed.netloc.rsplit('@', 1)[-1]
+        env[READER_URL] = urlunsplit((parsed.scheme,
+            quote(role, safe='') + ':' + quote(password, safe='') + '@' + authority,
+            parsed.path, parsed.query, parsed.fragment))
+        resolved['reader_database_url_env'] = READER_URL
+        resolved['reader_provision'] = True
     return resolved, env
 
 

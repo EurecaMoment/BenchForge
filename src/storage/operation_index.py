@@ -5,9 +5,10 @@ from pathlib import Path
 from sqlalchemy import select
 
 from database.config import resolve_workspace_url
-from database.engine import engine_for, workspace_id
+from database.engine import engine_for
 from database.migrations import initialize_schema
 from database.schema import operations
+from storage.access_identity import workspace_namespace
 
 
 FIELDS = ("id", "tool", "state", "artifact", "error", "session_id")
@@ -27,8 +28,9 @@ def query_operations(workspace, *, sessions=(), history=False, limit=30, tools=(
     root = Path(workspace).resolve()
     engine = _engine(root, database_url)
     initialize_schema(engine)
+    namespace = workspace_namespace(engine, root)
     with engine.begin() as connection:
-        clauses = [operations.c.workspace_id == workspace_id(root)]
+        clauses = [operations.c.workspace_id == namespace]
         if not history:
             clauses.append(operations.c.session_id.in_(sessions))
         if tools:

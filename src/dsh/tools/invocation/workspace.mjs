@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {currentAccessScope} from '../../access/context.mjs';
 
 const within = (root, file) => {
   const relative = path.relative(root, file);
@@ -14,11 +15,13 @@ export async function workspaceReference(file, workspace, signal) {
   if (file.split(/[\\/]/).some(part => part === '..')) return;
   const root = path.resolve(workspace);
   if (within(root, path.resolve(file))) return;
-  try {
-    await fs.stat(file);
-    return; // Existing references keep their identity, even outside this workspace.
-  } catch (error) {
-    if (!missing(error)) throw error;
+  if (!currentAccessScope()) {
+    try {
+      await fs.stat(file);
+      return;
+    } catch (error) {
+      if (!missing(error)) throw error;
+    }
   }
   const parts = root.slice(path.parse(root).root.length).split(path.sep);
   // Three exact trailing directory components identify the workspace; no fuzzy

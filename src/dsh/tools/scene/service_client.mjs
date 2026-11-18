@@ -1,5 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {createHmac} from 'node:crypto';
+import {currentAccessScope} from '../../access/context.mjs';
 import {HarnessError} from '@deepseek-ai/dsh-llm';
 
 export class ScenePreflightRejected extends HarnessError {
@@ -156,11 +158,23 @@ export async function loadServiceConfig(configFile, {getEnvironmentValue, requir
   return {config, configPath, serviceUrl: config.service_url, operatorToken: token, executionMode};
 }
 
+export function signAccessScope(scope, secret, now = Date.now()) {
+  const value = {
+    host_id: scope.host_id, owner_id: scope.owner_id, session_id: scope.session_id,
+    workspace_id: scope.workspace_id, root_path: scope.root_path,
+    policy_epoch: scope.policy_epoch, root_generation: scope.root_generation,
+    legacy_namespace: null, aud: 'benchforge-service', exp: Math.floor(now / 1000) + 300,
+  };
+  const encoded = Buffer.from(JSON.stringify(value)).toString('base64url');
+  return encoded + '.' + createHmac('sha256', secret).update(encoded).digest('hex');
+}
+
 export function createServiceClient({serviceUrl, operatorToken}) {
-  return async (route, args, signal) => {
+  return async (route, args, signal, {scope = currentAccessScope()} = {}) => {
     const response = await fetch(serviceUrl + route, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + operatorToken},
+      headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + operatorToken,
+        ...(scope ? {'X-BenchForge-Scope': signAccessScope(scope, operatorToken)} : {})},
       body: JSON.stringify(args), signal,
     });
     // Isaac camera matrices can contain -0.0; DSH's JSON transport rejects signed zero.

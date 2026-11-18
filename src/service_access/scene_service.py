@@ -150,6 +150,8 @@ def load_service_client_config(path, *, require_operator_token=True, require_sce
 
 def post_service_json(base_url, route, arguments, *, token, timeout, use_proxy=False):
     """Send a JSON request and leave HTTP errors available to the caller."""
+    from service_access.access_scope import current_access, sign_ticket
+    access = current_access()
     request = Request(
         base_url.rstrip('/') + route,
         data=json.dumps(arguments).encode('utf-8'),
@@ -157,6 +159,7 @@ def post_service_json(base_url, route, arguments, *, token, timeout, use_proxy=F
         headers={
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + token,
+            **({'X-BenchForge-Scope': sign_ticket(access, token)} if access else {}),
         },
     )
     open_url = urlopen if use_proxy else build_opener(ProxyHandler({})).open

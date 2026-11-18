@@ -5,8 +5,11 @@ import json
 
 from capabilities.isaac_sim.grpc.tasks import DurableTasks
 from capabilities.isaac_sim.grpc.transport import A100Client, RemoteJobFailed, document
+from capabilities.isaac_sim.guide import usage
 from storage.files import safe_path, write_json
 from storage.native_jobs import NativeJobs
+from capabilities.isaac_sim.resource_access import NativeResources
+from storage.operation_outputs import operation_workspace, persistent_outputs, logical_path
 
 
 def _legacy_submission(workspace, key, payload, feature, client, owners, session):
@@ -35,15 +38,22 @@ def _legacy_submission(workspace, key, payload, feature, client, owners, session
 def execute(args, directory, config):
     """Expose the actual catalog and messages, without deployment-specific plugins."""
     directory = Path(directory)
-    workspace = directory.parents[1]
+    workspace = operation_workspace(directory)
     action = args.get('action', 'capabilities')
     client = A100Client(config)
+    resources = NativeResources(client.endpoint)
     session = (args.get('_dsh_context') or {}).get('session_id') or 'local-cli'
-    owners = NativeJobs(workspace)
     try:
+        if action == 'guide':
+            result = usage(document(client.call('GetCapabilities')), document(client.call('GetApiCatalog')),
+                           operation=args.get('operation'), feature_id=args.get('feature_id'))
+            write_json(directory / 'guide.json', result)
+            return {'action': action, 'result': result, 'receipt_path': str(directory / 'guide.json')}
         if action in ('capabilities', 'catalog', 'assets'):
             result = document(client.call({'capabilities': 'GetCapabilities',
                 'catalog': 'GetApiCatalog', 'assets': 'ListAssets'}[action]))
+            if action == 'assets' and resources.access is not None:
+                result['assets'] = [asset for asset in result.get('assets', []) if resources.owns('asset', asset['asset_id'])]
             write_json(directory / f'{action}.json', result)
             if action == 'catalog' and args.get('feature_id'):
                 rows = [feature for domain in result['domains'] for feature in domain['features']
@@ -56,9 +66,19 @@ def execute(args, directory, config):
             source = (workspace / args['source_path']).resolve()
             if not source.is_relative_to(workspace.resolve()) or not source.is_file():
                 raise ValueError('Upload source must be a saved file inside this conversation workspace')
-            return {'action': action, 'asset': client.upload(source, asset_id=args.get('asset_id', ''),
-                                                            relative_path=args.get('relative_path'))}
+            if args.get('asset_id'):
+                resources.require('asset', args['asset_id'])
+            if resources.access is not None:
+                from capabilities.isaac_sim.upload_access import snapshot_upload
+                with snapshot_upload(source, args.get('relative_path')) as snapshot:
+                    asset = client.upload(snapshot, asset_id=args.get('asset_id', ''),
+                                          relative_path=args.get('relative_path') or source.name)
+            else:
+                asset = client.upload(source, asset_id=args.get('asset_id', ''), relative_path=args.get('relative_path'))
+            resources.remember('asset', asset['asset_id'], origin='upload')
+            return {'action': action, 'asset': asset}
         if action in ('submit', 'invoke'):
+            owners = NativeJobs(workspace)
             key = args.get('request_id')
             context = args.get('_dsh_context') or {}
             if not key:
@@ -70,20 +90,27 @@ def execute(args, directory, config):
                 payload = {'feature_id': args['feature_id'], 'arguments': payload}
             if 'request_id' in payload:
                 raise ValueError('request_id belongs at the tool request root')
+            resources.check(payload, feature=action == 'invoke')
             previous = _legacy_submission(workspace, key, payload, action == 'invoke', client, owners, session)
             if previous:
                 job, receipt = previous
                 return {'action': action, 'job': document(job), 'receipt_path': str(receipt),
                         'next_action': 'wait', 'accepted_is_complete': False}
             identity = hashlib.sha256((session + '\0' + key).encode()).hexdigest()
-            requests = DurableTasks(client, workspace / '.benchforge' / 'isaac_sim',
-                                    str(workspace.resolve()) + '\0' + session)
-            job = requests.submit(identity, payload, feature=action == 'invoke')
-            owners.remember(client.endpoint, job, session)
-            return {'action': action, 'job': document(job),
-                    'receipt_path': str(requests.directory / identity / 'receipt.json'),
-                    'next_action': 'wait', 'accepted_is_complete': False}
+            receipt_root = workspace / '.benchforge' / 'isaac_sim' / identity
+            with persistent_outputs(receipt_root, config, kind='native-requests') as private:
+                # The directory may change across deployments; native identity
+                # remains derived from the stable workspace/session/key.
+                requests = DurableTasks(client, private.parent,
+                                        str(workspace.resolve()) + '\0' + session)
+                job = requests.submit(identity, payload, feature=action == 'invoke')
+                owners.remember(client.endpoint, job, session)
+                resources.observe(document(job))
+                return {'action': action, 'job': document(job),
+                        'receipt_path': str(logical_path(requests.directory / identity / 'receipt.json')),
+                        'next_action': 'wait', 'accepted_is_complete': False}
         if action in ('status', 'wait', 'cancel', 'download'):
+            owners = NativeJobs(workspace)
             job_id = args['job_id']
             request_id = owners.require(client.endpoint, job_id, session)
             observed = client.get(job_id)
@@ -99,16 +126,21 @@ def execute(args, directory, config):
                 except (RemoteJobFailed, TimeoutError):
                     job = client.get(job_id)
             result = {'action': action, 'job': document(job)}
+            resources.observe(result['job'])
             if action == 'download':
                 from capabilities.isaac_sim.grpc import simulator_pb2 as pb
                 if job.state != pb.SUCCEEDED:
                     raise ValueError('Only a succeeded native job can publish artifacts')
-                destination = safe_path(workspace / 'artifacts' / 'isaac_sim', job_id)
+                # Downloads belong to the current private output stage and are
+                # published with its receipt after the complete operation.
+                destination = safe_path(directory / 'artifacts', job_id)
                 result['files'] = client.download(job, destination)
                 # The native operation establishes what was produced; filenames
                 # such as dataset.zip do not establish a question-generation stage.
                 stage = {'extension.world.collect': 'S3', 'extension.scene.capture': 'S2',
-                         'extension.scene.export': 'S2'}.get(job.operation)
+                         'extension.scene.export': 'S2', 'extension.extended.world.collect': 'S3',
+                         'extension.extended.scene.capture': 'S2',
+                         'extension.extended.scene.export': 'S2'}.get(job.operation)
                 result['artifacts'] = [{'path': item['source_path'], 'title': 'Isaac Sim · ' + item['name'],
                                         **({'stage': stage} if stage else {})}
                                        for item in result['files']]

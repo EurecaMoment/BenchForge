@@ -35,9 +35,11 @@ def build_environment(*, database=True):
     environment = {**environment, **projected, **os.environ}
     if projected.get(settings.MANAGED_MARKER) == 'true':
         # Compose and both server-side readers must address the same managed DB.
-        for key in (*settings.DATABASE_SETTINGS, settings.MANAGED_URL):
+        for key in (*settings.DATABASE_SETTINGS, settings.MANAGED_URL, settings.READER_URL):
             if key in projected:
                 environment[key] = projected[key]
+    if settings.READER_URL in projected:
+        environment[settings.READER_URL] = projected[settings.READER_URL]
     return environment
 
 
@@ -73,7 +75,8 @@ def sync_configuration(*, overrides=None):
 def _ensure_runtime_configuration():
     config = settings.read_object(CONFIG / 'benchforge.local.json', optional=True)
     projections = (SERVER, *(GENERATED / name for name in ('database.env', settings.CLIENT_CONFIG)))
-    if config.get('config_version') != settings.CONFIG_VERSION or not all(path.is_file() for path in projections):
+    if (config.get('config_version') != settings.CONFIG_VERSION or not all(path.is_file() for path in projections)
+            or not settings.read_object(SERVER, optional=True).get('reader_database_url_env')):
         sync_configuration()
 
 
@@ -193,6 +196,8 @@ def main():
         if environment.get('PYTHONPATH'):
             paths.append(environment['PYTHONPATH'])
         environment['PYTHONPATH'] = os.pathsep.join(paths)
+        subprocess.run([str(backend_python()), '-m', 'database', 'provision-reader', '--config', str(SERVER)],
+                       env=environment, check=True)
         subprocess.run([str(backend_python()), '-m', 'server.http_api', '--config', str(SERVER)],
                        env=environment, check=True)
     elif args.command.startswith('dsh-'):

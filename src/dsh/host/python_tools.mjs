@@ -9,6 +9,9 @@ import {presentOperationCatalog} from '../tools/benchmark/catalog.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 import {releaseProcess, releaseProcesses} from './process_cleanup.mjs';
 import {databaseEnvironment} from './database_environment.mjs';
+import {currentAccessScope} from '../access/context.mjs';
+import {loadServiceConfig, signAccessScope} from '../tools/scene/service_client.mjs';
+import {pythonHostDirectory, pythonHostEnvironment} from './python_environment.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
 export const Config = Schema.object({
@@ -28,12 +31,12 @@ export async function invoke(subprocess, python, workspace, configPath, tool, re
   signal?.throwIfAborted();
   const cwd = path.resolve(workspace);
   await fs.mkdir(cwd, {recursive:true});
-  const env = {...options.environment, PYTHONIOENCODING:'utf-8', BENCHFORGE_MANAGED_SUBPROCESS:'1'};
+  const env = pythonHostEnvironment({...options.environment, BENCHFORGE_MANAGED_SUBPROCESS:'1'});
   const executable = await subprocess.resolveExecutable(python, env, signal);
   signal?.throwIfAborted();
   const argv = [executable, '-m', options.module, tool, '--workspace', cwd, '--input', '-'];
   if (configPath) argv.push('--config', path.resolve(configPath));
-  const handle = subprocess.spawn({argv, cwd, env, signal, graceMs:options.graceMs ?? 1000,
+  const handle = subprocess.spawn({argv, cwd: pythonHostDirectory, env, signal, graceMs:options.graceMs ?? 1000,
     stdio:{stdin:{data:JSON.stringify(request)}, stdout:{maxBytes:options.maxOutputBytes ?? 16 * 1024 * 1024}, stderr:{maxBytes:65536}}});
   options.active?.add(handle);
   try {
@@ -68,6 +71,9 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   const environment = Object.fromEntries((config.forwardEnvironment || []).map(key => [key,snapshot.get(key)?.value]).filter(([,value])=>value!==undefined));
   Object.assign(environment,config.environment);
   Object.assign(environment,await databaseEnvironment(config.serviceConfig,snapshot,environment));
+  const accessService = config.serviceConfig ? await loadServiceConfig(config.serviceConfig, {
+    getEnvironmentValue: key => environment[key] ?? snapshot.get(key)?.value,
+  }) : null;
   if (config.serviceConfig) environment.BENCHFORGE_SERVICE_CONFIG = path.resolve(config.serviceConfig);
   const output = {schema:{type:'object',properties:{},additionalProperties:true},
     render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]};
@@ -89,6 +95,12 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
         }
         const scoped = tool === 'model_infer' ? annotationEnvironment : tool === 'isaac_sim' ? isaacEnvironment : environment;
         const sessionEnvironment = {...scoped, BENCHFORGE_DSH_SESSION_ID: exec.agent?.session?.id || '', BENCHFORGE_DSH_CALL_ID: exec.callId || ''};
+        const access = currentAccessScope();
+        if (access) {
+          if (!accessService) throw new Error('Workspace access requires the configured BenchForge service');
+          sessionEnvironment.BENCHFORGE_ACCESS_TICKET = signAccessScope(access, accessService.operatorToken);
+          sessionEnvironment.BENCHFORGE_ACCESS_KEY = accessService.operatorToken;
+        }
         const result = await invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module,
           onCleanupError: error => ctx.logger('benchforge-process-cleanup').error(error)});
         return tool === 'catalog' && result.workflow

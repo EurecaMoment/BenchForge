@@ -53,7 +53,7 @@ def _overview():
             'Evidence displays reference images, masks and actual captures, including earlier revisions. source_path outputs connect tools without copying or regenerating files.',
             'Scene data derives from Isaac capture. Use benchforge_pipeline_catalog and data.capability for template-based dataset production.'
         ],
-        'task_workspace': {'writable': '/workspace', 'read_only': ['/harness', '/assets'],
+        'task_workspace': {'writable': 'this conversation: tasks/<workspace_id>/work', 'read_only': ['selected runtime libraries'],
             'path_mapping': 'workspace_file is usable inside task_code; source_path is for service tool parameters',
             'authority_gt_mounted': False, 'host_network': False},
         'model_can_edit_harness_code': False, 'model_can_write_task_code': True,
@@ -93,10 +93,14 @@ def _load_rows(store, section, item_id):
                         'content': 'Source base color and 2x2 repeats; not rendered PBR or measured reflectance.'}
         return _rows(records)
     if section == 'generated_assets':
-        tools = GenerationTools(store.root)
+        tools = GenerationTools(store.root, engine=store.repo.engine)
         if item_id:
             # Filter first; never read every multi-megabyte mesh for an overview.
             return [{'id': value['asset_id'], 'value': value} for value in tools.catalog(asset_ids=[item_id])]
+        if tools.access is not None:
+            return [{'id': value['asset_id'], 'value': value,
+                     'detail': 'Owner-authorized immutable asset version; not scene acceptance.'}
+                    for value in tools.catalog()]
         result = []
         for path in sorted(tools.assets.glob('*/asset.json')):
             if path.is_symlink(): continue
@@ -112,18 +116,15 @@ def _load_rows(store, section, item_id):
 def _copy(store, workspace_id, section, rows, filters):
     if not isinstance(workspace_id, str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}', workspace_id):
         raise ValueError('invalid workspace_id')
-    base = store.root.resolve() / 'operator_workspaces'
-    base.mkdir(exist_ok=True)
-    if base.is_symlink(): raise ValueError('invalid workspace root')
-    workspace = base / workspace_id
-    workspace.mkdir(exist_ok=True)
-    if workspace.is_symlink() or workspace.resolve().parent != base.resolve():
-        raise ValueError('invalid workspace path')
+    from service_access.task_paths import task_directory
+    workspace = task_directory(workspace_id)
     data = _encoded({'section': section, **filters, 'items': rows, 'scope': 'catalog metadata snapshot; not GT or verified scene quality'})
     name = 'catalog_' + section + '_' + uuid.uuid4().hex[:12] + '.json'
     target = workspace / name
-    with target.open('xb') as output: output.write(data)
-    return {'workspace_file': '/workspace/' + name, 'source_path': str(target), 'bytes': len(data),
+    from storage.confined_files import open_write
+    from service_access.access_scope import current_access
+    with open_write(current_access().root_path, target) as output: output.write(data)
+    return {'workspace_file': str(target), 'source_path': str(target), 'bytes': len(data),
             'items': len(rows), 'scope': 'lossless copy of all matches before pagination; original registries unchanged'}
 
 

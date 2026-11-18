@@ -81,7 +81,7 @@ def plan_scene(store,task,stop):
     strict=bool(_strict_policy(store.root,execution_mode))
     if strict and not submission:raise ValueError('Unchecked scene planners are disabled; submit a complete SceneProgram')
     prompt='' if direct else 'You plan scenes for an embodied dataset. Realize the requested function with recognizable registered or generated assets, plausible scale, supports, access paths and functional layout. Never substitute cubes, primitives or composite proxies for real objects. Missing assets or execution evidence must cause an explicit failure. Produce a coherent scene for this frozen requirement. '+json.dumps(unit['intent'],ensure_ascii=False)+'\n'+SCENE_SCHEMA_DESCRIPTION
-    tools=GenerationTools(store.root)
+    tools=GenerationTools(store.root, engine=store.repo.engine, task_id=task['id'])
     @lru_cache(maxsize=8)
     def load_preview_mesh(asset_id):
         mesh=json.loads(tools.asset_path(asset_id,'mesh.json').read_text(encoding='utf8'))

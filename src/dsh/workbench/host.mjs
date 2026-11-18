@@ -23,10 +23,12 @@ import {collectionSummary} from '../production/collection.mjs';
 import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
 import {databaseEnvironment} from '../host/database_environment.mjs';
 import {createExampleWorkbench} from '../examples/workbench.mjs';
+import {createWorkspaceMigration} from '../access/migration.mjs';
+import {createUserMessage} from '@deepseek-ai/dsh-llm';
 
 export const name = 'benchforge-ui';
 export const inject = ['connection', 'typert', 'workspaceRegistry', 'benchforgeCapture', 'benchforgeSessions',
-  'sessionProjections', 'sessionQuery'];
+  'sessionProjections', 'sessionQuery', 'benchforgeAccess', 'sessionController', 'agents'];
 export const Config = z.object({
   workspacePaths: z.array(z.string()).default([]),
   maxRuns: z.natural().min(1).max(200).default(60),
@@ -624,7 +626,23 @@ export async function apply(ctx, config) {
     }
     return result;
   };
-  ctx.provide('benchforgeWorkbench', new WorkbenchRemote(dispatch));
+  const migration = createWorkspaceMigration({
+    observe: (id, options) => ctx.sessionQuery.observeSession(id, options),
+    readOperations: (root, id, signal) => workspaceOperations(config, {path: root}, {session_id: id}, {limit: 201, signal}),
+    access: ctx.benchforgeAccess, sessions: ctx.sessionController, agents: ctx.agents, createMessage: createUserMessage,
+  });
+  // Migration is reachable only through the Remote's owner principal check, not
+  // the file-fetch route or any model tool, and never accepts a filesystem manifest.
+  ctx.provide('benchforgeWorkbench', new WorkbenchRemote(async (url, request) => {
+    if (url.searchParams.get('view') !== 'workspace_migration') return dispatch(url, request);
+    const id = url.searchParams.get('session_id');
+    if (request.method === 'GET') return migration.preview(id, request.signal);
+    const body = await request.text();
+    if (body.length > 512000) throw new ApiError('Migration selection is too large', 413);
+    let selection;
+    try {selection = JSON.parse(body);} catch {throw new ApiError('Invalid migration selection JSON', 400);}
+    return migration.migrate(id, selection, request.signal);
+  }));
   // Local file overlays do not have a bare package row for the Typert loader.
   ctx.effect(() => ctx.typert.register(TYPERT), 'benchforge-workbench: Remote API');
   const dispose = ctx.connection.fetch.register({path: '/api/benchforge/workbench', methods: ['GET', 'POST'], requestBody: 'buffered',

@@ -7,21 +7,21 @@ from types import SimpleNamespace
 from sqlalchemy import select
 
 from database.config import resolve_workspace_url
-from database.engine import engine_for, workspace_id
+from database.engine import engine_for
 from database.migrations import initialize_schema
 from database.schema import native_jobs
 from database.transactions import insert_missing, transaction
 from storage.operation_index import query_operations
+from storage.access_identity import workspace_namespace
 
 
 class NativeJobs:
     def __init__(self, workspace):
         self.root = Path(workspace).resolve()
         self.file = self.root / ".benchforge" / "isaac_sim" / "receipts"
-        self.file.mkdir(parents=True, exist_ok=True)
         self.engine = engine_for(resolve_workspace_url(self.root))
         initialize_schema(self.engine)
-        self.workspace_id = workspace_id(self.root)
+        self.workspace_id = workspace_namespace(self.engine, self.root)
 
     def remember(self, endpoint, job, session):
         values = {"workspace_id": self.workspace_id, "endpoint": endpoint, "job_id": job.job_id,

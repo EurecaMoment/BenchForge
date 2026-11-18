@@ -239,7 +239,9 @@ class GrpcContractTests(unittest.TestCase):
         self.simulator.blobs['dataset'] = b'collected data'
         for index, (operation, stage) in enumerate([
             ('extension.world.collect', 'S3'), ('extension.scene.capture', 'S2'),
-            ('extension.scene.export', 'S2'), ('extension.other', None),
+            ('extension.scene.export', 'S2'), ('extension.extended.world.collect', 'S3'),
+            ('extension.extended.scene.capture', 'S2'), ('extension.extended.scene.export', 'S2'),
+            ('extension.other', None), ('extension.extended.other', None),
         ]):
             with self.subTest(operation=operation):
                 identity = f'download-{index}'

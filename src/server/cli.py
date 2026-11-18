@@ -20,7 +20,9 @@ def main():
     request = json.load(sys.stdin) if args.input == "-" else read(args.input) if args.input else {}
     runtime = Runtime(args.workspace, load_operation_config(args.config))
     try:
-        print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))
+        from service_access.access_scope import cli_access
+        with cli_access(runtime.engine, runtime.root):
+            print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))
     except (ValueError, KeyError, OSError, RuntimeError, subprocess.TimeoutExpired) as error:
         print(json.dumps({'error':str(error),'workspace':str(runtime.root)},ensure_ascii=False),file=sys.stderr)
         raise SystemExit(1)

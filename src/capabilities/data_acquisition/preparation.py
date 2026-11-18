@@ -5,10 +5,12 @@ import io
 import json
 import shutil
 import urllib.request
+from urllib.parse import urlsplit
 from collections import Counter
 from pathlib import Path
-from storage.artifacts import rows
-from storage.artifacts import read
+from capabilities.data_acquisition.source_files import (
+    open_source, read_source as read, source_path, source_rows as rows, text_source,
+)
 from storage.artifacts import write
 from storage.artifacts import jsonl
 from storage.artifacts import unique
@@ -24,28 +26,31 @@ def field(row,path,default=None):
 
 
 def normalize(args,directory,config):
-    source=Path(args['input']).expanduser().resolve()
+    source=source_path(args['input'])
     kind=args.get('format','jsonl' if source.suffix=='.jsonl' else source.suffix.lstrip('.'))
     mapping=args.get('fields',{})
     data=[]
     if kind=='images':
         if not source.is_dir():raise ValueError('Image source must be a directory')
-        data=[{'id':str(i),'image':str(p)} for i,p in enumerate(sorted(source.glob(args.get('pattern','*')))) if p.suffix.lower() in ('.png','.jpg','.jpeg','.webp')]
+        pattern=args.get('pattern','*')
+        if Path(pattern).is_absolute() or '..' in Path(pattern).parts:
+            raise ValueError('Image pattern must stay inside its source directory')
+        data=[{'id':str(i),'image':str(p)} for i,p in enumerate(sorted(source.glob(pattern))) if p.suffix.lower() in ('.png','.jpg','.jpeg','.webp')]
     elif kind=='jsonl':data=rows(source)
     elif kind=='json':
         value=read(source);data=value if isinstance(value,list) else field(value,args.get('records_key','items'),[])
     elif kind=='csv':
-        with source.open(encoding='utf-8-sig',newline='') as stream:data=list(csv.DictReader(stream))
+        with text_source(source) as stream:data=list(csv.DictReader(stream))
     elif kind=='parquet':
         try:import pyarrow.parquet as pq
         except ImportError:raise ValueError('Install benchforge[datasets] for Parquet / ERQA export support')
-        data=pq.read_table(source).to_pylist()
+        with open_source(source) as stream:data=pq.read_table(stream).to_pylist()
     else:raise ValueError('Supported formats: jsonl, json, csv, parquet, images')
     if args.get('limit'):data=data[:args['limit']]
     provenance=args.get('provenance','official' if kind!='images' else 'unlabeled')
     if provenance not in ('official','human','simulation','program','unlabeled','prediction'):raise ValueError('Unknown source kind')
     root=source if source.is_dir() else source.parent
-    if args.get('media_root'):root=Path(args['media_root']).resolve()
+    if args.get('media_root'):root=source_path(args['media_root'])
     media_dir=directory/'media';media_dir.mkdir()
     normalized=[];rejected=[]
     for index,raw in enumerate(data):
@@ -62,7 +67,9 @@ def normalize(args,directory,config):
                 else:
                     path=Path(value.get('path') if isinstance(value,dict) else value)
                     if not path.is_absolute():path=root/path
-                    dest=dest.with_suffix(path.suffix.lower());shutil.copyfile(path,dest)
+                    dest=dest.with_suffix(path.suffix.lower())
+                    with open_source(path) as stream, dest.open('xb') as output:
+                        shutil.copyfileobj(stream,output)
                 paths.append(str(dest))
             # Preserve an unmodified JSON form of the original record; bytes are materialized separately.
             serial=json.loads(json.dumps(raw,default=lambda v:{'binary_materialized':True,'bytes':len(v)} if isinstance(v,bytes) else str(v)))
@@ -92,9 +99,15 @@ def normalize(args,directory,config):
 
 def acquire(args,directory,config):
     if args.get('url'):
-        dest=directory/'download'/args.get('filename','source.jsonl');dest.parent.mkdir()
+        if urlsplit(args['url']).scheme not in ('http','https'):
+            raise ValueError('Source downloads require an HTTP or HTTPS URL')
+        name=args.get('filename','source.jsonl')
+        if (not isinstance(name,str) or not name or name in ('.','..')
+                or '/' in name or '\\' in name or ':' in name):
+            raise ValueError('Download filename must be a single portable file name')
+        dest=directory/'download'/name;dest.parent.mkdir()
         request=urllib.request.Request(args['url'],headers={'User-Agent':'BenchForge/0.2'})
-        with urllib.request.urlopen(request,timeout=args.get('timeout_seconds',120)) as response, dest.open('wb') as out:
+        with urllib.request.urlopen(request,timeout=args.get('timeout_seconds',120)) as response, dest.open('xb') as out:
             shutil.copyfileobj(response,out)
             write(directory/'download.json',{'url':args['url'],'status':response.status,'path':str(dest),'size':dest.stat().st_size})
         return normalize({**args,'input':str(dest)},directory,config)
@@ -102,7 +115,7 @@ def acquire(args,directory,config):
 
 
 def clean(args,directory,config):
-    source=Path(args['input']).resolve();data=rows(source)
+    source=source_path(args['input']);data=rows(source)
     backend=args.get('backend','native')
     rejected=[];valid=[];seen=set()
     for row in data:
@@ -113,17 +126,19 @@ def clean(args,directory,config):
         for media in row.get('media',[]):
             try:
                 from PIL import Image
-                with Image.open(media) as im:
-                    im.verify()
-                with Image.open(media) as im:
-                    if min(im.size)<args.get('min_side',32):reasons.append('image_too_small')
-                    from PIL import ImageStat
-                    gray=im.convert('L');stats=ImageStat.Stat(gray)
-                    if stats.stddev[0]<args.get('min_contrast',1):reasons.append('near_constant_image')
-                    if args.get('min_bright_fraction') is not None:
-                        histogram=gray.histogram()
-                        fraction=sum(histogram[17:])/sum(histogram)
-                        if fraction<args['min_bright_fraction']:reasons.append('insufficient_visible_brightness')
+                with open_source(media,base=source.parent) as stream:
+                    with Image.open(stream) as im:
+                        im.verify()
+                    stream.seek(0)
+                    with Image.open(stream) as im:
+                        if min(im.size)<args.get('min_side',32):reasons.append('image_too_small')
+                        from PIL import ImageStat
+                        gray=im.convert('L');stats=ImageStat.Stat(gray)
+                        if stats.stddev[0]<args.get('min_contrast',1):reasons.append('near_constant_image')
+                        if args.get('min_bright_fraction') is not None:
+                            histogram=gray.histogram()
+                            fraction=sum(histogram[17:])/sum(histogram)
+                            if fraction<args['min_bright_fraction']:reasons.append('insufficient_visible_brightness')
             except (OSError,ValueError):reasons.append('unreadable_media')
         if not row.get('media') and args.get('require_media',True):reasons.append('missing_media')
         if reasons:rejected.append({'id':iid,'reasons':reasons,'record':row})

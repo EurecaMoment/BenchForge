@@ -7,10 +7,12 @@ from typing import Any
 from storage.files import write_json as write
 from storage.operation_index import query_operations
 from database.config import configured_database_url, database_context, resolve_workspace_url
-from database.engine import engine_for, workspace_id
+from database.engine import engine_for
+from storage.access_identity import workspace_namespace
 from database.migrations import initialize_schema
 from database.schema import operations
 from sqlalchemy import update
+from storage.operation_outputs import operation_outputs, logical_value
 
 class WorkspaceJobs:
     def __init__(self, workspace, config=None):
@@ -23,12 +25,20 @@ class WorkspaceJobs:
             self.root, configured_database_url(self.config))
         self.engine = engine_for(self.database_url)
         initialize_schema(self.engine)
-        self.workspace_id = workspace_id(self.root)
+        self.workspace_id = workspace_namespace(self.engine, self.root)
 
     def close(self):
         """This request owns no pool; process shutdown releases shared engines."""
 
     def call(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+        from service_access.input_policy import resolve_arguments
+        from service_access.access_scope import current_access
+        access = current_access()
+        if access is not None:
+            if self.root != Path(access.root_path).resolve():
+                raise PermissionError('Operation workspace differs from its Host identity')
+            self.workspace_id = access.scope.workspace_id
+        args = resolve_arguments(args, self.root)
         with database_context(self.database_url):
             return self._call(tool, args)
 
@@ -39,21 +49,34 @@ class WorkspaceJobs:
             return {"operations": query_operations(self.root, sessions=[session] if session else [],
                                                    history=not bool(session), database_url=self.database_url)}
         operation = uuid.uuid4().hex[:16]
-        directory = self.root / "operations" / operation
-        directory.mkdir(parents=True)
+        from service_access.access_scope import current_access
+        try:
+            with operation_outputs(self.root, operation, scoped=current_access() is not None) as directory:
+                return self._execute_operation(tool, args, operation, directory)
+        except Exception as exc:
+            with self.engine.begin() as connection:
+                connection.execute(update(operations).where(
+                    operations.c.workspace_id == self.workspace_id, operations.c.id == operation
+                ).values(state='failed', error=str(exc)))
+            raise
+
+    def _execute_operation(self, tool, args, operation, directory):
+        public = self.root / 'operations' / operation
         write(directory / "request.json", {"tool": tool, "arguments": args, "time": datetime.now(timezone.utc).isoformat(), "context": self.dsh_context})
         with self.engine.begin() as connection:
             connection.execute(operations.insert().values(
                 workspace_id=self.workspace_id, id=operation, tool=tool, state="running",
-                artifact=str(directory), error=None, session_id=self.dsh_context.get('session_id', '')))
+                artifact=str(public), error=None, session_id=self.dsh_context.get('session_id', '')))
         try:
             value = self.execute(tool, {**args, '_dsh_context': self.dsh_context} if self.dsh_context else args, directory)
             write(directory / "result.json", value)
+            from storage.operation_outputs import publish_current
+            publish_current()
             with self.engine.begin() as connection:
                 connection.execute(update(operations).where(
                     operations.c.workspace_id == self.workspace_id, operations.c.id == operation
                 ).values(state='completed'))
-            return {"operation_id": operation, "artifact_dir": str(directory), **value}
+            return logical_value({"operation_id": operation, "artifact_dir": str(public), **value})
         except Exception as exc:
             with self.engine.begin() as connection:
                 connection.execute(update(operations).where(

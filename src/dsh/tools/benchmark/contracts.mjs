@@ -1,5 +1,5 @@
 export const definitions = {
-  "isaac_sim": "Use the configured Isaac Sim A100 a100sim.v1.Simulator gRPC service. Read capabilities/catalog for exact native operations and parameter schemas; catalog feature_id selects one feature. submit/invoke return a durable job, never completion. request holds the native SubmitTask payload without request_id, or the selected feature arguments. Reuse request_id and unchanged payload after a lost reply. status/wait observe; download retrieves only job-manifest artifacts into this workspace. Cancellation is confirmed only by the native service and may reject a running GPU job. No additional process is needed.",
+  "isaac_sim": "Use the configured Isaac Sim A100 a100sim.v1.Simulator gRPC service. Start with action=guide for usage and live discovery; guide operation selects a capability and guide/catalog feature_id selects a feature. Runtime support comes from capabilities/catalog, not Git or deployment inspection. Read published parameter/request schemas; a generic object schema does not document its fields. submit/invoke return durable accepted jobs, never completion. request holds the native SubmitTask payload without request_id, or the selected feature arguments. Reuse request_id and unchanged payload after a lost reply. status/wait observe; download retrieves only job-manifest artifacts into this workspace. Cancellation requires service confirmation. Use configured services; do not start a separate capture process.",
   "catalog": "Discover callable production tools and exact request examples. See exact request examples and the V2 task template catalog.",
   "status": "Read persisted operation results and artifact paths. Does not retry operations.",
   "plan": "Save a benchmark brief. Planning and capability choices belong to you; no fixed stage sequence.",
@@ -35,9 +35,10 @@ export const definitions = {
 
 export const schemas = {
   "isaac_sim": {
-    "action":{"type":"string","enum":["capabilities","catalog","assets","upload","submit","invoke","status","wait","cancel","download"],"required":true},
-    "feature_id":{"type":"string"},
-    "request":{"type":"object","additionalProperties":true},
+    "action":{"type":"string","enum":["guide","capabilities","catalog","assets","upload","submit","invoke","status","wait","cancel","download"],"required":true},
+    "operation":{"type":"string","description":"For guide only: exact live capability name, such as extension.asset.import, to read its full schema and scope."},
+    "feature_id":{"type":"string","description":"Catalog feature ID for guide/catalog filtering or invoke. This is not an extension operation name."},
+    "request":{"type":"object","additionalProperties":true,"description":"For submit: native task object, e.g. {extension:{operation:<suffix>,arguments:<schema-matching object>}}. For invoke: feature arguments only."},
     "request_id":{"type":"string","description":"Stable identity for this exact native submission. Omit to use the DSH session/tool-call identity."},
     "job_id":{"type":"string"},
     "source_path":{"type":"string","description":"Existing upload source file in this conversation workspace."},

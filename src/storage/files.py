@@ -32,6 +32,16 @@ def safe_path(root: Path, relative: str, must_exist: bool = False) -> Path:
 
 
 def write_json(path: Path, value: Any) -> None:
+    from service_access.access_scope import current_access
+    access = current_access()
+    if access is not None:
+        from storage.operation_outputs import trusted_output_path
+        candidate = path if path.is_absolute() else Path(access.root_path) / path
+        if candidate.is_relative_to(Path(access.root_path)) and not trusted_output_path(path):
+            from storage.confined_files import open_write
+            with open_write(access.root_path, path) as output:
+                output.write((json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode())
+            return
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp_{uuid4().hex}")
     try:

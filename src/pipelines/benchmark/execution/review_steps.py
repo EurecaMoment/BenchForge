@@ -6,6 +6,7 @@ from storage.artifacts import read_json as read
 from capabilities.benchmark_design.stages import STAGES
 from pipelines.benchmark.execution.artifact_graph import binding_roots
 from capabilities.benchmark_design.stages import stage_of
+from storage.operation_outputs import physical_path, logical_value
 
 def review_scope(plan, run_root, plan_path):
     """One review owner for the leaf artifacts of a composed production run."""
@@ -53,19 +54,19 @@ def completed_stage(scope, stage):
     for member in reversed(members):
         root = member['run']
         if root not in states:
-            path = Path(root)/'state.json'
+            path = physical_path(Path(root)/'state.json')
             states[root] = read(path).get('steps', {}) if path.exists() else {}
         prior = states[root].get(member['step'])
         if not prior or prior['state'] != 'completed':
             return None
     outputs = []
     for member in members:
-        result_path = Path(member['result_path'])
+        result_path = physical_path(member['result_path'])
         if not result_path.is_file():
             return None
         result = read(result_path)
         if member['terminal'] and result.get('state') in ('RUNNING', 'READY'):
             return None
         outputs.append({'step': member['label'], 'uses': member['uses'],
-                        'result_path': member['result_path'], 'result': result})
+                        'result_path': member['result_path'], 'result': logical_value(result)})
     return outputs

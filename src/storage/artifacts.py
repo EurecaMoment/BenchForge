@@ -29,6 +29,23 @@ def read_json(path):
 def atomic_text(path):
     """Publish a complete UTF-8 file, preserving the old file on write failure."""
     destination = Path(path)
+    if __package__:
+        from service_access.access_scope import current_access
+        access = current_access()
+        if access is not None:
+            from storage.operation_outputs import trusted_output_path
+            candidate = destination if destination.is_absolute() else Path(access.root_path) / destination
+            if candidate.is_relative_to(Path(access.root_path)) and not trusted_output_path(destination):
+                import io
+                from storage.confined_files import open_write
+                with open_write(access.root_path, destination) as binary:
+                    text = io.TextIOWrapper(binary, encoding='utf-8', newline='\n')
+                    try:
+                        yield text
+                        text.flush()
+                    finally:
+                        text.detach()
+                return
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)

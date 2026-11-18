@@ -1,6 +1,7 @@
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 import {releaseProcess, releaseProcesses} from './process_cleanup.mjs';
 import path from 'node:path';
+import {pythonHostDirectory, pythonHostEnvironment} from './python_environment.mjs';
 
 /** Host-owned backend calls; timers and browser reads use the same policy. */
 export function createStageReviewClient(subprocess, config = {}) {
@@ -8,14 +9,14 @@ export function createStageReviewClient(subprocess, config = {}) {
   const lifetime = new AbortController(), active = new Set();
   async function advance(workspace, sessionId, reviewId, _now, callerSignal) {
     const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(config.reviewTimeoutMs ?? 15000), ...(callerSignal ? [callerSignal] : [])]);
-    const env = {...config.environment, PYTHONIOENCODING:'utf-8', BENCHFORGE_MANAGED_SUBPROCESS:'1'};
+    const env = pythonHostEnvironment({...config.environment, BENCHFORGE_MANAGED_SUBPROCESS:'1'});
     const python = await subprocess.resolveExecutable(config.python || 'python3', env, signal);
     signal.throwIfAborted();
     const argv = [python, '-B', '-m', 'server.stage_review_cli',
       '--workspace',workspace,'--session',sessionId,'--request',JSON.stringify({action:'status',review_id:reviewId})];
     if (productionConfig) argv.push('--config', productionConfig);
     const handle = subprocess.spawn({argv,
-    cwd:workspace,env,signal,graceMs:1000,
+    cwd:pythonHostDirectory,env,signal,graceMs:1000,
     stdio:{stdout:{maxBytes:128000},stderr:{maxBytes:16000}}});
     active.add(handle);
     try {

@@ -36,7 +36,9 @@ def main():
     config = load_operation_config(args.config)
     runtime = Runtime(args.workspace, config)
     try:
-        print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))
+        from service_access.access_scope import cli_access
+        with cli_access(runtime.engine, runtime.root):
+            print(json.dumps(runtime.call(args.tool, request), ensure_ascii=False))
     finally:
         runtime.close()
 

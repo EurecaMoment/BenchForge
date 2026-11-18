@@ -1,21 +1,18 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {fileURLToPath} from 'node:url';
 import {readChildCatalog} from '../../host/session_family.mjs';
 
 const queues = new Map();
 const nativeIdleProbes = new WeakMap();
 const NATIVE_ACTIVITY_PROBE_MS = 50;
 const SCHEMA = 'benchforge.synthesis-sessions/v1';
-const FACING_REFERENCE = fileURLToPath(new URL('../../../capabilities/scene_authoring/resources/native_asset_facing.json', import.meta.url));
-const FACING_HELPER = fileURLToPath(new URL('../../../capabilities/scene_authoring/geometry/native_asset_facing.py', import.meta.url));
 const PERSONA = `You are a BenchForge preparation worker for one self-contained artifact assignment. Read the supplied frozen plan, contracts and relevant saved evidence. Write only inside the assigned output directory. Start file operations by changing to that directory and using explicit paths; preserve parent plans, scene selections, runner state, accepted artifacts and other workers' files.
 At the start of file work, batch-copy the supplied source scripts or programs into your directory and save manifest.json with status preparing, the working artifact paths and known missing inputs. Use the supplied source paths instead of rediscovering the workspace or checking the whole production chain first. On recovery, preserve saved edits and continue the existing working copies. If a source is actually missing, record its exact path and continue the already determined scope; when no source was supplied, save the known design or script scaffold and preparing manifest first.
 Apply the smallest concrete patch. Locate and batch-read only the functions or sections needed for it, then save known changes as you work. For scene design, persist the title, descriptive summary and program draft before investigating unresolved structure. If an exact input or required structure remains unknown, state the specific question or missing field in the manifest and hand off the completed scope; do not delay all saved preparation while trying to validate the entire production pipeline.
 Keep verification proportional to the actual change and unresolved evidence. Do not add complex SHA checks or compute checksums for every input, PNG, output and receipt. Preserve supplied native identities and use necessary file size/mtime version bindings. Serialize JSON/JSONL directly with explicit UTF-8 writes; do not re-read every newly written record just to check serialization. Do not repeatedly scan directories, poll unchanged state or revalidate unrelated completed stages. Run only the checks needed for the patch and its source/production boundary; broaden checks when a concrete failure requires it.
 Preparation is complete when the requested edits or design artifacts are saved, checks proportional to those changes have run, and an honest manifest reports artifact paths, actual checks, missing inputs and unresolved issues. A useful saved partial preparation can be handed off with its concrete blocker. Parent production acceptance is a later responsibility and must not prevent preparation drafts from being saved or delivered. Preserve hard requirements, exact measurement and public-question contracts, provenance, physics and everyday realism. Recognizable real assets are the default; geometry explicitly declared in the frozen plan remains valid in its scope. Predictions and references are not captured evidence or GT; record unaccepted or missing inputs without inventing results.
-For scene facing and functional-layout work, use the calibrated native asset front axes in ${FACING_REFERENCE}; the dependency-free planning helper is ${FACING_HELPER}. It provides yaw_toward(kind, source_xy, target_xy) and world_forward(kind, yaw_deg). These references apply to their named source USD assets. Do not infer an asset's front from AABB dimensions or an earlier visual-review pass. Unknown assets have no implied axis. Keep their uncertainty explicit and obtain only the necessary shape evidence. Face monitors toward their operator, chairs toward their declared working target and conversation seats toward their declared conversation target; use the saved role relations, not a single assumed axis for all assets. The helper computes planned directions, not executed physics or acceptance; verify changed poses in subsequent native capture. Use Python with -B when reading the helper outside your assigned write directory.
+For scene facing and functional-layout work, use only the calibrated asset-front evidence supplied in granted inputs or the public catalog. Do not inspect deployment or third-party source files. Do not infer an asset's front from AABB dimensions or an earlier visual-review pass. Unknown assets have no implied axis. Face monitors toward their operator, chairs toward their working target and conversation seats toward their conversation target; preserve uncertainty until native capture verifies it.
 The parent owns authoritative merging, capture, acceptance, export and each production stage's user window. Do not spawn more workers, create stage windows or bypass parent-owned tools through a shell, HTTP or task code. Question workers deliver S4 preparation or shards; the parent packages S5 after aggregate S4 acceptance. Update manifest.json to reflect the actual preparation outcome and quote its path in the final handoff. Preparation completion and accepted scene/data production are separate outcomes.`;
 
 class SynthesisError extends Error {
@@ -161,8 +158,8 @@ function nativeIdleProbe(agent) {
 
 /**
  * A trusted server adapter for native continuable spawn. The caller owns route
- * authentication and registered-workspace admission. Native spawn inherits the
- * parent's cwd; the assigned write directory is a worker policy, not an OS sandbox.
+ * authentication and registered-workspace admission. The Host reserves each
+ * child's independent workspace and hands off explicit input snapshots.
  */
 export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
   if (!Number.isSafeInteger(batchSize) || batchSize < 1) throw new SynthesisError('batchSize must be a positive integer');
@@ -225,7 +222,11 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     if (!inside(root, cwd)) throw new SynthesisError('The parent Agent belongs to another workspace', 403);
     const service = get('subagents');
     if (!service?.startActivation) throw new SynthesisError('Native subagent service is unavailable', 503);
-    return {root, parent, service, dir: await recordDirectory(root)};
+    const access = get('benchforgeAccess');
+    if (!access) throw new SynthesisError('Managed conversation workspaces are unavailable', 503);
+    if (access.get(parentId).rootPath !== cwd || root !== cwd)
+      throw new SynthesisError('Preparation requires the parent managed workspace', 403);
+    return {root, parent, service, access, dir: await recordDirectory(root)};
   }
   const fileOf = (dir, batchKey) => path.join(dir, 'batch-' + Buffer.from(nonempty(batchKey, 'batchKey'), 'utf8').toString('base64url') + '.json');
 
@@ -280,18 +281,27 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
 
   async function start(request, signal) {
     fields(request, ['parentId', 'batchKey', 'tasks', 'planPath'], 'synthesis request');
-    const {root, parent, service, dir} = await scope(request.parentId, true, signal);
+    const {root, parent, service, access, dir} = await scope(request.parentId, true, signal);
     const batchKey = nonempty(request.batchKey, 'batchKey');
     const planPath = request.planPath === undefined ? undefined : await existingFile(
       path.resolve(root, nonempty(request.planPath, 'planPath')), 'planPath');
     if (planPath && !inside(root, planPath)) throw new SynthesisError('The saved plan must stay inside the workspace', 403);
     if (!Array.isArray(request.tasks) || !request.tasks.length) throw new SynthesisError('tasks must contain preparation work');
     const tasks = await Promise.all(request.tasks.map(async task => {
-      fields(task, ['key', 'label', 'prompt', 'outputDirectory'], 'synthesis task');
+      fields(task, ['key', 'label', 'prompt', 'outputDirectory', 'inputFiles'], 'synthesis task');
       const outputDirectory = await directory(path.resolve(root, nonempty(task.outputDirectory, 'outputDirectory')), 'outputDirectory');
       if (outputDirectory === root || !inside(root, outputDirectory)) throw new SynthesisError('Worker output must be a dedicated directory inside the workspace', 403);
+      if (!/^(tasks|synthesis)[\\/]/.test(path.relative(root, outputDirectory)))
+        throw new SynthesisError('Preparation handoffs must stay in parent draft directories', 403);
+      if (task.inputFiles !== undefined && (!Array.isArray(task.inputFiles) || task.inputFiles.length > 32))
+        throw new SynthesisError('inputFiles must contain at most 32 explicit parent files');
+      const inputFiles = await Promise.all((task.inputFiles || []).map(async value => {
+        const file = await existingFile(path.resolve(root, nonempty(value, 'input file')), 'input file');
+        if (!inside(root, file)) throw new SynthesisError('Preparation input leaves the parent workspace', 403);
+        return file;
+      }));
       return {key: nonempty(task.key, 'key'), label: nonempty(task.label, 'label'),
-        prompt: nonempty(task.prompt, 'prompt'), outputDirectory};
+        prompt: nonempty(task.prompt, 'prompt'), outputDirectory, ...(inputFiles.length ? {inputFiles} : {})};
     }));
     tasks.sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
     for (let i = 0; i < tasks.length; i++) for (let j = i + 1; j < tasks.length; j++) {
@@ -347,11 +357,23 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
         await Promise.all(ready.map(async task => {
           try {
             signal?.throwIfAborted();
+            const binding = await access.reserve(task.childId, parent.id);
+            const childOutputDirectory = path.join(binding.rootPath, 'tasks', 'preparation');
+            await fs.mkdir(childOutputDirectory, {recursive: true});
+            task.childWorkspace = binding.rootPath;
+            task.childOutputDirectory = childOutputDirectory;
+            const inputs = [...new Set([...(planPath ? [planPath] : []), ...(task.inputFiles || [])])];
+            task.inputSnapshots = await Promise.all(inputs.map(async source => ({
+              source, path: await access.snapshotInput(task.childId, parent.id, source),
+            })));
+            const frozenPlan = task.inputSnapshots.find(input => input.source === planPath)?.path;
+            await save();
             const result = await service.startActivation({provider: 'spawn', childId: task.childId, label: task.label,
-              parent, delivery: 'parent', prompt: [{type: 'text', text:
+              parent, cwd: binding.rootPath, delivery: 'parent', prompt: [{type: 'text', text:
                 PERSONA + '\n\n' +
-                (planPath ? `Saved frozen plan: ${planPath}\nRead this saved plan for the assigned preparation.\n\n` : '') +
-                `Assigned output directory: ${task.outputDirectory}\nChange to this directory before file operations. All writes must stay there.\n\n${task.prompt}`}],
+                (frozenPlan ? `Saved frozen plan: ${frozenPlan}\nRead this snapshot for the assigned preparation.\n\n` : '') +
+                `Granted input snapshots: ${JSON.stringify(task.inputSnapshots)}\nUse snapshot paths instead of their original parent paths.\n` +
+                `Assigned output directory: ${childOutputDirectory}\nSave preparation files directly in this directory. The Host hands them back when you finish; do not write the parent workspace.\n\n${task.prompt}`}],
               ...(reasoningSelection.selectedEffort ? {agentOptions: {reasoningEffort: reasoningSelection.selectedEffort}} : {}),
               maxDepth: 1, signal: signal || new AbortController().signal});
             if (result.childId !== task.childId || typeof result.messageId !== 'string' || !result.messageId) {
@@ -390,6 +412,14 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     const [parentNativeActivity, ...taskActivities] = await Promise.all([
       nativeActivity(parentId), ...value.tasks.map(task => nativeActivity(task.childId)),
     ]);
+    const access = get('benchforgeAccess');
+    for (let index = 0; index < value.tasks.length; index++) {
+      const task = value.tasks[index];
+      if (access && task.childOutputDirectory && taskActivities[index].idleConfirmed) {
+        try { task.handoff = await access.exportPreparation(task.childId, parentId, task.outputDirectory); }
+        catch (error) { task.handoff = {accepted: false, error: error.message}; }
+      }
+    }
     return {...value, parentNativeActivity,
       tasks: value.tasks.map((task, index) => ({...task, nativeActivity: taskActivities[index]}))};
   }

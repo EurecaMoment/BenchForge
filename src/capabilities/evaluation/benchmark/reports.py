@@ -8,8 +8,10 @@ import os
 import random
 import re
 import shutil
+import stat
 import time
 import urllib.request
+import zipfile
 from collections import Counter
 from collections import defaultdict
 from pathlib import Path
@@ -25,6 +27,164 @@ else:
     from artifacts import write
     from artifacts import jsonl
     from artifacts import unique
+
+
+_INPUT_LIMIT = 512 * 1024 * 1024
+_RECORD_LIMIT = 64 * 1024 * 1024
+# Only these contract fields declare files. Provenance, prompts, commands and
+# other strings must never cause the service to open a path.
+_RESOURCE_FIELDS = frozenset({
+    'media', 'image', 'image_path', 'image_paths', 'source_image', 'source_mask',
+    'source_mesh', 'source_gaussian', 'raw_depth_path', 'depth_path', 'mask_path',
+    'mesh_path',
+})
+_PROVENANCE_FIELDS = frozenset({'provenance', 'source_provenance', 'history'})
+
+
+def _access():
+    # The exported score.py intentionally runs with standard Python alone.
+    if not __package__:
+        return None
+    from service_access.access_scope import current_access
+    return current_access()
+
+
+def _input_path(value, *, base=None):
+    path = Path(value)
+    if base is not None and not path.is_absolute():
+        path = base / path
+    if _access() is not None:
+        from storage.operation_outputs import trusted_output_path
+        if trusted_output_path(path):
+            return path
+        from service_access.access_scope import workspace_path
+        return workspace_path(path)
+    return path.absolute()
+
+
+def _input_bytes(path, *, limit=_INPUT_LIMIT):
+    path = _input_path(path)
+    access = _access()
+    if access is not None:
+        from storage.operation_outputs import trusted_output_path
+        if trusted_output_path(path):
+            return path.read_bytes()
+        from storage.confined_files import read_bytes
+        return read_bytes(access.root_path, path, limit=limit)
+    return path.read_bytes()
+
+
+def _input_rows(path):
+    if _access() is None:
+        return rows(path)
+    text = _input_bytes(path, limit=_RECORD_LIMIT).decode('utf-8-sig')
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def _copy_input(source, destination):
+    source = _input_path(source)
+    access = _access()
+    if access is not None:
+        from storage.operation_outputs import trusted_output_path
+        if trusted_output_path(source):
+            shutil.copyfile(source, destination)
+            return
+        from storage.confined_files import copy_input
+        copy_input(access.root_path, source, destination, limit=_INPUT_LIMIT)
+    else:
+        if source.is_symlink():
+            raise PermissionError('Symbolic links are not release inputs')
+        shutil.copyfile(source, destination)
+
+
+def _bundle_files(root):
+    """Enumerate only regular entries; never descend through a linked directory."""
+    if root.is_symlink():
+        raise PermissionError('Release directories cannot be symbolic links')
+    for directory, folders, names in os.walk(root, followlinks=False):
+        for name in folders:
+            if (Path(directory) / name).is_symlink():
+                raise PermissionError('Release directories cannot contain symbolic links')
+        for name in names:
+            path = Path(directory) / name
+            if not stat.S_ISREG(path.lstat().st_mode):
+                raise PermissionError('Release inputs must be regular files')
+            yield path
+
+
+def _zip_tree(root, destination):
+    """Hold file descriptors while archiving; ZipFile.write follows symlinks."""
+    root = Path(root).absolute()
+    with zipfile.ZipFile(destination, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for path in _bundle_files(root):
+            if os.name == 'posix':
+                from storage.confined_files import open_read
+                stream = open_read(root, path)
+            else:
+                stream = path.open('rb')
+            with stream as source, archive.open(path.relative_to(root).as_posix(), 'w') as output:
+                shutil.copyfileobj(source, output, 1024 * 1024)
+
+
+def _reproduce_bundle(bundle, copied):
+    bundle = _input_path(bundle)
+    if not bundle.is_dir():
+        raise ValueError('Reproduction bundle must be a directory')
+    files = list(_bundle_files(bundle))
+    copied.mkdir()
+    for source in files:
+        destination = copied / source.relative_to(bundle)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        _copy_input(source, destination)
+    external = copied / 'inputs'
+    external.mkdir(exist_ok=True)
+    mapping = {}
+
+    def relocate(value, field='', descriptor=False):
+        if field in _PROVENANCE_FIELDS:
+            return value
+        if isinstance(value, dict):
+            return {key: relocate(child, field if field == 'image_paths' else key,
+                                  field == 'resources') for key, child in value.items()}
+        if isinstance(value, list):
+            return [relocate(child, field, descriptor) for child in value]
+        declared = field in _RESOURCE_FIELDS or descriptor and field in ('path', 'file')
+        if not isinstance(value, str) or not declared or not value:
+            return value
+        # Remote references stay remote; packaging does not fetch them.
+        if value.startswith(('http://', 'https://', 'data:')):
+            return value
+        path = Path(value)
+        prefixed = value.replace('\\', '/').startswith(bundle.name + '/')
+        source = _input_path(path, base=bundle.parent if prefixed else bundle)
+        try:
+            relative = source.relative_to(bundle)
+        except ValueError:
+            relative = None
+        if relative is not None and '..' not in relative.parts:
+            return relative.as_posix()
+        # Scope validation and descriptor-relative copy apply even when JSON
+        # declares a file outside the reproduction directory.
+        key = str(source)
+        if key not in mapping:
+            destination = external / f'input_{len(mapping):06d}{source.suffix}'
+            # Never overwrite an existing bundle input with a relocated file.
+            while destination.exists():
+                destination = destination.with_name('_' + destination.name)
+            _copy_input(source, destination)
+            mapping[key] = destination.relative_to(copied).as_posix()
+        return mapping[key]
+
+    for source in files:
+        path = copied / source.relative_to(bundle)
+        if path.suffix == '.jsonl':
+            jsonl(path, [relocate(row) for row in rows(path)])
+        elif path.suffix == '.json':
+            write(path, relocate(read(path)))
+    write(copied / 'relocation.json', {
+        'external_files_copied': len(mapping),
+        'note': 'Only declared media/resource fields are relocated. Other strings are inert provenance.',
+    })
 
 
 def identity(row):
@@ -124,8 +284,8 @@ def score_predictions(items,predictions,model='saved_predictions'):
 
 
 def evaluate(args,directory,config):
-    items=rows(args['items'])
-    result=score_predictions(items,rows(args['predictions']),args.get('model','saved_predictions'))
+    items=_input_rows(args['items'])
+    result=score_predictions(items,_input_rows(args['predictions']),args.get('model','saved_predictions'))
     jsonl(directory/'score_items.jsonl',result.pop('scores'))
     write(directory/'metrics.json',result)
     return {**result,'scores':str(directory/'score_items.jsonl'),'metrics':str(directory/'metrics.json')}
@@ -143,19 +303,19 @@ def package(args,directory,config):
     root=directory/'benchmark'
     pub=root/'public';private=root/'authority'
     (pub/'media').mkdir(parents=True);private.mkdir()
-    source_items=rows(args['items']);unique([{**r,'id':identity(r)} for r in source_items])
+    items_path=_input_path(args['items'])
+    source_items=_input_rows(items_path);unique([{**r,'id':identity(r)} for r in source_items])
     public=[];gold=[]
     for i,row in enumerate(source_items):
         media=row.get('media',[row['image']] if row.get('image') else [])
         if isinstance(media,str):media=[media]
         relocated=[]
         for j,value in enumerate(media):
-            source=Path(value)
-            if not source.is_absolute():source=Path(args['items']).resolve().parent/source
+            source=_input_path(value,base=items_path.parent)
             if source.suffix.lower() not in ('.png','.jpg','.jpeg','.webp','.bmp','.gif','.mp4','.wav'):
                 raise ValueError('Public media must not contain privileged arrays or label files')
             dest=pub/'media'/f'{i:06d}_{j}{source.suffix.lower()}'
-            shutil.copyfile(source,dest);relocated.append(dest.relative_to(pub).as_posix())
+            _copy_input(source,dest);relocated.append(dest.relative_to(pub).as_posix())
         public.append(public_row(row,relocated))
         gold.append({**row,'id':identity(row),'media':['../public/'+p for p in relocated]})
     jsonl(pub/'items.jsonl',public);jsonl(private/'items.jsonl',gold)
@@ -164,37 +324,7 @@ def package(args,directory,config):
     for module in (source/'storage/artifacts.py', source/'service_access/processes.py'):
         shutil.copyfile(module, root/module.name)
     if args.get('bundle'):
-        bundle=Path(args['bundle']).resolve()
-        copied=root/'reproduce'
-        shutil.copytree(bundle,copied)
-        # Relocate only files explicitly referenced in bundle records; no filesystem audit.
-        external=copied/'inputs';external.mkdir(exist_ok=True)
-        mapping={}
-        def relocate(value):
-            if isinstance(value,dict):return {k:relocate(v) for k,v in value.items()}
-            if isinstance(value,list):return [relocate(v) for v in value]
-            if not isinstance(value,str):return value
-            path=Path(value)
-            if not path.is_absolute():
-                # Original image composer can record paths relative to the
-                # operation directory (bundle/image_processing/...). Normalize
-                # that known prefix before renaming the copy to reproduce/.
-                if value.replace('\\','/').startswith(bundle.name+'/'):
-                    candidate=(bundle.parent/path).resolve()
-                    if candidate.is_file():return candidate.relative_to(bundle).as_posix()
-                return value
-            try:return path.resolve().relative_to(bundle).as_posix()
-            except ValueError:pass
-            if path.is_file():
-                if value not in mapping:
-                    dest=external/f'input_{len(mapping):06d}{path.suffix}'
-                    shutil.copyfile(path,dest);mapping[value]=dest.relative_to(copied).as_posix()
-                return mapping[value]
-            return value  # provenance notes may retain historical paths, never dereferenced
-        for path in list(copied.rglob('*.json'))+list(copied.rglob('*.jsonl')):
-            if path.suffix=='.jsonl':jsonl(path,[relocate(row) for row in rows(path)])
-            else:write(path,relocate(read(path)))
-        write(copied/'relocation.json',{'external_files_copied':len(mapping),'note':'Historical source path strings are provenance notes. Executable evidence/media file references are local.'})
+        _reproduce_bundle(args['bundle'],root/'reproduce')
     (root/'README.md').write_text('''# Portable benchmark
 
 `public/` is the only model-visible input. `authority/` contains answers and audit data.
@@ -207,21 +337,21 @@ Each prediction is `{"id":"...","answer":"..."}`. Missing predictions score zero
 
 When supplied, `reproduce/` contains the caller's reproduction bundle and copied inputs. Keep it private during model inference.
 ''',encoding='utf-8')
-    shutil.make_archive(str(directory/'benchmark-public'),'zip',pub)
-    shutil.make_archive(str(directory/'benchmark-complete'),'zip',root)
+    _zip_tree(pub,directory/'benchmark-public.zip')
+    _zip_tree(root,directory/'benchmark-complete.zip')
     return {'public_package':str(directory/'benchmark-public.zip'),'complete_package':str(directory/'benchmark-complete.zip'),
             'public':str(pub),'authority':str(private),'count':len(public)}
 
 
 def model_eval(args,directory,config):
-    public=rows(args['public_items'])
+    public=_input_rows(args['public_items'])
     # Construct allowlisted request rows even if caller accidentally passes audit items.
     configs=config.get('models',{})
     names=args.get('models') or [name for name, spec in configs.items()
                                  if spec.get('url') and spec.get('model') and 'python' not in spec
                                  and 'path' not in spec]
     if not names:raise ValueError('Configure named models or explicitly request baselines')
-    items_path=Path(args['public_items']).resolve()
+    items_path=_input_path(args['public_items'])
     results=[]
     for name in names:
         if name not in configs:raise ValueError(f'Model not configured: {name}')
@@ -233,10 +363,9 @@ def model_eval(args,directory,config):
             media=row.get('media',[])
             if isinstance(media,str):media=[media]
             for value in media:
-                path=Path(value)
-                if not path.is_absolute():path=items_path.parent/path
+                path=_input_path(value,base=items_path.parent)
                 mime=mimetypes.guess_type(path.name)[0] or 'image/png'
-                content.append({'type':'image_url','image_url':{'url':'data:'+mime+';base64,'+base64.b64encode(path.read_bytes()).decode()}})
+                content.append({'type':'image_url','image_url':{'url':'data:'+mime+';base64,'+base64.b64encode(_input_bytes(path)).decode()}})
             body={'model':cfg['model'],'messages':[{'role':'user','content':content}],
                   'temperature':cfg.get('temperature',0),'max_tokens':cfg.get('max_tokens',4096),'stream':False,**cfg.get('parameters',{})}
             headers={'Content-Type':'application/json'}
@@ -267,7 +396,7 @@ def model_eval(args,directory,config):
         jsonl(out/'predictions.jsonl',predictions);jsonl(out/'failures.jsonl',failures)
         result={'model':name,'predictions':str(out/'predictions.jsonl'),'failed':len(failures),'completed':len(predictions),'evaluation_mode':'real_model'}
         if args.get('items'):
-            score=score_predictions(rows(args['items']),predictions,name)
+            score=score_predictions(_input_rows(args['items']),predictions,name)
             jsonl(out/'score_items.jsonl',score.pop('scores'));write(out/'metrics.json',score)
             result.update(scores=str(out/'score_items.jsonl'),overall=score['overall'])
         results.append(result)
@@ -276,7 +405,7 @@ def model_eval(args,directory,config):
 
 
 def baselines(args,directory,config):
-    items=rows(args['items']);rng=random.Random(args.get('seed',42))
+    items=_input_rows(args['items']);rng=random.Random(args.get('seed',42))
     results=[]
     for name in ('first_choice','random_choice'):
         preds=[]
@@ -296,7 +425,7 @@ def baselines(args,directory,config):
 
 def report(args,directory,config):
     paths=args['scores'] if isinstance(args['scores'],list) else [args['scores']]
-    matrix=[r for path in paths for r in rows(path)]
+    matrix=[r for path in paths for r in _input_rows(path)]
     seen=set()
     for r in matrix:
         key=(r['model'],identity(r))

@@ -4,10 +4,11 @@ from pathlib import Path
 
 from pipelines.reviews.service import review
 from capabilities.benchmark_design.stages import STAGES
+from storage.operation_outputs import operation_workspace
 
 
 def call(args, directory, config=None):
-    workspace = str(Path(directory).parents[1])
+    workspace = str(operation_workspace(directory))
     session = args.get('_dsh_context',{}).get('session_id')
     action = args.get('action','status')
     options = {k:args[k] for k in ('stage','key','artifact','review_id','instruction') if k in args}

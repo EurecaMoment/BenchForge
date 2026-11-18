@@ -16,7 +16,7 @@ versions = Table(
 )
 _initialized = WeakSet()
 _initialization_lock = RLock()
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 
 def initialize_schema(engine=None):
@@ -46,6 +46,12 @@ def initialize_schema(engine=None):
             if current < 2:
                 for index in metadata.tables["operations"].indexes:
                     index.create(connection, checkfirst=True)
+            if current < 5:
+                from database.migration_access import upgrade
+                upgrade(connection)
+            if current < 6:
+                from database.migration_documents import upgrade
+                upgrade(connection)
             from time import time
             for version in range(current + 1, SCHEMA_VERSION + 1):
                 connection.execute(versions.insert().values(version=version, applied_at=int(time())))

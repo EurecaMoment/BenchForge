@@ -197,9 +197,36 @@ def examples_entry(*, package_imports=False):
         'id': base.EXAMPLES_PLUGIN_ID,
         'name': '@eurecamoment/benchforge-dsh/examples' if package_imports
                 else (DSH / 'dist/examples.mjs').as_uri(),
-        # The npm bundle does not include the repository's large example assets.
-        'config': {'sourceDirectory': '' if package_imports
+        'config': {'sourceDirectory': base.JavaScript(
+            "process.getBuiltinModule('node:path').join("
+            "process.getBuiltinModule('node:path').dirname("
+            "process.getBuiltinModule('node:module').createRequire(baseUrl)"
+            ".resolve('@eurecamoment/benchforge-dsh/package.json')), 'dist/example/SpatialForge')"
+        ) if package_imports
                    else str(DSH.parent.parent / 'example/SpatialForge')},
+    }
+
+
+def skills_entry(*, package_imports=False):
+    """Contribute packaged usage guides only to the BenchForge preset."""
+    return {
+        'id': 'benchforge-skill-files',
+        'name': '@eurecamoment/benchforge-dsh/component-skills' if package_imports
+                else (DSH / 'dist/component-skills.mjs').as_uri(),
+    }
+
+
+def access_entry(*, package_imports=False):
+    """Host authority owns roots and identities; the preset only consumes it."""
+    def home_path(name):
+        return base.JavaScript("process.getBuiltinModule('node:path').join("
+            "process.env.DSH_HOME || (() => {throw new Error('DSH_HOME is required')})(), "
+            + repr(name) + ")")
+    return {
+        'id': 'benchforge-access',
+        'name': '@eurecamoment/benchforge-dsh/access' if package_imports
+                else (DSH / 'dist/access.mjs').as_uri(),
+        'config': {'workspaceRoot': home_path('workspaces'), 'resourceRoot': home_path('resources')},
     }
 
 
@@ -213,6 +240,7 @@ def build(standard, python, service_config, *, config_path=None,
     # DSH provides the current directory through its native runtime context.
     # Only provider/model are built-in persona template variables.
     persona_plugin['config'].update(prefix=persona(), suffix='You are using {{model}}.')
+    plugins.append(skills_entry(package_imports=package_imports))
     plugins.append({'id': 'benchforge-invocation',
                     'name': '@eurecamoment/benchforge-dsh/invocation' if package_imports
                             else (DSH / 'dist/invocation.mjs').as_uri()})
@@ -245,7 +273,8 @@ def build(standard, python, service_config, *, config_path=None,
         'config': {'persona': SYNTHESIS_WORKER_PERSONA, 'parentTools': sorted(configured_synthesis_tools(plugins))},
     })
     workbench = workbench_entry(python, service_config, package_imports=package_imports)
-    entries = [session_query_entry(service_config, package_imports=package_imports),
+    entries = [access_entry(package_imports=package_imports),
+               session_query_entry(service_config, package_imports=package_imports),
                examples_entry(package_imports=package_imports),
                session_operations_entry(python=python, service_config=service_config,
                                         package_imports=package_imports), preset,
