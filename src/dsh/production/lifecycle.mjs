@@ -1,16 +1,42 @@
 import {stageName, stageSummary} from './stages.mjs';
+import {waitWithSignal} from '../runtime/cancellation.mjs';
+import {ProductionIncompleteError} from './errors.mjs';
 
 /** Conversation policy; all facts come from the projection and domain receipts. */
 export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
-  schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{}}) {
-  const timers=new Map(), queues=new Map(), reminders=new Map();
+  schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
+  const timers=new Map(), queues=new Map(), reminders=new Map(), checks=new Map();
+  const lifetime=new AbortController();
   let disposed=false;
-  const serialized=(id,operation)=>{
+  const serialized=(id,operation,signal=lifetime.signal)=>{
     const previous=queues.get(id)||Promise.resolve();
-    const next=previous.catch(()=>{}).then(operation);
+    const next=waitWithSignal(previous,signal).catch(_priorFailure=>{signal?.throwIfAborted();}).then(()=>{signal?.throwIfAborted();return operation();});
     queues.set(id,next);
-    return next.finally(()=>{if(queues.get(id)===next)queues.delete(id);});
+    const settled=next.finally(()=>{if(queues.get(id)===next)queues.delete(id);});
+    return waitWithSignal(settled,signal);
   };
+  function checkSignal(id) {
+    if(!checks.has(id))checks.set(id,{controller:new AbortController()});
+    return AbortSignal.any([lifetime.signal,checks.get(id).controller.signal]);
+  }
+  function bindTurn(agent,signal) {
+    if(!signal || checks.get(agent.id)?.signal===signal)return;
+    const prior=checks.get(agent.id);
+    prior?.detach?.();
+    const controller=prior&&!prior.controller.signal.aborted?prior.controller:new AbortController();
+    const abort=()=>{
+      controller.abort(signal.reason);
+      if(timers.has(agent.id))unschedule(timers.get(agent.id));
+      timers.delete(agent.id);
+      if(signal.reason?.kind!=='disposed'&&!disposed)void serialized(agent.id,async()=>{
+        const record=table.get(agent.id);
+        if(record)await table.put(agent.id,{...record,suspended:true});
+      }).catch(error=>{if(!disposed)onError(error);});
+    };
+    signal.addEventListener('abort',abort,{once:true});
+    checks.set(agent.id,{controller,signal,detach:()=>signal.removeEventListener('abort',abort)});
+    if(signal.aborted)abort();
+  }
   const viewOf=agent=>projection.stateOf(agent.session).view;
   const notice=(kind,key,text)=>createMessage({source:{kind,noticeKey:key,form:'notice',summary:text},content:[{type:'text',text}]});
   function pendingNotice(agent,key) {
@@ -20,21 +46,23 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
   function arm(id,record,minDelay=0) {
     if(timers.has(id))unschedule(timers.get(id));
     timers.delete(id);
-    if(disposed||!record.review||record.suspended) return;
+    if(disposed||checks.get(id)?.controller.signal.aborted||!record.review||record.suspended) return;
     const timer=schedule(()=>{
       timers.delete(id);
-      return refresh(id).catch(error=>{if(!disposed){onError(error);arm(id,table.get(id)||record,5000);}});
+      return refresh(id).catch(error=>{if(!disposed&&!checks.get(id)?.controller.signal.aborted){onError(error);arm(id,table.get(id)||record,5000);}});
     },Math.max(minDelay,record.review.deadline*1000-now()));
     timer?.unref?.();timers.set(id,timer);
   }
-  async function observe(agent) {
+  async function observe(agent,signal=lifetime.signal) {
     if(disposed)return;
+    signal=AbortSignal.any([lifetime.signal,signal]);
     const view=viewOf(agent);
     if(!view.active || agent.session.header?.origin==='subagent')return;
     await serialized(agent.id,async()=>{
       const prior=table.get(agent.id);
       const key=view.review ? `${agent.id}:${view.review.review_id}` : '';
-      const current=view.review ? await readReview(view.workspace,agent.id,view.review.review_id,now()) : null;
+      const current=view.review ? await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal) : null;
+      signal?.throwIfAborted();
       const review=current ? {...view.review,deadline:current.deadline,state:current.state,
         artifact:current.artifact || view.review.artifact} : view.review;
       const record={sessionId:agent.id,workspace:view.workspace,plan:view.plan,run:view.run,
@@ -47,15 +75,18 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       const stable=value=>JSON.stringify(value && {...value,revision:0});
       if(stable(prior)===stable(record))return;
       await table.put(agent.id,record);
+      signal?.throwIfAborted();
       arm(agent.id,record);
-    });
+    },signal);
   }
   async function refresh(id) {
+    const signal=checkSignal(id);
     return serialized(id,async()=>{
       if(disposed)return false;
       const record=table.get(id);
       if(!record?.review||record.suspended)return false;
-      const review=await advanceReview(record.workspace,id,record.review.review_id,now());
+      const review=await waitWithSignal(advanceReview(record.workspace,id,record.review.review_id,now(),signal),signal);
+      signal.throwIfAborted();
       if(['paused','needs_input','superseded'].includes(review.state)) {
         await table.put(id,{...record,suspended:true});return false;
       }
@@ -66,6 +97,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
         arm(id,updated,1000);return false;
       }
       const agent=agents.get(id)||await restoreAgent(id);
+      signal.throwIfAborted();
       if(!agent||disposed)return false;
       const state=projection.stateOf(agent.session),view=state.view;
       if(view.state==='interrupted') {
@@ -86,7 +118,8 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       }
       if(!['elapsed','continued'].includes(review.state))return false;
       if(['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state))return false;
-      await reconcileCaptures(agent);
+      await reconcileCaptures(agent,signal);
+      signal.throwIfAborted();
       const recovered=state.notices.includes(record.key)&&view.state==='interrupted'&&state.interruption==='disposed';
       const key=recovered ? `${record.key}:disposal:${state.interruptionSeq}` : record.key;
       if(pendingNotice(agent,key))return true;
@@ -97,14 +130,15 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       // A queued notice may be lost before its first step is committed. The inbox
       // and standard session events, not a prior enqueue, establish delivery.
       return true;
-    });
+    },signal);
   }
   async function preStep({agent,signal},next) {
+    bindTurn(agent,signal);
     const decision=await next();
-    if(decision.kind!=='enter'||signal?.aborted)return decision;
     signal?.throwIfAborted();
+    if(decision.kind!=='enter')return decision;
     const view=viewOf(agent);
-    await observe(agent);
+    await observe(agent,signal);
     if(view.active&&view.workflowTurn===view.turn&&agent.status==='running') {
       const previous=reminders.get(agent.id);
       const silent=now()-view.lastTextAt>=60000;
@@ -114,7 +148,8 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
         reminders.set(agent.id,{...previous,at:now(),review:view.review?.review_id,error:view.error});
         // A review receipt in the projection can predate the user's Continue.
         // Read the domain before describing a wait; the UI is not its authority.
-        const review=view.review ? await readReview(view.workspace,agent.id,view.review.review_id,now()) : null;
+        const review=view.review ? await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal) : null;
+        signal?.throwIfAborted();
         const pending=review&&['waiting_user','paused','needs_input','check_failed'].includes(review.state);
         const reviewNotice=review ? `展示真实阶段产物：${review.artifact || view.review.artifact}；`+
           (pending ? (review.state==='check_failed' ? '真实产物自检失败，修复后重试，不能靠超时放行。' : `审核仍未放行，已完成等待 ${review.waits_completed||0}/3；处理当前用户指令或等待本轮，不重新计时。`) :
@@ -129,17 +164,27 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
   }
   async function stopping({agent,turn,signal}) {
     signal?.throwIfAborted();
-    const view=viewOf(agent);
+    const state=projection.stateOf(agent.session),view=state.view;
     if(!view.active||view.workflowTurn!==view.turn)return;
-    await observe(agent);
-    const key=`${agent.id}:${turn}:${view.state}:${view.review?.review_id||0}`;
+    await observe(agent,signal);
+    const review=view.review?await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal):null;
+    signal?.throwIfAborted();
+    const waiting=review&&['waiting_user','paused','needs_input','check_failed'].includes(review.state);
+    const blocked=['needs_input','needs_evidence','needs_plan_revision','blocked','failed','paused'].includes(view.state);
+    const delivered=view.state==='completed'&&view.delivered;
+    const visible=state.lastResponse?.visible ?? view.lastTextSeq>=0;
+    if((waiting||blocked||delivered)&&visible)return;
+    const key=`${agent.id}:${turn}:${view.state}:${view.plan}:${view.run}:${view.completed}:${review?.review_id||0}:${review?.state||''}`;
     const last=reminders.get(agent.id);
-    if(last?.stop===key)return;
-    if(view.lastTextSeq<0 || now()-view.lastTextAt>60000 || view.state==='completed'&&!view.delivered) {
-      reminders.set(agent.id,{...last,stop:key});
-      agent.steer(notice('benchforge/production-delivery',key,
-        `本轮收尾检查：当前生产状态=${view.state}。请给出面向用户的结果说明和真实产物链接；已完成交付使用 present。未完成时说明具体缺项和下一步，不能宣告完成。等待用户窗口时可以结束当前轮，系统会在窗口结束后通知继续。`));
-    }
+    if(last?.stop===key&&last.response===state.lastResponse?.seq)return;
+    const attempts=Math.max(state.notices.filter(value=>value.startsWith(key+':recovery:')).length,last?.stop===key?last.attempts||0:0);
+    if(attempts>=maxStopRecoveries)throw new ProductionIncompleteError();
+    reminders.set(agent.id,{...last,stop:key,response:state.lastResponse?.seq,attempts:attempts+1});
+    const action=!view.plan?'计划尚未保存。使用已读合同保存计划草稿并调用 benchforge_pipeline_plan；不要反复遍历源码。':
+      waiting?'当前阶段等待关口仍有效，不得提前执行依赖阶段。':blocked?'如实说明当前阻塞、已保存产物和所需输入。':
+        view.state==='completed'?'已完成交付使用 present，并向用户给出真实产物链接。':'沿已保存计划继续执行下一项未完成工作；不要重做已完成阶段。';
+    agent.steer(notice('benchforge/production-continue',`${key}:recovery:${attempts+1}`,
+      `本轮收尾检查：当前生产状态=${view.state}，尚不能据此宣告任务完成。${action}先简短说明当前进展；不能用空回复结束。若存在无法自行修复的阻塞，使用已有任务或阶段工具记录真实阻塞并解释，不能伪造验收。`));
   }
   async function resume(agent) {
     const record=table.get(agent.id);
@@ -161,6 +206,8 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     return ready ? refresh(id) : false;
   }
   return {observe,preStep,stopping,resume,start,refresh:changed,
-    async dispose(){disposed=true;for(const timer of timers.values())unschedule(timer);timers.clear();await Promise.allSettled([...queues.values()]);},
+    async dispose(){disposed=true;lifetime.abort(new DOMException('Production lifecycle unloaded','AbortError'));
+      for(const check of checks.values()){check.detach?.();check.controller.abort(lifetime.signal.reason);}checks.clear();
+      for(const timer of timers.values())unschedule(timer);timers.clear();await Promise.allSettled([...queues.values()]);},
   };
 }

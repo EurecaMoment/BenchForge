@@ -15,6 +15,7 @@ start with the workbench closed.
 | `remote/` | Host/Client contract compiled by the official Typert generator |
 | `workbench/` | Host projections and Remote handlers for the single workbench |
 | `production/` | Production projection, bounded progress reminders and durable review continuation |
+| `runtime/` | Shared cancellation-aware waiting without business state or process ownership |
 | `build.mjs` | Generate Typert Remote artifacts and bundle Host/browser entries |
 | `dist/` | Generated package entries and resources; excluded from version control |
 
@@ -99,6 +100,29 @@ same saved plan once, including after reload. Paused or canceled work stays stop
 The browser reads this projection and sends review actions through the existing
 Remote API. It owns no continuation timer or acceptance policy.
 
+The explicit production request submitted by the workbench starts this tracking
+before a plan exists. A reasoning-only or empty final response cannot substitute
+for a saved result. The Host requests continuation at most `maxStopRecoveries`
+times (default 2) for the same turn and business state, then reports
+`BENCHFORGE_PRODUCTION_INCOMPLETE`. Recovery notices are replayable; read-only
+chats do not activate this policy. User cancellation interrupts queued checks and
+prevents their late responses from resuming the conversation.
+
+Python tools and review checks release their managed process before accepting a
+result. `cleanupTimeoutMs` defaults to 5000 in both Host plugins; review calls also
+have a `reviewTimeoutMs` deadline of 15000. Unknown cleanup returns
+`BENCHFORGE_PROCESS_CLEANUP_PENDING` and retains the handle for later disposal.
+A timeout never certifies process exit or approves a stage. These settings belong
+to the corresponding Host plugin's `Config`.
+
+Review reads use short, consistent read-only snapshots. SQLite lock contention
+retries asynchronously for `reviewReadTimeoutMs` (default 10000), at
+`reviewRetryIntervalMs` intervals (default 25), without blocking Stop. Persistent
+contention reports `BENCHFORGE_REVIEW_STORAGE_BUSY`; it never approves a stage or
+replays a submission. These fields belong to the session-operations, capture and
+review-policy plugins. The policy reads immediately before dispatch through
+`tools/execute`, after approval, rather than caching a synchronous guard result.
+
 ## Batch scene preflight
 
 Before capture or a repair submission, call
@@ -158,8 +182,8 @@ it does not generate missing captures. Existing `evidence.validate` plans retain
 their operation IDs and `annotations.json` artifacts. New plans save `collection.json`.
 The UI can preview old files but never declares S3 complete from image/JSON pairing.
 
-The preset's `review-policy` module uses the public `ctx.tools.guard()` API to read
-the durable session review before dispatch. Pending reviews allow reads, inspection
+The preset's `review-policy` module uses the public `tools/execute` event to read
+the durable session review asynchronously before dispatch. Pending reviews allow reads, inspection
 and task draft edits, and block new production submissions, shells and executable
 delegation. Child sessions use their parent review. The user's Remote controls can
 release a window early; the model tool cannot manufacture a user instruction or

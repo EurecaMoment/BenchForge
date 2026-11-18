@@ -125,7 +125,7 @@ export function createProgressComponents({React, helpers}) {
       return ()=>clearInterval(timer);
     },[current]);
     if(!value?.active)return null;
-    const phase={planned:'productionPlanned',waiting_user:'reviewWaiting',needs_evidence:'productionNeedsEvidence',
+    const phase={planning:'productionPlanning',incomplete:'productionIncomplete',planned:'productionPlanned',waiting_user:'reviewWaiting',needs_evidence:'productionNeedsEvidence',
       needs_input:'productionNeedsInput',needs_plan_revision:'productionNeedsRevision',paused:'reviewPaused',
       waiting_capture:'productionWaitingCapture',needs_repair:'productionNeedsRepair',scene_ready:'productionSceneReady',
       capture_error:'productionCaptureError',blocked:'productionBlocked',

@@ -2,7 +2,7 @@ import {stageCopy, stageSummary} from '../../dsh/production/stages.mjs';
 
 export const dictionaries = {
   zh: {
-    productionSystemStatus: '系统状态', productionPlanned: '计划已保存', productionNeedsEvidence: '等待采集与标注验收',
+    productionSystemStatus: '系统状态', productionPlanning: '正在准备计划', productionIncomplete: '本轮已结束，生产任务尚未完成', productionPlanned: '计划已保存', productionNeedsEvidence: '等待采集与标注验收',
     productionNeedsInput: '等待输入', productionNeedsRevision: '计划需要修订', productionInterrupted: '执行已中断',
     productionCompleted: '流水线已完成', productionAwaitingUpdate: '正在等待进展说明', productionRecentFailure: '最近一次调用失败，等待处理',
     productionWaitingCapture: '采集已提交，等待真实结果', productionNeedsRepair: '采集或验收失败，待修复',
@@ -151,7 +151,7 @@ export const dictionaries = {
     savedAt: '草稿保存于', navigation: 'BenchForge 五步', liveRecords: '当前会话的实际产物', requiredGoal: '先填写评测目标。', perTemplate: '题 / 模板',
   },
   en: {
-    productionSystemStatus: 'System status', productionPlanned: 'Plan saved', productionNeedsEvidence: 'Awaiting collection and annotation validation',
+    productionSystemStatus: 'System status', productionPlanning: 'Preparing the plan', productionIncomplete: 'Turn ended; production is unfinished', productionPlanned: 'Plan saved', productionNeedsEvidence: 'Awaiting collection and annotation validation',
     productionNeedsInput: 'Awaiting input', productionNeedsRevision: 'Plan needs revision', productionInterrupted: 'Execution interrupted',
     productionCompleted: 'Pipeline completed', productionAwaitingUpdate: 'Awaiting a progress update', productionRecentFailure: 'Recent tool failure awaiting resolution',
     productionWaitingCapture: 'Capture submitted, awaiting results', productionNeedsRepair: 'Capture or acceptance failed, repair required',

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {readLatestStageReview} from './reviews.mjs';
-import {createReviewGuard, reviewDenial} from './review_policy.mjs';
+import {createReviewPolicy, reviewDenial} from './review_policy.mjs';
 
 const pending = {stage: 'S1', state: 'waiting_user'};
 
@@ -39,40 +39,40 @@ test('released reviews and ordinary chats do not reduce tool concurrency or capa
   assert.ok(reviewDenial({name: 'bash'}, {stage: 'S2', state: 'needs_input'}, '/workspace'));
 });
 
-test('child operations use the verified parent identity and workspace', () => {
+test('child operations use the verified parent identity and workspace', async () => {
   const observed = [];
   const parent = {id: 'parent', session: {header: {cwd: '/workspace'}}};
-  const guard = createReviewGuard({agents: new Map([['parent', parent]]),
+  const guard = createReviewPolicy({agents: new Map([['parent', parent]]),
     readReview: (workspace, id) => {observed.push([workspace, id]); return pending;}});
-  assert.ok(guard({name: 'bash', agent: {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}}}));
+  assert.ok(await guard({name: 'bash', agent: {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}}}));
   assert.deepEqual(observed, [['/workspace', 'parent']]);
 });
 
-test('an unloaded parent cannot hide its review behind a child working directory', () => {
-  const guard = createReviewGuard({agents: new Map(), readReview: () => null});
+test('an unloaded parent cannot hide its review behind a child working directory', async () => {
+  const guard = createReviewPolicy({agents: new Map(), readReview: () => null});
   const agent = {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}};
-  assert.ok(guard({name: 'bash', agent}));
-  assert.equal(guard({name: 'read', agent}), undefined);
+  assert.ok(await guard({name: 'bash', agent}));
+  assert.equal(await guard({name: 'read', agent}), undefined);
 });
 
 test('durable review reader never grants approval from a deadline, including legacy rows', async t => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-review-'));
-  assert.equal(readLatestStageReview(folder, 's1'), null);
+  assert.equal(await readLatestStageReview(folder, 's1'), null);
   const file = path.join(folder, 'stage-reviews.sqlite'), db = new DatabaseSync(file);
   t.after(async () => {db.close(); await fs.rm(folder, {recursive: true, force: true});});
   db.exec('CREATE TABLE reviews (id INTEGER PRIMARY KEY, session TEXT, key TEXT, stage TEXT, artifact TEXT, deadline REAL, state TEXT, instruction TEXT)');
   db.prepare('INSERT INTO reviews VALUES(?,?,?,?,?,?,?,?)').run(1, 's1', 'a', 'S1', '/plan.json', 100, 'waiting_user', '');
   db.prepare('INSERT INTO reviews VALUES(?,?,?,?,?,?,?,?)').run(2, 'other', 'b', 'S2', '/other.json', 100, 'paused', '');
-  assert.equal(readLatestStageReview(folder, 's1', 99999).state, 'waiting_user');
-  assert.equal(readLatestStageReview(folder, 's1', 100000).state, 'waiting_user');
+  assert.equal((await readLatestStageReview(folder, 's1', 99999)).state, 'waiting_user');
+  assert.equal((await readLatestStageReview(folder, 's1', 100000)).state, 'waiting_user');
   assert.equal(db.prepare('SELECT state FROM reviews WHERE id=1').get().state, 'waiting_user');
-  assert.equal(readLatestStageReview(folder, 'unrelated'), null);
+  assert.equal(await readLatestStageReview(folder, 'unrelated'), null);
   db.exec("ALTER TABLE reviews ADD COLUMN policy_version INTEGER DEFAULT 1; ALTER TABLE reviews ADD COLUMN progress TEXT DEFAULT '{}'");
   db.prepare('UPDATE reviews SET progress=? WHERE id=1').run(JSON.stringify({rounds:[{number:1,check:{passed:true}}]}));
-  assert.equal(readLatestStageReview(folder, 's1', 9999999).state, 'waiting_user');
+  assert.equal((await readLatestStageReview(folder, 's1', 9999999)).state, 'waiting_user');
   db.prepare('UPDATE reviews SET state=? WHERE id=1').run('check_failed');
-  assert.ok(reviewDenial({name:'bash'},readLatestStageReview(folder,'s1',9999999),folder));
-  assert.equal(reviewDenial({name:'benchforge_stage_review',arguments:{action:'retry'}},readLatestStageReview(folder,'s1'),folder),undefined);
+  assert.ok(reviewDenial({name:'bash'},await readLatestStageReview(folder,'s1',9999999),folder));
+  assert.equal(reviewDenial({name:'benchforge_stage_review',arguments:{action:'retry'}},await readLatestStageReview(folder,'s1'),folder),undefined);
   db.prepare('UPDATE reviews SET state=? WHERE id=1').run('elapsed');
-  assert.equal(readLatestStageReview(folder,'s1').state,'elapsed');
+  assert.equal((await readLatestStageReview(folder,'s1')).state,'elapsed');
 });

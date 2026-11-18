@@ -48,7 +48,7 @@ function harness() {
     return result;
   };
   const fire=async()=>{for(const timer of timers.splice(0))if(timer.ms===0)await timer.fn();};
-  return {agent,event,receipt,plan,create,sent,records,timers,preStep,fire,view:()=>state.view,setTime:value=>clock=value,setReview:value=>review=value,
+  return {agent,event,receipt,plan,create,sent,records,timers,preStep,fire,events,view:()=>state.view,setTime:value=>clock=value,setReview:value=>review=value,
     cold:()=>live=false,restores:()=>restored};
 }
 
@@ -64,6 +64,86 @@ test('capture submissions and terminal notices project distinct production state
   assert.equal(h.view().state,'capture_error');
   h.receipt('benchforge_scene_blocker',{run_id:'sf_capture',state:'blocked',reason:'Required asset is unavailable.'});
   assert.equal(h.view().state,'blocked');
+});
+
+const productionRequest={source:{kind:'user'},content:[{type:'text',text:
+  '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段。\nexecution_mode=production；quantity_contract=minimum。\n生产100条机器狗轨迹数据。'}]};
+const emptyReply={message:{role:'assistant',content:[]}};
+
+test('production is tracked before its first saved plan and an empty stop requests the next concrete action',async()=>{
+  const h=harness();h.event('turn/start',{turn:1});h.event('user/message',productionRequest);
+  h.event('assistant/message',{message:{content:[{type:'text',text:'先读取合同。'}]}});
+  h.receipt('benchforge_pipeline_catalog',{items:[]});h.event('assistant/message',emptyReply);
+  const runtime=h.create();await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.view().active,true);assert.equal(h.view().state,'planning');assert.equal(h.view().plan,'');
+  assert.match(h.sent.at(-1).content[0].text,/benchforge_pipeline_plan/);
+  assert.equal(h.sent.at(-1).source.kind,'benchforge/production-continue');await runtime.dispose();
+});
+
+test('repeated empty stops fail visibly after bounded recovery, including a host reload',async()=>{
+  const h=harness();h.event('turn/start',{turn:1});h.event('user/message',productionRequest);
+  let runtime=h.create();
+  for(let attempt=0;attempt<2;attempt++){
+    h.event('assistant/message',emptyReply);await runtime.stopping({agent:h.agent,turn:1});
+    h.event('user/message',h.sent.at(-1));h.agent.inbox.nextStep=[];
+    await runtime.dispose();runtime=h.create();
+  }
+  h.event('assistant/message',emptyReply);
+  await assert.rejects(runtime.stopping({agent:h.agent,turn:1}),{code:'BENCHFORGE_PRODUCTION_INCOMPLETE'});
+  h.event('turn/end',{turn:1,reason:{kind:'error'}});assert.equal(h.view().state,'incomplete');
+  assert.equal(h.sent.length,2);await runtime.dispose();
+});
+
+test('an old completed turn without a production receipt replays as unfinished',()=>{
+  const h=harness();h.event('turn/start',{turn:1});h.event('user/message',productionRequest);
+  h.event('assistant/message',emptyReply);h.event('turn/end',{turn:1,reason:{kind:'completed'}});
+  assert.equal(h.view().state,'incomplete');assert.equal(h.view().running,false);assert.equal(h.view().delivered,false);
+});
+
+test('the ending failure replaces an older tool error without declaring production complete',()=>{
+  const h=harness();h.event('turn/start',{turn:1});h.event('user/message',productionRequest);
+  h.event('tool/call',{name:'benchforge_isaac_sim',callId:'failed-call',arguments:'{}'});
+  h.event('tool/result',{message:{toolCallId:'failed-call',isError:true,content:[{type:'text',text:'Older capability error'}]}});
+  h.event('turn/end',{turn:1,reason:{kind:'error',error:{message:'database is locked',code:'UNKNOWN'}}});
+  assert.equal(h.view().error,'database is locked');assert.equal(h.view().state,'incomplete');
+  assert.equal(h.view().running,false);assert.equal(h.view().delivered,false);
+});
+
+test('system summaries and quoted execution-mode mentions do not start production',()=>{
+  const h=harness();h.event('turn/start',{turn:1});
+  h.event('user/message',{...productionRequest,source:{kind:'compaction'}});
+  h.event('user/message',{source:{kind:'user'},content:[{type:'text',text:'解释 execution_mode=production 是什么意思'}]});
+  assert.equal(h.view().active,false);
+});
+
+test('a released review cannot permit a premature final reply to replace continuing production',async()=>{
+  const h=harness();h.plan();h.setReview({review_id:1,state:'continued',deadline:100,stage:'S1'});
+  h.event('assistant/message',{message:{content:[{type:'text',text:'接下来会继续。'}]}});
+  const runtime=h.create();await runtime.stopping({agent:h.agent,turn:1});
+  assert.match(h.sent.at(-1).content[0].text,/继续执行下一项/);await runtime.dispose();
+});
+
+test('a real waiting gate with a visible update can end its turn without skipping the gate',async()=>{
+  const h=harness();h.plan();h.event('assistant/message',{message:{content:[{type:'text',text:'计划已保存，正在等待审核窗口。'}]}});
+  const runtime=h.create();await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,0);await runtime.dispose();
+});
+
+test('stop interrupts a pre-step queued behind a stuck background review and prevents a late continuation',async()=>{
+  const h=harness();h.plan();const controller=new AbortController(),entered=Promise.withResolvers(),backend=Promise.withResolvers();
+  let backendSignal;
+  const runtime=h.create(async(_workspace,_session,_id,_now,signal)=>{backendSignal=signal;entered.resolve();return backend.promise;});
+  await runtime.preStep({agent:h.agent,signal:controller.signal},async()=>({kind:'enter',messages:[]}));
+  const refreshing=runtime.refresh(h.agent.id),refreshStopped=assert.rejects(refreshing,{name:'AbortError'});
+  await entered.promise;
+  const preStep=runtime.preStep({agent:h.agent,signal:controller.signal},async()=>({kind:'enter',messages:[]}));
+  const stopped=assert.rejects(preStep,{name:'AbortError'});
+  controller.abort(new DOMException('User stopped','AbortError'));
+  await Promise.all([stopped,refreshStopped]);assert.equal(backendSignal.aborted,true);
+  backend.resolve({state:'continued',review_id:1,deadline:100,stage:'S1'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.sent.length,0);assert.equal(h.records.get(h.agent.id).suspended,true);
+  await runtime.dispose();
 });
 
 test('PTC capture dispatches use the same production projection as native tools',()=>{

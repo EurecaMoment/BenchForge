@@ -31,3 +31,23 @@ test('unloading the host aborts an in-flight review subprocess before disposal c
   await spawned.promise;await client.dispose();await rejected;
   assert.ok(terminated>=1);assert.ok(reaped>=1);
 });
+
+test('review deadline covers both a stalled subprocess and its stale systemd scope',async()=>{
+  const reports=[];
+  const subprocess={resolveExecutable:async()=>'/python',spawn:()=>({done:new Promise(()=>{}),terminate(){},waitForExit:()=>new Promise(()=>{})})};
+  const client=createStageReviewClient(subprocess,{reviewTimeoutMs:15,cleanupTimeoutMs:15,onCleanupError:error=>reports.push(error)});
+  await assert.rejects(client.advance('/workspace','session-test',1),{name:'TimeoutError'});
+  assert.equal(reports[0].code,'BENCHFORGE_PROCESS_CLEANUP_PENDING');
+  await assert.rejects(client.dispose(),AggregateError);
+});
+
+test('user cancellation is propagated to a running background review',async()=>{
+  const spawned=Promise.withResolvers(),controller=new AbortController();let signal;
+  const subprocess={resolveExecutable:async()=>'/python',spawn:spec=>{
+    signal=spec.signal;spawned.resolve();return {done:new Promise(()=>{}),terminate(){},waitForExit:async()=>true};
+  }};
+  const client=createStageReviewClient(subprocess),operation=client.advance('/workspace','session-test',1,0,controller.signal);
+  const stopped=assert.rejects(operation,{name:'AbortError'});
+  await spawned.promise;controller.abort(new DOMException('User stopped','AbortError'));await stopped;
+  assert.equal(signal.aborted,true);await client.dispose();
+});

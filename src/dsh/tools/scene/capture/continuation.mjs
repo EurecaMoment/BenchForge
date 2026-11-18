@@ -43,17 +43,21 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
   async function ownerOf(record) {
     return agents.get(record.owner) || await resolveAgent(record.owner);
   }
-  async function allowed(agent) {
+  async function allowed(agent,signal=lifetime) {
     if (!agent || history(agent.session).interrupted) return false;
-    return !suspendedReview(await readReview(agent.session.header.cwd, agent.id));
+    const review=await readReview(agent.session.header.cwd, agent.id,now(),signal);
+    signal.throwIfAborted();
+    return !history(agent.session).interrupted&&!suspendedReview(review);
   }
-  async function deliver(record) {
+  async function deliver(record,signal=lifetime) {
     if (!record.error && !terminalCapture(record.observation)) return record;
     const agent = await ownerOf(record);
     if (closed || lifetime.aborted) return record;
-    const context = agent && history(agent.session);
+    let context = agent && history(agent.session);
     if (context?.completed || context?.taskSeq > (record.task_seq || 0)) return save({...record,state:'settled'});
-    if (!await allowed(agent)) return save({...record,state:'paused'});
+    if (!await allowed(agent,signal)) return save({...record,state:'paused'});
+    context=history(agent.session);
+    if(context.completed||context.taskSeq>(record.task_seq||0))return save({...record,state:'settled'});
     const latest = table.get(keyOf(record.owner,record.run_id));
     if (closed || latest?.generation !== record.generation || record.error && latest.error !== record.error ||
         ['blocked','paused','settled'].includes(latest?.state)) return latest;
@@ -91,8 +95,10 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
       if (current.state === 'delivered') {
         if (agent && noticeDelivered(agent,noticeKey(current,context))) return;
       }
-      if (!await allowed(agent)) {await save({...current,state:'paused'});return;}
-      if (current.error || terminalCapture(current.observation)) {await deliver(current);return;}
+      if (!await allowed(agent,requestSignal)) {await save({...current,state:'paused'});return;}
+      const updated=history(agent.session);
+      if(updated.completed||updated.taskSeq>(current.task_seq||0)){await save({...current,state:'settled'});return;}
+      if (current.error || terminalCapture(current.observation)) {await deliver(current,requestSignal);return;}
       while (!closed && !requestSignal.aborted) {
         const stored = table.get(key);
         if (stored?.generation !== current.generation || !observable(stored)) return;
@@ -111,7 +117,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
           if (terminalCapture(raw)) {
             current = await save({...current,state:raw.state === 'CANCELED' ? 'cancelled' : 'terminal',finished_at:now()});
             if (current.generation !== observer.generation || !['terminal','cancelled'].includes(current.state)) return;
-            if (raw.state !== 'CANCELED') await deliver(current);
+            if (raw.state !== 'CANCELED') await deliver(current,requestSignal);
             return;
           }
           await save(current);
@@ -121,7 +127,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
           if (++failures < 3) {await delay(1000 * failures,requestSignal); continue;}
           current = await save({...current,state:'observer_failed',error:String(error.message || error)});
           if (current.generation !== observer.generation || current.state !== 'observer_failed') return;
-          await deliver(current); return;
+          await deliver(current,requestSignal); return;
         }
       }
     }).catch(error=>{if(!closed&&!requestSignal.aborted)onError(error);}).finally(()=>{
@@ -157,25 +163,34 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     registration.set(key,operation);
     try {return await operation;} finally {if(registration.get(key)===operation)registration.delete(key);}
   }
-  async function reconcile(agent, {recover = false} = {}) {
+  async function reconcile(agent, {recover = false,signal:turnSignal} = {}) {
+    const signal=turnSignal?AbortSignal.any([lifetime,turnSignal]):lifetime;
+    signal.throwIfAborted();
     const context = history(agent.session);
     if (context.interrupted || context.completed || recover && !context.production) return;
     const latest = context.captures.at(-1);
     if (!latest) return;
     // Upgrade old production sessions only at their latest capture. Never replay
     // historical failed attempts or acquire an unrelated ordinary conversation.
-    const review = await readReview(agent.session.header.cwd,agent.id);
+    const review = await readReview(agent.session.header.cwd,agent.id,now(),signal);
+    signal.throwIfAborted();
+    const updated=history(agent.session);
+    if(updated.interrupted||updated.completed||updated.taskSeq!==context.taskSeq)return;
     if (context.production || latest.turn === context.turn) await register(agent,latest,
       {resume:context.activeTurn && !suspendedReview(review) && table.get(keyOf(agent.id,latest.run_id))?.state === 'paused'});
   }
   async function stopping({agent,signal:turnSignal}) {
-    turnSignal?.throwIfAborted();
+    const signal=turnSignal?AbortSignal.any([lifetime,turnSignal]):lifetime;
+    signal.throwIfAborted();
     const context = history(agent.session);
-    if (context.interrupted || context.completed || !context.activeTurn || !await allowed(agent)) return;
-    const review = await readReview(agent.session.header.cwd,agent.id);
-    if (review?.state === 'waiting_user') return;
+    if (context.interrupted || context.completed || !context.activeTurn) return;
     const latest = context.captures.at(-1);
     if (!latest || latest.turn !== context.turn && !context.production) return;
+    const review = await readReview(agent.session.header.cwd,agent.id,now(),signal);
+    signal.throwIfAborted();
+    const updated=history(agent.session);
+    if(updated.interrupted||updated.completed||updated.taskSeq!==context.taskSeq)return;
+    if (suspendedReview(review)||review?.state==='waiting_user') return;
     await register(agent,latest);
     const record = table.get(keyOf(agent.id,latest.run_id));
     if (['watching','paused','blocked','cancelled'].includes(record.state)) return;
@@ -192,9 +207,11 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     if ([...(agent.inbox?.nextStep || []),...(agent.inbox?.nextTurn || [])].some(message=>message.source?.noticeKey===record.continuation?.notice)) return;
     const continuation = {progress,attempts:count+1,notice:key};
     await save({...record,continuation});
+    signal.throwIfAborted();
     if (count >= 2) {
       const reason='执行未推进：连续三次收尾仍无新采集提交或后续阶段回执。保留失败证据，停止自动催促；任务尚未完成，可在修复后重新提交。';
       await save({...record,continuation,state:'blocked',blocked_at:now(),blocker:{kind:'execution',reason,event_seq:context.activitySeq}});
+      signal.throwIfAborted();
       agent.steer(createMessage({source:{kind:'benchforge/capture-watch',noticeKey:key+':blocked',form:'notice',summary:reason,
         capture:{run_id:record.run_id,state:'blocked',failed:true,blocked:true}},content:[{type:'text',text:
         reason+' 请向用户明确说明任务未完成及真实缺项；不能宣称交付成功。'}]}));

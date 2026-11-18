@@ -1,8 +1,11 @@
+import {waitWithSignal} from '../runtime/cancellation.mjs';
+import {releaseProcess, releaseProcesses} from './process_cleanup.mjs';
+
 /** Host-owned backend calls; timers and browser reads use the same policy. */
 export function createStageReviewClient(subprocess, config = {}) {
   const lifetime = new AbortController(), active = new Set();
-  async function advance(workspace, sessionId, reviewId) {
-    const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(15000)]);
+  async function advance(workspace, sessionId, reviewId, _now, callerSignal) {
+    const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(config.reviewTimeoutMs ?? 15000), ...(callerSignal ? [callerSignal] : [])]);
     const env = {...config.environment, PYTHONIOENCODING:'utf-8', BENCHFORGE_MANAGED_SUBPROCESS:'1'};
     const python = await subprocess.resolveExecutable(config.python || 'python3', env, signal);
     signal.throwIfAborted();
@@ -12,21 +15,24 @@ export function createStageReviewClient(subprocess, config = {}) {
     stdio:{stdout:{maxBytes:128000},stderr:{maxBytes:16000}}});
     active.add(handle);
     try {
-      const outcome = await handle.done;
+      const outcome = await waitWithSignal(handle.done, signal);
       signal.throwIfAborted();
       const stdout = handle.collected.stdout.readFrom(0);
       if (outcome.exitCode !== 0) throw new Error(handle.collected.stderr.readFrom(0).text || 'Stage review check failed to run');
       if (stdout.lossy) throw new Error('Stage review receipt exceeded its output limit');
       return JSON.parse(stdout.text);
     } finally {
-      handle.terminate();
-      await handle.waitForExit();
-      active.delete(handle);
+      try {
+        await releaseProcess(handle, {active, timeoutMs: config.cleanupTimeoutMs});
+      } catch (error) {
+        config.onCleanupError?.(error);
+        if (!signal.aborted) throw error;
+      }
+      signal.throwIfAborted();
     }
   }
   return {advance, async dispose() {
     lifetime.abort(new DOMException('Stage review host unloaded', 'AbortError'));
-    for (const handle of active) handle.terminate();
-    await Promise.allSettled([...active].map(handle => handle.waitForExit()));
+    await releaseProcesses(active, config.cleanupTimeoutMs);
   }};
 }

@@ -3,6 +3,9 @@ import test from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import {DatabaseSync} from 'node:sqlite';
+import {setImmediate as nextTick} from 'node:timers/promises';
+import {createStageReviewReader} from '../../../production/reviews.mjs';
 import {createCaptureContinuation} from './continuation.mjs';
 import {captureContinuations,createCaptureHistory} from './continuation_state.mjs';
 import {trackCaptureSubmission} from './submission.mjs';
@@ -65,6 +68,41 @@ test('concurrent registrations observe one run once and preserve independent run
   await h.runtime.register(h.agent,{run_id:'sf_second'});await h.runtime.settled();
   assert.equal(h.sent.length,2);assert.equal(h.data.size,2);
   await h.dispose();
+});
+
+test('capture reconciliation and stopping can be cancelled while the review ledger is locked',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'benchforge-capture-lock-'));
+  const db=new DatabaseSync(path.join(root,'stage-reviews.sqlite'));
+  db.exec('CREATE TABLE reviews(id INTEGER PRIMARY KEY,session TEXT,state TEXT,deadline REAL,progress TEXT)');
+  db.exec('BEGIN EXCLUSIVE');
+  t.after(async()=>{db.close();await fs.rm(root,{recursive:true,force:true});});
+  const reader=createStageReviewReader({reviewReadTimeoutMs:1000,reviewRetryIntervalMs:5});
+  const h=harness({review:reader.latest});h.agent.session.header.cwd=root;h.plan();h.capture();
+  t.after(()=>h.dispose());
+  for(const operation of ['reconcile','stopping']){
+    const controller=new AbortController();
+    const pending=operation==='reconcile'?h.runtime.reconcile(h.agent,{signal:controller.signal}):
+      h.runtime.stopping({agent:h.agent,signal:controller.signal});
+    const rejected=assert.rejects(pending,{name:'AbortError'});
+    await nextTick();controller.abort();await rejected;
+    assert.equal(h.requests.length,0);assert.equal(h.sent.length,0);assert.equal(h.data.size,0);
+  }
+  db.exec('COMMIT');
+});
+
+test('a review read delayed past cancellation, completion or a new task cannot deliver an old capture',async()=>{
+  for(const change of ['cancel','complete','new-task']){
+    const entered=Promise.withResolvers(),released=Promise.withResolvers();let reads=0;
+    const h=harness({review:async()=>{if(++reads===3){entered.resolve();await released.promise;}return null;}});
+    h.plan();h.capture();
+    try{
+      await h.runtime.reconcile(h.agent);await entered.promise;
+      if(change==='cancel')h.append('turn/end',{turn:1,reason:{kind:'aborted',reason:{kind:'user'}}});
+      else if(change==='complete')h.call('benchforge_pipeline_run',{state:'completed'});
+      else h.call('benchforge_pipeline_plan',{production_contract:'benchforge.production-stages/v1',plan:'/workspace/new.json',review_revision:{kind:'new_task'}});
+      released.resolve();await h.runtime.settled();assert.equal(h.sent.length,0,change);
+    }finally{released.resolve();await h.dispose();}
+  }
 });
 
 test('host reload restores an unfinished wait; consumed notices do not replay',async()=>{

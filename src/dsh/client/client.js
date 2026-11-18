@@ -104,6 +104,8 @@ var benchforgeClient = (() => {
   var dictionaries = {
     zh: {
       productionSystemStatus: "\u7CFB\u7EDF\u72B6\u6001",
+      productionPlanning: "\u6B63\u5728\u51C6\u5907\u8BA1\u5212",
+      productionIncomplete: "\u672C\u8F6E\u5DF2\u7ED3\u675F\uFF0C\u751F\u4EA7\u4EFB\u52A1\u5C1A\u672A\u5B8C\u6210",
       productionPlanned: "\u8BA1\u5212\u5DF2\u4FDD\u5B58",
       productionNeedsEvidence: "\u7B49\u5F85\u91C7\u96C6\u4E0E\u6807\u6CE8\u9A8C\u6536",
       productionNeedsInput: "\u7B49\u5F85\u8F93\u5165",
@@ -585,6 +587,8 @@ var benchforgeClient = (() => {
     },
     en: {
       productionSystemStatus: "System status",
+      productionPlanning: "Preparing the plan",
+      productionIncomplete: "Turn ended; production is unfinished",
       productionPlanned: "Plan saved",
       productionNeedsEvidence: "Awaiting collection and annotation validation",
       productionNeedsInput: "Awaiting input",
@@ -1991,6 +1995,8 @@ var benchforgeClient = (() => {
       }, [current]);
       if (!value?.active) return null;
       const phase = {
+        planning: "productionPlanning",
+        incomplete: "productionIncomplete",
         planned: "productionPlanned",
         waiting_user: "reviewWaiting",
         needs_evidence: "productionNeedsEvidence",

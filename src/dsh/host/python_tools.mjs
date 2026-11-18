@@ -6,6 +6,8 @@ import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
 import {toolName, qualifyToolNames, qualifyDescriptions} from '../tools/benchmark/names.mjs';
 import {configuredProviders, modelRole, providerEnvironment} from './tool_credentials.mjs';
 import {presentOperationCatalog} from '../tools/benchmark/catalog.mjs';
+import {waitWithSignal} from '../runtime/cancellation.mjs';
+import {releaseProcess, releaseProcesses} from './process_cleanup.mjs';
 
 export const inject = ['tools', 'attachments', 'subprocess'];
 export const Config = Schema.object({
@@ -18,6 +20,7 @@ export const Config = Schema.object({
   forwardEnvironment: Schema.array(Schema.string()).default([]),
   maxOutputBytes: Schema.number().min(1024).default(16 * 1024 * 1024),
   graceMs: Schema.number().min(1).default(1000),
+  cleanupTimeoutMs: Schema.number().min(1).default(5000),
 });
 
 export async function invoke(subprocess, python, workspace, configPath, tool, request, signal, options = {}) {
@@ -33,7 +36,7 @@ export async function invoke(subprocess, python, workspace, configPath, tool, re
     stdio:{stdin:{data:JSON.stringify(request)}, stdout:{maxBytes:options.maxOutputBytes ?? 16 * 1024 * 1024}, stderr:{maxBytes:65536}}});
   options.active?.add(handle);
   try {
-    const outcome = await handle.done;
+    const outcome = await waitWithSignal(handle.done, signal);
     signal?.throwIfAborted();
     const stdout = handle.collected.stdout.readFrom(0);
     const stderr = handle.collected.stderr.readFrom(0);
@@ -43,9 +46,13 @@ export async function invoke(subprocess, python, workspace, configPath, tool, re
   } finally {
     // A CLI result is complete only after all of its owned work has stopped.
     // Explicit background jobs transfer to their own service before returning.
-    handle.terminate();
-    await handle.waitForExit();
-    options.active?.delete(handle);
+    try {
+      await releaseProcess(handle, {active: options.active, timeoutMs: options.cleanupTimeoutMs});
+    } catch (error) {
+      options.onCleanupError?.(error);
+      if (!signal?.aborted) throw error;
+    }
+    signal?.throwIfAborted();
   }
 }
 
@@ -54,8 +61,7 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   const lifetime = new AbortController();
   ctx.effect(() => async () => {
     lifetime.abort(new DOMException('BenchForge plugin unloaded', 'AbortError'));
-    for (const handle of active) handle.terminate();
-    await Promise.all([...active].map(handle => handle.waitForExit()));
+    await releaseProcesses(active, config.cleanupTimeoutMs);
   });
   const snapshot = launchEnvironmentOf(ctx);
   const environment = Object.fromEntries((config.forwardEnvironment || []).map(key => [key,snapshot.get(key)?.value]).filter(([,value])=>value!==undefined));
@@ -81,7 +87,8 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
         }
         const scoped = tool === 'model_infer' ? annotationEnvironment : tool === 'isaac_sim' ? isaacEnvironment : environment;
         const sessionEnvironment = {...scoped, BENCHFORGE_DSH_SESSION_ID: exec.agent?.session?.id || '', BENCHFORGE_DSH_CALL_ID: exec.callId || ''};
-        const result = await invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module});
+        const result = await invoke(ctx.subprocess,config.python || 'python3',workspace,config.configPath,tool,request,signal,{...config,environment:sessionEnvironment,active,module,
+          onCleanupError: error => ctx.logger('benchforge-process-cleanup').error(error)});
         return tool === 'catalog' && result.workflow
           ? presentOperationCatalog(result, name => Boolean(ctx.tools.executable(name, exec.agent, exec.toolSet)))
           : result;}}));

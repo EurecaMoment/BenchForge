@@ -7,11 +7,12 @@ import {createCaptureContinuation} from './continuation.mjs';
 import {defineDomain, domainTable} from '@deepseek-ai/dsh-storage-domain';
 import {createUserMessage} from '@deepseek-ai/dsh-llm';
 import {z} from 'zod';
-import {readLatestStageReview} from '../../../production/reviews.mjs';
+import {createStageReviewReader,reviewReadConfig} from '../../../production/reviews.mjs';
 
 export const name = 'benchforge-capture';
 export const inject = ['workspaceRegistry','storageDomain','agents','sessionController'];
 export const Config = Schema.object({
+  ...reviewReadConfig,
   productionConfig: Schema.string().default(''),
   workspacePaths: Schema.array(Schema.string()).default([]),
   revision: Schema.string().default('live-production-v1'),
@@ -41,7 +42,7 @@ export async function apply(ctx, config) {
   const service = createServiceClient(loaded);
   const continuation = createCaptureContinuation({table:domain.table('runs'),artifacts:loaded.config.artifacts,
     read:(route,args,signal)=>service(route,args,AbortSignal.any([signal,AbortSignal.timeout(route==='/wait'?75000:15000)])),
-    signal:controller.signal,readReview:readLatestStageReview,
+    signal:controller.signal,readReview:createStageReviewReader(config).latest,
     createMessage:createUserMessage,onError:error=>ctx.logger(name).error(error),
     resolveAgent:async id=>{
       const result = await ctx.sessionController.resolveAgent(id);
@@ -71,13 +72,13 @@ export async function apply(ctx, config) {
   ctx.on('agent/created',({agent})=>recover(agent));
   for (const agent of ctx.agents.list()) recover(agent);
   ctx.on('agent/turn-stopping',payload=>continuation.stopping(payload));
-  ctx.on('agent/pre-step', async ({agent}, next) => {
+  ctx.on('agent/pre-step', async ({agent,signal}, next) => {
     const decision = await next();
     if (decision.kind !== 'enter') return decision;
     const cwd = agent.session.header?.cwd;
     if (cwd && roots(cwd).length && agent.session.header?.origin !== 'subagent') {
       await associations.record(agent, agent.session.snapshotEvents().slice(-64));
-      await continuation.reconcile(agent);
+      await continuation.reconcile(agent,{signal});
     }
     return decision;
   });

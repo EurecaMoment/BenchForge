@@ -42,6 +42,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'benchforge/production-resume': ProductionNotice<'benchforge/production-resume'>;
     'benchforge/production-delivery': ProductionNotice<'benchforge/production-delivery'>;
     'benchforge/production-check-failed': ProductionNotice<'benchforge/production-check-failed'>;
+    'benchforge/production-continue': ProductionNotice<'benchforge/production-continue'>;
     'benchforge/capture-watch': CaptureNotice;
     'benchforge/capture-continuation': ProductionNotice<'benchforge/capture-continuation'>;
   }

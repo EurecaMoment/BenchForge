@@ -1,9 +1,12 @@
 import path from 'node:path';
-import {readLatestStageReview} from './reviews.mjs';
+import {readLatestStageReview,createStageReviewReader,reviewReadConfig} from './reviews.mjs';
+import Schema from '@deepseek-ai/schemastery';
+import {HarnessError} from '@deepseek-ai/dsh-error';
 import {stageName} from './stages.mjs';
 
 export const name = 'benchforge-review-policy';
 export const inject = ['tools'];
+export const Config = Schema.object(reviewReadConfig);
 
 const pending = new Set(['waiting_user', 'paused', 'needs_input', 'check_failed']);
 const reads = new Set(['read', 'read_image', 'read_file', 'list_directory', 'list_files', 'glob', 'grep',
@@ -48,8 +51,8 @@ export function reviewDenial(exec, review, workspace) {
   };
 }
 
-export function createReviewGuard({readReview = readLatestStageReview, agents, sessions} = {}) {
-  return exec => {
+export function createReviewPolicy({readReview = readLatestStageReview, agents, sessions} = {}) {
+  return async exec => {
     let agent = exec.agent;
     if (!agent?.session?.header?.cwd) return;
     const seen = new Set();
@@ -65,15 +68,27 @@ export function createReviewGuard({readReview = readLatestStageReview, agents, s
       agent = parent || {id: owner, session};
     }
     const workspace = agent.session.header.cwd;
-    try {return reviewDenial(exec, readReview(workspace, owner), workspace);}
-    catch {
+    if(!reviewDenial(exec,{stage:'',state:'needs_input'},workspace))return;
+    try {return reviewDenial(exec, await readReview(workspace, owner, Date.now(), exec.signal), workspace);}
+    catch (error) {
+      exec.signal?.throwIfAborted();
       // Allow inspection when storage is unavailable, but do not bypass a
       // potentially active review for a submission or shell.
-      return reviewDenial(exec, {stage: '', state: 'needs_input'}, workspace);
+      const denial=reviewDenial(exec, {stage: '', state: 'needs_input'}, workspace);
+      return denial && {...denial,reason:`Cannot verify the current stage review: ${error.message}. Production stays stopped until the stored review can be read; inspection remains available.`,
+        info:{name:'StageReviewStorageError',code:error.code||'BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE'}};
     }
   };
 }
 
-export function apply(ctx) {
-  ctx.tools.guard(createReviewGuard({agents: ctx.get('agents'), sessions: ctx.get('sessions')}));
+export function apply(ctx,config) {
+  const review=createReviewPolicy({readReview:createStageReviewReader(config).latest,agents:ctx.get('agents'),sessions:ctx.get('sessions')});
+  // Tool guards are synchronous. Read at the async dispatch boundary, after
+  // approval, so a paused review cannot be bypassed by a cached decision.
+  ctx.on('tools/execute',async(exec,next)=>{
+    const denial=await review(exec);
+    exec.signal.throwIfAborted();
+    if(denial)throw new HarnessError(denial.reason,denial.info.code);
+    return next();
+  });
 }

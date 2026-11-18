@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {canonicalToolName} from '../tools/invocation/identifiers.mjs';
+import {isProductionRequest} from './request.mjs';
 
 export const PRODUCTION_PROJECTION = 'benchforgeProduction';
 const Review = z.object({review_id:z.number(), stage:z.string(), artifact:z.string(), deadline:z.number(), state:z.string()});
@@ -11,6 +12,7 @@ export const ProductionView = z.object({
   error:z.string(), review:Review.nullable(), completed:z.number(), total:z.number(), delivered:z.boolean(),
 });
 const State = z.object({view:ProductionView, notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
+  lastResponse:z.object({seq:z.number(),visible:z.boolean()}),
   calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string()}))});
 const visible = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
 const parse = text => {try {return JSON.parse(text);} catch {return null;}};
@@ -18,8 +20,8 @@ const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benc
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:5, stateSchema:State,
-  init:header => ({calls:{},notices:[],interruption:'',interruptionSeq:0,view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
+  key:PRODUCTION_PROJECTION, stateVersion:6, stateSchema:State,
+  init:header => ({calls:{},notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
   apply(state,event) {
@@ -30,13 +32,18 @@ export const productionProjection = {
         message:{toolCallId:data.subCallId,isError:data.isError,content:data.content}}});
     }
     const {view} = state;
-    if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
+    if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false}},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
     if(event.type === 'turn/end') return patch({...state,interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
-      ...(event.data.reason?.kind === 'aborted' ? {state:'interrupted'} : {})});
-    if(event.type === 'user/message' && ['benchforge/production-resume','benchforge/production-check-failed'].includes(event.data.source?.kind)) {
+      ...(event.data.reason?.kind==='error'?{error:event.data.reason.error?.message || 'Production turn failed'}:{}),
+      ...(event.data.reason?.kind === 'aborted' ? {state:'interrupted'} :
+        view.active && view.workflowTurn===view.turn && !['completed','waiting_user','paused','needs_input','needs_evidence','needs_plan_revision','blocked','failed'].includes(view.state)
+          ? {state:'incomplete'} : {})});
+    if(event.type === 'user/message' && isProductionRequest(event.data))
+      return patch(state,event,{active:true,workflowTurn:view.turn,state:view.plan?'running':'planning',stage:view.stage||'S1',error:''});
+    if(event.type === 'user/message' && ['benchforge/production-resume','benchforge/production-check-failed','benchforge/production-continue'].includes(event.data.source?.kind)) {
       const key=event.data.source.noticeKey;
       return typeof key==='string'&&!state.notices.includes(key)
-        ? {...state,notices:[...state.notices.slice(-63),key]} : state;
+        ? patch({...state,notices:[...state.notices.slice(-63),key]},event,{workflowTurn:view.turn}) : state;
     }
     if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/capture-watch' && view.active) {
       const capture = event.data.source.capture;
@@ -44,14 +51,18 @@ export const productionProjection = {
         capture.state==='SUCCEEDED'?'scene_ready':'capture_error',error:capture.blocked?(event.data.source.summary || '执行受阻，任务未完成。'):
           capture.failed?'采集或场景验收失败；读取实际报告并修复。':capture.state==='observer_failed'?'后台跟踪暂时失败，等待恢复。':''});
     }
-    if(event.type === 'assistant/message' && visible(event.data.message))
-      return patch(state,event,{lastTextAt:event.time,lastTextSeq:event.seq});
+    if(event.type === 'assistant/message') {
+      const hasText=Boolean(visible(event.data.message));
+      return patch({...state,lastResponse:{seq:event.seq,visible:hasText}},event,hasText?{lastTextAt:event.time,lastTextSeq:event.seq}:{});
+    }
     if(event.type === 'deliverables/presented') return patch(state,event,{delivered:true});
     if(event.type === 'tool/call') {
       const {callId} = event.data, name = canonicalToolName(event.data.name), args = parse(event.data.arguments) || {};
       if(!name.startsWith('benchforge_')&&!view.active)return state;
       const next = {...state,calls:{...state.calls,[callId]:{name,workspace:args.workspace || view.workspace,plan:args.plan || ''}}};
-      return patch(next,event,{lastTool:name,tools:view.tools+1,shells:view.shells+(name==='bash'?1:0),
+      const workflow=['benchforge_pipeline_plan','benchforge_pipeline_run'].includes(name);
+      return patch(next,event,{...(workflow?{active:true,workflowTurn:view.turn,...(!view.active?{state:'planning',stage:'S1'}:{})}:{}),
+        lastTool:name,tools:view.tools+1,shells:view.shells+(name==='bash'?1:0),
         models:modelTools.has(name)&&!view.models.includes(name)?[...view.models,name]:view.models});
     }
     if(event.type !== 'tool/result' || event.surfaceOp === 'replace') return state;

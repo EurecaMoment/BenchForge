@@ -1,0 +1,14 @@
+# Isolated real Web composition; only model output and the Python workload are fixtures.
+- id: hmr
+  disabled: true
+- id: session-title
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- insert:
+    - id: benchforge-session-operations
+      name: '../../src/dsh/dist/session-operations.mjs'
+    - id: benchforge-review-policy
+      name: '../../src/dsh/production/review_policy.mjs'
+    - id: lifecycle-smoke
+      name: './fixture.mjs'
