@@ -58,7 +58,9 @@ def _native_imports(requests, identity, compiled):
         _, imported = requests.extension(f'asset-{index}', 'asset.import', {
             'session_id': identity, 'path': item['path'],
             'source': {key: binding[key] for key in ('asset_id', 'relative_path')},
-            'fix_base': binding.get('fix_base', not obj['dynamic'])})
+            'fix_base': binding.get('fix_base', not obj['dynamic']),
+            'mass_kg': obj['mass_kg'], 'physics': obj.get('physics', {}),
+            'source_up_axis': item['catalog'].get('source_up_axis', 'Z')})
         # Only an explicitly configured source can represent a named native asset.
         scale = [obj['size'][i] / item['catalog']['size'][i] for i in range(3)]
         changes = [{'op': 'transform', 'path': item['path'], 'translation': item['center'],

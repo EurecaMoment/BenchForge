@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
+from capabilities.isaac_sim.capture_stage import _native_imports
 from capabilities.isaac_sim.evidence import measured_entities, save_frame
 from storage.files import write_json
 
@@ -26,6 +27,34 @@ def scene_program(name='contract'):
 
 
 class EvidenceContractTests(unittest.TestCase):
+    def test_native_import_keeps_physical_parameters_and_source_axis(self):
+        class Requests:
+            def __init__(self):
+                self.calls = []
+
+            def extension(self, key, operation, arguments):
+                self.calls.append((operation, arguments))
+                return None, {'articulation_roots': []}
+
+        requests = Requests()
+        contact = {'static_friction': .6, 'dynamic_friction': .4, 'restitution': 0}
+        compiled = {'imports': [{
+            'object': {'id': 'cup', 'label': 'cup', 'dynamic': True,
+                       'mass_kg': .35, 'physics': contact, 'size': [.2, .2, .3]},
+            'source': {'asset_id': 'native', 'relative_path': 'cup.usd'},
+            'catalog': {'source_up_axis': 'Y', 'size': [2, 2, 3]},
+            'path': '/World/Scene/cup', 'center': [0, 0, .15],
+        }], 'entities': {'cup': {}}}
+        _native_imports(requests, 'scene-session', compiled)
+        operation, imported = requests.calls[0]
+        self.assertEqual(operation, 'asset.import')
+        self.assertEqual(imported['source'], {'asset_id': 'native', 'relative_path': 'cup.usd'})
+        self.assertFalse(imported['fix_base'])
+        self.assertEqual(imported['mass_kg'], .35)
+        self.assertEqual(imported['physics'], contact)
+        self.assertEqual(imported['source_up_axis'], 'Y')
+        self.assertEqual(requests.calls[1][0], 'scene.edit')
+
     def test_portable_scene_preserves_cameras_materials_and_real_physics(self):
         compiled = compile_scene(scene_program(), Path('.'), {})
         self.assertEqual(len(compiled['cameras']), 2)
