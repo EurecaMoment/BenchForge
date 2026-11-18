@@ -23,16 +23,23 @@ export function createWorkspaceMigration({observe, readOperations, access, sessi
       if (header.id !== sessionId || header.agentPreset !== 'benchforge' || !header.cwd || !view)
         throw fail('A BenchForge conversation with its native artifact projection is required');
       const root = await fs.realpath(header.cwd);
+      const declaredRoot = path.resolve(header.cwd);
+      // Rebase the trusted root alias, preserving every task-controlled child
+      // component so the regular-file/link check below still rejects links.
+      const resolveSource = value => {
+        const file = path.resolve(root, value);
+        return within(declaredRoot, file) ? path.resolve(root, path.relative(declaredRoot, file)) : file;
+      };
       const operations = await readOperations(root, sessionId, signal);
       const roots = operations.filter(row => row.session_id === sessionId && row.state === 'completed')
-        .map(row => path.resolve(root, row.artifact))
+        .map(row => resolveSource(row.artifact))
         .filter(directory => within(path.join(root, 'operations'), directory) && directory !== path.join(root, 'operations'));
       const references = [...view.files, ...roots.flatMap(directory => ['request.json', 'result.json']
         .map(name => ({path: path.join(directory, name), source: 'tool'})))];
       const files = new Map(), omitted = [];
       for (const reference of references) {
         signal?.throwIfAborted();
-        const file = path.resolve(root, reference.path), relativePath = path.relative(root, file).split(path.sep).join('/');
+        const file = resolveSource(reference.path), relativePath = path.relative(root, file).split(path.sep).join('/');
         const owned = roots.some(directory => within(directory, file));
         const kind = owned ? 'artifact' : reference.source === 'mutation' && relativePath.startsWith('tasks/') ? 'draft' : null;
         if (!kind || !within(root, file)) { omitted.push({path: reference.path, reason: 'ownership_unconfirmed'}); continue; }

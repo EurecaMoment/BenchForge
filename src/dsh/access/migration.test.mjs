@@ -6,15 +6,21 @@ import test from 'node:test';
 import {createWorkspaceMigration} from './migration.mjs';
 import {WorkspaceBindings} from './workspaces.mjs';
 
-async function fixture(t) {
+async function fixture(t, {aliasedRoot = false} = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bf-migration-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
-  const source = path.join(root, 'legacy'), sourceId = 'session-legacy';
+  let source = path.join(root, 'legacy');
+  const sourceId = 'session-legacy';
   const files = ['tasks/plan.json', 'tasks/unattributed.json', 'operations/own/result.json',
     'operations/own/render.png', 'operations/foreign/private.json'];
   for (const file of files) {
     await fs.mkdir(path.dirname(path.join(source, file)), {recursive: true});
     await fs.writeFile(path.join(source, file), file);
+  }
+  if (aliasedRoot) {
+    const alias = path.join(root, 'source-alias');
+    await fs.symlink(source, alias, 'junction');
+    source = alias;
   }
   const records = new Map();
   const store = new WorkspaceBindings({table: {get: id => records.get(id), put: async (id, row) => records.set(id, structuredClone(row))},
@@ -82,6 +88,22 @@ test('owner-selected migration uses native create, immutable evidence, writable 
   assert.equal(await fs.readFile(path.join(source, 'tasks/plan.json'), 'utf8'), 'tasks/plan.json');
   const evidence = result.files.find(row => row.kind === 'artifact');
   if (process.platform !== 'win32') assert.equal((await fs.stat(evidence.path)).mode & 0o222, 0);
+});
+
+test('root aliases retain owned candidates without accepting linked task directories', async t => {
+  const {migration, sourceId, source, state} = await fixture(t, {aliasedRoot: true});
+  await fs.symlink(path.join(source, 'operations/own'), path.join(source, 'tasks/linked'), 'junction');
+  state.files.push({path: path.join(source, 'tasks/linked/result.json'), source: 'mutation'});
+  const preview = await migration.preview(sourceId);
+  assert.deepEqual(preview.candidates.map(row => row.relativePath), [
+    'operations/own/render.png', 'operations/own/result.json', 'tasks/plan.json',
+  ]);
+  assert.ok(preview.omitted.some(row => row.path.endsWith(path.join('linked', 'result.json')) &&
+    row.reason === 'not_regular_file'));
+  const result = await migration.migrate(sourceId, {source_revision: preview.source_revision,
+    selected: preview.candidates.map(row => row.id)});
+  assert.equal(result.files.length, 3);
+  for (const file of result.files) assert.equal(typeof file.path, 'string');
 });
 
 test('stale native revision, changed files and forged manifests cannot migrate', async t => {
