@@ -14,8 +14,10 @@ const exists = async file => {try {await fs.access(file); return true;} catch (e
 const inside = (root, file) => {const relative = path.relative(root, file); return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);};
 
 async function verifyFile(root, relative) {
-  const file = await fs.realpath(path.join(root, relative));
-  if (!inside(root, file) || !(await fs.stat(file)).isFile()) throw new Error('Invalid example file: ' + relative);
+  // Compare canonical paths on both sides (Windows temp paths may use aliases).
+  const canonicalRoot = await fs.realpath(root);
+  const file = await fs.realpath(path.join(canonicalRoot, relative));
+  if (!inside(canonicalRoot, file) || !(await fs.stat(file)).isFile()) throw new Error('Invalid example file: ' + relative);
   return file;
 }
 

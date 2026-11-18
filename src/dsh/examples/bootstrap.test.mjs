@@ -1,15 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {zstdCompressSync} from 'node:zlib';
 import {bootstrapExample} from './bootstrap.mjs';
 
-test('imports a bundled example into an isolated workspace once', async () => {
+for (const aliased of [false, true]) test('imports a bundled example once' + (aliased ? ' through a home directory alias' : ''), async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'benchforge-example-test-'));
   try {
     const source = path.join(root, 'source'), home = path.join(root, 'home');
+    if (aliased) {
+      const actualHome = path.join(root, 'actual-home');
+      await mkdir(actualHome);
+      await symlink(actualHome, home, process.platform === 'win32' ? 'junction' : 'dir');
+    }
     const conversation = path.join(source, 'session-test');
     await mkdir(conversation, {recursive: true});
     await writeFile(path.join(source, 'README.md'), 'example');
