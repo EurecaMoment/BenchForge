@@ -176,8 +176,6 @@ var benchforgeClient = (() => {
       exactQuantityShort: "\u7CBE\u786E\u6570\u91CF",
       minimumQuantityShort: "\u81F3\u5C11\u76EE\u6807",
       moreProductionSettings: "\u66F4\u591A\u914D\u7F6E",
-      permissionEnableShort: "\u542F\u7528\u6743\u9650",
-      permissionRequestingShort: "\u8BF7\u6C42\u4E2D\u2026",
       productionMoved: "\u914D\u7F6E\u6807\u8BB0\u5DF2\u88AB\u79FB\u52A8\uFF0C\u8BF7\u5148\u5220\u9664\u8F93\u5165\u6846\u4E2D\u7684\u914D\u7F6E\u6807\u8BB0\uFF0C\u518D\u91CD\u65B0\u5F00\u542F\u3002",
       productionConfigInvalid: "\u751F\u4EA7\u914D\u7F6E\u5DF2\u5931\u6548\uFF0C\u8BF7\u5173\u95ED\u540E\u91CD\u65B0\u5F00\u542F\u3002",
       composerObjective: "\u4EE5\u672C\u6761\u6D88\u606F\u672B\u5C3E\u7684\u7528\u6237\u8F93\u5165\u548C\u6240\u9644\u6587\u4EF6\u4E3A\u51C6\u3002",
@@ -185,7 +183,6 @@ var benchforgeClient = (() => {
       restoreProductionDraft: "\u5C06\u539F\u751F\u4EA7\u9700\u6C42\u8349\u7A3F\u63D2\u5165\u4E3B\u8F93\u5165\u6846",
       productionCommandHint: "\u8FD9\u662F\u659C\u6760\u547D\u4EE4\uFF0C\u8BF7\u4F7F\u7528\u4E3B\u8F93\u5165\u6846\u539F\u6709\u7684\u53D1\u9001\u6309\u94AE\u6267\u884C\u3002",
       retryProductionSend: "\u91CD\u8BD5\u53D1\u9001",
-      permissionUnavailable: "\u4F1A\u8BDD\u5F53\u524D\u4E0D\u53EF\u66F4\u6539\u6743\u9650",
       stopFailed: "\u65E0\u6CD5\u505C\u6B62\u5F53\u524D\u8F6E\u6B21",
       sceneLibrary: "\u573A\u666F\u5E93",
       sceneLibraryHelp: "\u5386\u53F2\u4E0E\u672C\u6B21\u573A\u666F\u7EDF\u4E00\u5F52\u6863\uFF0C\u53EF\u9884\u89C8\u3001\u591A\u9009\u3002",
@@ -227,12 +224,7 @@ var benchforgeClient = (() => {
       positiveSceneCount: "\u573A\u666F\u6570\u5FC5\u987B\u662F\u6B63\u6574\u6570\u6216\u7559\u7A7A\u3002",
       positiveBudget: "\u5B58\u50A8\u9884\u7B97\u5FC5\u987B\u5927\u4E8E 0 \u6216\u7559\u7A7A\u3002",
       previousUnsentRequest: "\u4E0A\u6B21\u63D0\u4EA4\u672A\u5B8C\u6210\uFF0C\u8981\u6C42\u4ECD\u4FDD\u7559\u5728\u539F\u8F93\u5165\u8349\u7A3F\u4E2D\u3002\u8BF7\u4F7F\u7528\u76F8\u540C\u8981\u6C42\u91CD\u8BD5\uFF0C\u907F\u514D\u91CD\u590D\u63D2\u5165\u3002",
-      permissionsPending: "\u6B64\u4F1A\u8BDD\u5C1A\u672A\u542F\u7528\u751F\u4EA7\u6240\u9700\u6743\u9650\u3002",
-      permissionEnable: "\u4E3A\u6B64\u4F1A\u8BDD\u542F\u7528\u751F\u4EA7\u6743\u9650",
-      permissionRequesting: "\u6B63\u5728\u8BF7\u6C42\u6743\u9650\u2026",
-      fullPermissions: "\u672C\u4F1A\u8BDD\u6743\u9650\u5DF2\u5C31\u7EEA",
-      permissionFailed: "\u6743\u9650\u8BF7\u6C42\u5931\u8D25",
-      permissionRetry: "\u91CD\u8BD5\u5F00\u542F\u6743\u9650",
+      permissionsPending: "\u8BF7\u5728\u8F93\u5165\u6846\u6743\u9650\u83DC\u5355\u9009\u62E9\u201C\u5DE5\u4F5C\u533A\u5185\u4FEE\u6539\u201D\uFF1B\u4E5F\u53EF\u81EA\u884C\u9009\u62E9\u201C\u5B8C\u5168\u8BBF\u95EE\u201D\u3002",
       executionMode: "\u4EFB\u52A1\u6A21\u5F0F",
       productionMode: "\u6B63\u5F0F\u751F\u4EA7",
       explorationMode: "\u63A2\u7D22\u8BD5\u8DD1",
@@ -659,8 +651,6 @@ var benchforgeClient = (() => {
       exactQuantityShort: "Exact",
       minimumQuantityShort: "Minimum",
       moreProductionSettings: "More settings",
-      permissionEnableShort: "Enable access",
-      permissionRequestingShort: "Requesting\u2026",
       productionMoved: "The settings reference was moved. Remove it from the composer and enable settings again.",
       productionConfigInvalid: "Production settings are no longer valid. Turn them off and enable them again.",
       composerObjective: "Use the user input at the end of this message and its attached files.",
@@ -668,7 +658,6 @@ var benchforgeClient = (() => {
       restoreProductionDraft: "Insert previous production draft into composer",
       productionCommandHint: "Use the main composer Send button to run slash commands.",
       retryProductionSend: "Retry sending",
-      permissionUnavailable: "Permissions cannot be changed while this session is unavailable",
       stopFailed: "Unable to stop the current turn",
       sceneLibrary: "Scene library",
       sceneLibraryHelp: "Past and newly produced scenes share this library. Preview each scene, then select it for this request.",
@@ -710,12 +699,7 @@ var benchforgeClient = (() => {
       positiveSceneCount: "Scenes must be a positive integer or blank.",
       positiveBudget: "Storage budget must be greater than zero or blank.",
       previousUnsentRequest: "The last request remains in the composer after an incomplete submission. Retry the same request to avoid inserting it twice.",
-      permissionsPending: "Production permissions are not enabled for this session.",
-      permissionEnable: "Enable production permissions for this session",
-      permissionRequesting: "Requesting permissions\u2026",
-      fullPermissions: "Session permissions are ready",
-      permissionFailed: "Permission request failed",
-      permissionRetry: "Retry permissions",
+      permissionsPending: "Select workspace write in the composer permission menu, or choose full access explicitly.",
       executionMode: "Task mode",
       productionMode: "Production",
       explorationMode: "Exploration run",
@@ -3799,6 +3783,11 @@ var benchforgeClient = (() => {
     srOnly: "composer_srOnly"
   };
 
+  // src/ui/workbench/production-permissions.js
+  function canStartProduction(selection) {
+    return ["workspace-write", "danger-full-access"].includes(selection?.currentValue);
+  }
+
   // src/ui/workbench/production-input.js
   var PRODUCTION_SOURCE = "benchforge-production";
   function createProductionInput({ ctx, requestWorkbench, productionRequest, productionContext, t }) {
@@ -3846,7 +3835,7 @@ var benchforgeClient = (() => {
           const { sessionId, demand } = value;
           const binding = ctx.sessions.binding(sessionId);
           if (binding.session.projections.faceOf("agentPreset").getSnapshot() !== "benchforge") throw new Error(t("productionConfigInvalid"));
-          if (binding.session.projections.faceOf("permissions").getSnapshot()?.currentValue !== "danger-full-access") {
+          if (!canStartProduction(binding.session.projections.faceOf("permissions").getSnapshot())) {
             throw new Error(t("permissionsPending"));
           }
           const input = inputFor(sessionId).state.getSnapshot();
@@ -3904,9 +3893,6 @@ var benchforgeClient = (() => {
       actions,
       hero,
       canSubmit,
-      permissionError,
-      requestPermission,
-      requestingPermission,
       configureProduction,
       openScenes
     }) {
@@ -3957,7 +3943,7 @@ var benchforgeClient = (() => {
         onChange: (event) => change({ [key]: event.target.value })
       }, options.map(([value, title]) => h("option", { key: value, value }, t(title))));
       const append = demand.mode === "append";
-      const errorMessage = error || permissionError && t("permissionFailed") + ": " + permissionError;
+      const errorMessage = error || (enabled && !canSubmit ? t("permissionsPending") : "");
       return h(
         "section",
         { className: composer_default.root + (hero ? " " + composer_default.hero : ""), "data-benchforge-composer": sessionId },
@@ -3991,19 +3977,7 @@ var benchforgeClient = (() => {
               "aria-expanded": advanced,
               "aria-controls": advancedId,
               onClick: () => setAdvanced(!advanced)
-            }, t("moreProductionSettings")),
-            !canSubmit && h(
-              Button,
-              {
-                size: "sm",
-                variant: "outline",
-                disabled: requestingPermission,
-                title: t("permissionsPending"),
-                "data-request-permission": true,
-                onClick: requestPermission
-              },
-              t(requestingPermission ? "permissionRequestingShort" : "permissionEnableShort")
-            )
+            }, t("moreProductionSettings"))
           )
         ),
         enabled && !append && advanced && h(
@@ -4751,25 +4725,9 @@ var benchforgeClient = (() => {
     const components = { ...progress, ...gallery, ...createProductComponents({ React, helpers, components: { ...progress, ...gallery } }) };
     const composer = createComposerComponents({ React, helpers, ui });
     const { Workbench } = createWorkbenchComponent({ React, helpers, components });
-    function ProductionEnvironment({ t, enableProductionPermission, component: Component = Workbench, ...props }) {
+    function ProductionEnvironment({ t, component: Component = Workbench, ...props }) {
       const permissions = props.useProjection("permissions");
-      const openState = props.useSession((session) => session.openState);
-      const ready = permissions?.currentValue === "danger-full-access";
-      const [permissionError, setPermissionError] = React.useState("");
-      const [requestingPermission, setRequestingPermission] = React.useState(false);
-      const requestPermission = async () => {
-        setRequestingPermission(true);
-        setPermissionError("");
-        try {
-          if (openState !== "open") throw new Error(t("permissionUnavailable"));
-          await enableProductionPermission();
-        } catch (error) {
-          setPermissionError(error.message);
-        } finally {
-          setRequestingPermission(false);
-        }
-      };
-      return h(Component, { ...props, t, canSubmit: ready, permissionError, requestPermission, requestingPermission });
+      return h(Component, { ...props, t, canSubmit: canStartProduction(permissions) });
     }
     async function apply(ctx) {
       await ctx.remote.$mount(typert_remote_client_default);
@@ -4796,10 +4754,6 @@ var benchforgeClient = (() => {
           return {
             requestWorkbench,
             configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
-            enableProductionPermission: async () => {
-              const result = await workbenchCtx.sessions.binding(sessionId).session.command("/permission danger-full-access");
-              if (!result.ok || !result.value.matched) throw new Error(result.error?.message || t("permissionFailed"));
-            },
             stopExecution: async () => {
               const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();
               if (!result.ok) throw new Error(result.error?.message || t("stopFailed"));

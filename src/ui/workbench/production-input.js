@@ -1,3 +1,5 @@
+import {canStartProduction} from './production-permissions.js';
+
 export const PRODUCTION_SOURCE = 'benchforge-production';
 
 export function createProductionInput({ctx, requestWorkbench, productionRequest, productionContext, t}) {
@@ -40,7 +42,7 @@ export function createProductionInput({ctx, requestWorkbench, productionRequest,
         const {sessionId, demand} = value;
         const binding = ctx.sessions.binding(sessionId);
         if (binding.session.projections.faceOf('agentPreset').getSnapshot() !== 'benchforge') throw new Error(t('productionConfigInvalid'));
-        if (binding.session.projections.faceOf('permissions').getSnapshot()?.currentValue !== 'danger-full-access') {
+        if (!canStartProduction(binding.session.projections.faceOf('permissions').getSnapshot())) {
           throw new Error(t('permissionsPending'));
         }
         const input = inputFor(sessionId).state.getSnapshot();

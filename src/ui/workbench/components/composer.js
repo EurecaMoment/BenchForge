@@ -6,7 +6,7 @@ export function createComposerComponents({React, ui}) {
   const {Button, Input, Switch} = ui;
 
   function ProductionComposer({t, sessionId, useInput, inputActions, useStore, actions, hero,
-    canSubmit, permissionError, requestPermission, requestingPermission, configureProduction, openScenes}) {
+    canSubmit, configureProduction, openScenes}) {
     const demand = useStore((value) => value.demand);
     const input = useInput((value) => value);
     const enabled = input.occurrences.some((row) => row.source === PRODUCTION_SOURCE);
@@ -37,7 +37,7 @@ export function createComposerComponents({React, ui}) {
       onChange: (event) => change({[key]: event.target.value}),
     }, options.map(([value, title]) => h('option', {key: value, value}, t(title))));
     const append = demand.mode === 'append';
-    const errorMessage = error || (permissionError && t('permissionFailed') + ': ' + permissionError);
+    const errorMessage = error || (enabled && !canSubmit ? t('permissionsPending') : '');
     return h('section', {className: css.root + (hero ? ' ' + css.hero : ''), 'data-benchforge-composer': sessionId},
       h('div', {className: css.toolbar},
         h('label', {className: css.toggleRow},
@@ -52,10 +52,7 @@ export function createComposerComponents({React, ui}) {
           !append && select('quantityContract', 'quantityContract', [['exact', 'exactQuantityShort'], ['minimum', 'minimumQuantityShort'], ['best_effort', 'bestEffortQuantity']]),
           h(Button, {size: 'sm', variant: 'ghost', onClick: openScenes}, t('sceneLibrary')),
           !append && h(Button, {size: 'sm', variant: 'ghost', 'aria-expanded': advanced,
-            'aria-controls': advancedId, onClick: () => setAdvanced(!advanced)}, t('moreProductionSettings')),
-          !canSubmit && h(Button, {size: 'sm', variant: 'outline', disabled: requestingPermission,
-            title: t('permissionsPending'), 'data-request-permission': true, onClick: requestPermission},
-            t(requestingPermission ? 'permissionRequestingShort' : 'permissionEnableShort')))),
+            'aria-controls': advancedId, onClick: () => setAdvanced(!advanced)}, t('moreProductionSettings')))),
       enabled && !append && advanced && h('fieldset', {id: advancedId, className: css.advanced,
         disabled: busy, 'data-production-advanced': true},
         h('legend', {className: css.srOnly}, t('moreProductionSettings')),

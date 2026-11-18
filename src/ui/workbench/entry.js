@@ -10,6 +10,7 @@ import {createWorkbenchComponent} from './components/workbench.js';
 import {createComposerComponents} from './components/composer.js';
 import {createWorkbenchViewStore} from './composer-store.js';
 import {createProductionInput} from './production-input.js';
+import {canStartProduction} from './production-permissions.js';
 import {createProductsResource, productsResourceAddress} from './products-resource.js';
 import workbenchRemote from '../../dsh/remote/lib/typert.remote-client.js';
 import {STAGES} from '../../dsh/production/stages.mjs';
@@ -57,25 +58,9 @@ function createClient(React, defineStore, ui) {
   const composer = createComposerComponents({React, helpers, ui});
   const {Workbench} = createWorkbenchComponent({React, helpers, components});
 
-  function ProductionEnvironment({t, enableProductionPermission, component: Component = Workbench, ...props}) {
+  function ProductionEnvironment({t, component: Component = Workbench, ...props}) {
     const permissions = props.useProjection('permissions');
-    const openState = props.useSession((session) => session.openState);
-    const ready = permissions?.currentValue === 'danger-full-access';
-    const [permissionError, setPermissionError] = React.useState('');
-    const [requestingPermission, setRequestingPermission] = React.useState(false);
-    const requestPermission = async () => {
-      setRequestingPermission(true);
-      setPermissionError('');
-      try {
-        if (openState !== 'open') throw new Error(t('permissionUnavailable'));
-        await enableProductionPermission();
-      } catch (error) {
-        setPermissionError(error.message);
-      } finally {
-        setRequestingPermission(false);
-      }
-    };
-    return h(Component, {...props, t, canSubmit: ready, permissionError, requestPermission, requestingPermission});
+    return h(Component, {...props, t, canSubmit: canStartProduction(permissions)});
   }
 
   async function apply(ctx) {
@@ -96,10 +81,6 @@ function createClient(React, defineStore, ui) {
         return {
           requestWorkbench,
           configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
-          enableProductionPermission: async () => {
-            const result = await workbenchCtx.sessions.binding(sessionId).session.command('/permission danger-full-access');
-            if (!result.ok || !result.value.matched) throw new Error(result.error?.message || t('permissionFailed'));
-          },
           stopExecution: async () => {
             const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();
             if (!result.ok) throw new Error(result.error?.message || t('stopFailed'));
