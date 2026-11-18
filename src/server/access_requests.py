@@ -1,6 +1,5 @@
 """Authorize model-facing service requests before domain handlers read files."""
 
-from pathlib import Path
 from sqlalchemy import select
 from database.schema import runs
 from service_access.access_scope import current_access, workspace_path
@@ -63,18 +62,10 @@ def authorize_request(store, route, value):
                         from capabilities.asset_generation.generation import GenerationTools
                         GenerationTools(store.root, engine=store.repo.engine).source_path(child)
                         continue
-                    candidate = Path(child)
-                    try:
-                        workspace_path(candidate)
-                    except (PermissionError, FileNotFoundError):
-                        # Production evidence is owned by a run and remains in
-                        # private storage; its file APIs retain their allowlist.
-                        resolved = candidate.resolve(strict=True)
-                        try:
-                            relative = resolved.relative_to(store.root.resolve())
-                        except ValueError as exc:
-                            raise PermissionError("Input is outside authorized task resources") from exc
-                        require_run(store.repo.engine, relative.parts[0].split(".scene", 1)[0])
+                    # Scene submissions are task-authored JSON. Production
+                    # evidence has separate export APIs and is not an alternate
+                    # workspace for this input contract.
+                    workspace_path(child)
                 else:
                     paths(child)
         elif isinstance(item, list):

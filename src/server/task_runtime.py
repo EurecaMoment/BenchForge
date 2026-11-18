@@ -11,10 +11,11 @@ PACKAGES = ("numpy", "numpy.libs", "PIL", "pillow.libs", "scipy", "scipy.libs",
             "trimesh", "networkx", "packaging", "typing_extensions")
 
 
-def python_command(workspace, script, *, workspace_fd, script_fd, argv=()):
+def python_command(workspace, script, *, workspace_fd, script_fd,
+                   conversation_root, conversation_fd, argv=()):
     """Build a command from pinned workspace/script descriptors.
 
-    The caller must keep both descriptors open and pass them via Popen pass_fds.
+    The caller must keep all descriptors open and pass them via Popen pass_fds.
     Bubblewrap consumes them for mounts and closes them before running Python.
     """
     runner = shutil.which("bwrap")
@@ -22,9 +23,13 @@ def python_command(workspace, script, *, workspace_fd, script_fd, argv=()):
         raise RuntimeError("Task-code sandbox requires bubblewrap (bwrap) on the backend service PATH")
     workspace = Path(workspace).absolute()
     script = Path(script).absolute()
+    conversation_root = Path(conversation_root).absolute()
+    if not workspace.is_relative_to(conversation_root) or '..' in workspace.parts:
+        raise PermissionError("Task directory must be inside this conversation workspace")
     if not script.is_relative_to(workspace) or '..' in script.parts:
         raise PermissionError("Task script must be inside this conversation workspace")
-    if any(type(descriptor) is not int or descriptor < 0 for descriptor in (workspace_fd, script_fd)):
+    if any(type(descriptor) is not int or descriptor < 0
+           for descriptor in (workspace_fd, script_fd, conversation_fd)):
         raise ValueError('Pinned workspace and script descriptors are required')
     command = [str(Path(runner).absolute()), "--die-with-parent", "--unshare-all", "--new-session",
                "--tmpfs", "/tmp", "--dir", "/home/task", "--dir", "/run",
@@ -58,7 +63,10 @@ def python_command(workspace, script, *, workspace_fd, script_fd, argv=()):
     for library in Path(sys.prefix, "lib").glob("*.so*"):
         if library.is_file():
             mount(library)
-    command.extend(["--bind-fd", str(workspace_fd), str(workspace),
+    # All tools share the Host's absolute namespace. Conversation inputs are
+    # readable; only this task's output directory is writable.
+    command.extend(["--ro-bind-fd", str(conversation_fd), str(conversation_root),
+                    "--bind-fd", str(workspace_fd), str(workspace),
                     "--ro-bind-data", str(script_fd), "/run/benchforge-task.py",
                     "--chdir", str(workspace),
                     "--setenv", "HOME", "/home/task", "--setenv", "PYTHONIOENCODING", "utf8",

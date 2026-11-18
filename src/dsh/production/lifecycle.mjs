@@ -1,6 +1,7 @@
 import {stageName, stageSummary} from './stages.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 import {ProductionIncompleteError} from './errors.mjs';
+import {reviewSnapshot, reviewNotice, reviewChanges} from './review_snapshot.mjs';
 
 /** Conversation policy; all facts come from the projection and domain receipts. */
 export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
@@ -38,7 +39,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     if(signal.aborted)abort();
   }
   const viewOf=agent=>projection.stateOf(agent.session).view;
-  const notice=(kind,key,text)=>createMessage({source:{kind,noticeKey:key,form:'notice',summary:text},content:[{type:'text',text}]});
+  const notice=(kind,key,text,facts={})=>createMessage({source:{kind,noticeKey:key,form:'notice',summary:text,...facts},content:[{type:'text',text}]});
   function pendingNotice(agent,key) {
     const pending=[...(agent.inbox?.nextTurn||[]),...(agent.inbox?.nextStep||[])];
     return pending.some(message=>message.source?.noticeKey===key);
@@ -58,12 +59,11 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     signal=AbortSignal.any([lifetime.signal,signal]);
     const view=viewOf(agent);
     if(!view.active || agent.session.header?.origin==='subagent')return;
-    await serialized(agent.id,async()=>{
+    return serialized(agent.id,async()=>{
       const prior=table.get(agent.id);
       const current=view.review ? await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal) : null;
       signal?.throwIfAborted();
-      const review=current ? {...view.review,review_id:current.review_id ?? view.review.review_id,deadline:current.deadline,state:current.state,
-        artifact:current.artifact || view.review.artifact} : view.review;
+      const review=reviewSnapshot(current,view.review) || view.review;
       const key=review ? `${agent.id}:${review.review_id}` : '';
       const record={sessionId:agent.id,workspace:view.workspace,plan:view.plan,run:view.run,
         revision:view.revision,review,key,suspended:false};
@@ -73,10 +73,11 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
         ['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state)) record.suspended=true;
       if(prior?.key===key&&prior.suspended&&view.state==='interrupted')record.suspended=true;
       const stable=value=>JSON.stringify(value && {...value,revision:0});
-      if(stable(prior)===stable(record))return;
+      if(stable(prior)===stable(record))return {...record,reviewReceipt:current};
       await table.put(agent.id,record);
       signal?.throwIfAborted();
       arm(agent.id,record);
+      return {...record,reviewReceipt:current};
     },signal);
   }
   async function refresh(id) {
@@ -87,12 +88,11 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       if(!record?.review||record.suspended)return false;
       const review=await waitWithSignal(advanceReview(record.workspace,id,record.review.review_id,now(),signal),signal);
       signal.throwIfAborted();
+      const updated={...record,review:reviewSnapshot(review,record.review) || record.review};
       if(['paused','needs_input','superseded'].includes(review.state)) {
-        await table.put(id,{...record,suspended:true});return false;
+        await table.put(id,{...updated,suspended:true});return false;
       }
       if(review.state==='waiting_user') {
-        const updated={...record,review:{...record.review,deadline:review.deadline,state:review.state,
-          artifact:review.artifact || record.review.artifact}};
         await table.put(id,updated);
         arm(id,updated,1000);return false;
       }
@@ -107,16 +107,17 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
         }
       }
       if(review.state==='check_failed') {
-        await table.put(id,{...record,suspended:true});
+        await table.put(id,{...updated,suspended:true});
         const key=`${record.key}:check-failed:${review.last_check?.checked_at||0}`;
         if(!pendingNotice(agent,key)&&!state.notices.includes(key)) {
           const message=notice('benchforge/production-check-failed',key,
-            `阶段自检未通过，自动继续已停止：${review.check_failure?.error||'请读取 benchforge_stage_review 当前检查结果'}。保留当前审核和已完成等待，修复产物后调用 benchforge_stage_review(action=retry)。先向用户说明实际缺项，不能把等待结束当成检查通过。`);
+            `阶段自检未通过，自动继续已停止：${review.check_failure?.error||'请读取 benchforge_stage_review 当前检查结果'}。保留当前审核和已完成等待，修复产物后调用 benchforge_stage_review(action=retry)。先向用户说明实际缺项，不能把等待结束当成检查通过。`,reviewNotice(review,view.review));
           if(agent.status==='running')agent.steer(message);else agent.followup(message);
         }
         return false;
       }
       if(!['elapsed','continued'].includes(review.state))return false;
+      await table.put(id,updated);
       if(['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state))return false;
       await reconcileCaptures(agent,signal);
       signal.throwIfAborted();
@@ -125,7 +126,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       if(pendingNotice(agent,key))return true;
       if(state.notices.includes(key))return agent.status==='running';
       const message=notice('benchforge/production-resume',key,
-        `生产阶段通知（系统状态）：${review.stage} ${stageName(review.stage)} 的审核已放行。${review.state==='elapsed'?'三轮自检和等待已完成。':'用户已要求继续，产物检查已通过。'}读取 benchforge_stage_review 的当前状态，处理已有用户指令，然后使用 benchforge_pipeline_run 继续同一个任务。阶段含义：${stageSummary()}，S3 包含标注。workspace=${record.workspace}；plan=${record.plan}；run=${record.run || '尚未创建'}。不要重建已完成阶段。先向用户简短说明当前阶段和下一步。`);
+        `生产阶段通知（系统状态）：${review.stage} ${stageName(review.stage)} 的审核已放行。${review.state==='elapsed'?'三轮自检和等待已完成。':'用户已要求继续，产物检查已通过。'}读取 benchforge_stage_review 的当前状态，处理已有用户指令，然后使用 benchforge_pipeline_run 继续同一个任务。阶段含义：${stageSummary()}，S3 包含标注。workspace=${record.workspace}；plan=${record.plan}；run=${record.run || '尚未创建'}。不要重建已完成阶段。先向用户简短说明当前阶段和下一步。`,reviewNotice(review,view.review));
       if(agent.status==='running')agent.steer(message);else agent.followup(message);
       // A queued notice may be lost before its first step is committed. The inbox
       // and standard session events, not a prior enqueue, establish delivery.
@@ -138,17 +139,19 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     signal?.throwIfAborted();
     if(decision.kind!=='enter')return decision;
     const view=viewOf(agent);
-    await observe(agent,signal);
+    const observed=await observe(agent,signal);
     if(view.active&&view.workflowTurn===view.turn&&agent.status==='running') {
       const previous=reminders.get(agent.id);
       const silent=now()-view.lastTextAt>=60000;
       const stageChanged=view.review&&previous?.review!==view.review.review_id;
       const failed=view.error&&previous?.error!==view.error;
-      if((silent||stageChanged||failed)&&(!previous||now()-previous.at>=60000)) {
+      const facts=reviewNotice(observed?.review,view.review);
+      const reviewChanged=facts.review && JSON.stringify(facts.review)!==JSON.stringify(view.review);
+      if(reviewChanged || (silent||stageChanged||failed)&&(!previous||now()-previous.at>=60000)) {
         reminders.set(agent.id,{...previous,at:now(),review:view.review?.review_id,error:view.error});
         // A review receipt in the projection can predate the user's Continue.
         // Read the domain before describing a wait; the UI is not its authority.
-        const review=view.review ? await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal) : null;
+        const review=observed?.reviewReceipt || observed?.review;
         signal?.throwIfAborted();
         const pending=review&&['waiting_user','paused','needs_input','check_failed'].includes(review.state);
         const reviewNotice=review ? `展示真实阶段产物：${review.artifact || view.review.artifact}；`+
@@ -156,7 +159,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
             review.state==='superseded' ? '已有更新的阶段回执，请读取当前状态。' :
               '该审核已放行，继续执行并报告真实执行错误；不要再次等待或因执行修补重开 S1。') : '';
         const message=notice('benchforge/production-progress',`${agent.id}:${view.revision}`,
-          `进度沟通提醒（系统状态）：请在继续工具调用前，用用户的语言简短说明已完成的工作、当前阶段、实际阻塞和下一步。最近记录阶段=${stageName(view.stage)||'计划'}，状态=${view.state}，本任务工具调用=${view.tools}，shell=${view.shells}。S2 是场景选取或新建，S3 是采集（包含标注）。${view.error?'最近调用失败，请说明实际原因并修正入口。':''}${reviewNotice}不要展示隐藏推理，不要把调用次数或文件数量当成完成比例。`);
+          `进度沟通提醒（系统状态）：请在继续工具调用前，用用户的语言简短说明已完成的工作、当前阶段、实际阻塞和下一步。最近记录阶段=${stageName(view.stage)||'计划'}，状态=${reviewChanges(view,facts).state || view.state}，本任务工具调用=${view.tools}，shell=${view.shells}。S2 是场景选取或新建，S3 是采集（包含标注）。${view.error?'最近调用失败，请说明实际原因并修正入口。':''}${reviewNotice}不要展示隐藏推理，不要把调用次数或文件数量当成完成比例。`,facts);
         return {...decision,messages:[...decision.messages,message]};
       }
     }
@@ -164,11 +167,13 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
   }
   async function stopping({agent,turn,signal}) {
     signal?.throwIfAborted();
-    const state=projection.stateOf(agent.session),view=state.view;
+    const state=projection.stateOf(agent.session);
+    let view=state.view;
     if(!view.active||view.workflowTurn!==view.turn)return;
     await observe(agent,signal);
     const review=view.review?await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal):null;
     signal?.throwIfAborted();
+    view={...view,...reviewChanges(view,reviewNotice(review,view.review))};
     const waiting=review&&['waiting_user','paused','needs_input','check_failed'].includes(review.state);
     const blocked=['needs_input','needs_evidence','needs_plan_revision','blocked','failed','paused'].includes(view.state);
     const delivered=view.state==='completed'&&view.delivered;
@@ -184,7 +189,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       waiting?'当前阶段等待关口仍有效，不得提前执行依赖阶段。':blocked?'如实说明当前阻塞、已保存产物和所需输入。':
         view.state==='completed'?'已完成交付使用 present，并向用户给出真实产物链接。':'沿已保存计划继续执行下一项未完成工作；不要重做已完成阶段。';
     agent.steer(notice('benchforge/production-continue',`${key}:recovery:${attempts+1}`,
-      `本轮收尾检查：当前生产状态=${view.state}，尚不能据此宣告任务完成。${action}先简短说明当前进展；不能用空回复结束。若存在无法自行修复的阻塞，使用已有任务或阶段工具记录真实阻塞并解释，不能伪造验收。`));
+      `本轮收尾检查：当前生产状态=${view.state}，尚不能据此宣告任务完成。${action}先简短说明当前进展；不能用空回复结束。若存在无法自行修复的阻塞，使用已有任务或阶段工具记录真实阻塞并解释，不能伪造验收。`,reviewNotice(review,view.review)));
   }
   async function resume(agent) {
     const record=table.get(agent.id);

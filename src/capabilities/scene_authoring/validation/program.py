@@ -16,6 +16,7 @@ import re
 from copy import deepcopy
 from capabilities.scene_authoring.catalog.native import ASSETS
 from capabilities.scene_authoring.catalog.native import NATIVE_MATERIALS
+from capabilities.scene_authoring.catalog.native_reference import validate_native_reference
 from capabilities.scene_authoring.catalog.environments import ENVIRONMENTS
 def require(ok, message):
     if not ok: raise ValueError(message)
@@ -219,7 +220,7 @@ def _validate_scene_extensions(p, checks):
     if not isinstance(assets, list):
         assets = []
     asset_ids = set()
-    asset_kinds = {'builtin', 'usd', 'mesh', 'generated', 'diffusion', 'sam3d', 'procedural', 'imported', 'unknown'} | set(ASSETS)
+    asset_kinds = {'builtin', 'usd', 'mesh', 'generated', 'diffusion', 'sam3d', 'procedural', 'imported', 'native', 'unknown'} | set(ASSETS)
     for index, asset in assets_records:
         with checks.at(f'/assets/{index}'):
             require(isinstance(asset, dict), 'invalid asset record')
@@ -523,7 +524,7 @@ def _validate_object_fields(obj, index, checks):
         return
     object_id = obj.get('id')
     required = {'id', 'label', 'kind', 'size', 'xy', 'support', 'base_z', 'dynamic', 'mass_kg'}
-    optional = {'color', 'yaw_deg', 'parts', 'generation', 'asset_id', 'asset_quality',
+    optional = {'color', 'yaw_deg', 'parts', 'generation', 'asset_id', 'asset_quality', 'native_asset',
                 'mesh_transform', 'render_representation', 'cast_shadows', 'physics',
                 'appearance', 'room_id', 'zone_id', 'material_id', 'semantic_labels',
                 'affordances', 'tags', 'metadata', 'source_ref'}
@@ -544,7 +545,7 @@ def _validate_object_fields(obj, index, checks):
     kind = obj.get('kind')
     kind_valid = check('kind', require, isinstance(kind, str) and
                        kind in {'box', 'sphere', 'cylinder', 'container', 'composite',
-                                'generated', 'mesh'} | set(ASSETS), 'unsupported builder')
+                                'generated', 'mesh', 'native'} | set(ASSETS), 'unsupported builder')
     if kind_valid and kind == 'generated':
         generation = obj.get('generation')
         checks.require(path + '/generation', isinstance(generation, dict) and
@@ -552,6 +553,15 @@ def _validate_object_fields(obj, index, checks):
                        'generated asset needs a visual generation prompt', object_id=object_id)
     if kind_valid and kind == 'mesh':
         checks.check(path + '/asset_id', ident, obj.get('asset_id'), object_id=object_id)
+    if kind_valid and kind == 'native':
+        checks.check(path + '/native_asset', validate_native_reference, obj.get('native_asset'),
+                     object_id=object_id)
+        checks.require(path, not {'asset_id', 'generation', 'asset_quality'} & set(obj),
+                       'native objects use native_asset exclusively; do not mix mesh/generation inputs',
+                       object_id=object_id)
+    elif 'native_asset' in obj:
+        checks.require(path + '/native_asset', False, 'native_asset requires kind=native',
+                       object_id=object_id)
     check('render_representation', require, obj.get('render_representation') in
           ('auto', 'gaussian', 'mesh'), 'render_representation must be auto, gaussian or mesh')
     check('cast_shadows', require, type(obj.get('cast_shadows')) is bool,

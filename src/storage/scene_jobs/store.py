@@ -11,6 +11,7 @@ from storage.scene_jobs.metadata import runs
 from storage.scene_jobs.metadata import tasks
 from storage.files import safe_path
 from service_access.request_context import RunContext
+from service_access.access_scope import current_access
 from service_access.runtime_config import resolve_database_url
 
 
@@ -30,6 +31,14 @@ class Store:
         external_context = RunContext.from_request(context)
         if external_context is None:
             external_context = RunContext()
+        access = current_access()
+        if access is not None:
+            if (external_context.workspace_id not in (None, *access.scope.ledger_namespaces)
+                    or external_context.session_id not in (None, access.scope.session_id)):
+                raise PermissionError('Run context belongs to another conversation')
+            external_context = RunContext(workspace_id=access.scope.workspace_id,
+                                          session_id=access.scope.session_id,
+                                          parent_run_id=external_context.parent_run_id)
         parent_runs = {
             str(intent.get(key)).split('.')[0]
             for intent in intents

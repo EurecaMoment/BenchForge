@@ -45,6 +45,14 @@ BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `a100sim.v1.Simula
 
 上传先冻结会话文件，再校验其依赖闭包。USD、材质、纹理、URDF/MJCF 和 glTF 等不能携带越界路径或未授权外链；必要解析器缺失时拒绝上传。同一 owner 的新会话可通过授权资产版本复用生成网格、材质和纹理，不读取原对话目录。资产共享也不自动授予原仿真世界的控制权。
 
+### SceneProgram 引用本会话原生资产
+
+`benchforge_isaac_sim(action=upload)` 返回的 `asset_id` 和 `relative_path` 可以直接写入对象的 `native_asset`，对象使用 `kind="native"`。该字段还要求源坐标下以米计的 `size:[x,y,z]` 和 `source_up_axis:"Y"|"Z"`，可选 `fix_base`。对象自身的 `size` 则是场景 Z-up 下的目标尺寸。适配器转换源尺寸轴向后计算缩放，沿用 `asset.import` 和 `scene.edit`，不要求修改源码目录、静态资产表或部署配置。
+
+句柄在预检、任务准入及后台编译时核对会话和服务端点归属。通用身份恢复在 `src/service_access/task_access.py`，数据合同在 `src/capabilities/scene_authoring/catalog/native_reference.py`，权限校验在 `src/capabilities/isaac_sim/scene_requirements.py`，导入编排在同目录的 `authoring.py` 和 `capture_stage.py`。有可信会话身份的任务提交不能因漏传 context 而退为无身份维护任务。
+
+`native_assets` 目录的 `configured`、`unconfigured`、`unknown` 只说明提供者绑定状态；目录不承诺文件存在、渲染成功、关节有效或飞行控制可用。上传及静态预检也不构成视觉或机器人验收。`benchforge_mesh_import` 仅导入 GLB/glTF/OBJ/PLY/STL 静态网格；USD、URDF/MJCF 等在提交前返回明确的原生导入指引，避免排队转换失败和关节信息丢失。
+
 ### 同一网关内的两个操作族
 
 候选部署方案使用同一 gRPC 网关组合两套服务：A100 retained scene 的 8 项标准操作用于 SceneProgram 采集；原有 20 项扩展操作保留在 `extended.` 命名空间中，用于多世界及机器人功能。**这是路由说明，正式 `50051` 尚未完成本轮切换，不能代替实例的逐项验收。**

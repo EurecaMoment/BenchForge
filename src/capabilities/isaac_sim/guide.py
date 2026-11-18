@@ -35,6 +35,10 @@ def usage(capabilities, catalog, *, operation=None, feature_id=None):
             'identifier across unrelated scene/robot/world backends without an explicit service contract.',
             'Keep task code and uploads in this conversation workspace. Use returned source_path, '
             'asset_id, relative_path and job_id verbatim. Stage and quality reviews still apply.',
+            'To reuse a USD asset in SceneProgram, upload the workspace file and use kind=native '
+            'with native_asset containing the returned asset_id/relative_path, source size and up axis. '
+            'Do not edit source catalogs or deployment asset directories. Native import preserves the '
+            'source representation; verify articulation and controller support from actual service evidence.',
         ],
         'actions': {
             'guide': 'Read this guide and live summaries; operation or feature_id selects full live details.',

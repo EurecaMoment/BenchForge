@@ -13,6 +13,24 @@ from database.access import AccessScope
 
 
 class TaskWorkspaceTests(unittest.TestCase):
+    def test_command_preserves_conversation_input_and_task_output_namespaces(self):
+        from server.task_runtime import python_command
+
+        with TemporaryDirectory() as temporary, patch('shutil.which', return_value='/usr/bin/bwrap'):
+            root = Path(temporary).resolve()
+            task = root / 'tasks/sample/work'
+            script = task / 'code.py'
+            command = python_command(task, script, workspace_fd=10, script_fd=11,
+                                     conversation_root=root, conversation_fd=12)
+            self.assertEqual(command[command.index('--ro-bind-fd') + 1:command.index('--ro-bind-fd') + 3],
+                             ['12', str(root)])
+            self.assertEqual(command[command.index('--bind-fd') + 1:command.index('--bind-fd') + 3],
+                             ['10', str(task)])
+            self.assertEqual(command[command.index('--chdir') + 1], str(task))
+            with self.assertRaises(PermissionError):
+                python_command(root.parent / 'other', root.parent / 'other/code.py',
+                               workspace_fd=10, script_fd=11, conversation_root=root, conversation_fd=12)
+
     @unittest.skipUnless(os.name == 'posix', 'Task-code execution requires Linux descriptors')
     def test_user_installed_runner_does_not_leak_service_environment(self):
         with TemporaryDirectory() as temporary:
@@ -40,9 +58,11 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertNotIn('/harness', args[0])
             self.assertNotIn('/assets', args[0])
             self.assertNotIn('--ro-bind / /', ' '.join(args[0]))
-            self.assertEqual(len(kwargs['pass_fds']), 2)
+            self.assertEqual(len(kwargs['pass_fds']), 3)
             self.assertEqual(args[0][args[0].index('--bind-fd') + 1], str(kwargs['pass_fds'][0]))
             self.assertEqual(args[0][args[0].index('--ro-bind-data') + 1], str(kwargs['pass_fds'][1]))
+            self.assertEqual(args[0][args[0].index('--ro-bind-fd') + 1], str(kwargs['pass_fds'][2]))
+            self.assertEqual(args[0][args[0].index('--ro-bind-fd') + 2], str(root))
             self.assertIn('/run/benchforge-task.py', args[0])
 
     @unittest.skipUnless(os.name == 'posix', 'Task-code execution requires Linux descriptors')
@@ -121,6 +141,48 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertEqual(result['returncode'], 0, result['stderr'])
             self.assertEqual(result['stdout'].strip(), '6')
             self.assertTrue(any(row['file'] == 'array.npy' for row in result['artifacts']))
+
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('bwrap'), 'Live bubblewrap requires Linux runner')
+    def test_real_runtime_reads_conversation_inputs_and_returns_reusable_paths(self):
+        from capabilities.asset_generation.generation import GenerationTools
+        from capabilities.scene_authoring.program_submission import read_program_document
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            workspace = root / 'session-a'
+            workspace.mkdir()
+            sibling = workspace / 'tasks/prepare/work'
+            sibling.mkdir(parents=True)
+            source = sibling / 'mesh.obj'
+            source.write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
+            other = root / 'session-b'
+            other.mkdir()
+            (other / 'secret.json').write_text('{"private":true}')
+            service = root / 'service.py'
+            service.write_text('private_service_code = True')
+            access = TrustedAccess(AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1), str(workspace))
+            code = ("from pathlib import Path\nimport json\n"
+                    f"source = Path({str(source)!r})\n"
+                    "assert source.read_text().startswith('v 0 0 0')\n"
+                    "try:\n    source.write_text('changed')\n"
+                    "except OSError:\n    pass\n"
+                    "else:\n    raise AssertionError('conversation input was writable')\n"
+                    f"assert not Path({str(other / 'secret.json')!r}).exists()\n"
+                    f"assert not Path({str(service)!r}).exists()\n"
+                    "Path('scene.json').write_text(json.dumps({'objects':[]}))\n"
+                    "Path('mesh.obj').write_bytes(source.read_bytes())\n")
+            with access_context(access):
+                result = run_task_code(root / 'private', 'consume', code)
+                self.assertEqual(result['returncode'], 0, result['stderr'])
+                files = {row['file']: row['source_path'] for row in result['artifacts']}
+                submitted = read_program_document(root / 'private', files['scene.json'])
+                self.assertEqual(submitted['program'], {'objects': []})
+                imported = GenerationTools(root / 'private').source_path(files['mesh.obj'])
+                self.assertEqual(imported.read_bytes(), source.read_bytes())
+                self.assertEqual(result['conversation_path'], str(workspace))
+            for file in (root / 'private').rglob('*'):
+                if file.is_file():
+                    file.chmod(0o600)
 
     def test_task_code_requires_host_identity(self):
         with patch('server.task_workspace.shutil.which', return_value='/usr/bin/bwrap'):

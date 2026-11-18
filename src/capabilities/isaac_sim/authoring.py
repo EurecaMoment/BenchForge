@@ -14,6 +14,7 @@ from capabilities.isaac_sim.scene_requirements import (
     UnsupportedScene, UNSUPPORTED_MATERIAL_FIELDS, validate_capture_requirements,
 )
 from capabilities.scene_authoring.catalog.native import ASSETS
+from capabilities.scene_authoring.catalog.native_reference import native_size_z_up
 from capabilities.scene_authoring.geometry.mesh import transform_mesh_geometry, transform_mesh_normals
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
 from capabilities.scene_authoring.validation.program import validate_program
@@ -87,10 +88,12 @@ def compile_scene(program, assets_root, settings):
                   'dynamic': obj['dynamic'], 'declared_yaw_deg': obj.get('yaw_deg', 0),
                   'parameter_origin': 'declared synthetic priors'}
         entities[identity] = entity
-        if kind in ASSETS:
-            source = sources.get(kind)
+        if kind in ASSETS or kind == 'native':
+            source = obj['native_asset'] if kind == 'native' else sources.get(kind)
+            catalog = ({'size': native_size_z_up(source), 'source_up_axis': source['source_up_axis']}
+                       if kind == 'native' else ASSETS[kind])
             imports.append({'object': obj, 'path': root, 'source': source,
-                            'center': center, 'catalog': ASSETS[kind]})
+                            'center': center, 'catalog': catalog})
             continue
         if kind == 'generated':
             raise ValueError('Generate and register the mesh before Isaac Sim capture')

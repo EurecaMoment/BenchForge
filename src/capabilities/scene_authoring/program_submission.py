@@ -24,24 +24,26 @@ def submission_identity(value):
 
 def read_program_document(artifact_root, source_path):
     from service_access.access_scope import current_access, workspace_path
-    roots=[(Path(artifact_root)/'operator_workspaces').resolve()]
-    configured_root=environment_value('BENCHFORGE_TASK_ROOT')
-    if configured_root:
-        roots.append(Path(configured_root).expanduser().resolve())
     if not isinstance(source_path,str) or not source_path:raise ValueError('scene_program_path must be a task workspace JSON source_path')
-    path=Path(source_path).resolve()
-    if current_access() is not None:
+    access = current_access()
+    if access is not None:
         path = workspace_path(source_path)
-        roots = [Path(current_access().root_path).resolve()]
+        roots = [Path(access.root_path).resolve()]
+    else:
+        roots=[(Path(artifact_root)/'operator_workspaces').resolve()]
+        configured_root=environment_value('BENCHFORGE_TASK_ROOT')
+        if configured_root:
+            roots.append(Path(configured_root).expanduser().resolve())
+        path=Path(source_path).resolve()
     if not any(path.is_relative_to(root) for root in roots) or path.suffix.lower()!='.json':
         raise ValueError('scene_program_path must be a .json file inside an operator task workspace. '
                          f'Accepted roots: {", ".join(str(root) for root in roots)}. '
                          'Use standard file tools to write or copy the task JSON under a configured task root, '
                          'or use benchforge_task_code and its returned source_path.')
     try:
-        if current_access() is not None:
+        if access is not None:
             from storage.confined_files import read_bytes
-            raw = read_bytes(current_access().root_path, path, limit=MAX_PROGRAM_BYTES)
+            raw = read_bytes(access.root_path, path, limit=MAX_PROGRAM_BYTES)
         else:
             with path.open('rb') as stream:raw=stream.read(MAX_PROGRAM_BYTES+1)
     except OSError as exc:raise ValueError('SceneProgram task file unavailable') from exc
@@ -51,15 +53,16 @@ def read_program_document(artifact_root, source_path):
         program=json.loads(raw.decode('utf-8-sig'),object_pairs_hook=_pairs,parse_constant=invalid_constant)
         json.dumps(program,allow_nan=False)  # Also rejects exponent overflow such as 1e999.
     except (UnicodeError,ValueError,RecursionError) as exc:raise ValueError('invalid SceneProgram JSON: '+str(exc)[:300]) from exc
-    if current_access() is not None:
+    if access is not None:
         from capabilities.asset_generation.generation import GenerationTools
         assets = GenerationTools(artifact_root)
         def authorize_assets(value):
             if isinstance(value, dict):
                 if isinstance(value.get('asset_id'), str) and value['asset_id'].startswith('asset_'):
                     assets.asset_path(value['asset_id'])
-                for child in value.values():
-                    authorize_assets(child)
+                for key, child in value.items():
+                    if key != 'native_asset':
+                        authorize_assets(child)
             elif isinstance(value, list):
                 for child in value:
                     authorize_assets(child)

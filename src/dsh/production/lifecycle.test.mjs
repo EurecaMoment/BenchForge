@@ -386,3 +386,100 @@ test('failed artifact checks report the issue once without a production-resume n
   assert.equal(h.records.get(h.agent.id).suspended,true);
   await runtime.dispose();
 });
+
+test('committed release notices refresh the projection and durable observer without advancing stages',async()=>{
+  const h=harness();h.plan();const runtime=h.create();await runtime.observe(h.agent);
+  h.setReview({review_id:1,revision:9,state:'elapsed',deadline:400,stage:'S1'});
+  await runtime.refresh(h.agent.id);
+  assert.equal(h.view().review.state,'waiting_user'); // queued messages are not yet committed
+  assert.equal(h.records.get(h.agent.id).review.state,'elapsed');
+  const message=h.sent.at(-1);
+  assert.equal(message.source.review.revision,9);
+  h.event('user/message',message);
+  assert.equal(h.view().review.state,'elapsed');assert.equal(h.view().state,'running');
+  assert.equal(h.view().stage,'S1');assert.equal(h.view().completed,0);assert.equal(h.view().delivered,false);
+  await runtime.dispose();
+});
+
+test('fresh domain changes bypass reminder throttling and persist through ordinary session events',async()=>{
+  const h=harness();h.plan();const runtime=h.create();
+  const initial=await h.preStep(runtime);
+  h.event('user/message',initial.messages.at(-1));
+  h.setReview({review_id:1,revision:8,state:'continued',deadline:400,stage:'S1'});
+  const changed=await h.preStep(runtime);
+  assert.equal(changed.messages.length,1);
+  assert.equal(changed.messages[0].source.review.state,'continued');
+  assert.doesNotMatch(changed.messages[0].content[0].text,/状态=waiting_user/);
+  h.event('user/message',changed.messages[0]);
+  assert.equal(h.view().state,'running');assert.equal(h.view().review.revision,8);
+  assert.equal((await h.preStep(runtime)).messages.length,0);
+  await runtime.dispose();
+});
+
+test('unstructured, obsolete and out-of-order notices cannot release a newer review',()=>{
+  const h=harness();h.plan();
+  h.receipt('benchforge_stage_review',{review_id:2,revision:7,state:'paused',stage:'S2',artifact:'/workspace/scene.json',deadline:400});
+  const source={kind:'benchforge/production-resume',noticeKey:'old',previousReviewId:1,
+    review:{review_id:1,revision:20,state:'elapsed',stage:'S1',artifact:'/workspace/plan.json',deadline:100}};
+  h.event('user/message',{source});
+  assert.equal(h.view().state,'paused');assert.equal(h.view().review.review_id,2);
+  h.event('user/message',{source:{...source,noticeKey:'stale',previousReviewId:2,
+    review:{...source.review,review_id:2,revision:6,stage:'S2'}}});
+  assert.equal(h.view().review.state,'paused');assert.equal(h.view().review.revision,7);
+  h.event('user/message',{source:{kind:'benchforge/production-continue',noticeKey:'prose'},
+    content:[{type:'text',text:'The timer elapsed and all checks passed.'}]});
+  assert.equal(h.view().state,'paused');
+});
+
+test('continue recovery carries authoritative release and never mistakes a stale pause for a blocker',async()=>{
+  const h=harness();h.plan();
+  h.receipt('benchforge_stage_review',{review_id:1,revision:3,state:'paused',stage:'S1',artifact:'/workspace/plan.json',deadline:400});
+  h.setReview({review_id:1,revision:4,state:'continued',deadline:400,stage:'S1'});
+  h.event('assistant/message',{message:{content:[{type:'text',text:'准备继续。'}]}});
+  const runtime=h.create();await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,1);assert.equal(h.sent[0].source.kind,'benchforge/production-continue');
+  assert.match(h.sent[0].content[0].text,/继续执行下一项/);
+  h.event('user/message',h.sent[0]);assert.equal(h.view().state,'running');
+  await runtime.dispose();
+});
+
+test('a successful canonical retry clears its own error but unrelated successes do not',()=>{
+  const h=harness();h.plan();
+  h.event('tool/call',{name:'benchforge_scene_preflight',callId:'relative',arguments:'{"scene_program_path":"tasks/scene.json"}'});
+  h.event('tool/result',{message:{toolCallId:'relative',isError:true,content:[{type:'text',text:'Relative path was not found'}]}});
+  h.receipt('benchforge_scene_status',{state:'RUNNING'});
+  assert.equal(h.view().error,'Relative path was not found');
+  h.receipt('benchforge_pipeline_status',{state:'running'});
+  assert.equal(h.view().error,'Relative path was not found');
+  h.event('tool/call',{name:'benchmarkforge_scene_preflight',callId:'absolute',arguments:'{"scene_program_path":"/workspace/tasks/scene.json"}'});
+  h.event('tool/result',{meta:{benchforgeInvocation:{resolved:{name:'benchforge_scene_preflight',arguments:{workspace:'/workspace'}}}},
+    message:{toolCallId:'absolute',content:[{type:'text',text:JSON.stringify({schema:'benchforge.scene-diagnostics/v1',status:'blocked',passed:false})}]}});
+  assert.equal(h.view().error,'');assert.equal(h.view().state,'planned');assert.equal(h.view().completed,0);
+});
+
+test('an earlier concurrent success cannot erase a newer failed invocation',()=>{
+  const h=harness();h.plan();
+  h.event('tool/call',{name:'benchforge_scene_preflight',callId:'older',arguments:'{}'});
+  h.event('tool/call',{name:'benchforge_scene_preflight',callId:'newer',arguments:'{}'});
+  h.event('tool/result',{message:{toolCallId:'newer',isError:true,content:[{type:'text',text:'Newer input missing'}]}});
+  h.event('tool/result',{message:{toolCallId:'older',content:[{type:'text',text:'{"passed":true}'}]}});
+  assert.equal(h.view().error,'Newer input missing');
+  h.receipt('benchforge_scene_preflight',{passed:true});
+  assert.equal(h.view().error,'');
+});
+
+test('older tool receipts cannot downgrade a committed review notice or a newer review window',()=>{
+  const h=harness();h.plan();
+  h.event('user/message',{source:{kind:'benchforge/production-resume',noticeKey:'release',previousReviewId:1,
+    review:{review_id:1,revision:9,state:'continued',stage:'S1',artifact:'/workspace/plan.json',deadline:400}}});
+  for(const name of ['benchforge_stage_review','benchforge_pipeline_run']) {
+    const review={review_id:1,revision:8,state:'waiting_user',stage:'S1',artifact:'/workspace/plan.json',deadline:700};
+    h.receipt(name,name==='benchforge_stage_review'?review:{state:'waiting_user',stage_review:review});
+    assert.equal(h.view().review.revision,9);assert.equal(h.view().state,'running');
+  }
+  h.receipt('benchforge_stage_review',{review_id:2,revision:1,state:'waiting_user',stage:'S2',artifact:'/workspace/scene.json',deadline:800});
+  h.receipt('benchforge_stage_review',{review_id:1,revision:12,state:'continued',stage:'S1',artifact:'/workspace/plan.json',deadline:400});
+  assert.equal(h.view().review.review_id,2);assert.equal(h.view().state,'waiting_user');assert.equal(h.view().stage,'S2');
+  h.receipt('benchforge_stage_review',{review_id:2,revision:2,state:'check_failed',stage:'S2',artifact:'/workspace/scene.json',deadline:800});
+  assert.equal(h.view().review.state,'check_failed');assert.equal(h.view().completed,0);
+});

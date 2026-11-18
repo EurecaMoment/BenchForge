@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from capabilities.scene_authoring.catalog.native import ASSETS, normalize_native_asset_references
+from capabilities.scene_authoring.catalog.native_reference import native_size_z_up
 from capabilities.scene_authoring.contracts.scene_program import SCENE_V2_MAX_OBJECTS
 from capabilities.scene_authoring.validation.program import program_contract_issues
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry, initial_bounds_overlaps
@@ -89,7 +90,7 @@ def _independent_geometry(program, contract_issues, diagnostics):
     cyclic = {key for issue in contract_issues if issue['code'] == 'cyclic_support'
               for key in issue['object_ids']}
     geometry_fields = {'id', 'kind', 'size', 'xy', 'support', 'base_z', 'yaw_deg', 'dynamic',
-                       'parts', 'mesh_transform', 'asset_id'}
+                       'parts', 'mesh_transform', 'asset_id', 'native_asset'}
     for index, obj in enumerate(rows):
         path = f'/objects/{index}'
         invalid_geometry = any(row['path'] == path or any(
@@ -161,7 +162,7 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
             continue
         kind = obj['kind']
         if declared and key not in simplified:
-            if (kind not in ASSETS and kind not in {'mesh', 'bin', 'container', 'generated'}
+            if (kind not in ASSETS and kind not in {'mesh', 'bin', 'container', 'generated', 'native'}
                     and not detailed_construction(obj)):
                 diagnostics.add('recognizable_asset_required', path + '/kind',
                     'Default scene design uses recognizable assets; simplified geometry needs an '
@@ -171,12 +172,14 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
                 diagnostics.add('geometry_exception_required', path + '/label',
                     'Default scene design needs an explicit planned geometry exception for cube objects',
                     basis='scene_policy', object_ids=[key])
-        if kind in ASSETS:
-            ratios = [obj['size'][i] / ASSETS[kind]['size'][i] for i in range(3)]
+        if kind in ASSETS or kind == 'native':
+            source_size = native_size_z_up(obj['native_asset']) if kind == 'native' else ASSETS[kind]['size']
+            ratios = [obj['size'][i] / source_size[i] for i in range(3)]
             if min(ratios) < .5 or max(ratios) > 2 or max(ratios) / min(ratios) > 1.5:
                 diagnostics.add('native_asset_scale', path + '/size',
-                    'Scale or proportions depart from the registered real asset',
-                    basis='registered_asset_dimensions', object_ids=[key], ratios=ratios)
+                    'Scale or proportions depart from the declared native source dimensions',
+                    basis='declared_native_dimensions' if kind == 'native' else 'registered_asset_dimensions',
+                    object_ids=[key], ratios=ratios)
         if ok and not mount and obj['support'] == 'ground' and abs(obj['base_z']) > .03:
             diagnostics.add('ground_offset', path + '/base_z',
                 'Declared initial geometry floats above or penetrates ground; model actual support/attachment. '
@@ -196,9 +199,9 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
                 if obj is None:
                     diagnostics.skip('required_native_asset', '/scene_brief/object_roles',
                                      'object contract or support component is invalid')
-                elif obj['kind'] not in ASSETS:
+                elif obj['kind'] not in ASSETS and obj['kind'] != 'native':
                     diagnostics.add('required_native_asset', f'/objects/{indexes[obj["id"]]}/kind',
-                        'Requires a registered native asset; primitive geometry and metadata '
+                        'Requires a registered native asset or an authorized uploaded native handle; primitive geometry and metadata '
                         'cannot substitute for asset identity', basis='saved_scene_plan',
                         object_ids=[obj['id']])
         for index, relation in enumerate(brief['relations']):

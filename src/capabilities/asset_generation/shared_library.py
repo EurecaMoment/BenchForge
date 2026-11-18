@@ -9,34 +9,11 @@ import struct
 from urllib.parse import unquote, urlsplit
 import uuid
 
-from sqlalchemy import select
 from database.engine import engine_for
-from database.schema import runs, work_items, workspaces, workspace_sessions
 from database.access import validate_scope
-from service_access.access_scope import TrustedAccess
-from storage.access_identity import resolve_access_scope
+from service_access.task_access import task_access as task_access
 from storage.shared_assets import (publish_version, grant_version, list_versions,
                                    resolve_asset_version, resolve_storage_version)
-
-
-def task_access(engine, task_id):
-    """Recover the registered owner from persisted service rows, not thread state."""
-    with engine.connect() as connection:
-        row = connection.execute(select(runs).join(work_items, work_items.c.run_id == runs.c.id)
-                                 .where(work_items.c.id == task_id)).mappings().first()
-        if not row:
-            raise PermissionError("Generation task is unavailable")
-        context = row["plan"].get("context") or {}
-        wid, sid = row["workspace_id"] or context.get("workspace_id"), row["session_id"] or context.get("session_id")
-        if not wid and not sid:
-            return None  # Explicit operator jobs have no model-facing identity.
-        identity = connection.execute(select(workspaces, workspace_sessions.c.session_id).join(
-            workspace_sessions, workspace_sessions.c.workspace_id == workspaces.c.workspace_id).where(
-                workspaces.c.workspace_id == wid, workspace_sessions.c.session_id == sid)).mappings().first()
-    if not identity:
-        raise PermissionError("Generation task has no registered conversation owner")
-    scope = resolve_access_scope(engine, host_id=identity["host_id"], session_id=sid, owner_id=identity["owner_id"])
-    return TrustedAccess(scope, identity["root_path"])
 
 
 def _file(root, relative):

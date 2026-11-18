@@ -63,7 +63,7 @@ class GenerationTools:
 
     def bind_task(self, task_id):
         from database.engine import engine_for
-        from capabilities.asset_generation.shared_library import task_access
+        from service_access.task_access import task_access
         self.engine = self.engine or engine_for()
         self.access = task_access(self.engine, task_id)
         self.run_id = task_id.split('.')[0]
@@ -111,20 +111,31 @@ class GenerationTools:
         return path
 
     def source_path(self, value):
-        """Only operator-configured import roots can supply production inputs."""
+        """Resolve session-relative inputs or explicitly owned service artifacts."""
         if self.access is not None:
             from service_access.access_scope import access_context, workspace_path
-            with access_context(self.access):
-                try:
+            source = Path(value)
+            workspace = Path(self.access.root_path).resolve()
+            # Relative paths have exactly one meaning: the conversation root.
+            # A missing/linked workspace input must not retry against service cwd.
+            if (not source.is_absolute() or source.is_relative_to(workspace)
+                    or source.resolve().is_relative_to(workspace)):
+                with access_context(self.access):
                     path = workspace_path(value)
-                    if path.is_file():
-                        from capabilities.asset_generation.shared_library import snapshot_input
-                        return snapshot_input(self.root, self.access, path)
-                except (PermissionError, FileNotFoundError):
-                    pass
+                if not path.is_file():
+                    raise ValueError('Source must be a regular conversation workspace file')
+                from capabilities.asset_generation.shared_library import snapshot_input
+                return snapshot_input(self.root, self.access, path)
             # The service may consume an owned production image/mesh, never an
             # arbitrary global artifact path or private evaluation authority.
-            path = Path(value).expanduser().resolve(strict=True)
+            if not source.is_relative_to(self.root) or '..' in source.parts:
+                raise PermissionError('Source is outside this conversation and its production artifacts')
+            for candidate in (source, *source.parents):
+                if candidate == self.root:
+                    break
+                if candidate.is_symlink():
+                    raise PermissionError('Production source cannot follow symbolic links')
+            path = source.resolve()
             if path.is_file() and path.is_relative_to(self.root):
                 relative = path.relative_to(self.root)
                 if (len(relative.parts) >= 4 and relative.parts[0] == '.generation-inputs'
@@ -138,7 +149,7 @@ class GenerationTools:
                         and not any(part in {'authority', 'private', 'answers', 'gold'} for part in relative.parts)
                         and path.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp', '.glb', '.gltf', '.obj', '.ply', '.stl', '.npz', '.npy'}):
                     from database.engine import engine_for
-                    from capabilities.asset_generation.shared_library import task_access
+                    from service_access.task_access import task_access
                     owner = task_access(self.engine or engine_for(), relative.parts[0])
                     if owner is not None and owner.scope == self.access.scope:
                         return path
@@ -271,6 +282,8 @@ class GenerationTools:
 
     def import_asset(self, source, spec, work, stop):
         """Register an existing GLB/glTF/OBJ/PLY/STL mesh without model inference."""
+        from capabilities.asset_generation.mesh_input import validate_mesh_input
+        validate_mesh_input(source)
         work = Path(work).resolve()
         work.mkdir(parents=True, exist_ok=True)
         if stop.is_set():

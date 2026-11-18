@@ -235,7 +235,7 @@ def main():
                     self.reply(result)
                 elif self.path=='/catalog':
                     from capabilities.scene_authoring.catalog.operators import catalog_response
-                    self.reply(catalog_response(store,value))
+                    self.reply(catalog_response(store,value,settings=capture_settings))
                 elif self.path=='/layout':
                     self.reply(start_design_request(store,value))
                 elif self.path in {'/diffusion','/sam3','/trellis','/depth','/mesh-import'}:
@@ -248,7 +248,9 @@ def main():
                     self.reply(start_capture_request(store,value,settings=capture_settings))
                 elif self.path=='/preview':
                     from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
+                    from capabilities.isaac_sim.scene_requirements import validate_native_references
                     program=read_program_submission(store.root,value['scene_program_path'],policy={})['program']
+                    validate_native_references(program,capture_settings)
                     def mesh(asset_id):
                         return json.loads(GenerationTools(store.root).asset_path(asset_id,'mesh.json').read_text())
                     self.reply(preview_scene_geometry(program,mesh_loader=mesh))

@@ -111,10 +111,18 @@ Stage reviews and production decisions belong to the owning services. See
 
 Production uses a replayable `benchforgeProduction` session projection. The Host
 stores pending review notices through `dsh-storage-domain`; pre-step and turn-stop
-hooks request concise public progress and delivery. A review deadline resumes the
-same saved plan once, including after reload. Paused or canceled work stays stopped.
+hooks request concise public progress and delivery. A committed released review
+resumes the same saved plan once, including after reload. Paused or canceled work stays stopped.
 The browser reads this projection and sends review actions through the existing
 Remote API. It owns no continuation timer or acceptance policy.
+
+Progress and continuation notices carry a typed review snapshot read from PostgreSQL,
+including its revision. Replaying that native session message refreshes the projection;
+an older review or revision cannot override the current gate. Release updates the
+waiting state without completing a stage or advancing its number. Successful tool
+retries clear only their own earlier invocation error; unrelated or older concurrent
+results cannot erase it. Scene preflight diagnostics and their exact program snapshot
+are S2 artifacts, not S5 delivery reports or proof of visual acceptance.
 
 The explicit production request submitted by the workbench starts this tracking
 before a plan exists. A reasoning-only or empty final response cannot substitute

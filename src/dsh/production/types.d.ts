@@ -19,13 +19,18 @@ export interface ProductionView {
   state: string;
   stage: string;
   error: string;
-  review: {review_id: number; stage: string; artifact: string; deadline: number; state: string} | null;
+  review: {review_id: number; stage: string; artifact: string; deadline: number; state: string; revision?: number} | null;
   completed: number;
   total: number;
   delivered: boolean;
 }
 
-type ProductionNotice<K extends string> = {kind: K; form: 'notice'; summary: string; noticeKey: string};
+type ProductionNotice<K extends string> = {
+  kind: K; form: 'notice'; summary: string; noticeKey: string;
+  /** Committed domain receipt, never a local timeout prediction. */
+  review?: NonNullable<ProductionView['review']>;
+  previousReviewId?: number;
+};
 type CaptureNotice = ProductionNotice<'benchforge/capture-watch'> & {
   capture: {run_id: string; state: string; failed: boolean; blocked?: boolean};
 };

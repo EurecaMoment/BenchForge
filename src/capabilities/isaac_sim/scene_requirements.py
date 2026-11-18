@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 
 from capabilities.scene_authoring.catalog.native import ASSETS
+from capabilities.scene_authoring.catalog.native_reference import native_references, validate_native_reference
 
 
 UNSUPPORTED_MATERIAL_FIELDS = (
@@ -19,8 +20,36 @@ class UnsupportedScene(ValueError):
         super().__init__(message)
 
 
-def validate_scene_requirements(program):
-    _require_supported(scene_requirement_issues(program))
+def validate_scene_requirements(program, settings=None):
+    _require_supported(scene_requirement_issues(program, settings=settings))
+
+
+def native_reference_issues(program, settings=None):
+    """Check uploaded handles against the current conversation before admission."""
+    from service_access.access_scope import current_access
+    from service_access.configuration import isaac_config, isaac_endpoint
+    from service_access.runtime_config import environment_value, read_json
+    from capabilities.isaac_sim.resource_access import NativeResources
+
+    issues, resources = [], None
+    for index, obj in native_references(program):
+        path = f'/objects/{index}/native_asset'
+        try:
+            reference = validate_native_reference(obj.get('native_asset'))
+            if current_access() is not None:
+                if resources is None:
+                    if settings is None:
+                        config_path = environment_value('BENCHFORGE_MODELS_CONFIG')
+                        settings = isaac_config(read_json(config_path)) if config_path else {}
+                    resources = NativeResources(isaac_endpoint(settings.get('grpc', {})))
+                resources.require('asset', reference['asset_id'])
+        except (ValueError, PermissionError) as error:
+            issues.append(_issue(path, str(error), obj.get('id')))
+    return issues
+
+
+def validate_native_references(program, settings=None):
+    _require_supported(native_reference_issues(program, settings))
 
 
 def _records(value):
@@ -33,12 +62,12 @@ def _issue(path, message, object_id=None):
             **({'object_ids': [object_id]} if isinstance(object_id, str) else {})}
 
 
-def scene_requirement_issues(program):
+def scene_requirement_issues(program, *, settings=None):
     """Actions have no implicit SceneProgram-to-native command mapping."""
     if not isinstance(program, dict):
         return []
     field = 'interactions' if 'interactions' in program else 'affordances'
-    return [_issue(f'/{field}/{index}',
+    return native_reference_issues(program, settings) + [_issue(f'/{field}/{index}',
                    'This SceneProgram action requires native session commands and world.collect receipts. '
                    'Use benchforge_isaac_sim with the live catalog before submitting a capture; '
                    'robot/contact/trajectory execution cannot be silently substituted.',
@@ -54,7 +83,7 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
     explicit unsupported requirements even when unrelated contract fields fail.
     Asset contents and current native capabilities still need capture validation.
     """
-    issues = scene_requirement_issues(program)
+    issues = scene_requirement_issues(program, settings=settings)
     if not isinstance(program, dict):
         return issues
     named = {row['id']: (index, row) for index, row in enumerate(_records(program.get('materials')))
@@ -100,6 +129,8 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
         if obj.get('cast_shadows') is False:
             issues.append(_issue(path + '/cast_shadows',
                                  'A100 scene capture cannot disable individual shadow casting', identity))
+        if kind == 'native':
+            continue  # Owned upload keeps its authored native materials/topology.
         if kind in ASSETS:
             if settings is not None and not settings.get('asset_sources', {}).get(kind):
                 issues.append(_issue(path + '/kind', f'Native asset {kind} needs an explicit '

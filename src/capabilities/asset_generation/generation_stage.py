@@ -20,6 +20,9 @@ def validate_generation_request(tools, name, parameters):
     if not isinstance(parameters, dict):
         raise ValueError('generation parameters must be an object')
     value = dict(parameters)
+    if name == 'mesh_import' and value.get('source_mesh'):
+        from capabilities.asset_generation.mesh_input import validate_mesh_input
+        validate_mesh_input(value['source_mesh'])
     defaults = generation_defaults(name) if name != 'mesh_import' else {}
     for key in ('source_image', 'source_mesh', 'source_gaussian'):
         if value.get(key):

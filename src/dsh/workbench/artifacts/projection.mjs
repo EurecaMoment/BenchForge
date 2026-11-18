@@ -17,6 +17,7 @@ const State = z.object({cwd: z.string(), calls: z.record(z.string(), Call), view
 const OUTPUT_FILES = new Map([
   ['plan', ['S1', '评测计划']], ['brief', ['S1', '评测需求']], ['plan_path', ['S1', '评测计划']],
   ['scene_program', ['S2', '场景程序']], ['scene_program_path', ['S2', '场景程序']],
+  ['program_snapshot_path', ['S2', '场景程序快照']],
   ['image_path', ['S2', '场景图']], ['video_path', ['S2', '场景视频']], ['usd_path', ['S2', 'USD 场景']],
   ['annotations', ['S3', '标注数据']], ['annotation_path', ['S3', '标注数据']],
   ['annotations_path', ['S3', '标注数据']], ['questions', ['S4', '题目数据']],
@@ -30,7 +31,8 @@ const OUTPUT_FILES = new Map([
   ['receipt_path', [null, '执行回执']], ['manifest_path', [null, '产物清单']], ['authority_path', [null, '真值数据']],
 ]);
 const STEP_STAGES = {scene: 'S2', capture: 'S2', accepted_scenes:'S2', collection: 'S3', annotations: 'S3', questions: 'S4', package: 'S5'};
-const RECEIPT_STAGES = {'benchforge.scene-stage/v1': 'S2', 'benchforge.collection-stage/v1': 'S3', 'benchforge.annotation-stage/v1': 'S3'};
+const RECEIPT_STAGES = {'benchforge.scene-stage/v1': 'S2', 'benchforge.scene-diagnostics/v1': 'S2',
+  'benchforge.collection-stage/v1': 'S3', 'benchforge.annotation-stage/v1': 'S3'};
 const OUTPUT_CONTAINERS = new Set(['result', 'artifact', 'outputs', 'watch']);
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => typeof value === 'string' && value.trim() ? value : null;
@@ -77,8 +79,9 @@ function fileReferences(receipt) {
       const field = OUTPUT_FILES.get(key);
       if (field) {
         const [defaultStage, defaultTitle] = field;
-        const title = step === 'questions' && ['report', 'report_path', 'quality_report'].includes(key)
-          ? '题目质量报告' : defaultTitle;
+        const title = value.schema === 'benchforge.scene-diagnostics/v1' && key === 'report_path'
+          ? '场景预检报告' : step === 'questions' && ['report', 'report_path', 'quality_report'].includes(key)
+            ? '题目质量报告' : defaultTitle;
         for (const file of Array.isArray(child) ? child : [child]) {
           if (text(file)) files.push({path: file, title, stage: stage || defaultStage});
         }
@@ -131,7 +134,7 @@ function publish(state, {files = [], workspace, captureId}, seq) {
 
 /** A framework-owned, replayable fold. Pending calls never enter the wire view. */
 export const artifactProjection = {
-  key: ARTIFACT_PROJECTION, stateVersion: 6, stateSchema: State,
+  key: ARTIFACT_PROJECTION, stateVersion: 7, stateSchema: State,
   init: (header) => ({cwd: header.cwd || '', calls: {}, view: {
     revision: 0, workspaces: [], primaryWorkspace: null, files: [], captureIds: [],
   }}),

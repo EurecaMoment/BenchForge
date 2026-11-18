@@ -55,21 +55,24 @@ def run_task_code(artifact_root, workspace_id, code, timeout_seconds=60):
     if not shutil.which("bwrap"):
         raise RuntimeError("Task-code sandbox requires bubblewrap (bwrap) on the backend service PATH")
     workspace = task_directory(workspace_id)
+    conversation_root = Path(current_access().root_path).resolve()
     call_id = "code_" + uuid.uuid4().hex[:12]
     script = workspace / (call_id + ".py")
     # Keep code and process output private until execution ends. Task-controlled
     # names cannot replace interpreter input or cause us to read host secrets.
-    with (open_directory(current_access().root_path, workspace) as workspace_fd,
+    with (open_directory(conversation_root) as conversation_fd,
+          open_directory(conversation_fd, workspace.relative_to(conversation_root)) as workspace_fd,
           tempfile.TemporaryFile() as source, tempfile.TemporaryFile() as out,
           tempfile.TemporaryFile() as err):
         source.write(code.encode('utf8'))
         _publish(workspace_fd, script.name, source)
         source.seek(0)
-        command = python_command(workspace, script, workspace_fd=workspace_fd, script_fd=source.fileno())
+        command = python_command(workspace, script, workspace_fd=workspace_fd, script_fd=source.fileno(),
+                                 conversation_root=conversation_root, conversation_fd=conversation_fd)
         started, timed_out = time.time(), False
         process = subprocess.Popen(command, stdout=out, stderr=err,
             stdin=subprocess.DEVNULL, env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
-            start_new_session=True, pass_fds=(workspace_fd, source.fileno()))
+            start_new_session=True, pass_fds=(workspace_fd, source.fileno(), conversation_fd))
         try:
             process.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
@@ -81,11 +84,13 @@ def run_task_code(artifact_root, workspace_id, code, timeout_seconds=60):
         out.seek(0)
         err.seek(0)
         result = {"workspace_id": workspace_id, "workspace_path": str(workspace), "call_id": call_id,
+              "conversation_path": str(conversation_root),
               "returncode": process.returncode, "timed_out": timed_out,
               "stdout": out.read(12000).decode("utf8", errors="replace"),
               "stderr": err.read(6000).decode("utf8", errors="replace"),
               "artifacts": _artifacts(workspace_fd, workspace, started, call_id),
-              "permissions": {"task_workspace": "read_write", "service_source": "not_mounted",
+              "permissions": {"task_workspace": "read_write", "conversation_inputs": "read_only",
+                              "service_source": "not_mounted",
                               "shared_assets": "authorized task copies only", "host_network": "unavailable; use production tools",
                               "gpu": "use production tools"},
               "artifact_scope": "task-authored intermediate data; never simulator or official GT"}

@@ -16,7 +16,7 @@ SECTIONS = {
     'overview': 'Workflow, permissions and available catalog sections',
     'contracts': 'Executable scene capabilities and feedback contracts',
     'scene_schema': 'Complete SceneProgram writing contract, in ordered text fragments',
-    'native_assets': 'Installed USD kinds, dimensions and native appearance controls',
+    'native_assets': 'Native USD kinds, declared dimensions and configured binding status; not live acceptance',
     'generated_assets': 'Reusable mesh metadata; item_id loads only that mesh geometry detail',
     'generation_tools': 'Independent image generation, segmentation, reconstruction, depth and mesh import',
     'materials': 'Registered texture materials with source/repeat preview paths for read_image',
@@ -63,14 +63,14 @@ def _overview():
     }
 
 
-def _load_rows(store, section, item_id):
+def _load_rows(store, section, item_id, settings=None):
     if section=='generation_tools':
         tools = {
             'diffusion':{'tool':'benchforge_diffusion','inputs':'prompt; optional source_image for editing','outputs':'image source_path'},
             'sam3':{'tool':'benchforge_scene_sam3','inputs':'source_image and prompts or pixel box instances','outputs':'all masks, boxes and scores'},
             'trellis':{'tool':'benchforge_trellis','inputs':'source_image and objects with selected source_mask','outputs':'Y-up PBR meshes with unmeasured scale'},
             'depth':{'tool':'benchforge_depth','inputs':'source_image','outputs':'predicted depth arrays, camera parameters and visualization'},
-            'mesh_import':{'tool':'benchforge_mesh_import','inputs':'source_mesh, label and source frame; optional source_gaussian','outputs':'registered asset_id and geometry'},
+            'mesh_import':{'tool':'benchforge_mesh_import','inputs':'static GLB/glTF/OBJ/PLY/STL source_mesh, label and source frame; optional source_gaussian; USD/robots use native upload/import','outputs':'registered asset_id and geometry'},
         }
         return _rows(tools)
     if section == 'contracts':
@@ -83,13 +83,22 @@ def _load_rows(store, section, item_id):
     if section in {'native_assets', 'materials', 'environments'}:
         values = {'native_assets': ASSETS, 'materials': NATIVE_MATERIALS, 'environments': ENVIRONMENTS}[section]
         records = {key: {k: v for k, v in value.items() if k not in {'path', 'textures', 'preview_file'}} for key, value in values.items()}
+        if section == 'native_assets':
+            sources = (settings or {}).get('asset_sources', {})
+            for key, record in records.items():
+                binding = sources.get(key)
+                bound = isinstance(binding, dict) and all(binding.get(field) for field in ('asset_id', 'relative_path'))
+                record['availability'] = 'configured' if bound else 'unconfigured' if settings is not None else 'unknown'
+                record['availability_basis'] = 'capture provider binding; existence, rendering and articulation require native evidence'
+                record['next_action'] = ('Preflight the complete scene, then inspect native capture evidence.' if bound else
+                    'Use an owned uploaded asset with kind=native and native_asset; do not edit source catalogs or deployment directories. '
+                    'If no suitable source is available, report the missing asset rather than substituting a box or static mesh.')
         if section == 'materials':
             for key, value in values.items():
                 if value.get('preview_file'):
                     records[key]['preview'] = {
                         'source_path': str((Path(__file__).resolve().parents[1] / 'resources' / value['preview_file']).resolve()),
-                        'task_code_path': '/harness/scene_production/scene_program/' + value['preview_file'],
-                        'use': 'Open source_path with standard read_image, or task_code_path inside task_code.',
+                        'use': 'Service resource path only; task_code does not mount source code. Use an authorized workspace copy to inspect it.',
                         'content': 'Source base color and 2x2 repeats; not rendered PBR or measured reflectance.'}
         return _rows(records)
     if section == 'generated_assets':
@@ -128,7 +137,7 @@ def _copy(store, workspace_id, section, rows, filters):
             'items': len(rows), 'scope': 'lossless copy of all matches before pagination; original registries unchanged'}
 
 
-def catalog_response(store, request):
+def catalog_response(store, request, *, settings=None):
     if not isinstance(request, dict) or set(request) - {'section', 'query', 'item_id', 'offset', 'limit', 'workspace_id'}:
         raise ValueError('catalog parameters: section, query, item_id, offset, limit, workspace_id')
     section = request.get('section', 'overview')
@@ -145,7 +154,7 @@ def catalog_response(store, request):
         if request.get('workspace_id') is not None:
             result['copy'] = _copy(store, request['workspace_id'], section, [result.copy()], {})
         return result
-    rows = _load_rows(store, section, item_id)
+    rows = _load_rows(store, section, item_id, settings)
     if item_id is not None: rows = [r for r in rows if r['id'] == item_id]
     if query: rows = [r for r in rows if query.casefold() in _encoded(r).decode('utf8').casefold()]
     result = {'section': section, 'query': query, 'item_id': item_id, 'total_matches': len(rows),

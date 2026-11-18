@@ -1,27 +1,27 @@
 import {z} from 'zod';
 import {canonicalToolName} from '../tools/invocation/identifiers.mjs';
 import {isProductionRequest} from './request.mjs';
+import {ReviewSnapshot, currentReviewSnapshot, reviewChanges, reviewSnapshot} from './review_snapshot.mjs';
 
 export const PRODUCTION_PROJECTION = 'benchforgeProduction';
-const Review = z.object({review_id:z.number(), stage:z.string(), artifact:z.string(), deadline:z.number(), state:z.string()});
 export const ProductionView = z.object({
   revision:z.number(), active:z.boolean(), running:z.boolean(), turn:z.number(), workflowTurn:z.number(),
   startedAt:z.number(), lastTextAt:z.number(), lastTextSeq:z.number(), lastEventAt:z.number(),
   lastTool:z.string(), tools:z.number(), shells:z.number(), models:z.array(z.string()),
   workspace:z.string(), plan:z.string(), run:z.string(), state:z.string(), stage:z.string(),
-  error:z.string(), review:Review.nullable(), completed:z.number(), total:z.number(), delivered:z.boolean(),
+  error:z.string(), review:ReviewSnapshot.nullable(), completed:z.number(), total:z.number(), delivered:z.boolean(),
 });
-const State = z.object({view:ProductionView, notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
+const State = z.object({view:ProductionView, errorTool:z.string(), errorCallSeq:z.number(), notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
   lastResponse:z.object({seq:z.number(),visible:z.boolean()}),
-  calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string()}))});
+  calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string(), seq:z.number()}))});
 const visible = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
 const parse = text => {try {return JSON.parse(text);} catch {return null;}};
 const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benchforge_depth','benchforge_trellis','benchforge_isaac_sim']);
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:6, stateSchema:State,
-  init:header => ({calls:{},notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
+  key:PRODUCTION_PROJECTION, stateVersion:7, stateSchema:State,
+  init:header => ({calls:{},errorTool:'',errorCallSeq:0,notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
   apply(state,event) {
@@ -33,21 +33,23 @@ export const productionProjection = {
     }
     const {view} = state;
     if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false}},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
-    if(event.type === 'turn/end') return patch({...state,interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
+    if(event.type === 'turn/end') return patch({...state,...(event.data.reason?.kind==='error'?{errorTool:''}:{}),interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
       ...(event.data.reason?.kind==='error'?{error:event.data.reason.error?.message || 'Production turn failed'}:{}),
       ...(event.data.reason?.kind === 'aborted' ? {state:'interrupted'} :
         view.active && view.workflowTurn===view.turn && !['completed','waiting_user','paused','needs_input','needs_evidence','needs_plan_revision','blocked','failed'].includes(view.state)
           ? {state:'incomplete'} : {})});
     if(event.type === 'user/message' && isProductionRequest(event.data))
-      return patch(state,event,{active:true,workflowTurn:view.turn,state:view.plan?'running':'planning',stage:view.stage||'S1',error:''});
+      return patch({...state,errorTool:''},event,{active:true,workflowTurn:view.turn,state:view.plan?'running':'planning',stage:view.stage||'S1',error:''});
+    if(event.type === 'user/message' && event.data.source?.kind==='benchforge/production-progress')
+      return patch(state,event,reviewChanges(view,event.data.source));
     if(event.type === 'user/message' && ['benchforge/production-resume','benchforge/production-check-failed','benchforge/production-continue'].includes(event.data.source?.kind)) {
       const key=event.data.source.noticeKey;
       return typeof key==='string'&&!state.notices.includes(key)
-        ? patch({...state,notices:[...state.notices.slice(-63),key]},event,{workflowTurn:view.turn}) : state;
+        ? patch({...state,notices:[...state.notices.slice(-63),key]},event,{workflowTurn:view.turn,...reviewChanges(view,event.data.source)}) : state;
     }
     if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/capture-watch' && view.active) {
       const capture = event.data.source.capture;
-      if(capture) return patch(state,event,{workflowTurn:view.turn,state:capture.blocked?'blocked':capture.failed?'needs_repair':
+      if(capture) return patch({...state,errorTool:''},event,{workflowTurn:view.turn,state:capture.blocked?'blocked':capture.failed?'needs_repair':
         capture.state==='SUCCEEDED'?'scene_ready':'capture_error',error:capture.blocked?(event.data.source.summary || '执行受阻，任务未完成。'):
           capture.failed?'采集或场景验收失败；读取实际报告并修复。':capture.state==='observer_failed'?'后台跟踪暂时失败，等待恢复。':''});
     }
@@ -59,7 +61,7 @@ export const productionProjection = {
     if(event.type === 'tool/call') {
       const {callId} = event.data, name = canonicalToolName(event.data.name), args = parse(event.data.arguments) || {};
       if(!name.startsWith('benchforge_')&&!view.active)return state;
-      const next = {...state,calls:{...state.calls,[callId]:{name,workspace:args.workspace || view.workspace,plan:args.plan || ''}}};
+      const next = {...state,calls:{...state.calls,[callId]:{name,workspace:args.workspace || view.workspace,plan:args.plan || '',seq:event.seq}}};
       const workflow=['benchforge_pipeline_plan','benchforge_pipeline_run'].includes(name);
       return patch(next,event,{...(workflow?{active:true,workflowTurn:view.turn,...(!view.active?{state:'planning',stage:'S1'}:{})}:{}),
         lastTool:name,tools:view.tools+1,shells:view.shells+(name==='bash'?1:0),
@@ -76,22 +78,32 @@ export const productionProjection = {
     const next = {...state,calls};
     if(!call.name.startsWith('benchforge_')) return next;
     const text = visible(message), receipt = parse(text);
-    if(message?.isError || event.data.error) return patch(next,event,{error:text.slice(0,700)});
+    if(message?.isError || event.data.error) return patch({...next,errorTool:call.name,errorCallSeq:call.seq},event,{error:text.slice(0,700)});
     if(!receipt || typeof receipt !== 'object') return next;
     const activated = receipt.production_contract === 'benchforge.production-stages/v1';
     const review = receipt.stage_review || (call.name==='benchforge_stage_review'?receipt:null);
+    const snapshot=reviewSnapshot(review,view.review);
+    // A slower status/run response can predate a newly committed review notice.
+    // Do not let that receipt restore its stale state, error or stage counters.
+    if(snapshot && !currentReviewSnapshot(view.review,snapshot,{allowNewReview:true})) return next;
     const current = Object.values(receipt.steps || {}).find(row=>row.state!=='completed');
     const changes = {workspace:call.workspace,active:activated || view.active};
+    if (receipt.error) {next.errorTool=call.name;next.errorCallSeq=call.seq;changes.error=String(receipt.error).slice(0,700);}
+    else if (state.errorTool===call.name && call.seq>state.errorCallSeq &&
+        !['failed','error','rejected'].includes(receipt.state || receipt.status)) {
+      next.errorTool='';changes.error='';
+    }
     const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review';
     if(!workflow) {
       if(view.active && ['benchforge_capture','benchforge_refine','benchforge_run','benchforge_extend','benchforge_retry'].includes(call.name) && receipt.run_id)
-        Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,error:'',review:null});
-      if(view.active && call.name==='benchforge_scene_blocker' && receipt.state==='blocked')
+        Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,review:null});
+      if(view.active && call.name==='benchforge_scene_blocker' && receipt.state==='blocked') {
+        next.errorTool=call.name;next.errorCallSeq=call.seq;
         Object.assign(changes,{workflowTurn:view.turn,state:'blocked',error:receipt.reason});
+      }
       return patch(next,event,changes);
     }
     changes.workflowTurn=view.turn;
-    changes.error=receipt.error || '';
     if(!view.plan&&call.plan)changes.plan=call.plan;
     if(receipt.plan && typeof receipt.plan==='string') changes.plan = receipt.plan;
     if(receipt.run && typeof receipt.run==='string') changes.run = receipt.run;
@@ -102,8 +114,8 @@ export const productionProjection = {
     if(receipt.steps) changes.completed=Object.values(receipt.steps).filter(row=>row.state==='completed').length;
     if(receipt.total_steps) changes.total=receipt.total_steps;
     if(review?.review_id) {
-      changes.review={review_id:review.review_id,stage:review.stage,artifact:review.artifact,deadline:review.deadline,state:review.state};
-      changes.stage=review.stage;
+      if(snapshot){changes.review=snapshot;changes.stage=snapshot.stage;
+        if(call.name==='benchforge_stage_review' && ['elapsed','continued'].includes(snapshot.state))changes.state='running';}
     }
     if(activated && receipt.state==='planned') Object.assign(changes,{run:'',completed:0,total:receipt.total_steps || 4,delivered:false});
     return patch(next,event,changes);

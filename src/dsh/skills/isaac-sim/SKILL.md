@@ -18,6 +18,8 @@ description: 通过 BenchForge 已配置的 Isaac Sim 服务查询能力、导�
 
 `workspace` 始终使用当前会话绑定的工作区。原样保留返回的 `source_path`、`asset_id`、`relative_path`、`job_id` 和 `session_id`，不要凭记忆重写路径或标识。
 
+SceneProgram 可以直接使用本会话上传的原生资产：对象设为 `kind="native"`，`native_asset` 填入上传返回的 `asset_id`、`relative_path`，以及来源资产的 `size`、`source_up_axis`，按需声明 `fix_base`。不要修改源码中的原生目录、部署配置或服务器全局资产目录。目录中的 `configured` 仅说明有绑定，不代表资源存在、渲染成功或机器人能运动；`unconfigured` 不能当作可直接使用。普通 `mesh_import` 接受 GLB/glTF/OBJ/PLY/STL 静态网格，不能通过转换 USD 来保证关节语义。保留机器人原生表示后，仍须用仿真器实际回执验证关节、控制和采集能力。
+
 ## 观察到完成，验证产物
 
 `submit` / `invoke` 返回受理作业。保存返回的 `job.job_id` 和 `receipt_path`，对同一作业调用 `status` 或最长 60 秒的 `wait`。`QUEUED`、`RUNNING`、`accepted`、观察超时都不等于完成；等待超时不重提作业、不自动取消。

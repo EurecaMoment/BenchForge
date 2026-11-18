@@ -11,6 +11,7 @@ from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
 from capabilities.isaac_sim.evidence import measured_entities, physics_summary, resolve_artifact, save_frame
 from capabilities.isaac_sim.native_geometry import exported_entities
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
+from capabilities.scene_authoring.catalog.native_reference import native_references
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
 from capabilities.isaac_sim.grpc.transport import A100Client, document
@@ -61,7 +62,7 @@ def _native_imports(requests, identity, compiled):
             'fix_base': binding.get('fix_base', not obj['dynamic']),
             'mass_kg': obj['mass_kg'], 'physics': obj.get('physics', {}),
             'source_up_axis': item['catalog'].get('source_up_axis', 'Z')})
-        # Only an explicitly configured source can represent a named native asset.
+        # Admission checks either a configured source or an owned upload handle.
         scale = [obj['size'][i] / item['catalog']['size'][i] for i in range(3)]
         changes = [{'op': 'transform', 'path': item['path'], 'translation': item['center'],
                     'rotation_deg': [0, 0, obj.get('yaw_deg', 0)], 'scale': scale},
@@ -69,6 +70,17 @@ def _native_imports(requests, identity, compiled):
                     'type': 'string', 'value': obj['label']}]
         requests.extension(f'asset-pose-{index}', 'scene.edit', {'session_id': identity, 'changes': changes})
         compiled['entities'][obj['id']]['articulation_roots'] = imported.get('articulation_roots', [])
+
+
+def _compile_for_task(store, task, program, settings):
+    """Restore queued ownership before consuming native handles without HTTP context."""
+    if not native_references(program):
+        return compile_scene(program, store.root / 'generated_assets', settings)
+    from service_access.task_access import task_access
+    from service_access.access_scope import access_context
+    access = task_access(store.repo.engine, task['id'])
+    with access_context(access):
+        return compile_scene(program, store.root / 'generated_assets', settings)
 
 
 def execute_capture(store, task, stop, *, config, client=None):
@@ -89,7 +101,7 @@ def execute_capture(store, task, stop, *, config, client=None):
         program = json.loads((directory / 'program.json').read_text())
         settings = isaac_config(config)
         scope = capture_scope(program, unit['intent'].get('capture_options'))
-        validate_scene_requirements(program)
+        validate_scene_requirements(program, settings=settings)
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
                   'protocol': 'a100sim.v1.Simulator', 'capture_token': token}
         frozen_path = attempt / 'capture.json'
@@ -97,7 +109,7 @@ def execute_capture(store, task, stop, *, config, client=None):
             raise ValueError('Frozen capture inputs/configuration changed; an explicit new attempt is required')
         write_json(frozen_path, frozen)
         record_progress(directory, 'isaac_sim_preparing', protocol='a100sim.v1.Simulator')
-        compiled = compile_scene(program, store.root / 'generated_assets', settings)
+        compiled = _compile_for_task(store, task, program, settings)
         source = attempt / 'scene.usda'
         source.write_text(compiled['usd'], encoding='utf-8')
         own_client = client is None

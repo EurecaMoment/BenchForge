@@ -30,6 +30,20 @@ test('custom collection step IDs retain S3 outputs by receipt schema', () => {
   ]);
 });
 
+test('scene preflight reports and program snapshots belong to S2 without asserting acceptance', () => {
+  let state=artifactProjection.init({cwd:'/workspace'});
+  state=call(state,'benchforge_scene_preflight',{});
+  state=result(state,{schema:'benchforge.scene-diagnostics/v1',status:'blocked',passed:false,
+    report_path:'operations/preflight/scene_preflight.json',program_snapshot_path:'operations/preflight/program.json'});
+  assert.deepEqual(state.view.files.map(({stage,title})=>[stage,title]),[
+    ['S2','场景预检报告'],['S2','场景程序快照'],
+  ]);
+  assert.equal(Object.hasOwn(state.view,'state'),false);
+  state=call(state,'benchforge_pipeline_status',{});
+  state=result(state,{steps:{package:{result:{report_path:'operations/release/report.json'}}}});
+  assert.equal(state.view.files.at(-1).stage,'S5');
+});
+
 test('declared episode media are displayed in collection while delivery reports stay in S5', async t => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-collection-'));
   t.after(() => fs.rm(folder, {recursive: true, force: true}));
