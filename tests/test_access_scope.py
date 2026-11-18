@@ -16,7 +16,7 @@ class AccessScopeTests(unittest.TestCase):
     def setUp(self):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.access = TrustedAccess(AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1), str(self.root))
 
     def test_signed_scope_tampering_and_expiration(self):

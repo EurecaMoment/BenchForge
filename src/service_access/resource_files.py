@@ -20,17 +20,21 @@ def _resource(engine, artifact_root, file, *, must_exist):
         return path.resolve(strict=must_exist), None
     workspace = Path(access.root_path).resolve()
     candidate = path if path.is_absolute() else workspace / path
-    if candidate.is_relative_to(workspace):
+    # Windows short names and long names may identify the same directory.
+    # Keep the original candidate for link checks; resolving it must not hide
+    # a task-controlled symlink from the authorization below.
+    resolved = candidate.resolve()
+    if resolved.is_relative_to(workspace):
         return workspace_path(candidate, must_exist=must_exist), workspace
     configured = artifact_root or environment_value('BENCHFORGE_ARTIFACTS')
     if not configured:
         raise PermissionError('Production evidence requires its configured artifact root')
     root = Path(configured).resolve()
     try:
-        relative = candidate.relative_to(root)
+        relative = resolved.relative_to(root)
     except ValueError as exc:
         raise PermissionError('File is outside this conversation and its production evidence') from exc
-    if not relative.parts or '..' in relative.parts:
+    if not relative.parts or '..' in candidate.parts:
         raise PermissionError('Invalid production evidence path')
     with (engine or engine_for()).connect() as connection:
         validate_scope(connection, access.scope)
@@ -45,9 +49,8 @@ def _resource(engine, artifact_root, file, *, must_exist):
             break
         if parent.is_symlink():
             raise PermissionError('Production evidence cannot follow symbolic links')
-    resolved = candidate.resolve(strict=must_exist)
-    if not resolved.is_relative_to(root):
-        raise PermissionError('Production evidence path escaped its configured root')
+    if candidate.resolve(strict=must_exist) != resolved:
+        raise PermissionError('Production evidence path changed during authorization')
     return resolved, root
 
 

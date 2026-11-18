@@ -90,6 +90,51 @@ class SceneDesignAccessTests(unittest.TestCase):
             self.assertEqual(saved_design(program)[1]['id'], 'room')
             validate_brief_revision(design, path)
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows short-path aliases')
+    def test_short_paths_preserve_workspace_and_evidence_ownership(self):
+        import ctypes
+        from ctypes import wintypes
+        short_path = ctypes.WinDLL('kernel32', use_last_error=True).GetShortPathNameW
+        short_path.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        short_path.restype = wintypes.DWORD
+        directory = self.artifacts / 'sf_owned.scene0/revision_0'
+        directory.mkdir(parents=True)
+        engine = MagicMock()
+        connection = engine.connect.return_value.__enter__.return_value
+        owner = connection.execute.return_value.mappings.return_value.first
+        for path in (self.workspace / 'scene plan.json', directory / 'scene brief.json'):
+            path.write_text('{}', encoding='utf-8')
+            buffer = ctypes.create_unicode_buffer(32768)
+            length = short_path(str(path.resolve()), buffer, len(buffer))
+            self.assertGreater(length, 0)
+            self.assertLess(length, len(buffer))
+            alias = Path(buffer.value)
+            if alias == path.resolve():
+                self.skipTest('Filesystem has 8.3 short names disabled')
+            owner.return_value = {'workspace_id': 'workspace-a', 'session_id': 'session-a'}
+            with self.subTest(path=path), access_context(self.access), patch('service_access.resource_files.validate_scope'):
+                self.assertEqual(resolve_owned_resource(engine, self.artifacts, alias), path.resolve())
+                if path.parent == directory:
+                    owner.return_value = {'workspace_id': 'workspace-a', 'session_id': 'session-b'}
+                    with self.assertRaises(PermissionError):
+                        resolve_owned_resource(engine, self.artifacts, alias)
+
+    @unittest.skipUnless(os.name == 'posix', 'Symbolic link regression')
+    def test_canonical_comparison_does_not_authorize_linked_owned_evidence(self):
+        directory = self.artifacts / 'sf_owned.scene0/revision_0'
+        directory.mkdir(parents=True)
+        path = directory / 'scene_brief.json'
+        path.write_text('{}', encoding='utf-8')
+        link = self.root / 'evidence-link'
+        link.symlink_to(directory, target_is_directory=True)
+        engine = MagicMock()
+        connection = engine.connect.return_value.__enter__.return_value
+        connection.execute.return_value.mappings.return_value.first.return_value = {
+            'workspace_id': 'workspace-a', 'session_id': 'session-a'}
+        with access_context(self.access), patch('service_access.resource_files.validate_scope'):
+            with self.assertRaises(PermissionError):
+                resolve_owned_resource(engine, self.artifacts, link / path.name)
+
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative file reads require Linux')
     def test_plan_symlink_cannot_hide_foreign_file(self):
         foreign = self.root / 'workspace-b/plan.json'
