@@ -8,6 +8,7 @@ from capabilities.task_catalog.execution_support import BUILTINS as BUILTINS, su
 PALETTE = [(56, 117, 167), (191, 76, 74), (68, 147, 101), (164, 106, 190), (213, 152, 56), (60, 146, 154)]
 
 
+# 创建用于合成题目观察的浅色RGB画布及绘图接口。
 def canvas(path, width=640, height=360):
     from PIL import Image
     from PIL import ImageDraw
@@ -15,6 +16,7 @@ def canvas(path, width=640, height=360):
     return image, ImageDraw.Draw(image)
 
 
+# 渲染三个显式标定的正交视图，使全部对象在每个视图中完整可见。
 def calibrated_views(scene, directory):
     """Three explicitly calibrated orthographic views, all objects fully visible."""
     images = []
@@ -40,6 +42,7 @@ def calibrated_views(scene, directory):
     return images
 
 
+# 按随机种子构造不穿透且投影可区分的米制球体场景。
 def sphere_world(rng, count):
     # Distinct x/y/z slots ensure identification and no overlapping projections.
     slots = list(range(1, 10))
@@ -50,6 +53,7 @@ def sphere_world(rng, count):
             'grid_spacing_m': 1, 'shape': 'sphere', 'nonpenetrating': True}
 
 
+# 仅从私有源世界独立重算模板答案，不读取公开题目中的答案文字。
 def oracle(template_id, source):
     """Recompute independently from the private source world, not public answer text."""
     task, variant = template_id.split('-T')
@@ -79,6 +83,7 @@ def oracle(template_id, source):
         speed, gravity, height = source.get('v0', 0), source['gravity'], source['height']
         return {'value': (math.sqrt(speed*speed+2*gravity*height)-speed)/gravity, 'unit': 's'}
     if task == 'P001':
+        # 用鞋带公式计算二维多边形面积。
         def area(points):
             return abs(sum(a[0]*b[1]-b[0]*a[1] for a, b in zip(points, points[1:]+points[:1])))/2
         areas = {key: area(value['boundary']) - sum(area(hole) for hole in value.get('holes', [])) for key, value in source['regions'].items()}
@@ -93,6 +98,7 @@ def oracle(template_id, source):
     raise ValueError(f'No built-in oracle for {template_id}; use source evidence')
 
 
+# 按内置模板与随机种子生成私有世界、公开观察及可重算证据。
 def generate(template_id, seed, directory):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)

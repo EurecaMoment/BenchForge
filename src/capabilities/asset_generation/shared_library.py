@@ -16,6 +16,7 @@ from storage.shared_assets import (publish_version, grant_version, list_versions
                                    resolve_asset_version, resolve_storage_version)
 
 
+# 解析资产包内的普通相对文件，拒绝越界、符号链接及缺失依赖。
 def _file(root, relative):
     if not isinstance(relative, str) or not relative or "\\" in relative or ":" in relative:
         raise ValueError("Asset references must be relative files")
@@ -33,6 +34,7 @@ def _file(root, relative):
     return candidate
 
 
+# 读取glTF文档或校验GLB头后提取JSON块。
 def _gltf_document(path):
     if path.suffix.lower() == ".gltf":
         return json.loads(path.read_text(encoding="utf-8"))
@@ -46,9 +48,11 @@ def _gltf_document(path):
         return json.loads(source.read(chunk_length).decode("utf-8"))
 
 
+# 提取glTF、OBJ和MTL中的外部文件引用，供依赖闭包验证。
 def _references(file):
     refs = []
     if file.suffix.lower() in {".glb", ".gltf"}:
+        # 递归遍历glTF对象及数组，收集uri字段的引用值。
         def visit(value):
             if isinstance(value, dict):
                 for key, child in value.items():
@@ -70,6 +74,7 @@ def _references(file):
     return refs
 
 
+# 解析资产相对URI；忽略内嵌数据并拒绝远程地址和目录穿越。
 def _relative_reference(relative, reference):
     if not isinstance(reference, str):
         raise ValueError("Invalid asset URI")
@@ -83,6 +88,7 @@ def _relative_reference(relative, reference):
     return (PurePosixPath(relative).parent / decoded).as_posix()
 
 
+# 在通用网格加载器运行前验证全部外部依赖，限制闭包大小并阻止越界读取。
 def verify_reference_closure(source):
     """Check external dependencies before a general mesh loader can follow them."""
     source = Path(source)
@@ -105,6 +111,7 @@ def verify_reference_closure(source):
     return seen
 
 
+# 分块计算文件的SHA-256摘要，用于验证资产快照内容。
 def _digest(file):
     digest = hashlib.sha256()
     with file.open("rb") as source:
@@ -113,6 +120,7 @@ def _digest(file):
     return digest.hexdigest()
 
 
+# 通过受限文件访问复制输入及依赖到私有暂存区，再按内容摘要冻结快照。
 def snapshot_input(artifact_root, access, source):
     """Copy by workspace dirfd first; parse references only in private staging."""
     from storage.confined_files import copy_input
@@ -152,6 +160,7 @@ def snapshot_input(artifact_root, access, source):
     return destination / source.name
 
 
+# 验证发布包的几何、纹理和文件依赖，并生成可核验的文件摘要清单。
 def verify_bundle(root):
     root = Path(root).resolve(strict=True)
     mesh = json.loads(_file(root, "mesh.json").read_text(encoding="utf-8"))
@@ -172,6 +181,7 @@ def verify_bundle(root):
     return files
 
 
+# 验证服务输出并创建不可变快照，将该版本授权给当前资产所有者。
 def publish_generated(artifact_root, access, source, record, *, engine=None, run_id=None, operation_id=None):
     """Snapshot verified service output, then publish to this owner's private library."""
     engine = engine or engine_for()
@@ -211,6 +221,7 @@ def publish_generated(artifact_root, access, source, record, *, engine=None, run
     return result
 
 
+# 按访问身份解析资产版本中的指定文件，并验证包内路径。
 def asset_file(artifact_root, access, asset_id, filename="asset.json", *, engine=None):
     row = resolve_asset_version(engine or engine_for(), access.scope, asset_id)
     file = next((item for item in row["manifest"] if item["path"] == filename), None)
@@ -226,6 +237,7 @@ def asset_file(artifact_root, access, asset_id, filename="asset.json", *, engine
     return path
 
 
+# 确认共享资产源文件属于当前访问身份已获授权的版本。
 def authorized_source(artifact_root, access, source, *, engine=None):
     library = Path(artifact_root).resolve() / ".shared-assets"
     path = Path(source).resolve(strict=True)
@@ -240,6 +252,7 @@ def authorized_source(artifact_root, access, source, *, engine=None):
     return _file(library / row["storage_ref"], filename)
 
 
+# 查询当前所有者获授权的资产版本并返回可供生产使用的目录记录。
 def catalog(artifact_root, access, asset_ids=None, *, engine=None):
     engine = engine or engine_for()
     records, after, seen = [], None, set()

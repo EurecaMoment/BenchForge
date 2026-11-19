@@ -10,6 +10,7 @@ from capabilities.scene_authoring.program_submission import (
 from capabilities.scene_authoring.validation.preflight import inspect_program
 
 
+# 在通用程序检查上补充当前原生采集设置支持的能力约束。
 def inspect_capture_program(root, program, *, settings=None, **options):
     issues = capture_requirement_issues(program, Path(root) / 'generated_assets', settings)
     report = inspect_program(root, program, **options, additional_issues=issues)
@@ -25,6 +26,7 @@ def inspect_capture_program(root, program, *, settings=None, **options):
                      'basis': 'live_isaac_sim_schema', 'severity': 'error', 'blocking': True,
                      'repair_owner': 'service_configuration_or_adapter', 'retry_unchanged': False}]
         if live:
+            # 保留原有完整静态诊断，服务错配明确归部署/适配器处理，不能指示模型删物理要求。
             from capabilities.scene_authoring.validation.diagnostics import SceneDiagnostics
             diagnostics = SceneDiagnostics()
             diagnostics.issues = [*report['issues'], *live]
@@ -36,11 +38,13 @@ def inspect_capture_program(root, program, *, settings=None, **options):
     return report
 
 
+# 读取并检查外部程序提交，注入采集设置但保留完整诊断报告。
 def inspect_capture_submission(root, source_path, *, execution_mode=None, settings=None):
     return inspect_program_submission(root, source_path, execution_mode=execution_mode,
                                       inspector=partial(inspect_capture_program, settings=settings))
 
 
+# 要求程序提交通过采集预检后返回规范化提交对象。
 def read_capture_submission(root, source_path, *, execution_mode=None, settings=None):
     return read_program_submission(root, source_path, execution_mode=execution_mode,
                                    inspector=partial(inspect_capture_program, settings=settings))

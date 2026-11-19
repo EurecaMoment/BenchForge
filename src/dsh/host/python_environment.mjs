@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 // This directory belongs to the installed Host bundle in source and releases.
 export const pythonHostDirectory = fileURLToPath(new URL('.', import.meta.url));
 
+/** 构造可信 Python 启动环境，启用 UTF-8 和安全导入，并拒绝相对 PYTHONPATH 项。 */
 export function pythonHostEnvironment(environment = {}) {
   const env = {...environment, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1',
     PYTHONNOUSERSITE: '1', PYTHONSAFEPATH: '1'};

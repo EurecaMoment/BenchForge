@@ -6,6 +6,7 @@ from storage.artifacts import write
 from storage.artifacts import jsonl
 
 
+# 将模拟器采集清单转换为统一证据记录，使用显式相机标定解释深度数据。
 def adapt_capture(args,directory,config):
     source=Path(args['input']).resolve()
     if source.is_dir():source=source/'collection_manifest.json'

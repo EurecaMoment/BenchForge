@@ -5,6 +5,7 @@ from database.access import read_transaction
 from database.schema import runs, work_items, events, operations, reviews, active_plans, native_jobs
 
 
+# 按资源类型与分页参数查询当前作用域可见的记录，限制返回字段和条数。
 def query_records(engine, scope, resource, *, limit=30, after=None, enforce_role=True):
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("Query limit must be 1..100")

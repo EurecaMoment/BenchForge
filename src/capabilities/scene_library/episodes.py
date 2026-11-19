@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 
 
+# 从通过验收且版本匹配的原生动作录像提取可用于轨迹证据的执行片段。
 def native_episodes(directory, receipt):
     directory = Path(directory).resolve()
     evidence = json.loads((directory / 'capture/evidence.json').read_text(encoding='utf-8'))

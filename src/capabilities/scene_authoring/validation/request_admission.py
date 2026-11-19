@@ -8,6 +8,7 @@ from capabilities.scene_authoring.validation.policy import (
 )
 
 
+# 在创建、采集和修订等入口按各意图执行生产策略准入检查。
 def check_request(root, route, arguments):
     intents = arguments.get("intents", []) if route == "/start" else [arguments]
     if route == "/start" and not intents:

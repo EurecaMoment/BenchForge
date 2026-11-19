@@ -19,6 +19,7 @@ from pipelines.benchmark.design.plan_versions import activate
 
 
 class PipelineStageTests(unittest.TestCase):
+    # 建立五阶段计划、原生来源、独立数据库及服务回执夹具。
     def setUp(self):
         self.database_url = use_postgres(self)
         self.temp = tempfile.TemporaryDirectory()
@@ -67,19 +68,23 @@ class PipelineStageTests(unittest.TestCase):
         self.policy.start(); self.addCleanup(self.policy.stop)
         dataset_policy = patch('capabilities.dataset_authoring.production.load_policy', return_value={'execution_mode': 'production', 'enabled': True, 'enforce_realism': True})
         dataset_policy.start(); self.addCleanup(dataset_policy.stop)
+        # 为回执客户端注入本测试的固定原生证据来源。
         def initialize_receipts(instance, config_path, call=None):
             self.receipts(instance, config_path, self.native_source)
         receipt = patch('service_access.production_receipts.SceneReceipts.__init__', initialize_receipts)
         receipt.start(); self.addCleanup(receipt.stop)
 
+    # 记录实际使用的服务配置并返回生产模式策略。
     def load_policy(self, _workspace, config):
         self.calls.append(config)
         return {'execution_mode': 'production'}
 
+    # 配置批量场景验收客户端夹具，生成与真实采集文件绑定的回执。
     @staticmethod
     def receipts(instance, config_path, native_source):
         instance.config_path = config_path
         instance.receipts = {}
+        # 按请求场景身份构造已验收且带真实来源文件的服务回执。
         def accept(_route, args, _config):
             scenes = []
             for source in args['scene_sources']:
@@ -91,13 +96,16 @@ class PipelineStageTests(unittest.TestCase):
             return {'scenes': scenes}
         instance.call = accept
 
+    # 带当前会话及新增绑定推进一次流水线运行。
     def advance(self, bindings=None):
         return run({'plan': str(self.plan), 'run': str(self.root / 'run'), '_workspace': str(self.root),
                     '_dsh_context': {'session_id': self.session}, 'bindings': bindings or {}}, self.root)
 
+    # 通过用户继续操作放行当前会话的阶段评审。
     def continue_review(self):
         return review(self.root, self.session, 'continue')
 
+    # 验证完整五阶段运行保留恢复绑定，逐阶段评审并打包真实文件。
     def test_full_five_stage_review_retains_bindings_and_packages_real_files(self):
         result = self.advance({'service_config': 'test-client.json'})
         stages = [result['stage_review']['stage']]
@@ -123,6 +131,7 @@ class PipelineStageTests(unittest.TestCase):
         self.assertEqual(collection['annotations']['items'], 1)
         self.assertTrue(Path(collection['collection_path']).is_file())
 
+    # 验证旧保存计划中的注释验证操作保持原身份及产物路径。
     def test_saved_annotation_operation_keeps_its_identity_and_output_path(self):
         plan = json.loads(self.plan.read_text(encoding='utf-8'))
         step = plan['steps'][1]
@@ -141,6 +150,7 @@ class PipelineStageTests(unittest.TestCase):
             result = self.advance()
         self.assertEqual(result['state'], 'completed')
 
+    # 验证即使所有输入已齐，S1 与 S2 未放行仍阻止后续执行。
     def test_s1_and_s2_reviews_block_downstream_steps_even_with_all_bindings(self):
         bindings = {'service_config': 'test-client.json', 'evidence': str(self.evidence),
                     'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}
@@ -156,6 +166,7 @@ class PipelineStageTests(unittest.TestCase):
         self.assertEqual(third['stage_review']['stage'], 'S3')
         self.assertNotIn('questions', third['steps'])
 
+    # 验证标注来源在 S3 后变化会在问题生成前被拦截。
     def test_changed_annotation_source_is_blocked_before_s4(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
@@ -166,6 +177,7 @@ class PipelineStageTests(unittest.TestCase):
         self.assertIn('annotation source changed', result['stage_review']['check_failure']['error'])
         self.assertNotIn('questions', result['steps'])
 
+    # 验证 S3 拒绝跨分区重命名来源及不满足模板配额的采集。
     def test_s3_rejects_cross_partition_rename_and_missing_template_quantity(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
@@ -178,6 +190,7 @@ class PipelineStageTests(unittest.TestCase):
         self.assertEqual(result['state'], 'needs_evidence')
         self.assertEqual(result['steps']['collection']['result']['shortfall'], {'C43-T01': 1})
 
+    # 验证伪造来源不能仅借用已验收场景编号通过 S3。
     def test_s3_rejects_a_fabricated_source_with_an_accepted_scene_id(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
@@ -190,6 +203,7 @@ class PipelineStageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'covered by the service acceptance'):
             self.advance({'evidence': str(self.evidence)})
 
+    # 验证派生答案必须能由原生字段重放计算得到。
     def test_derived_answer_must_replay_from_native_fields(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
@@ -200,6 +214,7 @@ class PipelineStageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'does not match replay'):
             self.advance({'evidence': str(self.evidence)})
 
+    # 验证 S3 后派生证据的依赖文件也保持版本冻结。
     def test_derived_source_dependencies_remain_frozen_after_s3(self):
         self.advance({'service_config': 'test-client.json'}); self.continue_review()
         self.advance({'scene_sources': [{'task_id': 'sf_test.scene0', 'revision': 0}]}); self.continue_review()
@@ -210,6 +225,7 @@ class PipelineStageTests(unittest.TestCase):
         self.assertIn('annotation source changed', result['stage_review']['check_failure']['error'])
         self.assertNotIn('questions', result['steps'])
 
+    # 验证要求机器人运动的任务缺少真实原生回合时停在采集阶段。
     def test_robot_task_stops_at_s3_without_a_native_robot_episode(self):
         plan = json.loads(self.plan.read_text(encoding='utf-8'))
         plan['assessment']['annotations'] = {'require_robot_locomotion': True}

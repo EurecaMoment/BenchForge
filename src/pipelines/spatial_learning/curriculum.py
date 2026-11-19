@@ -14,10 +14,12 @@ DEFAULTS={'promotion_success':.9,'joint_success':.8,'parse_rate':.99,'retention_
 STAGE_FRACTIONS={'S1':(.85,.15,0),'S2':(.6,.4,0),'S3':(.3,.6,.1),'S4':(.25,.25,.5),'S5':(.25,.15,.6)}
 
 
+# 组合模板、输入模式、干预条件和难度，形成课程反馈分组键。
 def condition_key(row):
     return '|'.join([row['template_id'],row.get('input_mode','structured'),row.get('condition','natural'),str(row.get('difficulty',1))])
 
 
+# 只用开发分区反馈按场景组汇总成功率及不确定度，避免泄漏测试集信号。
 def summarize(rows):
     bins=defaultdict(list)
     for row in rows:
@@ -37,6 +39,7 @@ def summarize(rows):
     return result
 
 
+# 幂等应用反馈窗口，更新掌握度、近期收益及退步信号并记录检查点。
 def update_state(state,observations,checkpoint,window_id):
     if window_id in state.get('windows',[]):return state
     current=summarize(observations);cfg={**DEFAULTS,**state.get('config',{})};previous=state.get('mastery',{});reference=state.get('reference',{})
@@ -55,6 +58,7 @@ def update_state(state,observations,checkpoint,window_id):
             'windows':state.get('windows',[])+[window_id]}
 
 
+# 结合课程状态、预算、条件和可选模板范围生成训练采样配额。
 def allocate(state,budget,condition='C',eligible_ids=None,seed=None,categories=None,stage=None):
     cfg={**DEFAULTS,**state.get('config',{})};mastery=state.get('mastery',{});pool=templates()
     if eligible_ids is not None:pool=[t for t in pool if t['id'] in eligible_ids]
@@ -110,6 +114,7 @@ def allocate(state,budget,condition='C',eligible_ids=None,seed=None,categories=N
         'missing_stage_categories':[k for k,v in category_ids.items() if not v] if stage else []}
 
 
+# 加载课程状态、按需吸收新反馈并保存，再输出本轮预算分配建议。
 def curriculum(args,directory,config=None):
     state_path=Path(args['state']);state=json.loads(state_path.read_text(encoding='utf8')) if state_path.exists() else {'config':args.get('settings',{})}
     if args.get('feedback'):

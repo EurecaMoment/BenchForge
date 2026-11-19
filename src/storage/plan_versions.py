@@ -10,17 +10,20 @@ from database.transactions import insert_statement, lock_entity, transaction
 from storage.access_identity import workspace_namespace
 
 
+# 取得工作区数据库引擎并确保计划版本表结构已初始化。
 def _engine(workspace):
     engine = engine_for(resolve_workspace_url(workspace))
     initialize_schema(engine)
     return engine
 
 
+# 按工作区命名空间和会话定位当前活动计划记录。
 def _query(namespace, session):
     return select(active_plans).where(active_plans.c.workspace_id == namespace,
                                       active_plans.c.session == session)
 
 
+# 读取会话当前活动计划，尚无计划时返回空值。
 def current(workspace, session):
     engine = _engine(workspace)
     namespace = workspace_namespace(engine, workspace, session_id=session)
@@ -29,6 +32,7 @@ def current(workspace, session):
         return dict(row) if row else None
 
 
+# 在实体锁下激活新计划，检查预期旧版本及尚未处理的用户编辑以避免覆盖。
 def activate(workspace, session, plan, *, expected=None, pending=False, changes=()):
     engine = _engine(workspace)
     namespace = workspace_namespace(engine, workspace, session_id=session)

@@ -11,6 +11,7 @@ from tests.database_fixtures import use_postgres
 
 
 class PipelineDocumentsTests(unittest.TestCase):
+    # 创建独立数据库与会话作用域，用于验证数据库文档的权威和并发版本。
     def setUp(self):
         self.engine = engine_for(use_postgres(self))
         directory = tempfile.TemporaryDirectory()
@@ -19,6 +20,7 @@ class PipelineDocumentsTests(unittest.TestCase):
         self.scope = register_session_workspace(self.engine, host_id="host", session_id="session",
             owner_id="owner", root_path=self.root)
 
+    # 验证修改文件副本不能改变权威文档，写入必须匹配已读版本。
     def test_filesystem_projection_cannot_change_authority_and_updates_use_cas(self):
         saved = write_document(self.engine, self.scope, "pipeline-1", "state.json", {"status": "waiting_review"}, expected_revision=0)
         (self.root / "state.json").write_text('{"status":"passed"}')

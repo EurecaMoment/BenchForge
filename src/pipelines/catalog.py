@@ -10,6 +10,7 @@ from pipelines.benchmark.design.production_steps import execution_contract
 ROOT = Path(__file__).parent
 
 
+# 按文件名稳定读取基准和场景生产目录中的自有流水线配方。
 def pipeline_files():
     directories = (ROOT / 'benchmark/recipes', ROOT / 'scene_production/recipes')
     files = sorted((path for directory in directories for path in directory.glob('*.json')),
@@ -17,6 +18,7 @@ def pipeline_files():
     return [json.loads(path.read_text(encoding='utf-8')) for path in files]
 
 
+# 按查询分区返回计划模板、协议、流水线或能力模板目录及执行契约。
 def catalog(args, directory=None, config=None):
     section = args.get('section', 'pipelines')
     if section == 'plan_template':

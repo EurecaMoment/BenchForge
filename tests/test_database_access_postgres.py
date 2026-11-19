@@ -17,6 +17,7 @@ from storage.access_queries import query_records
 
 
 class AccessPostgresTests(unittest.TestCase):
+    # 初始化独立 PostgreSQL schema 与多个会话身份，供真实行级隔离验证。
     def setUp(self):
         self.url = use_postgres(self)
         self.engine = engine_for(self.url)
@@ -30,6 +31,7 @@ class AccessPostgresTests(unittest.TestCase):
             self.scopes.append(register_session_workspace(self.engine, host_id="host", session_id="session-" + name,
                 owner_id="owner", root_path=root))
 
+    # 验证重复登记保持稳定身份，不同会话查询严格隔离。
     def test_stable_registration_and_cross_session_reads(self):
         a, b = self.scopes
         same = register_session_workspace(self.engine, host_id="host", session_id="session-a",
@@ -51,6 +53,7 @@ class AccessPostgresTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             query_records(self.engine, a, "runs")  # owner connections are not reader credentials
 
+    # 验证撤销使旧作用域失效，连接池复用不保留上一事务身份。
     def test_revoke_invalidates_old_scope_and_pool_state_is_transaction_local(self):
         a, b = self.scopes
         with read_transaction(self.engine, a, enforce_role=False) as connection:
@@ -61,6 +64,7 @@ class AccessPostgresTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             query_records(self.engine, a, "runs", enforce_role=False)
 
+    # 验证可信存储无线程身份时仍使用登记命名空间，而不是错误的路径摘要。
     def test_existing_storage_uses_registered_namespace_without_thread_context(self):
         from storage.operation_index import query_operations
         from storage.plan_versions import activate, current
@@ -87,6 +91,7 @@ class AccessPostgresTests(unittest.TestCase):
         jobs.remember("isaac", SimpleNamespace(job_id="job", request_id="request"), a.session_id)
         self.assertEqual(jobs.require("isaac", "job", a.session_id), "request")
 
+    # 验证真实只读角色不能看到其他会话或执行写入。
     def test_rls_reader_cannot_see_other_session_or_write(self):
         with self.engine.connect() as connection:
             can_create = connection.execute(text("SELECT rolsuper OR rolcreaterole FROM pg_roles WHERE rolname=current_user")).scalar_one()

@@ -4,6 +4,7 @@ import {SESSION_FORMAT_VERSION, interruptedTurnClosers} from '@deepseek-ai/dsh-s
 import {assertContiguous, validateStoredEvents} from '@deepseek-ai/dsh-session-persistence';
 
 /** JSONL persistence writes independent Zstandard frames, including a header-only frame. */
+/** 解码拼接的 Zstandard 会话帧并校验归档头，限制解压后总大小以避免无界读取。 */
 export function decodeArchive(bytes) {
   const parts = [];
   let offset = 0, size = 0;
@@ -25,6 +26,7 @@ export function decodeArchive(bytes) {
 }
 
 /** Relocate only declared absolute path roots, including paths inside encoded tool JSON. */
+/** 递归替换示例中的旧路径根，保留名称前缀相同但不属于该根的字符串。 */
 export function relocate(value, roots, destination) {
   if (typeof value === 'string') {
     for (const root of roots) value = value.replaceAll(root, (match, offset, text) => {
@@ -40,6 +42,7 @@ export function relocate(value, roots, destination) {
 }
 
 /** Import history without starting an Agent or carrying the source machine's permissions. */
+/** 校验示例会话身份，重定位工作区路径并补齐中断轮次，使导入事件可以正常恢复。 */
 export async function prepareConversation(file, manifest, workspace, assetRoot, time) {
   const source = decodeArchive(await readFile(file));
   if (source.header.id !== manifest.sessionId) throw new Error('Example conversation identity differs from its manifest');
@@ -47,6 +50,7 @@ export async function prepareConversation(file, manifest, workspace, assetRoot, 
   const roots = [...new Set([source.header.cwd, ...manifest.pathRoots].filter(Boolean))].sort((a, b) => b.length - a.length);
   const events = relocate(source.events, roots, assetRoot.replaceAll('\\', '/'));
   events.push(...interruptedTurnClosers(events));
+  /** 按当前事件数量分配连续序号并追加导入修复事件。 */
   const append = (type, data) => events.push({type, seq: events.length, time, data});
   append('agent-preset/selected', {agentPreset: 'benchforge'});
   append('working-directory/change', {cwd: workspace});

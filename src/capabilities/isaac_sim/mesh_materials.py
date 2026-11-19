@@ -5,6 +5,7 @@ from capabilities.isaac_sim.usd_materials import array, material_usd
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
 
 
+# 为无纹理网格生成USD材质及分配记录，含纹理输入必须走原生资产导入。
 def author_mesh_materials(mesh, name, fallback):
     records = mesh.get("materials") or []
     colors = mesh.get("vertex_colors", mesh.get("colors"))

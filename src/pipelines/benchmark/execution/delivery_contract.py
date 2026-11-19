@@ -6,6 +6,7 @@ from capabilities.task_catalog.allocation import counts_for
 from storage.artifacts import read, rows
 
 
+# 统计实际保存的公开条目并与计划模板配额核对，避免相信生产者自报数量。
 def verify_delivery(plan, outputs, stage):
     """Check saved public items, not a producer's self-reported requested count."""
     expected = counts_for(plan["inputs"]["selections"])

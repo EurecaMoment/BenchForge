@@ -6,13 +6,13 @@ import os from 'node:os';
 import {executePython} from './python_process.mjs';
 import {pythonHostEnvironment} from './python_environment.mjs';
 
-test('trusted Python rejects relative module roots and removes empty search entries', () => {
+test('trusted Python rejects relative module roots and removes empty search entries', /** 验证宿主进程、取消信号和资源清理在该用例中的具体边界，完成准备、调用和结果断言。用例：trusted Python rejects relative module roots and removes empty search entries。 */ () => {
   assert.throws(() => pythonHostEnvironment({PYTHONPATH: 'src'}), /absolute PYTHONPATH/);
   const root = path.resolve('trusted');
   assert.equal(pythonHostEnvironment({PYTHONPATH: path.delimiter + root + path.delimiter}).PYTHONPATH, root);
 });
 
-test('workspace modules and sitecustomize cannot run inside a credential-bearing Host query', async t => {
+test('workspace modules and sitecustomize cannot run inside a credential-bearing Host query', /** 验证宿主进程、取消信号和资源清理在该用例中的具体边界，完成准备、调用和结果断言。用例：workspace modules and sitecustomize cannot run inside a credential-bearing Host query。 */ async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-python-import-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
   const workspace = path.join(root, 'workspace'), trusted = path.join(root, 'trusted');

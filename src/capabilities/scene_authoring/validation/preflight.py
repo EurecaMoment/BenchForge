@@ -16,10 +16,12 @@ from capabilities.scene_authoring.validation.diagnostics import SceneDiagnostics
 from capabilities.scene_authoring.validation.policy import attachment, check_references, detailed_construction, policy_for, structure
 
 
+# 判断三维点是否位于给定中心和尺寸的轴对齐范围内。
 def _inside(point: list[float], center: list[float], size: list[float]) -> bool:
     return all(abs(point[i] - center[i]) <= size[i] / 2 for i in range(3))
 
 
+# 检查相机与房间位置约束，保留显式外部相机声明并报告垂直越界。
 def preflight_scene(program: dict[str, Any], *, vertical_tolerance_m: float = 0.05) -> dict[str, Any]:
     rooms = [room for room in program.get("rooms", []) if isinstance(room, dict)]
     records = []
@@ -66,15 +68,18 @@ def preflight_scene(program: dict[str, Any], *, vertical_tolerance_m: float = 0.
             "limits": ["declared room bounds only", "does not infer walls or occlusion", "external cameras are allowed"]}
 
 
+# 仅返回场景字段中的列表记录，其他类型视为空以继续批量诊断。
 def _records(program, field):
     value = program.get(field, [])
     return value if isinstance(value, list) else []
 
 
+# 判断指定路径或其子字段是否已经存在合同错误。
 def _invalid_at(issues, path):
     return any(row['path'] == path or row['path'].startswith(path + '/') for row in issues)
 
 
+# 筛选可安全诊断的独立几何组件，保持原始提交完全不变。
 def _independent_geometry(program, contract_issues, diagnostics):
     """Select safe components for diagnostics only; the submitted input is intact."""
     selected = {}
@@ -119,6 +124,7 @@ def _independent_geometry(program, contract_issues, diagnostics):
     return list(selected.values()), indexes
 
 
+# 独立检查保存计划、几何例外和场景简报，并记录依赖失败导致的跳过项。
 def _design_diagnostics(root, program, policy, diagnostics):
     path = '/provenance/sources'
     ok, saved = diagnostics.attempt('scene_plan', path, lambda: saved_design(program, policy),
@@ -134,6 +140,7 @@ def _design_diagnostics(root, program, policy, diagnostics):
     return declaration, brief, declared
 
 
+# 检查前景资产、简化声明及静态安装关系，收集对象级准入问题。
 def _object_admission(program, objects, indexes, policy, declaration, brief, declared, diagnostics):
     by_id = {obj['id']: obj for obj in objects}
     simplified = set(declaration['object_ids']) if declaration else set()
@@ -221,6 +228,7 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
     return mounts, simplified
 
 
+# 使用只读网格预览检查真实尺寸、支撑和潜在重叠，汇总几何准入问题。
 def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
                           policy, allow_generated, diagnostics):
     cache = {}
@@ -228,6 +236,7 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
     resolved_assets_root = assets_root.resolve()
     simplified_assets = {obj.get('asset_id') for obj in objects if obj['id'] in simplified}
 
+    # 受限读取并缓存登记网格，生产策略下拒绝未经声明的原始占位几何。
     def mesh(asset_id):
         if asset_id not in cache:
             path = assets_root / asset_id / 'mesh.json'
@@ -305,6 +314,7 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
     return preview
 
 
+# 批量诊断所有可安全检查的独立组件，不启动采集、生成或修改提交。
 def inspect_program(root, program, *, policy=None, execution_mode=None, allow_generated=True,
                     additional_issues=()):
     """Inspect every safe independent component without capture, generation or edits."""

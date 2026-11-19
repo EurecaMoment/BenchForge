@@ -8,12 +8,14 @@ from capabilities.benchmark_design.stages import CONTRACT
 
 
 class AssessmentValidationError(ValueError):
+    # 保存结构化评估问题，并为调用者构建可读的校验错误。
     def __init__(self, issues):
         self.issues = issues
         super().__init__('Plan needs corrections:\n' + '\n'.join('- ' + issue for issue in issues)
                          + '\nEdit these fields in the saved source file; do not rewrite the complete assessment.')
 
 
+# 加载基准设计评估模板，返回独立的模板数据。
 def assessment_template():
     from capabilities.dataset_authoring.question_writing import contract
     value = json.loads((Path(__file__).with_name('resources') / 'assessment_template.json').read_text(encoding='utf-8'))
@@ -86,12 +88,14 @@ def assessment_template():
     return value
 
 
+# 保留已有评估及其模式标识；缺少模式声明的输入原样返回。
 def assessment_with_current_schema(assessment):
     if not isinstance(assessment, dict) or 'schema' not in assessment:
         return assessment
     return {**assessment, 'schema': assessment['schema']}
 
 
+# 结合模板选择和输入材料检查设计评估，汇总字段路径明确的全部问题。
 def validate_assessment(value, selections, inputs):
     if not isinstance(value, dict):
         raise AssessmentValidationError(['assessment must be an object'])
@@ -99,16 +103,19 @@ def validate_assessment(value, selections, inputs):
     issues = []
     invalid = set()
 
+    # 向问题清单追加字段路径和对应的校验说明。
     def issue(path, message):
         invalid.add(path)
         text = f'{path} {message}'
         if text not in issues:
             issues.append(text)
 
+    # 判断指定评估路径是否已具备后续检查所需的有效内容。
     def ready(path):
         return not any(path == item or path.startswith(item + '.') or path.startswith(item + '[') or
                        item.startswith(path + '.') or item.startswith(path + '[') for item in invalid)
 
+    # 递归对照模板检查评估结构，并记录类型或内容不匹配的位置。
     def check(actual, expected, path):
         if isinstance(expected, dict):
             if not isinstance(actual, dict):

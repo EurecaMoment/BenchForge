@@ -28,11 +28,12 @@ export const handoffParameters = {
 
 const pending = new Map();
 
+/** 按交接日志串行发布、读取或确认子 Agent 交接记录，避免并发写入覆盖。 */
 export async function executeHandoff(args, {agent, signal}) {
   signal?.throwIfAborted();
   const file = path.join(path.resolve(args.workspace), '.benchforge', 'collaboration', 'handoffs.jsonl');
   const previous = pending.get(file) ?? Promise.resolve();
-  const operation = previous.catch(() => {}).then(async () => {
+  const operation = previous.catch(() => {}).then(/** 在同一交接日志队列内执行发布、查询或确认，写入前重新检查取消。 */ async () => {
     signal?.throwIfAborted();
     if (args.action === 'publish') {
       if (!args.role || !args.summary) throw new Error('collaboration publish needs role and summary');

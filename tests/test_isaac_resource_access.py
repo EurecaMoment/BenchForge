@@ -42,6 +42,7 @@ class NativeResourceAccessTests(TestCase):
             with self.assertRaises(PermissionError):
                 resources.check({'extension': {'operation': 'assets.import_robot', 'arguments': {}}})
 
+    # 验证跨会话世界被拒绝，自有世界中的 USD 场景节点路径可正常使用。
     def test_other_world_is_denied_and_owned_session_is_allowed(self):
         access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')
         with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'), \
@@ -52,6 +53,7 @@ class NativeResourceAccessTests(TestCase):
             with patch.object(resources, 'owns', return_value=True):
                 resources.check({'extension': {'operation': 'scene.capture', 'arguments': {'session_id': 'mine', 'cameras': [{'path': '/World/Camera'}]}}})
 
+    # 验证无世界归属的全局修改及服务本地来源路径均被拒绝。
     def test_global_world_mutation_and_local_source_paths_are_rejected(self):
         access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')
         with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'):
@@ -61,6 +63,7 @@ class NativeResourceAccessTests(TestCase):
             with self.assertRaises(PermissionError):
                 resources.check({'extension': {'operation': 'asset.import', 'arguments': {'source': '/service/secret.usd'}}})
 
+    # 验证 USD 场景树中的绝对节点路径不会被误当作主机文件路径。
     def test_usd_prim_paths_are_not_host_paths(self):
         from service_access.input_policy import check_arguments
         access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')

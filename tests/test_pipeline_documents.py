@@ -12,6 +12,7 @@ from pipelines.benchmark.execution.documents import RunDocuments
 
 
 class PipelineDocumentsTests(TestCase):
+    # 验证受管理运行不把可变文件状态副本导入为数据库权威状态。
     def test_managed_run_never_imports_mutable_state_projection(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -21,6 +22,7 @@ class PipelineDocumentsTests(TestCase):
                     patch('pipelines.benchmark.execution.documents.read_document', return_value=None):
                 self.assertIsNone(RunDocuments(root).load('state.json'))
 
+    # 验证数据库文档先提交，再更新文件副本，且后续写入使用正确版本。
     @skipUnless(os.name == 'posix', 'Scoped projection writes require Linux descriptors')
     def test_database_commit_precedes_projection_and_tracks_revision(self):
         with TemporaryDirectory() as tmp:

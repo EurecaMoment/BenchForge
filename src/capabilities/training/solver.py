@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 class TransformersSolver:
+    # 按配置加载文本或多模态模型及处理器，设置设备、优化器和训练参数。
     def __init__(self,config):
         import torch
         import transformers
@@ -26,6 +27,7 @@ class TransformersSolver:
         self.optimizer=torch.optim.AdamW((p for p in self.model.parameters() if p.requires_grad),lr=config.get('learning_rate',2e-5))
         self.max_length=config.get('max_length',2048)
 
+    # 应用模型对话模板并编码文本和图像，拒绝模态不匹配或超长样本。
     def encode(self,messages,images,assistant=False):
         from PIL import Image
         if images and not self.multimodal:raise ValueError('This dataset has images; select a multimodal checkpoint or a structured-only task subset')
@@ -42,6 +44,7 @@ class TransformersSolver:
         if encoded['input_ids'].shape[1]>self.max_length:raise ValueError('Sample exceeds max_length; increase the configured limit or shorten its actual evidence')
         return {k:v.to(self.device) for k,v in encoded.items()}
 
+    # 只对助手回复计算监督损失，累积批次梯度并裁剪后更新模型。
     def update(self,records):
         self.model.train();self.optimizer.zero_grad();losses=[];tokens=0;input_tokens=0
         for record in records:
@@ -56,18 +59,21 @@ class TransformersSolver:
         self.torch.nn.utils.clip_grad_norm_(self.model.parameters(),self.config.get('max_grad_norm',1.))
         self.optimizer.step();return {'loss':sum(losses)/len(losses),'supervised_tokens':tokens,'input_tokens':input_tokens,'examples':len(records)}
 
+    # 将公开问题与输入编码后执行确定性生成，只返回新生成的回复文字。
     def predict(self,question):
         self.model.eval();messages=[{'role':'user','content':question['question']+'\n'+json.dumps(question['inputs'],ensure_ascii=False)}]
         encoded=self.encode(messages,question.get('images',[]),assistant=True)
         with self.torch.no_grad():generated=self.model.generate(**encoded,max_new_tokens=self.config.get('max_new_tokens',256),do_sample=False,pad_token_id=self.tokenizer.pad_token_id)
         return self.tokenizer.decode(generated[0,encoded['input_ids'].shape[1]:],skip_special_tokens=True)
 
+    # 保存模型、处理器及优化器和随机数状态，支持后续训练恢复。
     def save(self,path):
         path=Path(path);path.mkdir(parents=True,exist_ok=True)
         self.model.save_pretrained(path);(self.processor if self.multimodal else self.tokenizer).save_pretrained(path)
         self.torch.save({'model':self.model.state_dict(),'optimizer':self.optimizer.state_dict(),'torch_rng':self.torch.get_rng_state(),
                         'cuda_rng':self.torch.cuda.get_rng_state_all() if self.torch.cuda.is_available() else None},path/'training-state.pt')
 
+    # 恢复训练参数、优化器及CPU和可用GPU随机数状态。
     def restore(self,path):
         state=self.torch.load(Path(path)/'training-state.pt',map_location=self.device,weights_only=False)
         self.model.load_state_dict(state['model']);self.optimizer.load_state_dict(state['optimizer']);self.torch.set_rng_state(state['torch_rng'].cpu())

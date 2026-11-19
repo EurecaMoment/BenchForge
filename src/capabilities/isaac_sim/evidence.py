@@ -11,6 +11,7 @@ from storage.files import write_json
 from capabilities.capture.quality import assess_view
 
 
+# 仅用当前任务拥有的产物句柄从下载文件中选择证据。
 def resolve_artifact(reference, files):
     """Only job-owned artifact handles can select a downloaded file."""
     if not isinstance(reference, str) or not reference.startswith('artifact://'):
@@ -21,6 +22,7 @@ def resolve_artifact(reference, files):
     return Path(matches[0]['source_path'])
 
 
+# 根据原生仿真后的变换和碰撞体提取实体事实，保持上传几何记录不可变。
 def measured_entities(compiled, prims):
     """Use native post-step transforms/colliders; uploaded geometry stays immutable."""
     by_path = {row['path']: row for row in prims}
@@ -81,6 +83,7 @@ def measured_entities(compiled, prims):
     return entities
 
 
+# 汇总原生刚体线速度和角速度，以显式阈值报告稳定状态及仿真时刻。
 def physics_summary(observation, steps, dt):
     bodies = observation.get('bodies', [])
     speeds = [float(np.linalg.norm(body['linear_velocity_world_m_s'])) for body in bodies]
@@ -92,6 +95,7 @@ def physics_summary(observation, steps, dt):
             'basis': 'native CUDA tensors after settling; static geometry still needs bounds/support acceptance'}
 
 
+# 保存原生RGB及标注数组，结合相机和对象记录形成单帧采集证据。
 def save_frame(frame, files, index, program, output, *, physics_tick=None, dt=None):
     prefix = output / f'view_{index}'
     image = resolve_artifact(frame['image'], files)

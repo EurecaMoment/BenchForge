@@ -10,43 +10,56 @@ import {captureContinuations,createCaptureHistory} from './continuation_state.mj
 import {trackCaptureSubmission} from './submission.mjs';
 import {captureNotice} from './notice.mjs';
 
+/** 构造带场景质量诊断的最终失败观察结果，允许指定运行和具体问题。 */
 const failure = (run='sf_scene', issue='dog_go2 has no recognizable asset', scene='apartment') => ({
   run_id:run,state:'FAILED_FINAL',terminal:true,tasks:[{id:run+'.scene0',state:'FAILED_FINAL',unit:{revision:0},
     failure:{next_action:'repair_complete_program_and_resubmit',scene_review:{passed:false,issues:[issue],
       production_acceptance:{passed:false,enforced:true,scene_id:scene}}},result:{directory:'/artifacts/'+run+'.scene0/revision_0'}}],
 });
 const running = {run_id:'sf_scene',state:'RUNNING',terminal:false,tasks:[]};
+/** 创建可控事件历史、持久化续接表和采集服务，收集通知、请求与错误。 */
 function harness({read=async()=>failure(),data=new Map(),events=[],artifacts='/artifacts',review=()=>null}={}) {
   const sent=[],errors=[],requests=[],abort=new AbortController();
   let seq=events.at(-1)?.seq||0;
+  /** 把原生事件加入测试历史并分配连续序号及确定性时间。 */
   const append=(type,values)=>{const event={type,seq:++seq,time:seq*1000,data:values};events.push(event);return event;};
+  /** 以标准工具调用和结果事件记录一次采集业务回执。 */
   const call=(name,value)=>{
     const callId='call-'+seq;
     append('tool/call',{name,callId,arguments:'{}'});
     append('tool/result',{message:{source:{callId},toolCallId:callId,content:[{type:'text',text:JSON.stringify(value)}]}});
   };
-  const agent={id:'session-owner',status:'idle',session:{header:{cwd:'/workspace'},snapshotEvents:()=>events},
-    inbox:{nextStep:[],nextTurn:[]},steer:message=>{sent.push(message);agent.inbox.nextStep.push(message);},
+  const agent={id:'session-owner',status:'idle',session:{header:{cwd:'/workspace'},/** 返回夹具当前原生历史，供续接上下文增量归约。 */ snapshotEvents:()=>events},
+    inbox:{nextStep:[],nextTurn:[]},/** 记录当前步骤收到的引导消息，并加入测试收件箱。 */ steer:message=>{sent.push(message);agent.inbox.nextStep.push(message);},
+    /** 记录下一轮收到的跟进消息，并加入测试收件箱。 */
     followup:message=>{sent.push(message);agent.inbox.nextTurn.push(message);}};
+  /** 把待处理通知写入原生用户消息历史，再清空测试收件箱。 */
   const consume=()=>{
     for(const message of [...agent.inbox.nextStep,...agent.inbox.nextTurn]) append('user/message',message);
     agent.inbox.nextStep=[];agent.inbox.nextTurn=[];
   };
-  const table={get:key=>data.get(key),entries:()=>data.entries(),put:async(key,value)=>{data.set(key,structuredClone(value));},
+  const table={/** 按测试键读取内存记录或模拟服务。 */ get:key=>data.get(key),/** 返回测试内存表中的全部记录，供恢复与遍历逻辑使用。 */ entries:()=>data.entries(),/** 保存测试记录的副本，模拟持久化写入并防止引用共享。 */ put:async(key,value)=>{data.set(key,structuredClone(value));},
+    /** 按更新函数修改持久化记录并保存副本，模拟原子表更新。 */
     update:async(key,fn)=>{const value=fn(data.get(key));data.set(key,structuredClone(value));return value;}};
   const runtime=createCaptureContinuation({table,artifacts,signal:abort.signal,readReview:review,
+    /** 收集采集服务路由与参数，再转给测试传入的可控读取器。 */
     read:async(route,args,signal)=>{requests.push({route,args});return read(route,args,signal);},
-    resolveAgent:async()=>agent,createMessage:value=>value,onError:error=>errors.push(error),delay:async()=>{}});
+    /** 返回持有采集任务的测试 Agent，模拟重载后的原生恢复。 */
+    resolveAgent:async()=>agent,/** 保留测试消息结构，便于断言实际投递内容。 */ createMessage:value=>value,/** 收集后台续接错误，供测试在结束时确认没有遗漏异常。 */ onError:error=>errors.push(error),/** 立即完成测试退避等待，使故障重试无需真实计时。 */ delay:async()=>{}});
+  /** 写入原生轮次开始和生产计划回执，建立续接所属的生产任务。 */
   const plan=()=>{append('turn/start',{turn:1});call('benchforge_pipeline_plan',{production_contract:'benchforge.production-stages/v1',state:'planned'});};
+  /** 写入指定运行的采集提交回执，模拟模型已经成功启动任务。 */
   const capture=(run='sf_scene')=>call('benchforge_capture',{run_id:run,task_id:run+'.scene0',state:'submitted'});
+  /** 以夹具取消信号触发生产停止前的采集协调。 */
   const stop=()=>runtime.stopping({agent,signal:abort.signal});
   return {runtime,agent,append,call,consume,plan,capture,stop,sent,requests,data,events,errors,abort,
+    /** 取消并等待后台观察退出，再断言没有未处理的续接异常。 */
     dispose:async()=>{abort.abort();await runtime.dispose();assert.deepEqual(errors,[]);}};
 }
 
-test('failure after the model final response wakes the same idle conversation without a wait tool',async()=>{
+test('failure after the model final response wakes the same idle conversation without a wait tool',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：failure after the model final response wakes the same idle conversation without a wait tool。 */ async()=>{
   const terminal=Promise.withResolvers();let reads=0;
-  const h=harness({read:async()=>++reads===1?running:terminal.promise});h.plan();h.capture();
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async()=>++reads===1?running:terminal.promise});h.plan();h.capture();
   await h.runtime.reconcile(h.agent);
   await h.stop();
   h.append('turn/end',{turn:1,reason:{kind:'completed'}});
@@ -59,8 +72,8 @@ test('failure after the model final response wakes the same idle conversation wi
   await h.dispose();
 });
 
-test('concurrent registrations observe one run once and preserve independent runs',async()=>{
-  const h=harness({read:async(_route,args)=>failure(args.run_id)});
+test('concurrent registrations observe one run once and preserve independent runs',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：concurrent registrations observe one run once and preserve independent runs。 */ async()=>{
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async(_route,args)=>failure(args.run_id)});
   await Promise.all(Array.from({length:8},()=>h.runtime.register(h.agent,{run_id:'sf_scene'})));
   await h.runtime.settled();
   assert.equal(h.requests.length,1);assert.equal(h.sent.length,1);
@@ -69,8 +82,8 @@ test('concurrent registrations observe one run once and preserve independent run
   await h.dispose();
 });
 
-test('capture reconciliation and stopping can be cancelled during a stalled backend read',async t=>{
-  const reader=createStageReviewReader({service:()=>new Promise(()=>{})});
+test('capture reconciliation and stopping can be cancelled during a stalled backend read',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：capture reconciliation and stopping can be cancelled during a stalled backend read。 */ async t=>{
+  const reader=createStageReviewReader({/** 提供用例控制的服务响应，覆盖正常返回、超时和取消等读取边界。 */ service:()=>new Promise(()=>{})});
   const h=harness({review:reader.latest});h.plan();h.capture();
   t.after(()=>h.dispose());
   for(const operation of ['reconcile','stopping']){
@@ -83,10 +96,10 @@ test('capture reconciliation and stopping can be cancelled during a stalled back
   }
 });
 
-test('a review read delayed past cancellation, completion or a new task cannot deliver an old capture',async()=>{
+test('a review read delayed past cancellation, completion or a new task cannot deliver an old capture',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a review read delayed past cancellation, completion or a new task cannot deliver an old capture。 */ async()=>{
   for(const change of ['cancel','complete','new-task']){
     const entered=Promise.withResolvers(),released=Promise.withResolvers();let reads=0;
-    const h=harness({review:async()=>{if(++reads===3){entered.resolve();await released.promise;}return null;}});
+    const h=harness({/** 提供该用例的可控复核状态，并允许在读取边界制造并发变化。 */ review:async()=>{if(++reads===3){entered.resolve();await released.promise;}return null;}});
     h.plan();h.capture();
     try{
       await h.runtime.reconcile(h.agent);await entered.promise;
@@ -98,9 +111,9 @@ test('a review read delayed past cancellation, completion or a new task cannot d
   }
 });
 
-test('host reload restores an unfinished wait; consumed notices do not replay',async()=>{
+test('host reload restores an unfinished wait; consumed notices do not replay',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：host reload restores an unfinished wait; consumed notices do not replay。 */ async()=>{
   const entered=Promise.withResolvers();
-  const h=harness({read:(_route,_args,signal)=>new Promise((resolve,reject)=>{
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:(_route,_args,signal)=>new Promise((resolve,reject)=>{
     entered.resolve();signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
   })});h.plan();h.capture();await h.runtime.reconcile(h.agent);await entered.promise;
   await h.dispose();
@@ -110,13 +123,13 @@ test('host reload restores an unfinished wait; consumed notices do not replay',a
   assert.equal(restored.sent.length,0);assert.equal(restored.requests.length,0);await restored.dispose();
 });
 
-test('a notice lost before log commit is redelivered after restart',async()=>{
+test('a notice lost before log commit is redelivered after restart',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a notice lost before log commit is redelivered after restart。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();await h.dispose();
   const next=harness({data:h.data,events:h.events});next.runtime.restore();await next.runtime.settled();
   assert.equal(next.sent.length,1);await next.dispose();
 });
 
-test('reload during an unfinished repair resumes once after the original notice was consumed',async()=>{
+test('reload during an unfinished repair resumes once after the original notice was consumed',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：reload during an unfinished repair resumes once after the original notice was consumed。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
   h.append('turn/end',{turn:1,reason:{kind:'aborted',reason:{kind:'disposed'}}});await h.dispose();
   const next=harness({data:h.data,events:h.events});next.runtime.restore();await next.runtime.settled();
@@ -126,9 +139,9 @@ test('reload during an unfinished repair resumes once after the original notice 
   assert.equal(again.sent.length,0);await again.dispose();
 });
 
-test('explicit cancellation and a paused review park results until authorized continuation',async()=>{
+test('explicit cancellation and a paused review park results until authorized continuation',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：explicit cancellation and a paused review park results until authorized continuation。 */ async()=>{
   let state='paused';
-  const h=harness({review:()=>({state})});h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();
+  const h=harness({/** 提供该用例的可控复核状态，并允许在读取边界制造并发变化。 */ review:()=>({state})});h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();
   assert.equal(h.sent.length,0);assert.equal(h.runtime.records(h.agent.id)[0].state,'paused');
   state='elapsed';h.append('turn/start',{turn:2});h.append('user/message',{source:{kind:'benchforge/production-resume'}});
   await h.runtime.reconcile(h.agent);await h.runtime.settled();assert.equal(h.sent.length,1);await h.dispose();
@@ -137,7 +150,7 @@ test('explicit cancellation and a paused review park results until authorized co
   await cancelled.runtime.reconcile(cancelled.agent);assert.equal(cancelled.requests.length,0);await cancelled.dispose();
 });
 
-test('final text does not discharge repair obligations; duplicate queued reminders are suppressed',async()=>{
+test('final text does not discharge repair obligations; duplicate queued reminders are suppressed',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：final text does not discharge repair obligations; duplicate queued reminders are suppressed。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
   h.append('assistant/message',{message:{content:[{type:'text',text:'下一步我会修复。'}]}});
   await h.stop();await h.stop();assert.equal(h.sent.length,2);
@@ -148,14 +161,14 @@ test('final text does not discharge repair obligations; duplicate queued reminde
   await h.dispose();
 });
 
-test('pipeline completion releases capture obligations; unrelated follow-up is not restarted',async()=>{
+test('pipeline completion releases capture obligations; unrelated follow-up is not restarted',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：pipeline completion releases capture obligations; unrelated follow-up is not restarted。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
   h.call('benchforge_pipeline_run',{state:'completed'});await h.stop();assert.equal(h.sent.length,1);
   h.append('turn/start',{turn:2});h.append('assistant/message',{message:{content:[{type:'text',text:'解释工作流程。'}]}});
   await h.stop();assert.equal(h.sent.length,1);await h.dispose();
 });
 
-test('shell activity cannot reset repeated final responses, including after host reload',async()=>{
+test('shell activity cannot reset repeated final responses, including after host reload',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：shell activity cannot reset repeated final responses, including after host reload。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
   await h.stop();h.consume();h.call('bash',{output:'go'});await h.stop();h.consume();await h.dispose();
   const next=harness({data:h.data,events:h.events});
@@ -165,7 +178,7 @@ test('shell activity cannot reset repeated final responses, including after host
   await next.dispose();
 });
 
-test('a newly submitted repair gets its own budget; active captures are never stopped',async()=>{
+test('a newly submitted repair gets its own budget; active captures are never stopped',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a newly submitted repair gets its own budget; active captures are never stopped。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
   await h.stop();h.consume();await h.stop();h.consume();
   h.capture('sf_repaired');await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
@@ -173,7 +186,7 @@ test('a newly submitted repair gets its own budget; active captures are never st
   await h.dispose();
 });
 
-test('capture notices deduplicate and bound diagnostics while retaining evidence references',()=>{
+test('capture notices deduplicate and bound diagnostics while retaining evidence references',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：capture notices deduplicate and bound diagnostics while retaining evidence references。 */ ()=>{
   const issues=Array.from({length:30},(_,i)=>`object_${i}: wrong support `+'x'.repeat(800));
   const records={scene_review_path:'/artifacts/review.json'};
   const value=captureNotice({run_id:'sf_scene',state:'FAILED_FINAL',tasks:[{id:'sf_scene.scene0',records,
@@ -183,15 +196,15 @@ test('capture notices deduplicate and bound diagnostics while retaining evidence
   assert.deepEqual(value.detail,{tool:'benchforge_scene_status',run_id:'sf_scene',detail:true});
 });
 
-test('retrying a settled service task tracks its new attempt and receives one new result',async()=>{
+test('retrying a settled service task tracks its new attempt and receives one new result',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：retrying a settled service task tracks its new attempt and receives one new result。 */ async()=>{
   const h=harness();await h.runtime.register(h.agent,{run_id:'sf_scene',call_id:'first'});await h.runtime.settled();h.consume();
   await h.runtime.register(h.agent,{run_id:'sf_scene',call_id:'retry',retry:true});await h.runtime.settled();
   assert.equal(h.sent.length,2);assert.notEqual(h.sent[0].source.noticeKey,h.sent[1].source.noticeKey);await h.dispose();
 });
 
-test('a retry supersedes an active observation without losing the new generation',async()=>{
+test('a retry supersedes an active observation without losing the new generation',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a retry supersedes an active observation without losing the new generation。 */ async()=>{
   const entered=Promise.withResolvers();let reads=0,aborted=false;
-  const h=harness({read:async(_route,_args,signal)=>{
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async(_route,_args,signal)=>{
     if(++reads>1)return failure();
     entered.resolve();
     return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>{aborted=true;reject(signal.reason);},{once:true}));
@@ -202,9 +215,9 @@ test('a retry supersedes an active observation without losing the new generation
   assert.match(h.sent[0].source.noticeKey,/:retry:FAILED_FINAL$/);await h.dispose();
 });
 
-test('observer errors are bounded; explicit recovery can deliver a distinct terminal result',async()=>{
+test('observer errors are bounded; explicit recovery can deliver a distinct terminal result',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：observer errors are bounded; explicit recovery can deliver a distinct terminal result。 */ async()=>{
   let available=false;
-  const h=harness({read:async()=>{if(!available)throw Error('service temporarily unavailable');return failure();}});
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async()=>{if(!available)throw Error('service temporarily unavailable');return failure();}});
   h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();
   assert.equal(h.requests.length,3);assert.equal(h.sent.length,1);h.consume();
   for(let i=0;i<4;i++)await h.runtime.reconcile(h.agent);
@@ -215,9 +228,9 @@ test('observer errors are bounded; explicit recovery can deliver a distinct term
   assert.match(h.sent[1].source.noticeKey,/:FAILED_FINAL$/);await h.dispose();
 });
 
-test('new production objectives do not inherit or wake old capture obligations',async()=>{
+test('new production objectives do not inherit or wake old capture obligations',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：new production objectives do not inherit or wake old capture obligations。 */ async()=>{
   const terminal=Promise.withResolvers(),entered=Promise.withResolvers();
-  const h=harness({read:async()=>{entered.resolve();return terminal.promise;}});
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async()=>{entered.resolve();return terminal.promise;}});
   h.plan();h.capture();await h.runtime.reconcile(h.agent);await entered.promise;
   h.call('benchforge_pipeline_plan',{production_contract:'benchforge.production-stages/v1',state:'planned',
     plan:'/workspace/new-plan.json',review_revision:{kind:'new_task'}});
@@ -226,7 +239,7 @@ test('new production objectives do not inherit or wake old capture obligations',
   assert.equal(captureContinuations(h.events).captures.length,0);await h.dispose();
 });
 
-test('execution repairs retain ownership but a completed task is not resurrected on reload',async()=>{
+test('execution repairs retain ownership but a completed task is not resurrected on reload',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：execution repairs retain ownership but a completed task is not resurrected on reload。 */ async()=>{
   const h=harness();h.plan();h.capture();
   const before=captureContinuations(h.events);
   h.call('benchforge_pipeline_plan',{production_contract:'benchforge.production-stages/v1',state:'planned',
@@ -240,8 +253,8 @@ test('execution repairs retain ownership but a completed task is not resurrected
   assert.equal(next.sent.length,0);assert.equal(next.requests.length,0);await next.dispose();
 });
 
-test('checking an old stage does not complete production after a successful capture',async()=>{
-  const h=harness({read:async()=>({run_id:'sf_scene',state:'SUCCEEDED',terminal:true,tasks:[]})});
+test('checking an old stage does not complete production after a successful capture',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：checking an old stage does not complete production after a successful capture。 */ async()=>{
+  const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async()=>({run_id:'sf_scene',state:'SUCCEEDED',terminal:true,tasks:[]})});
   h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
   h.call('benchforge_stage_review',{stage:'S1',state:'elapsed'});await h.stop();
   assert.equal(h.sent.length,2);h.consume();
@@ -249,9 +262,9 @@ test('checking an old stage does not complete production after a successful capt
   assert.equal(h.sent.length,2);await h.dispose();
 });
 
-test('a service submission retains its identity if durable tracking cannot be registered',async()=>{
+test('a service submission retains its identity if durable tracking cannot be registered',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a service submission retains its identity if durable tracking cannot be registered。 */ async()=>{
   const exec={agent:{id:'owner'},callId:'capture-call'};
-  const tracking={register:async()=>{throw Error('storage write failed');}};
+  const tracking={/** 模拟持久化登记失败，验证已提交的采集回执仍可返回和恢复。 */ register:async()=>{throw Error('storage write failed');}};
   const submitted=await trackCaptureSubmission({state:'accepted',run_id:'sf_scene',task_id:'sf_scene.scene0'},'/capture',{},exec,tracking);
   assert.equal(submitted.run_id,'sf_scene');assert.equal(submitted.state,'submitted');
   assert.equal(submitted.submission_accepted,true);assert.equal(submitted.scene_acceptance,'pending');
@@ -261,9 +274,9 @@ test('a service submission retains its identity if durable tracking cannot be re
   assert.deepEqual(JSON.parse(JSON.stringify(retried)),retried);
 });
 
-test('quality failure cannot masquerade as an external blocker; unchanged evidence can stop repeated repairs',async()=>{
+test('quality failure cannot masquerade as an external blocker; unchanged evidence can stop repeated repairs',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：quality failure cannot masquerade as an external blocker; unchanged evidence can stop repeated repairs。 */ async()=>{
   const folder=await fs.mkdtemp(path.join(os.tmpdir(),'benchforge-continuation-'));
-  const h=harness({artifacts:folder,read:async(_route,args)=>failure(args.run_id)});
+  const h=harness({artifacts:folder,/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async(_route,args)=>failure(args.run_id)});
   try {
     for(const run of ['sf_first','sf_second']) {
       await fs.mkdir(path.join(folder,run+'.scene0','revision_0'),{recursive:true});
@@ -282,7 +295,7 @@ test('quality failure cannot masquerade as an external blocker; unchanged eviden
   }
 });
 
-test('canonical metadata, PTC and incremental history preserve native ownership',()=>{
+test('canonical metadata, PTC and incremental history preserve native ownership',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：canonical metadata, PTC and incremental history preserve native ownership。 */ ()=>{
   const h=harness();h.plan();
   h.append('tool/ptc-dispatch',{name:'benchmarkforge_capture',subCallId:'inner',arguments:{},isError:false,
     content:[{type:'text',text:JSON.stringify({run_id:'sf_ptc',state:'submitted'})}]});

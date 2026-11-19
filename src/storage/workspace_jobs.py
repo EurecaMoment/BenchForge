@@ -15,6 +15,7 @@ from sqlalchemy import update
 from storage.operation_outputs import operation_outputs, logical_value
 
 class WorkspaceJobs:
+    # 绑定工作区、配置、DSH 会话及共享数据库命名空间，准备操作存储。
     def __init__(self, workspace, config=None):
         self.root = Path(workspace).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
@@ -27,9 +28,11 @@ class WorkspaceJobs:
         initialize_schema(self.engine)
         self.workspace_id = workspace_namespace(self.engine, self.root)
 
+    # 保留兼容的关闭入口；连接池由进程统一管理，不属于单次请求。
     def close(self):
         """This request owns no pool; process shutdown releases shared engines."""
 
+    # 核验宿主工作区身份并解析受限输入参数，在当前数据库上下文中调用操作。
     def call(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:
         from service_access.input_policy import resolve_arguments
         from service_access.access_scope import current_access
@@ -42,6 +45,7 @@ class WorkspaceJobs:
         with database_context(self.database_url):
             return self._call(tool, args)
 
+    # 分配操作编号并管理私有输出上下文，将状态查询或执行失败写入操作账本。
     def _call(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:
         """Execute one harness operation and persist its request and result."""
         if tool == "status":
@@ -60,6 +64,7 @@ class WorkspaceJobs:
                 ).values(state='failed', error=str(exc)))
             raise
 
+    # 持久化请求、调用实际工具、发布产物并更新操作结果及成功失败状态。
     def _execute_operation(self, tool, args, operation, directory):
         public = self.root / 'operations' / operation
         write(directory / "request.json", {"tool": tool, "arguments": args, "time": datetime.now(timezone.utc).isoformat(), "context": self.dsh_context})

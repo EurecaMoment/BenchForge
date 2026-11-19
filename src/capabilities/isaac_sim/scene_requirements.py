@@ -15,15 +15,18 @@ class UnsupportedScene(ValueError):
     """An explicit requirement has no faithful SceneProgram adapter mapping."""
     code = 'unsupported_scene'
 
+    # 保存结构化的不支持问题，并构建场景能力异常。
     def __init__(self, message, *, issues=()):
         self.issues = list(issues)
         super().__init__(message)
 
 
+# 检查场景对适配器的要求，遇到不支持项即阻止执行。
 def validate_scene_requirements(program, settings=None):
     _require_supported(scene_requirement_issues(program, settings=settings))
 
 
+# 在准入前验证上传句柄是否属于当前会话，返回原生引用问题。
 def native_reference_issues(program, settings=None):
     """Check uploaded handles against the current conversation before admission."""
     from service_access.access_scope import current_access
@@ -48,20 +51,24 @@ def native_reference_issues(program, settings=None):
     return issues
 
 
+# 校验场景中的原生资产引用，并将发现的问题作为异常返回。
 def validate_native_references(program, settings=None):
     _require_supported(native_reference_issues(program, settings))
 
 
+# 仅保留列表形式的声明，其他值视为空以便继续收集独立问题。
 def _records(value):
     return value if isinstance(value, list) else []
 
 
+# 构造带字段路径、对象标识和阻断级别的能力不支持问题。
 def _issue(path, message, object_id=None):
     return {'code': 'unsupported_capture_requirement', 'path': path, 'message': message,
             'basis': 'isaac_sim_capture_adapter', 'severity': 'error', 'blocking': True,
             **({'object_ids': [object_id]} if isinstance(object_id, str) else {})}
 
 
+# 收集场景要求中的适配器限制，不把动作声明隐式转换为原生命令。
 def scene_requirement_issues(program, *, settings=None):
     """Actions have no implicit SceneProgram-to-native command mapping."""
     if not isinstance(program, dict):
@@ -76,6 +83,7 @@ def scene_requirement_issues(program, *, settings=None):
             if isinstance(row, dict) and row.get('action') in ('apply_force', 'robot_push', 'record_trajectory')]
 
 
+# 无需编译或连接GPU即可收集采集适配器的独立限制，契约格式错误另行处理。
 def capture_requirement_issues(program, assets_root=None, settings=None):
     """Collect independent adapter limitations without compiling or contacting a GPU.
 
@@ -90,6 +98,7 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
              if isinstance(row, dict) and isinstance(row.get('id'), str)}
     checked_materials = set()
 
+    # 检查对象或部件材质中的不支持字段，并避免重复报告同一路径。
     def material_fields(row, path, object_id):
         appearance = row.get('appearance')
         appearance = appearance if isinstance(appearance, dict) else {}
@@ -100,6 +109,7 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
                 issues.append(_issue(location, f'A100 SceneProgram material {key} has no faithful mapping; '
                                      'inspect the live catalog', object_id))
 
+    # 检查对象自带外观和实际引用的命名材质。
     def used_material(row, path, object_id):
         material_fields(row, path, object_id)
         identity = row.get('material_id')
@@ -168,11 +178,13 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
     return issues
 
 
+# 把全部不支持项组合为保留结构化问题的异常。
 def _require_supported(issues):
     if issues:
         raise UnsupportedScene('\n'.join(row['path'] + ': ' + row['message'] for row in issues),
                                issues=issues)
 
 
+# 在进入原生采集前统一拒绝不支持的采集声明。
 def validate_capture_requirements(program, assets_root, settings):
     _require_supported(capture_requirement_issues(program, assets_root, settings))

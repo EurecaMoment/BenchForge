@@ -7,6 +7,7 @@ import urllib.request
 from service_access import configuration as provider_config
 
 
+# 按标注角色的模型配置发送请求，校验凭据并返回结构化标注结果。
 def annotation(args, config):
     config = provider_config.selected_model(config, 'annotation')
     if not config.get('url'):

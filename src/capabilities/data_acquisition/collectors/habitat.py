@@ -12,6 +12,7 @@ import numpy as np
 
 
 
+# 解析Habitat场景列表、采集帧数、图像尺寸及随机种子。
 def parse_args():
     parser = argparse.ArgumentParser(description="Collect Habitat RGB frames and GT from multiple scenes.")
     parser.add_argument("--output-dir", default="output_dataset")
@@ -23,10 +24,12 @@ def parse_args():
     return parser.parse_args()
 
 
+# 将三维向量转换为保留六位小数的数值列表。
 def serialize_vec3(values):
     return [round(float(v), 6) for v in values]
 
 
+# 将四元数的四个分量转换为JSON兼容记录。
 def serialize_quat(quat):
     return {
         "x": round(float(quat.x), 6),
@@ -36,6 +39,7 @@ def serialize_quat(quat):
     }
 
 
+# 建立分辨率、位置和视场角一致的RGB与深度传感器配置。
 def sensor_specs(width, height):
     rgb = habitat_sim.CameraSensorSpec()
     rgb.uuid = "color_sensor"
@@ -54,6 +58,7 @@ def sensor_specs(width, height):
     return [rgb, depth]
 
 
+# 为指定场景创建Habitat模拟器并初始化带传感器的智能体。
 def make_sim(scene, width, height):
     sim_cfg = habitat_sim.SimulatorConfiguration()
     sim_cfg.scene_id = scene
@@ -68,6 +73,7 @@ def make_sim(scene, width, height):
     return sim, agent
 
 
+# 将无效深度清零，并把0到10米范围编码为16位图像。
 def save_depth(depth_array, output_path):
     depth = np.nan_to_num(depth_array, nan=0.0, posinf=0.0, neginf=0.0)
     depth = np.clip(depth, 0.0, 10.0)
@@ -75,6 +81,7 @@ def save_depth(depth_array, output_path):
     Image.fromarray(depth_u16).save(output_path)
 
 
+# 利用已加载导航网格采样可通行位置和相机朝向。
 def sample_agent_states(sim, frames_per_scene):
     pathfinder = sim.pathfinder
     if not pathfinder.is_loaded:
@@ -88,6 +95,7 @@ def sample_agent_states(sim, frames_per_scene):
     return states
 
 
+# 在采样位姿采集场景图像、原始深度及标定真值，并释放模拟器。
 def collect_scene(scene_path, output_root, frames_per_scene, width, height):
     scene_name = Path(scene_path).stem
     scene_dir = output_root / scene_name
@@ -162,6 +170,7 @@ def collect_scene(scene_path, output_root, frames_per_scene, width, height):
     return manifest
 
 
+# 按给定场景列表运行Habitat采集并写出汇总清单。
 def main():
     args = parse_args()
     np.random.seed(args.seed)

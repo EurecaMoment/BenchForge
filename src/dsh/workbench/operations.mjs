@@ -1,6 +1,7 @@
 import {executePython} from '../host/python_process.mjs';
 
 // The backend owns the index schema, migration, filtering and pagination.
+/** 通过受管辅助进程读取工作区操作账本，显式传入会话范围、工具筛选和数量上限。 */
 export async function workspaceOperations(config, root, scope, {limit, tools = [], signal} = {}) {
   const sessions = [...new Set([scope.session_id, ...(scope.session_ids || [])].filter(Boolean))];
   const args = ['-B', '-m', 'server.workspace_operations', '--workspace', root.path,

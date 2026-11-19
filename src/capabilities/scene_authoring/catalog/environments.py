@@ -13,6 +13,7 @@ ENVIRONMENTS={
 }
 
 
+# 加载登记的环境贴图并配置光源纹理及可选方向。
 def apply_environment_texture(light, environment_id, asset_root, direction=None):
     from pxr import Gf
     from pxr import Sdf

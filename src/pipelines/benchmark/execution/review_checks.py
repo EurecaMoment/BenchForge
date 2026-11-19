@@ -6,6 +6,7 @@ from storage.artifacts import read
 from pipelines.benchmark.execution.review_artifacts import require_stage_artifact
 
 
+# 逐项复核已验证来源文件的大小与时间版本，拒绝检查后被修改的采集或注释。
 def _source_versions(outputs):
     count = 0
     for output in outputs:
@@ -21,6 +22,7 @@ def _source_versions(outputs):
     return count
 
 
+# 重新检查真实保存的阶段回执及当前计划身份，不接受模型提供的通过标志。
 def check_artifact(workspace, session, row):
     """Revalidate actual saved receipts; model-supplied pass flags are ignored."""
     root = Path(workspace).resolve()

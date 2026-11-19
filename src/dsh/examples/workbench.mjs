@@ -6,8 +6,10 @@ const names = ['办公区域', '休闲会议角', '书房茶水角'];
 const mime = {'.png':'image/png', '.json':'application/json', '.jsonl':'application/x-ndjson', '.md':'text/markdown; charset=utf-8'};
 
 /** Read a shipped archive through the same workbench response contract, without replaying production. */
+/** 创建受清单约束的示例工作台读取器，并缓存已验证的示例展示数据。 */
 export function createExampleWorkbench({publicPlan}) {
   const cache = new Map();
+  /** 核验示例安装回执和会话标识，只加载清单允许公开的计划、数据集与媒体。 */
   async function load(root, sessionId, signal) {
     const marker = await readJson(path.join(root.path, '.benchforge-example.json'));
     if (marker?.id !== 'spatialforge-v1') return null;
@@ -16,7 +18,9 @@ export function createExampleWorkbench({publicPlan}) {
     if (manifest?.sessionId !== sessionId || !manifest.workbench) return null;
     const key = root.path + ':' + sessionId;
     if (cache.has(key)) return cache.get(key);
+    /** 解析示例资源真实路径，拒绝离开安装资产目录的引用。 */
     const resolve = async file => inside({path:asset}, path.resolve(asset, file));
+    /** 在取消信号约束下读取并解析已验证的示例 JSON 文件。 */
     const read = async file => JSON.parse(await fs.readFile(await resolve(file), {encoding:'utf8', signal}));
     const inventory = await read('sample-manifest.json'), config = manifest.workbench;
     const plan = publicPlan(await read(config.plan));
@@ -26,8 +30,10 @@ export function createExampleWorkbench({publicPlan}) {
     if (rows.length !== inventory.question_count || captures.length !== inventory.collection_record_count)
       throw new Error('The bundled example inventory does not match its files');
     const files = [], allowed = new Set();
+    /** 生成绑定当前工作区和会话的示例媒体访问链接。 */
     const link = relative => '/api/benchforge/workbench?' + new URLSearchParams({view:'example_media',
       file:relative, session_id:sessionId, workspace_path:root.path});
+    /** 验证资源路径后加入公开白名单，并按扩展名登记工作台文件类型。 */
     const add = async (file, stage, title, extra={}) => {
       await resolve(file); allowed.add(file);
       files.push({stage, title, file, kind:path.extname(file)==='.png'?'image':path.extname(file)==='.jsonl'?'text':'json', url:link(file), ...extra});
@@ -52,7 +58,7 @@ export function createExampleWorkbench({publicPlan}) {
     if(cache.size>=8)cache.delete(cache.keys().next().value);
     cache.set(key,value);return value;
   }
-  return async ({roots,scope,url,request}) => {
+  return /** 仅为准确匹配的示例会话分发预置工作台视图和清单允许的媒体读取。 */ async ({roots,scope,url,request}) => {
     if(scope.history || !scope.session_id)return null;
     let example;
     for(const root of roots) {example=await load(root,scope.session_id,request.signal);if(example)break;}

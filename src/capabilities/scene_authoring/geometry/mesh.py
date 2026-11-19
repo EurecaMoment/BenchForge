@@ -1,17 +1,20 @@
 """Pure mesh transform shared by planning previews and the desktop executor."""
 import math
 
+# 用变换的逆转置更新法线，保持非均匀缩放后的原始方向语义。
 def transform_mesh_normals(normals, transform):
     """Apply the inverse transpose, preserving authored directions under scaling."""
     import numpy as np
     transformed = np.asarray(normals, dtype=np.float64) @ np.linalg.inv(np.asarray(transform)[:3, :3])
     return transformed / np.linalg.norm(transformed, axis=1, keepdims=True)
 
+# 校验命名参数是指定范围内的有限数字并转换为浮点数。
 def _number(value,lo,hi,name):
     if type(value) not in (int,float) or not math.isfinite(value) or not lo<=value<=hi:
         raise ValueError('invalid '+name)
     return float(value)
 
+# 按声明坐标与旋转统一缩放源顶点，使其落在请求尺寸包络内并保持原形比例。
 def transform_mesh_geometry(vertices, requested_size, coordinate_frame, mesh_transform=None):
     """Preserve source shape with explicit rotation and a single scale factor.
 

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const producer = /^benchforge_(capture|run|refine|extend)$/;
+/** 检查采集工作目录是否仍处于当前会话拥有的根目录中。 */
 const inside = (root, value) => {
   const relative = path.relative(root, value);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
@@ -9,6 +10,7 @@ const inside = (root, value) => {
 
 // Associations come from paired native tool results, never a browser-supplied ID
 // or a model-authored provenance string. Custom idempotency keys retain ownership.
+/** 从原生工具结果中提取采集运行标识及相关任务信息。 */
 export function nativeCaptureAssociations(events) {
   const calls = new Map(), found = [];
   for (const event of events) {
@@ -26,8 +28,10 @@ export function nativeCaptureAssociations(events) {
   return found;
 }
 
+/** 创建会话与采集运行的持久化关联记录器，按文件串行更新以避免覆盖。 */
 export function createCaptureAssociations({ctx, roots}) {
   const warmed = new Set(), writes = new Map();
+  /** 核验工作区归属后合并该会话已有的采集关联，并原子保存新记录。 */
   async function record(agent, events) {
     if (!/^session-[A-Za-z0-9-]+$/.test(agent?.id || '') || !agent.session?.header ||
         agent.session.header.origin === 'subagent') return;
@@ -40,7 +44,7 @@ export function createCaptureAssociations({ctx, roots}) {
     const directory = path.join(root, '.benchforge', 'capture-associations');
     const file = path.join(directory, agent.id + '.json');
     const previous = writes.get(file) || Promise.resolve();
-    const write = previous.catch(() => {}).then(async () => {
+    const write = previous.catch(() => {}).then(/** 在关联文件队列内合并并原子保存采集运行，拒绝覆盖其他会话的记录。 */ async () => {
       let current;
       try {current = JSON.parse(await fs.readFile(file, 'utf8'));} catch (error) {if (error.code !== 'ENOENT') throw error;}
       if (current && current.context?.session_id !== agent.id) throw new Error('Native capture association belongs to another session');
@@ -59,6 +63,7 @@ export function createCaptureAssociations({ctx, roots}) {
     writes.set(file, write);
     try {await write;} finally {if (writes.get(file) === write) writes.delete(file);}
   }
+  /** 从原生会话事件补建采集关联缓存，便于重载后定位已有场景。 */
   async function warm(id) {
     if (warmed.has(id)) return;
     const agent = ctx.get('agents')?.get(id);

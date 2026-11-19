@@ -28,6 +28,7 @@ from service_access.scene_service import environment_value
 from storage.operation_outputs import operation_workspace, logical_path, publish_current
 
 
+# 为同一会话的计划保存加锁，验证查询仍可并行；锁内统一完成激活与评审发布。
 def plan(args, directory, config=None):
     args, authoring_sources = resolve_request(args, operation_workspace(directory))
     session = args.get('_dsh_context', {}).get('session_id')
@@ -43,6 +44,7 @@ def plan(args, directory, config=None):
         raise ValueError('Another plan revision is being saved in this conversation. Retry after it finishes.') from error
 
 
+# 解析任务选择、评估方案和执行步骤，校验生产契约后保存计划、版本和评审回执。
 def _plan(args, directory, config, authoring_sources):
     if type(args.get('new_task', False)) is not bool:
         raise ValueError('new_task must be a boolean')

@@ -7,6 +7,7 @@ from service_access.runtime_config import environment_value
 MAX_PROGRAM_BYTES=1024*1024
 
 
+# 构建JSON对象并拒绝重复键，避免场景字段被静默覆盖。
 def _pairs(pairs):
     result={}
     for key,value in pairs:
@@ -15,6 +16,7 @@ def _pairs(pairs):
     return result
 
 
+# 保留提交身份与模式标识，使冻结源文件快照可被准确追踪。
 def submission_identity(value):
     if value is None or 'schema' not in value:
         return value
@@ -22,6 +24,7 @@ def submission_identity(value):
     return {**value, 'schema': value['schema']}
 
 
+# 从授权工作区读取有限大小场景JSON快照，校验数字、重复键和资产访问权。
 def read_program_document(artifact_root, source_path):
     from service_access.access_scope import current_access, workspace_path
     if not isinstance(source_path,str) or not source_path:raise ValueError('scene_program_path must be a task workspace JSON source_path')
@@ -48,6 +51,7 @@ def read_program_document(artifact_root, source_path):
             with path.open('rb') as stream:raw=stream.read(MAX_PROGRAM_BYTES+1)
     except OSError as exc:raise ValueError('SceneProgram task file unavailable') from exc
     if len(raw)>MAX_PROGRAM_BYTES:raise ValueError('SceneProgram exceeds 1 MiB input limit')
+    # 拒绝JSON中的非有限数值常量。
     def invalid_constant(value):raise ValueError('non-finite JSON constant: '+value)
     try:
         program=json.loads(raw.decode('utf-8-sig'),object_pairs_hook=_pairs,parse_constant=invalid_constant)
@@ -55,6 +59,7 @@ def read_program_document(artifact_root, source_path):
     except (UnicodeError,ValueError,RecursionError) as exc:raise ValueError('invalid SceneProgram JSON: '+str(exc)[:300]) from exc
     if access is not None:
         from capabilities.asset_generation.asset_access import registered_asset_path
+        # 递归验证已登记网格资产的访问权，原生资产句柄由专用流程处理。
         def authorize_assets(value):
             if isinstance(value, dict):
                 if isinstance(value.get('asset_id'), str) and value['asset_id'].startswith('asset_'):
@@ -71,6 +76,7 @@ def read_program_document(artifact_root, source_path):
         'program':program}
 
 
+# 为每次调用保存完整且不可变的诊断及其准确输入快照。
 def save_preflight_report(artifact_root, submission, report):
     """Keep a complete immutable diagnostic and its exact input per invocation."""
     directory = Path(artifact_root) / 'scene_preflights' / uuid4().hex
@@ -86,6 +92,7 @@ def save_preflight_report(artifact_root, submission, report):
     return result
 
 
+# 读取场景提交并执行批量预检，将完整诊断保存为可审查产物。
 def inspect_program_submission(artifact_root, source_path, *, execution_mode=None, inspector=None):
     from capabilities.scene_authoring.validation.preflight import inspect_program
     submission = read_program_document(artifact_root, source_path)
@@ -94,6 +101,7 @@ def inspect_program_submission(artifact_root, source_path, *, execution_mode=Non
     return save_preflight_report(artifact_root, submission, report)
 
 
+# 读取并预检场景提交，失败时保留报告并抛出准入异常。
 def read_program_submission(artifact_root, source_path, *, execution_mode=None, policy=None,
                             inspector=None, include_preflight=False):
     from capabilities.scene_authoring.validation.preflight import inspect_program, ScenePreflightError
@@ -105,6 +113,7 @@ def read_program_submission(artifact_root, source_path, *, execution_mode=None, 
     return {**submission, 'preflight': report} if include_preflight else submission
 
 
+# 比较提交快照与准备后的场景，记录对象、相机及各分区的精确变更。
 def handoff_receipt(submission,program,revision):
     original=submission['program']
     old={o['id']:o for o in original['objects']};new={o['id']:o for o in program['objects']}

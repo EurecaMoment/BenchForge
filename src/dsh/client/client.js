@@ -1164,6 +1164,7 @@ var benchforgeClient = (() => {
           "aria-label": path.join("."),
           "data-plan-field": path.join("."),
           value: value ?? "",
+          /** 把数值编辑结果写回计划路径，空输入对应空值。 */
           onChange: (event) => next(path, event.target.value === "" ? null : Number(event.target.value))
         });
       }
@@ -1175,6 +1176,7 @@ var benchforgeClient = (() => {
         "aria-multiline": true,
         "aria-label": path.join("."),
         "data-plan-field": path.join("."),
+        /** 把可编辑文本节点的正文写回对应计划路径。 */
         onInput: (event) => next(path, event.currentTarget.textContent)
       }, value);
       if (value === null || value === void 0 || value === "") return h("span", { className: "bfw-muted" }, "\u2014");
@@ -1274,7 +1276,13 @@ var benchforgeClient = (() => {
     function select(label, value, onChange, options) {
       return h("label", { className: "bfw-label" }, label, h(
         "select",
-        { className: "bfw-select", "aria-label": label, value, onChange: (e) => onChange(e.target.value) },
+        {
+          className: "bfw-select",
+          "aria-label": label,
+          value,
+          /** 把原生选择事件转换为选项字符串。 */
+          onChange: (e) => onChange(e.target.value)
+        },
         options.map(([id, text]) => h("option", { key: id, value: id }, text))
       ));
     }
@@ -1666,63 +1674,79 @@ var benchforgeClient = (() => {
 
   // src/ui/workbench/api.js
   function createWorkbenchRequest(remote) {
-    return async (params, { body, signal } = {}) => {
-      const query = Object.fromEntries(new URLSearchParams(params));
-      const methods = { stage_review: "stageReview", progress: "progress", stage_artifacts: "sceneArtifacts" };
-      const method = methods[query.view];
-      const { view: _view, ...typedQuery } = query;
-      const result = body === void 0 ? await (method ? remote.benchforgeWorkbench[method](typedQuery, signal) : remote.benchforgeWorkbench.read(query, signal)) : await remote.benchforgeWorkbench.write(query, body, signal);
-      if (!result.ok) {
-        signal?.throwIfAborted();
-        throw new Error(result.error.message);
+    return (
+      /** 按视图选用有类型的原生远程读取接口；写入统一使用工作台写方法并传播取消。 */
+      async (params, { body, signal } = {}) => {
+        const query = Object.fromEntries(new URLSearchParams(params));
+        const methods = { stage_review: "stageReview", progress: "progress", stage_artifacts: "sceneArtifacts" };
+        const method = methods[query.view];
+        const { view: _view, ...typedQuery } = query;
+        const result = body === void 0 ? await (method ? remote.benchforgeWorkbench[method](typedQuery, signal) : remote.benchforgeWorkbench.read(query, signal)) : await remote.benchforgeWorkbench.write(query, body, signal);
+        if (!result.ok) {
+          signal?.throwIfAborted();
+          throw new Error(result.error.message);
+        }
+        return result.value;
       }
-      return result.value;
-    };
+    );
   }
   function createApiHooks({ React }) {
     function useRecord(requestWorkbench, params, revision, interval = 0, active = true) {
       const key = params ? new URLSearchParams(params).toString() : "";
       const [record, setRecord] = React.useState({ key: "", value: null, error: null, loading: false });
-      React.useEffect(() => {
-        if (!key) return;
-        let stopped = false, timer, controller, inFlight = false;
-        const load = async () => {
-          if (stopped || inFlight) return;
-          inFlight = true;
-          controller = new AbortController();
-          const deadline = setTimeout(() => controller.abort(), 16e3);
-          setRecord((old) => old.key === key ? { ...old, loading: !old.value, refreshing: true } : { key, value: null, error: null, loading: true, refreshing: true });
-          try {
-            const value = await requestWorkbench(key, { signal: controller.signal });
-            if (!stopped) setRecord((old) => {
-              if (value.scenes && old.key === key && old.value?.scenes) {
-                const prior = old.value.scenes.runs || [];
-                if (value.scenes.status === "unavailable") value.scenes.runs = prior;
-                else value.scenes.runs = (value.scenes.runs || []).map((row) => row.error ? { ...prior.find((previous) => previous.run_id === row.run_id) || row, error: row.error } : row);
-              }
-              return { key, value, error: null, loading: false, refreshing: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-            });
-          } catch (error) {
-            if (!stopped) setRecord((old) => ({ ...old, key, error: error.message, loading: false, refreshing: false }));
-          } finally {
-            clearTimeout(deadline);
-            inFlight = false;
-            if (!stopped && interval && active && document.visibilityState !== "hidden") timer = setTimeout(load, interval);
-          }
-        };
-        const resume = () => {
-          clearTimeout(timer);
-          if (active && document.visibilityState !== "hidden") load();
-        };
-        load();
-        if (interval) document.addEventListener("visibilitychange", resume);
-        return () => {
-          stopped = true;
-          clearTimeout(timer);
-          controller?.abort();
-          document.removeEventListener("visibilitychange", resume);
-        };
-      }, [requestWorkbench, key, revision, interval, active]);
+      React.useEffect(
+        /** 管理当前查询的请求、轮询与页面可见监听，清理时取消请求并阻止旧响应写回。 */
+        () => {
+          if (!key) return;
+          let stopped = false, timer, controller, inFlight = false;
+          const load = async () => {
+            if (stopped || inFlight) return;
+            inFlight = true;
+            controller = new AbortController();
+            const deadline = setTimeout(() => controller.abort(), 16e3);
+            setRecord(
+              /** 合并同一查询的新结果；场景服务短暂不可用时保留先前可见场景以免界面闪空。 */
+              (old) => old.key === key ? { ...old, loading: !old.value, refreshing: true } : { key, value: null, error: null, loading: true, refreshing: true }
+            );
+            try {
+              const value = await requestWorkbench(key, { signal: controller.signal });
+              if (!stopped) setRecord(
+                /** 合并同一查询的新结果；场景服务短暂不可用时保留先前可见场景以免界面闪空。 */
+                (old) => {
+                  if (value.scenes && old.key === key && old.value?.scenes) {
+                    const prior = old.value.scenes.runs || [];
+                    if (value.scenes.status === "unavailable") value.scenes.runs = prior;
+                    else value.scenes.runs = (value.scenes.runs || []).map((row) => row.error ? { ...prior.find((previous) => previous.run_id === row.run_id) || row, error: row.error } : row);
+                  }
+                  return { key, value, error: null, loading: false, refreshing: false, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+                }
+              );
+            } catch (error) {
+              if (!stopped) setRecord(
+                /** 合并同一查询的新结果；场景服务短暂不可用时保留先前可见场景以免界面闪空。 */
+                (old) => ({ ...old, key, error: error.message, loading: false, refreshing: false })
+              );
+            } finally {
+              clearTimeout(deadline);
+              inFlight = false;
+              if (!stopped && interval && active && document.visibilityState !== "hidden") timer = setTimeout(load, interval);
+            }
+          };
+          const resume = () => {
+            clearTimeout(timer);
+            if (active && document.visibilityState !== "hidden") load();
+          };
+          load();
+          if (interval) document.addEventListener("visibilitychange", resume);
+          return () => {
+            stopped = true;
+            clearTimeout(timer);
+            controller?.abort();
+            document.removeEventListener("visibilitychange", resume);
+          };
+        },
+        [requestWorkbench, key, revision, interval, active]
+      );
       return record.key === key ? record : { value: null, error: null, loading: Boolean(key) };
     }
     function usePanelVisible(ref) {
@@ -1804,6 +1828,7 @@ var benchforgeClient = (() => {
             "aria-label": t("searchTemplates"),
             value: catalogQuery,
             placeholder: t("searchTemplates"),
+            /** 更新模板搜索词并返回第一页。 */
             onChange: (e) => {
               setCatalogQuery(e.target.value);
               setCatalogPage(1);
@@ -2237,20 +2262,24 @@ var benchforgeClient = (() => {
     function PublicObservation({ src, type = "image/*", label, compact = false, t }) {
       const [record, setRecord] = React.useState({ loading: type === "application/json", data: null, error: "" });
       const [attempt, setAttempt] = React.useState(0);
-      React.useEffect(() => {
-        setRecord({ loading: type === "application/json", data: null, error: "" });
-        if (type !== "application/json") return;
-        const controller = new AbortController();
-        fetch(src, { signal: controller.signal }).then(async (response) => {
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          return response.json();
-        }).then((data) => {
-          if (!controller.signal.aborted) setRecord({ loading: false, data, error: "" });
-        }).catch((error) => {
-          if (!controller.signal.aborted) setRecord({ loading: false, data: null, error: error.message });
-        });
-        return () => controller.abort();
-      }, [src, type, attempt]);
+      React.useEffect(
+        /** 在公开观察地址或类型变化时重置内容，按需读取 JSON，并在卸载时取消旧请求。 */
+        () => {
+          setRecord({ loading: type === "application/json", data: null, error: "" });
+          if (type !== "application/json") return;
+          const controller = new AbortController();
+          fetch(src, { signal: controller.signal }).then(async (response) => {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+          }).then((data) => {
+            if (!controller.signal.aborted) setRecord({ loading: false, data, error: "" });
+          }).catch((error) => {
+            if (!controller.signal.aborted) setRecord({ loading: false, data: null, error: error.message });
+          });
+          return () => controller.abort();
+        },
+        [src, type, attempt]
+      );
       return h(
         "figure",
         { className: "bfw-public-observation", "data-observation-type": type, "data-compact": compact },
@@ -2267,6 +2296,7 @@ var benchforgeClient = (() => {
           src,
           alt: label,
           loading: compact ? "lazy" : void 0,
+          /** 将媒体加载失败转换为当前观察组件的可读错误状态。 */
           onError: () => setRecord({ loading: false, data: null, error: t("readFailed") })
         }) : h("p", { className: "bfw-muted" }, t("unsupportedObservation"))
       );
@@ -2294,10 +2324,12 @@ var benchforgeClient = (() => {
           className: "bfw-preview-dialog bfw-question-dialog",
           "data-question-dialog": true,
           "aria-label": title,
+          /** 接管浏览器取消事件，通过组件统一关闭题目预览。 */
           onCancel: (event) => {
             event.preventDefault();
             close();
           },
+          /** 仅在点击对话框背景时关闭预览，保留内容区交互。 */
           onClick: (event) => {
             if (event.target === ref.current) close();
           }
@@ -2357,6 +2389,7 @@ var benchforgeClient = (() => {
           {
             type: "button",
             className: "bfw-preview-open",
+            /** 打开当前场景项目的完整媒体预览。 */
             onClick: () => preview(project),
             "aria-label": t("preview") + " " + t("sceneProject") + " " + (index + 1)
           },
@@ -2426,7 +2459,9 @@ var benchforgeClient = (() => {
           muted: true,
           playsInline: true,
           "aria-label": t("sceneTour"),
+          /** 视频成功加载后清除旧的媒体错误。 */
           onLoadedData: () => setError(""),
+          /** 记录巡览加载失败，使组件展示可用帧及重试入口。 */
           onError: () => setError(t("artifactReadFailed"))
         }) : frameViews,
         h("p", { className: "bfw-muted" }, t(project.video ? "sceneTour" : "sceneViews") + " \xB7 " + t("recordedViews") + ": " + project.frames.length)
@@ -2469,6 +2504,7 @@ var benchforgeClient = (() => {
             "aria-label": t("sceneSearch"),
             placeholder: t("sceneSearch"),
             value: query,
+            /** 把场景库控件的当前值传给对应的查询或选择操作。 */
             onChange: (event) => search(event.target.value)
           }),
           select(t("sceneOrigin"), origin, filter, [["all", t("all")], ["current", t("currentScenes")], ["history", t("historyScenes")]]),
@@ -2479,6 +2515,7 @@ var benchforgeClient = (() => {
           type: "checkbox",
           checked: !!selection?.allow_new_scenes,
           disabled: busy,
+          /** 把场景库控件的当前值传给对应的查询或选择操作。 */
           onChange: (event) => choose(selected, event.target.checked)
         }), t("allowNewScenes")),
         h("small", { className: "bfw-hint" }, t("sceneSelectionHelp")),
@@ -2501,6 +2538,7 @@ var benchforgeClient = (() => {
               checked,
               disabled: busy || !row.available || row.production_eligible === false,
               "aria-label": t("useScene") + " " + name,
+              /** 按当前行和修订号更新场景选择，避免同一场景重复登记。 */
               onChange: (event) => choose(event.target.checked ? [...selected.filter((reference) => reference.id !== row.id), { id: row.id, revision: row.revision }] : selected.filter((reference) => reference.id !== row.id), selection.allow_new_scenes)
             }), row.production_eligible === false ? "\u5F85\u7269\u7406\u4E0E\u751F\u6D3B\u5408\u7406\u6027\u9A8C\u6536" : t("useScene")),
             row.scene_style === "simplified_geometry" ? h("p", { className: "bfw-muted" }, "\u7B80\u5316\u51E0\u4F55\u5B9E\u9A8C \xB7 " + (row.geometry_purpose || "\u6309\u8BA1\u5212\u6D4B\u91CF")) : null,
@@ -2510,6 +2548,7 @@ var benchforgeClient = (() => {
                 type: "button",
                 className: "bfw-preview-open",
                 disabled: !row.available,
+                /** 打开当前场景库条目的媒体预览。 */
                 onClick: () => preview(project),
                 "aria-label": t("preview") + " " + name
               },
@@ -2553,26 +2592,34 @@ var benchforgeClient = (() => {
       const ref = React.useRef(null);
       const [content, setContent] = React.useState(null);
       const [error, setError] = React.useState("");
-      React.useEffect(() => {
-        const dialog = ref.current;
-        const trigger = document.activeElement;
-        dialog.showModal();
-        return () => {
-          dialog.close();
-          trigger?.focus();
-        };
-      }, []);
-      React.useEffect(() => {
-        if (item.data || !item.url || ["image", "video", "file"].includes(item.kind)) return;
-        const controller = new AbortController();
-        fetch(item.url, { signal: controller.signal }).then(async (response) => {
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          return item.kind === "json" ? response.json() : response.text();
-        }).then(setContent).catch((reason) => {
-          if (reason.name !== "AbortError") setError(reason.message);
-        });
-        return () => controller.abort();
-      }, [item]);
+      React.useEffect(
+        /** 按预览内容设置模态焦点及可取消读取；清理时关闭对话框或结束旧请求。 */
+        () => {
+          const dialog = ref.current;
+          const trigger = document.activeElement;
+          dialog.showModal();
+          return () => {
+            dialog.close();
+            trigger?.focus();
+          };
+        },
+        []
+      );
+      React.useEffect(
+        /** 按预览内容设置模态焦点及可取消读取；清理时关闭对话框或结束旧请求。 */
+        () => {
+          if (item.data || !item.url || ["image", "video", "file"].includes(item.kind)) return;
+          const controller = new AbortController();
+          fetch(item.url, { signal: controller.signal }).then(async (response) => {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return item.kind === "json" ? response.json() : response.text();
+          }).then(setContent).catch((reason) => {
+            if (reason.name !== "AbortError") setError(reason.message);
+          });
+          return () => controller.abort();
+        },
+        [item]
+      );
       const data = item.data || content;
       return h(
         "dialog",
@@ -2580,10 +2627,12 @@ var benchforgeClient = (() => {
           ref,
           className: "bfw-preview-dialog",
           "aria-label": t("preview") + " \xB7 " + item.title,
+          /** 使用组件关闭流程响应预览对话框的取消操作。 */
           onCancel: (event) => {
             event.preventDefault();
             close();
           },
+          /** 仅在点击预览背景时关闭对话框。 */
           onClick: (event) => {
             if (event.target === ref.current) close();
           }
@@ -2646,7 +2695,13 @@ var benchforgeClient = (() => {
           },
           h(
             "button",
-            { type: "button", className: "bfw-preview-open", onClick: () => preview(item), "aria-label": t("preview") + " " + item.title },
+            {
+              type: "button",
+              className: "bfw-preview-open",
+              /** 打开当前产物卡片对应的详细预览。 */
+              onClick: () => preview(item),
+              "aria-label": t("preview") + " " + item.title
+            },
             item.kind === "image" || item.image_url ? h("img", { src: item.image_url || item.url, loading: "lazy", alt: item.title }) : item.kind === "video" ? h("video", { src: item.url, preload: "metadata", muted: true, "aria-label": item.title }) : h("div", { className: "bfw-document-thumb" }, h("span", null, item.kind === "json" ? "{ }" : "\u2261"), h("span", null, item.title)),
             h("strong", null, item.title),
             h("span", { className: "bfw-muted" }, t("preview"))
@@ -2857,6 +2912,7 @@ var benchforgeClient = (() => {
             type: "button",
             className: "bfw-plan-scene",
             key: row.id,
+            /** 打开计划所引用场景的预览。 */
             onClick: () => preview({ ...row, title: row.name, kind: "scene" })
           },
           row.frames?.[0]?.url && h("img", { src: row.frames[0].url, alt: sceneName(row.name), loading: "lazy" }),
@@ -2871,6 +2927,7 @@ var benchforgeClient = (() => {
           spellCheck: false,
           style: { minHeight: "min(70vh, 50rem)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: ".8rem", lineHeight: 1.55, whiteSpace: "pre", overflow: "auto" },
           value: draft.markdown,
+          /** 同步更新编辑草稿的引用与界面状态，保留最新 Markdown 正文。 */
           onChange: (event) => {
             const value = { ...draftRef.current, markdown: event.target.value };
             draftRef.current = value;
@@ -2912,26 +2969,30 @@ var benchforgeClient = (() => {
     function ReportProduct({ item, observedAt, t }) {
       const [data, setData] = React.useState(item?.data || null);
       const [error, setError] = React.useState("");
-      React.useEffect(() => {
-        setError("");
-        if (!item) {
+      React.useEffect(
+        /** 优先使用内嵌报告，否则按链接读取；切换或卸载时取消旧请求。 */
+        () => {
+          setError("");
+          if (!item) {
+            setData(null);
+            return;
+          }
+          if (item.data) {
+            setData(item.data);
+            return;
+          }
+          const controller = new AbortController();
           setData(null);
-          return;
-        }
-        if (item.data) {
-          setData(item.data);
-          return;
-        }
-        const controller = new AbortController();
-        setData(null);
-        fetch(item.url, { signal: controller.signal }).then(async (response) => {
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          return response.json();
-        }).then(setData).catch((reason) => {
-          if (reason.name !== "AbortError") setError(reason.message);
-        });
-        return () => controller.abort();
-      }, [item?.url, observedAt]);
+          fetch(item.url, { signal: controller.signal }).then(async (response) => {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+          }).then(setData).catch((reason) => {
+            if (reason.name !== "AbortError") setError(reason.message);
+          });
+          return () => controller.abort();
+        },
+        [item?.url, observedAt]
+      );
       if (!item) return empty(t("reportPending"));
       if (error) return h("p", { className: "bfw-error", role: "alert" }, t("artifactReadFailed") + " " + error);
       if (!data) return empty(t("loading"));
@@ -3202,31 +3263,55 @@ var benchforgeClient = (() => {
       };
       const sampleId = sample?.row_index;
       const currentSample = sample ? dataset.value?.items.find((row) => row.row_index === sampleId && (row.item_id || row.id) === (sample.item_id || sample.id)) : null;
-      React.useEffect(() => {
-        setSample(null);
-      }, [route.dataset, route.page, route.size, route.template, route.split, route.q]);
-      React.useEffect(() => {
-        setPreview((current) => current?.library ? current : null);
-      }, [selectedRunId, sourceScene?.run_id]);
-      React.useEffect(() => {
-        if (dataset.value && route.page > Math.max(1, dataset.value.pages)) update({ page: Math.max(1, dataset.value.pages) });
-      }, [dataset.value, route.page]);
-      React.useEffect(() => {
-        if (sample && dataset.value && !currentSample) {
+      React.useEffect(
+        /** 切换数据集、分页或样本筛选后关闭旧题目，避免展示不属于当前列表的内容。 */
+        () => {
           setSample(null);
-          setNotice(t("sampleRemoved"));
-        }
-      }, [dataset.value, sample, currentSample]);
-      React.useEffect(() => {
-        if (route.stage !== "S4") setSample(null);
-      }, [sampleId, route.stage]);
-      React.useEffect(() => {
-        if (!summary.value) return;
-        const patch = {};
-        if (route.run && !rows.some((row) => row.id === route.run)) patch.run = "";
-        if (!selectedDataset && (route.dataset || datasets.length)) Object.assign(patch, { dataset: datasets[0]?.id || "", template: "", split: "", q: "", page: 1 });
-        if (Object.keys(patch).length) update(patch);
-      }, [summary.value, selectedRunId, route.run, route.dataset]);
+        },
+        [route.dataset, route.page, route.size, route.template, route.split, route.q]
+      );
+      React.useEffect(
+        /** 切换运行或来源场景时关闭旧产物预览，独立场景库预览可继续保留。 */
+        () => {
+          setPreview((current) => current?.library ? current : null);
+        },
+        [selectedRunId, sourceScene?.run_id]
+      );
+      React.useEffect(
+        /** 数据集更新导致总页数减少时，将当前页调整到仍然存在的最后一页。 */
+        () => {
+          if (dataset.value && route.page > Math.max(1, dataset.value.pages)) update({ page: Math.max(1, dataset.value.pages) });
+        },
+        [dataset.value, route.page]
+      );
+      React.useEffect(
+        /** 当前预览样本已不在最新数据中时关闭对话框，并提示样本已移除。 */
+        () => {
+          if (sample && dataset.value && !currentSample) {
+            setSample(null);
+            setNotice(t("sampleRemoved"));
+          }
+        },
+        [dataset.value, sample, currentSample]
+      );
+      React.useEffect(
+        /** 离开数据集阶段时关闭样本详情，保持预览与当前阶段一致。 */
+        () => {
+          if (route.stage !== "S4") setSample(null);
+        },
+        [sampleId, route.stage]
+      );
+      React.useEffect(
+        /** 摘要刷新后清除已消失的运行，并在当前数据集失效时选择首个可用数据集。 */
+        () => {
+          if (!summary.value) return;
+          const patch = {};
+          if (route.run && !rows.some((row) => row.id === route.run)) patch.run = "";
+          if (!selectedDataset && (route.dataset || datasets.length)) Object.assign(patch, { dataset: datasets[0]?.id || "", template: "", split: "", q: "", page: 1 });
+          if (Object.keys(patch).length) update(patch);
+        },
+        [summary.value, selectedRunId, route.run, route.dataset]
+      );
       const runListing = filteredPage(
         rows,
         route.runFilter,
@@ -3424,7 +3509,15 @@ var benchforgeClient = (() => {
         h(
           "div",
           { className: "bfw-toolbar" },
-          h("input", { className: "bfw-input", type: "search", "aria-label": label, placeholder: label, value: query, onChange: (e) => onQuery(e.target.value) }),
+          h("input", {
+            className: "bfw-input",
+            type: "search",
+            "aria-label": label,
+            placeholder: label,
+            value: query,
+            /** 把列表搜索框当前值传给对应筛选操作。 */
+            onChange: (e) => onQuery(e.target.value)
+          }),
           select(t("pageSize"), String(pageSize), (value) => onPageSize(Number(value)), [12, 24, 48].map((value) => [String(value), String(value)])),
           h("span", { className: "bfw-muted" }, t("matches") + ": " + listing.total)
         ),
@@ -3452,9 +3545,12 @@ var benchforgeClient = (() => {
           runListing,
           route.runFilter,
           t("runFilter"),
+          /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
           (value) => update({ runFilter: value, runListPage: 1 }),
+          /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
           (page) => update({ runListPage: page }),
           route.runListSize,
+          /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
           (size) => update({ runListSize: size, runListPage: 1 })
         ),
         summary.loading ? empty(t("loading")) : summary.error && !summary.value ? readFailure() : runListing.total ? runTable(runListing.items) : empty(rows.length ? t("noMatchingRuns") : t("noRuns"))
@@ -3471,9 +3567,12 @@ var benchforgeClient = (() => {
             versionListing,
             route.versionFilter,
             t("versionFilter"),
+            /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
             (value) => update({ versionFilter: value, versionListPage: 1 }),
+            /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
             (page) => update({ versionListPage: page }),
             route.versionListSize,
+            /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
             (size) => update({ versionListSize: size, versionListPage: 1 })
           ),
           versionListing.total ? table([t("workspace"), t("version"), t("generationAccepted"), t("state"), t("open")], versionListing.items.map((row) => [
@@ -3491,13 +3590,24 @@ var benchforgeClient = (() => {
         h("small", { className: "bfw-hint" }, t("publicNote")),
         h(
           "form",
-          { className: "bfw-toolbar", onSubmit: (e) => {
-            e.preventDefault();
-            update({ q: search, page: 1 });
-          } },
+          {
+            className: "bfw-toolbar",
+            /** 阻止表单页面跳转，应用当前样本搜索词并回到第一页。 */
+            onSubmit: (e) => {
+              e.preventDefault();
+              update({ q: search, page: 1 });
+            }
+          },
           select(t("template"), route.template, (id) => update({ template: id, page: 1 }), [["", t("all")], ...(data?.facets.templates || []).map((id) => [id, templateName(id)])]),
           select(t("split"), route.split, (id) => update({ split: id, page: 1 }), [["", t("all")], ...(data?.facets.splits || []).map((id) => [id, id])]),
-          h("input", { className: "bfw-input", "aria-label": t("search"), placeholder: t("search"), value: search, onChange: (e) => setSearch(e.target.value) }),
+          h("input", {
+            className: "bfw-input",
+            "aria-label": t("search"),
+            placeholder: t("search"),
+            value: search,
+            /** 保存样本搜索输入草稿，等待用户提交筛选。 */
+            onChange: (e) => setSearch(e.target.value)
+          }),
           h("button", { className: "bfw-button", type: "submit" }, t("apply"))
         ),
         h(
@@ -3519,6 +3629,7 @@ var benchforgeClient = (() => {
             key: item.row_index,
             "data-sample-row": String(item.row_index),
             "aria-label": "\u67E5\u770B\u9898\u76EE " + (item.row_index + 1),
+            /** 打开当前样本的题目与公开观察预览。 */
             onClick: () => openSample(item)
           },
           firstImage(item) ? h(PublicObservation, { src: firstImage(item), compact: true, label: "\u9898\u76EE " + (item.row_index + 1), t }) : h("div", { className: "bfw-question-placeholder" }, "\u6587\u5B57\u9898"),
@@ -3533,7 +3644,13 @@ var benchforgeClient = (() => {
           h("span", null, t("page") + " " + route.page + " / " + Math.max(1, data?.pages || 1)),
           button(t("nextPage"), () => update({ page: route.page + 1 }), { disabled: !data || route.page >= data.pages || dataset.loading })
         ),
-        route.stage === "S4" && currentSample && h(QuestionDialog, { key: currentSample.row_index, item: currentSample, close: () => setSample(null), t })
+        route.stage === "S4" && currentSample && h(QuestionDialog, {
+          key: currentSample.row_index,
+          item: currentSample,
+          /** 关闭当前样本或产物预览，清除对应选择状态。 */
+          close: () => setSample(null),
+          t
+        })
       );
       const planReceipt = plan ? {
         id: conversationPlan || !selectedRunId ? summary.value?.plan_source?.operation_id || "saved-plan" : selectedRunId,
@@ -3589,6 +3706,7 @@ var benchforgeClient = (() => {
           setCatalogPage,
           capability,
           setCapability,
+          /** 增加读取修订标记，触发失败查询重试。 */
           retry: () => setRevision((value) => value + 1),
           t
         }),
@@ -3601,16 +3719,19 @@ var benchforgeClient = (() => {
         error: sceneError,
         choose: chooseScenes,
         query: sceneQuery,
+        /** 更新场景搜索词并返回场景列表第一页。 */
         search: (query) => {
           setSceneQuery(query);
           setScenePage(1);
         },
         origin: sceneOrigin,
+        /** 更新场景来源筛选并重置分页。 */
         filter: (origin) => {
           setSceneOrigin(origin);
           setScenePage(1);
         },
         page: setScenePage,
+        /** 触发当前工作台查询重新读取最新快照。 */
         refresh: () => setRevision((value) => value + 1),
         preview: setPreview,
         t
@@ -3715,6 +3836,7 @@ var benchforgeClient = (() => {
             key: step.id,
             "data-stage": step.id,
             "aria-current": stage.id === step.id ? "step" : void 0,
+            /** 切换到用户选择的生产阶段，并清除上次操作提示。 */
             onClick: () => {
               update({ stage: step.id });
               setNotice("");
@@ -3745,22 +3867,35 @@ var benchforgeClient = (() => {
           completedStages: Object.values(progressStates).filter((state) => state === "completed").length,
           t
         }),
-        h(StageReviewPanel, { value: reviewRecord.value, t, change: () => prepare(""), act: async (action) => {
-          try {
-            const result = await reviewAction(action);
-            if (action === "pause" && conversationRunning) await stopExecution();
-            if (action === "continue" && result.can_continue && !result.continuation_managed && !conversationRunning) {
-              await submitWithScenes({ text: "\u7528\u6237\u5DF2\u70B9\u51FB\u7ACB\u5373\u7EE7\u7EED\u3002\u8BFB\u53D6 benchforge_stage_review \u7684\u9636\u6BB5\u72B6\u6001\uFF0C\u590D\u7528\u5F53\u524D\u8BA1\u5212\u548C\u4EA7\u7269\u7EE7\u7EED\u751F\u4EA7\u3002", inserted: false, reviewContinued: true }, setDemandError);
+        h(StageReviewPanel, {
+          value: reviewRecord.value,
+          t,
+          /** 进入原生输入框中的追加需求编辑流程。 */
+          change: () => prepare(""),
+          /** 处理复核暂停或继续操作；必要时停止执行，或为未被宿主接管的继续动作提交生产指令。 */
+          act: async (action) => {
+            try {
+              const result = await reviewAction(action);
+              if (action === "pause" && conversationRunning) await stopExecution();
+              if (action === "continue" && result.can_continue && !result.continuation_managed && !conversationRunning) {
+                await submitWithScenes({ text: "\u7528\u6237\u5DF2\u70B9\u51FB\u7ACB\u5373\u7EE7\u7EED\u3002\u8BFB\u53D6 benchforge_stage_review \u7684\u9636\u6BB5\u72B6\u6001\uFF0C\u590D\u7528\u5F53\u524D\u8BA1\u5212\u548C\u4EA7\u7269\u7EE7\u7EED\u751F\u4EA7\u3002", inserted: false, reviewContinued: true }, setDemandError);
+              }
+            } catch (error) {
+              setNotice(error.message);
             }
-          } catch (error) {
-            setNotice(error.message);
           }
-        } }),
+        }),
         demandError && h("p", { className: "bfw-error", role: "alert" }, demandError),
         notice && h("div", { className: "bfw-notice", role: "status" }, notice),
         [summary.error, run.error, dataset.error].filter(Boolean).map((error, i) => h("div", { className: "bfw-error", role: "alert", key: i }, error)),
         h("section", { id: "bfw-content-" + sessionId, "aria-label": t(stage.key) }, body),
-        preview && h(PreviewDialog, { key: preview.url || preview.title, item: preview, close: () => setPreview(null), t })
+        preview && h(PreviewDialog, {
+          key: preview.url || preview.title,
+          item: preview,
+          /** 关闭当前样本或产物预览，清除对应选择状态。 */
+          close: () => setPreview(null),
+          t
+        })
       ));
     }
     return { Workbench };
@@ -3818,10 +3953,14 @@ var benchforgeClient = (() => {
       trigger: "@",
       name: PRODUCTION_SOURCE,
       showGroupTitle: false,
+      /** 生产配置仅由显式界面插入，因此不提供自动补全候选。 */
       candidates: async () => [],
+      /** 保留输入来源的选择接口；生产配置由专门设置界面处理。 */
       onPick: () => void 0,
       codec: {
+        /** 提供复制配置块时使用的简短本地化占位文本。 */
         clipboardText: () => "[" + t("productionSettings") + "]",
+        /** 验证配置块版本和字段，读取当前场景约束后生成真正发送的生产指令与上下文。 */
         serialize: async (ref, signal) => {
           let value;
           try {
@@ -3933,13 +4072,19 @@ var benchforgeClient = (() => {
         "label",
         { className },
         h("span", null, t(label)),
-        h(Input, { ...attributes, value: demand[key], onChange: (event) => change({ [key]: event.target.value }) })
+        h(Input, {
+          ...attributes,
+          value: demand[key],
+          /** 把文本框当前值合并到指定生产需求字段。 */
+          onChange: (event) => change({ [key]: event.target.value })
+        })
       );
       const select = (key, label, options) => h("select", {
         className: composer_default.select,
         "aria-label": t(label),
         title: t(label),
         value: demand[key],
+        /** 将用户选择写回对应生产设置字段。 */
         onChange: (event) => change({ [key]: event.target.value })
       }, options.map(([value, title]) => h("option", { key: value, value }, t(title))));
       const append = demand.mode === "append";
@@ -3976,6 +4121,7 @@ var benchforgeClient = (() => {
               variant: "ghost",
               "aria-expanded": advanced,
               "aria-controls": advancedId,
+              /** 切换高级生产设置的展开状态。 */
               onClick: () => setAdvanced(!advanced)
             }, t("moreProductionSettings"))
           )
@@ -4013,22 +4159,28 @@ var benchforgeClient = (() => {
   // src/ui/workbench/composer-store.js
   function createWorkbenchViewStore(defineStore) {
     return defineStore({
+      /** 为会话构造初始路由、需求和初始化状态。 */
       init: () => ({ route: null, demand: null }),
       persist: "bfw:workbench-view:v1",
       actions: {
+        /** 载入并保存指定会话的初始工作台状态。 */
         initialize: (state, route, demand) => {
           state.route ??= route;
           state.demand ??= demand;
         },
+        /** 合并路由变化并持久化当前会话的浏览位置。 */
         updateRoute: (state, patch) => {
           Object.assign(state.route, patch);
         },
+        /** 合并生产需求字段并写入当前会话的本地保存记录。 */
         changeDemand: (state, patch) => {
           Object.assign(state.demand, patch);
         },
+        /** 切换需求编辑模式并保留现有生产上下文。 */
         requestChange: (state) => {
           state.demand.mode = "append";
         },
+        /** 导航到场景选择界面并保留当前会话其他视图状态。 */
         openScenes: (state) => {
           state.route.stage = "S2";
         }
@@ -4053,6 +4205,7 @@ var benchforgeClient = (() => {
   function createProductsResource(remote) {
     return {
       protocol: "benchforge-workbench",
+      /** 校验资源地址中的会话身份，按序输出产物快照或可读错误并等待下一次刷新。 */
       async *open(address, { signal }) {
         let query;
         try {
@@ -4407,6 +4560,7 @@ var benchforgeClient = (() => {
     methods: {
       "benchforgeWorkbench/products": {
         service: "benchforgeWorkbench",
+        description: "\u8BFB\u53D6\u5F53\u524D\u4F1A\u8BDD\u7684\u7ED3\u6784\u5316\u4EA7\u7269\u5217\u8868\u3002",
         invocation: { kind: "direct" },
         parameters: [
           {
@@ -4433,10 +4587,11 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_products_result$schema,
           jsonSchema: { "type": "object", "properties": { "session_id": { "type": "string" }, "workspace_path": { "oneOf": [{ "type": "null", "const": null }, { "type": "string" }] }, "revision": { "type": "string" }, "items": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "title": { "type": "string" }, "stage": { "oneOf": [{ "type": "null", "const": null }, { "type": "string", "enum": ["S1", "S2", "S3", "S4", "S5"] }] }, "kind": { "type": "string", "enum": ["image", "video", "audio", "json", "text", "file"] }, "content_type": { "type": "string" }, "source": { "type": "string", "enum": ["tool", "mutation", "present"] }, "session_id": { "type": "string" }, "status": { "type": "string", "enum": ["available", "missing", "excluded", "unavailable"] }, "bytes": { "oneOf": [{ "type": "null", "const": null }, { "type": "number" }] }, "updated_at": { "oneOf": [{ "type": "null", "const": null }, { "type": "string" }] }, "url": { "oneOf": [{ "type": "null", "const": null }, { "type": "string" }] } }, "required": ["id", "name", "title", "stage", "kind", "content_type", "source", "session_id", "status", "bytes", "updated_at", "url"], "additionalProperties": true } }, "total": { "type": "number" }, "truncated": { "type": "boolean" } }, "required": ["session_id", "workspace_path", "revision", "items", "total", "truncated"], "additionalProperties": true }
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 41, "column": 9 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 45, "column": 9 }
       },
       "benchforgeWorkbench/progress": {
         service: "benchforgeWorkbench",
+        description: "\u8BFB\u53D6\u751F\u4EA7\u8FDB\u5EA6\uFF0C\u5E76\u68C0\u67E5\u64CD\u4F5C\u3001\u6D41\u6C34\u7EBF\u548C\u5FEB\u7167\u65F6\u95F4\u5B57\u6BB5\u3002",
         invocation: { kind: "direct" },
         parameters: [
           {
@@ -4463,10 +4618,11 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_progress_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 56, "column": 9 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 62, "column": 9 }
       },
       "benchforgeWorkbench/read": {
         service: "benchforgeWorkbench",
+        description: "\u628A\u539F\u751F\u8FDC\u7A0B\u8BFB\u53D6\u8BF7\u6C42\u548C\u53D6\u6D88\u4FE1\u53F7\u8F6C\u4EA4\u5DE5\u4F5C\u53F0\u5206\u53D1\u5668\u3002",
         invocation: { kind: "direct" },
         parameters: [
           {
@@ -4493,10 +4649,11 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_read_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 31, "column": 3 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 33, "column": 3 }
       },
       "benchforgeWorkbench/sceneArtifacts": {
         service: "benchforgeWorkbench",
+        description: "\u8BFB\u53D6\u573A\u666F\u9636\u6BB5\u4EA7\u7269\uFF0C\u5E76\u6821\u9A8C\u8FD4\u56DE\u6761\u76EE\u96C6\u5408\u3002",
         invocation: { kind: "direct" },
         parameters: [
           {
@@ -4523,10 +4680,11 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_sceneArtifacts_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 66, "column": 9 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 73, "column": 9 }
       },
       "benchforgeWorkbench/stageReview": {
         service: "benchforgeWorkbench",
+        description: "\u8BFB\u53D6\u9636\u6BB5\u590D\u6838\u7ED3\u679C\uFF0C\u5E76\u9A8C\u8BC1\u72B6\u6001\u548C\u7EE7\u7EED\u6267\u884C\u6807\u8BB0\u7B26\u5408\u7EA6\u5B9A\u3002",
         invocation: { kind: "direct" },
         parameters: [
           {
@@ -4553,10 +4711,11 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_stageReview_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 46, "column": 9 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 51, "column": 9 }
       },
       "benchforgeWorkbench/write": {
         service: "benchforgeWorkbench",
+        description: "\u628A\u539F\u751F\u8FDC\u7A0B\u5199\u5165\u8BF7\u6C42\u3001\u8BF7\u6C42\u4F53\u548C\u53D6\u6D88\u4FE1\u53F7\u8F6C\u4EA4\u5DE5\u4F5C\u53F0\u5206\u53D1\u5668\u3002",
         invocation: { kind: "direct" },
         parameters: [
           {
@@ -4599,7 +4758,7 @@ var benchforgeClient = (() => {
           create: _eurecamoment_benchforge_workbench_benchforgeWorkbench_write_result$schema,
           jsonSchemaError: "typert tool schema: recursive selected type requires a supported JSON value declaration"
         },
-        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 36, "column": 3 }
+        sourceLocation: { "file": "packages/workbench/src/index.ts", "line": 39, "column": 3 }
       }
     }
   }, import_zod.z);
@@ -4733,104 +4892,136 @@ var benchforgeClient = (() => {
       await ctx.remote.$mount(typert_remote_client_default);
       ctx.effect(() => ctx.locale.register(NS, dictionaries));
       const t = ctx.locale.bind(NS);
-      ctx.inject(["remote.benchforgeWorkbench", "resources"], (workbenchCtx) => {
-        const requestWorkbench = createWorkbenchRequest(workbenchCtx.remote);
-        workbenchCtx.effect(
-          () => workbenchCtx.resources.register(createProductsResource(workbenchCtx.remote)),
-          "benchforge-workbench: conversation products resource"
-        );
-        const sidebar = workbenchCtx.sidebarRight;
-        const store = createWorkbenchViewStore(defineStore);
-        const production = createProductionInput({
-          ctx: workbenchCtx,
-          requestWorkbench,
-          productionRequest: helpers.productionRequest,
-          productionContext: helpers.productionContext,
-          t
-        });
-        workbenchCtx.effect(() => workbenchCtx.inputTriggers.registerSource(production.source));
-        const environment = (sessionId, actions) => {
-          actions.initialize(helpers.initialState(sessionId), helpers.initialDemand(sessionId));
-          return {
+      ctx.inject(
+        ["remote.benchforgeWorkbench", "resources"],
+        /** 在原生远程与资源服务可用后注册工作台资源、按会话隔离的存储及界面插槽。 */
+        (workbenchCtx) => {
+          const requestWorkbench = createWorkbenchRequest(workbenchCtx.remote);
+          workbenchCtx.effect(
+            () => workbenchCtx.resources.register(createProductsResource(workbenchCtx.remote)),
+            "benchforge-workbench: conversation products resource"
+          );
+          const sidebar = workbenchCtx.sidebarRight;
+          const store = createWorkbenchViewStore(defineStore);
+          const production = createProductionInput({
+            ctx: workbenchCtx,
             requestWorkbench,
-            configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
-            stopExecution: async () => {
-              const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();
-              if (!result.ok) throw new Error(result.error?.message || t("stopFailed"));
-            },
-            openScenes: () => {
-              actions.openScenes();
-              sidebar.openTab(WORKBENCH_KIND);
-            }
-          };
-        };
-        workbenchCtx.effect(() => workbenchCtx.sidebarRightTabs.register({
-          id: WORKBENCH_TAB,
-          kind: WORKBENCH_KIND,
-          title: () => t("panel"),
-          keepMounted: true
-        }));
-        workbenchCtx.slots.inject("sidebar.right.pane.tab", () => workbenchCtx.slots.register({
-          name: "sidebar.right.pane.tab",
-          key: WORKBENCH_TAB,
-          locale: NS,
-          store,
-          inject: environment
-        }, function WorkbenchPanel(props) {
-          const preset = props.useProjection("agentPreset");
-          if (preset !== PRESET_ID) return null;
-          return h(ProductionEnvironment, { ...props, key: props.sessionId, t });
-        }));
-        for (const slot of ["conversation.composer.dock", "conversation.input.dock"]) {
-          workbenchCtx.slots.inject(slot, () => workbenchCtx.slots.register({
-            name: slot,
-            id: "benchforge-production-settings",
-            order: 10,
-            locale: NS,
-            store,
-            inject: environment
-          }, function WorkbenchComposer(props) {
-            const preset = props.useProjection("agentPreset");
-            const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
-            const hero = slot === "conversation.input.dock";
-            if (preset !== PRESET_ID || hero && !blank) return null;
-            return h(ProductionEnvironment, { ...props, key: props.sessionId, t, hero, component: composer.ProductionComposer });
-          }));
-        }
-        const toggle = () => {
-          const active = sidebar.active();
-          if (active?.kind === WORKBENCH_KIND && sidebar.isExpanded()) sidebar.hide(active.id);
-          else sidebar.openTab(WORKBENCH_KIND);
-        };
-        for (const slot of ["conversation.session.header.utilities", "conversation.hero.options"]) {
-          workbenchCtx.slots.inject(slot, () => workbenchCtx.slots.register({
-            name: slot,
-            id: "benchforge-workbench-toggle",
-            order: 10,
-            locale: NS
-          }, function WorkbenchToggle({ useProjection }) {
-            const preset = useProjection("agentPreset");
-            if (preset !== PRESET_ID) return null;
-            return h("button", {
-              type: "button",
-              onClick: toggle,
-              title: t("toggleWorkbench"),
-              "aria-label": t("toggleWorkbench"),
-              "data-workbench-toggle": true,
-              style: {
-                padding: ".35rem .65rem",
-                borderRadius: ".5rem",
-                cursor: "pointer",
-                border: "1px solid var(--dsw-alias-border-l3)",
-                whiteSpace: "nowrap",
-                background: "var(--dsw-alias-bg-base)",
-                color: "var(--dsw-alias-label-primary)",
-                font: "inherit"
+            productionRequest: helpers.productionRequest,
+            productionContext: helpers.productionContext,
+            t
+          });
+          workbenchCtx.effect(() => workbenchCtx.inputTriggers.registerSource(production.source));
+          const environment = (sessionId, actions) => {
+            actions.initialize(helpers.initialState(sessionId), helpers.initialDemand(sessionId));
+            return {
+              requestWorkbench,
+              /** 将当前会话身份附到生产配置更新操作。 */
+              configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
+              /** 调用当前原生会话的取消接口，失败时向界面报告原因。 */
+              stopExecution: async () => {
+                const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();
+                if (!result.ok) throw new Error(result.error?.message || t("stopFailed"));
+              },
+              /** 切换工作台到场景选择，并展开右侧面板。 */
+              openScenes: () => {
+                actions.openScenes();
+                sidebar.openTab(WORKBENCH_KIND);
               }
-            }, t("panel"));
+            };
+          };
+          workbenchCtx.effect(() => workbenchCtx.sidebarRightTabs.register({
+            id: WORKBENCH_TAB,
+            kind: WORKBENCH_KIND,
+            /** 按当前语言读取工作台标签页标题。 */
+            title: () => t("panel"),
+            keepMounted: true
           }));
+          workbenchCtx.slots.inject(
+            "sidebar.right.pane.tab",
+            /** 在插槽提供方作用域内注册对应工作台面板、输入设置或切换按钮，并随依赖卸载释放。 */
+            () => workbenchCtx.slots.register(
+              {
+                name: "sidebar.right.pane.tab",
+                key: WORKBENCH_TAB,
+                locale: NS,
+                store,
+                inject: environment
+              },
+              /** 仅为 BenchForge 预设会话渲染带权限环境的工作台面板。 */
+              function WorkbenchPanel(props) {
+                const preset = props.useProjection("agentPreset");
+                if (preset !== PRESET_ID) return null;
+                return h(ProductionEnvironment, { ...props, key: props.sessionId, t });
+              }
+            )
+          );
+          for (const slot of ["conversation.composer.dock", "conversation.input.dock"]) {
+            workbenchCtx.slots.inject(
+              slot,
+              /** 在插槽提供方作用域内注册对应工作台面板、输入设置或切换按钮，并随依赖卸载释放。 */
+              () => workbenchCtx.slots.register(
+                {
+                  name: slot,
+                  id: "benchforge-production-settings",
+                  order: 10,
+                  locale: NS,
+                  store,
+                  inject: environment
+                },
+                /** 在适用的输入插槽显示生产设置，首页形态仅用于空白会话。 */
+                function WorkbenchComposer(props) {
+                  const preset = props.useProjection("agentPreset");
+                  const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
+                  const hero = slot === "conversation.input.dock";
+                  if (preset !== PRESET_ID || hero && !blank) return null;
+                  return h(ProductionEnvironment, { ...props, key: props.sessionId, t, hero, component: composer.ProductionComposer });
+                }
+              )
+            );
+          }
+          const toggle = () => {
+            const active = sidebar.active();
+            if (active?.kind === WORKBENCH_KIND && sidebar.isExpanded()) sidebar.hide(active.id);
+            else sidebar.openTab(WORKBENCH_KIND);
+          };
+          for (const slot of ["conversation.session.header.utilities", "conversation.hero.options"]) {
+            workbenchCtx.slots.inject(
+              slot,
+              /** 在插槽提供方作用域内注册对应工作台面板、输入设置或切换按钮，并随依赖卸载释放。 */
+              () => workbenchCtx.slots.register(
+                {
+                  name: slot,
+                  id: "benchforge-workbench-toggle",
+                  order: 10,
+                  locale: NS
+                },
+                /** 仅在 BenchForge 会话显示具有可访问标签的工作台切换按钮。 */
+                function WorkbenchToggle({ useProjection }) {
+                  const preset = useProjection("agentPreset");
+                  if (preset !== PRESET_ID) return null;
+                  return h("button", {
+                    type: "button",
+                    onClick: toggle,
+                    title: t("toggleWorkbench"),
+                    "aria-label": t("toggleWorkbench"),
+                    "data-workbench-toggle": true,
+                    style: {
+                      padding: ".35rem .65rem",
+                      borderRadius: ".5rem",
+                      cursor: "pointer",
+                      border: "1px solid var(--dsw-alias-border-l3)",
+                      whiteSpace: "nowrap",
+                      background: "var(--dsw-alias-bg-base)",
+                      color: "var(--dsw-alias-label-primary)",
+                      font: "inherit"
+                    }
+                  }, t("panel"));
+                }
+              )
+            );
+          }
         }
-      });
+      );
     }
     const { productionContext, ...publicHelpers } = helpers;
     return { ProductionEnvironment, Workbench, dictionaries, apply, createWorkbenchRequest, ...publicHelpers, ...components };

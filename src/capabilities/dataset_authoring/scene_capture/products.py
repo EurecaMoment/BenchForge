@@ -27,6 +27,7 @@ from capabilities.dataset_authoring.scene_capture.product_packaging import packa
 _PUBLISH_LOCK=threading.Lock()
 
 
+# 只按中心标记所需空间筛选候选，保留原始几何和真值并记录筛除原因。
 def filter_readable_candidates(pairs):
     """Keep geometry and GT untouched; require room around the center marker.
 
@@ -65,6 +66,7 @@ def filter_readable_candidates(pairs):
                        'Visual item review still applies; review decisions are model opinions, not benchmark certification.']}
 
 
+# 先验证场景验收与交付合同，再原子发布完整数据版本并保留失败导出供审计。
 def produce(directory,split='dev',intent=None,*,stop=None,context=None):
     """Commit a complete release atomically; keep partial export attempts for audit."""
     intent = intent or {}
@@ -109,6 +111,7 @@ def produce(directory,split='dev',intent=None,*,stop=None,context=None):
         return summary
 
 
+# 从采集帧生成确定性的空间题目候选，暂不渲染标记图像。
 def _question_candidates(capture,frames,target):
     pairs=[]
     sources={f['frame_id']:capture/f['image'] for f in frames}
@@ -119,6 +122,7 @@ def _question_candidates(capture,frames,target):
     return pairs
 
 
+# 为选中候选绘制题目图像，并保留原候选记录供诊断。
 def _render_question_images(directory,capture,frames,pairs):
     sources={f['frame_id']:capture/f['image'] for f in frames}
     selected=[]
@@ -131,6 +135,7 @@ def _render_question_images(directory,capture,frames,pairs):
     return selected
 
 
+# 先筛选可读且覆盖多样的候选，再生成题目标记图像。
 def _select_question_images(directory,capture,frames,target):
     """Select eligible unchanged candidates before writing question overlays."""
     pairs=_question_candidates(capture,frames,target)
@@ -139,6 +144,7 @@ def _select_question_images(directory,capture,frames,target):
     return pairs,selected
 
 
+# 在有限审查预算内选择、渲染和审查题目，输出公开题目、私有答案及诊断报告。
 def _produce(directory,release,split,intent,*,stop=None,context=None):
     intent = intent or {}
     target = intent.get('target_items', 24)
@@ -156,6 +162,7 @@ def _produce(directory,release,split,intent,*,stop=None,context=None):
     pool=select_diverse(eligible,review_budget)
     selected=[];cursor=0;batch_index=0
     public=[];authority=[];reviews=[]
+    # 把当前导出尝试、候选池和审查预算状态持久化，便于审计未完成选择。
     def save_selection(state):
         selection.update({
             'export_attempt': release.name,

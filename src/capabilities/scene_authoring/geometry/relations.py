@@ -6,6 +6,7 @@ from capabilities.scene_authoring.geometry.parts import part_bounds
 from capabilities.scene_authoring.geometry.parts import horizontal_box_top
 
 
+# 从已执行部件及原生世界变换计算部件边界，可只保留可支撑顶面。
 def native_part_bounds(entity, *, support_only=False):
     geometry = entity.get('geometry_parts', {})
     matrix = entity.get('world_transform')
@@ -31,12 +32,14 @@ def native_part_bounds(entity, *, support_only=False):
     return boxes
 
 
+# 检查子物体底面与任一部件顶面的高度间隙及水平包容关系。
 def supported_by_parts(child, parts, gap=.04):
     lo, hi = child
     return any(abs(lo[2] - top[2]) <= gap and all(lo[i] >= bottom[i] - .02 and hi[i] <= top[i] + .02 for i in (0, 1))
                for bottom, top in parts)
 
 
+# 检查子物体是否落在实际执行的水平盒面或直立椭圆柱顶面内。
 def supported_by_native_parts(child, entity):
     """Executed box tops and upright elliptical cylinder tops can carry props.
 
@@ -71,11 +74,13 @@ def supported_by_native_parts(child, entity):
     return False
 
 
+# 判断两组部件边界是否在三轴均存在超过容差的未解决重叠。
 def overlap_unresolved(left, right):
     return any(all(min(b[k], d[k]) - max(a[k], c[k]) > .02 for k in range(3))
                for a, b in left for c, d in right)
 
 
+# 将源网格顶点按最终原生变换计算紧边界，用于排除空包围盒角造成的假重叠。
 def transported_mesh_bounds(entity, dependency, mesh):
     """Tight source-vertex bounds under the measured final native transform.
 

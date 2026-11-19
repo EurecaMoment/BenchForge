@@ -21,6 +21,7 @@ from capabilities.dataset_authoring.spatial.conditions import apply_condition
 PARTITIONS=('train','curriculum_dev','selection_dev','sealed_test')
 
 
+# 按能力编号分派几何、运动、图与交互任务，并构建对应私有答案或示范。
 def build_task(scene,template):
     nid=template['primary_capabilities'][0];op=template['query']
     if nid in ['N04','N05','N09','N14','N18']:spec=motion_task(scene,nid,op)
@@ -66,6 +67,7 @@ def build_task(scene,template):
     return spec
 
 
+# 按模板生成场景、任务和可选观察图像，组合公开记录与私有评分依据。
 def make_item(template,seed,difficulty,group,media_directory=None):
     scene=create_scene(template,seed,difficulty,group);spec=build_task(scene,template)
     nid=template['primary_capabilities'][0];images=[]
@@ -95,6 +97,7 @@ def make_item(template,seed,difficulty,group,media_directory=None):
     return public,authority
 
 
+# 按固定场景组生产空间任务和对照条件，使同源世界保持同一数据分区。
 def generate(args,directory,config=None):
     root=Path(directory)/'dataset'
     selected=templates(args.get('capability'))

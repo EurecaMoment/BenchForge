@@ -6,6 +6,7 @@ from pathlib import Path
 from storage.scene_jobs.migrate_capture import migrate_capture
 
 
+# 加载运行配置，在调度启动前执行一次性采集协议迁移并输出回执。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)

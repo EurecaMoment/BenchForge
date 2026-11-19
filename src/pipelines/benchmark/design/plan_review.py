@@ -7,6 +7,7 @@ CONTRACT_FIELDS = ('schema', 'pipeline_id', 'objective', 'inputs', 'steps', 'sel
                    'template_contracts', 'assessment', 'production_contract', 'user_markdown')
 
 
+# 提取决定生产评审身份的任务契约，排除执行路径及不改变测量要求的修复描述。
 def _contract(plan):
     value = {key: deepcopy(plan[key]) for key in CONTRACT_FIELDS if key in plan}
     # Collected receipts and output locations are execution bindings. Their
@@ -21,6 +22,7 @@ def _contract(plan):
     return value
 
 
+# 仅将角色声明完全一致的一对一对象更名识别为机械修复。
 def _object_renames(before, after):
     """Only a one-to-one rename with identical declared roles is mechanical."""
     old, new = before.get('object_roles', []), after.get('object_roles', [])
@@ -37,6 +39,7 @@ def _object_renames(before, after):
     return dict(zip(old_ids, new_ids))
 
 
+# 对齐前后场景声明中的机械对象更名，避免将标识修复误判为任务变更。
 def _align_repairs(before, after):
     old = before.get('assessment', {}).get('scenes', {})
     new = after.get('assessment', {}).get('scenes', {})
@@ -65,6 +68,7 @@ def _align_repairs(before, after):
         left['object_ids'], right['object_ids'] = sorted(old_ids), sorted(new_ids)
 
 
+# 递归比较结构值，返回有差异的字段路径，供版本与评审变更说明使用。
 def _changes(before, after, prefix=''):
     if type(before) is type(after) and before == after:
         return []
@@ -81,6 +85,7 @@ def _changes(before, after, prefix=''):
     return [prefix]
 
 
+# 确保执行修复保留已有采集、机器人及对象要求，实质改任务须通过用户计划编辑。
 def _preserve_requirements(before, after):
     old, new = before.get('assessment', {}), after.get('assessment', {})
     for flag in ('require_native_episode', 'require_robot_locomotion'):
@@ -98,6 +103,7 @@ def _preserve_requirements(before, after):
                     raise ValueError('Execution repairs cannot remove required asset identity: ' + role['object_id'])
 
 
+# 由领域契约决定计划谱系和评审身份，复用等价修复的评审并记录实质变更。
 def revision_review(plan, target, previous=None, base_plan=None, *, new_task=False, applied_edit=False, draft_edit=False):
     """Return domain-owned lineage and review identity; never accept a caller key."""
     key = str(Path(target).resolve())

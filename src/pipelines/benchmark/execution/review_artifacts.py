@@ -5,6 +5,7 @@ from storage.artifacts import read
 from pipelines.benchmark.design.plan_versions import current
 
 
+# 确认评审引用当前已应用计划在工作区内的真实阶段回执，并返回领域评审身份。
 def require_stage_artifact(workspace, session, stage, artifact):
     root = Path(workspace).resolve()
     file = (root / artifact).resolve()

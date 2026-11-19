@@ -7,13 +7,13 @@ import {createProgressComponents} from '../../ui/workbench/components/progress.j
 import {pendingCapture} from '../tools/scene/capture/quality_review.mjs';
 import {collectionSummary} from './collection.mjs';
 
-const state = createWorkbenchState({STAGES, sceneName: value => value});
+const state = createWorkbenchState({STAGES, /** 保留测试场景名称，避免名称转换影响阶段推导断言。 */ sceneName: value => value});
 const previews = [
   {stage: 'S2', kind: 'image', task_id: 'scene', revision: 0, file: 'capture/view_0.png'},
   {stage: 'S3', kind: 'json', task_id: 'scene', revision: 0, file: 'capture/view_0.json'},
 ];
 
-test('both language packs and plan instructions use the shared five-stage meaning', () => {
+test('both language packs and plan instructions use the shared five-stage meaning', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：both language packs and plan instructions use the shared five-stage meaning。 */ () => {
   assert.equal(STAGES[1].key, 'scenes');
   assert.equal(STAGES[2].key, 'collection');
   assert.equal(dictionaries.zh.collectionNav, '采集');
@@ -24,7 +24,7 @@ test('both language packs and plan instructions use the shared five-stage meanin
   assert.match(request, /S3 采集包含标注/);
 });
 
-test('required stage semantics cannot be relabeled by review_stage', () => {
+test('required stage semantics cannot be relabeled by review_stage', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：required stage semantics cannot be relabeled by review_stage。 */ () => {
   assert.equal(stageOfStep({uses: 'collection.validate', review_stage: 'S2'}), 'S3');
   assert.equal(stageOfStep({uses: 'evidence.validate', review_stage: 'S2'}), 'S3');
   assert.equal(stageOfStep({uses: 'templates.produce', review_stage: 'S2'}), 'S4');
@@ -35,7 +35,7 @@ test('required stage semantics cannot be relabeled by review_stage', () => {
   assert.equal(state.sceneStage({workflow: 'scene', phase: 'collect'}), 'S3');
 });
 
-test('collection counts come from explicit validation receipts and exclude private answers', () => {
+test('collection counts come from explicit validation receipts and exclude private answers', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：collection counts come from explicit validation receipts and exclude private answers。 */ () => {
   assert.equal(collectionSummary({items: 100, state: 'completed'}), null);
   const summary = collectionSummary({schema: 'benchforge.collection-stage/v1', state: 'needs_evidence',
     required_items: 100, collection: {records: 5, scenes: 1, media_files: 10, native_episodes: 5, native_samples: 500},
@@ -47,7 +47,7 @@ test('collection counts come from explicit validation receipts and exclude priva
   assert.equal(summary.answer, undefined);
 });
 
-test('paired scene previews and a completed scene never complete S3 collection', () => {
+test('paired scene previews and a completed scene never complete S3 collection', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：paired scene previews and a completed scene never complete S3 collection。 */ () => {
   const pipeline = {steps: [{id: 'scene', uses: 'scene.acceptance', stage: 'S2', state: 'completed'}]};
   const scene = {state: 'SUCCEEDED', tasks: [{workflow: 'scene', state: 'SUCCEEDED'}]};
   assert.equal(state.stageState('S3', pipeline, scene, [], null, previews), 'previewable');
@@ -55,7 +55,7 @@ test('paired scene previews and a completed scene never complete S3 collection',
   assert.equal(state.stageState('S3', pipeline, annotations, [], null, previews), 'previewable');
 });
 
-test('only validated collection steps can complete S3; failed validation stays failed', () => {
+test('only validated collection steps can complete S3; failed validation stays failed', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：only validated collection steps can complete S3; failed validation stays failed。 */ () => {
   for (const uses of ['collection.validate', 'evidence.validate']) {
     const pipeline = {steps: [{uses, stage: 'S3', state: 'completed'}]};
     assert.equal(state.stageState('S3', pipeline, null), 'completed');
@@ -65,19 +65,20 @@ test('only validated collection steps can complete S3; failed validation stays f
   assert.equal(state.stageState('S3', {steps: [{uses: 'benchforge.evidence', stage: 'S3', state: 'completed'}]}, null), 'previewable');
 });
 
-test('S3 preview cards do not render a fabricated completion percentage', () => {
+test('S3 preview cards do not render a fabricated completion percentage', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：S3 preview cards do not render a fabricated completion percentage。 */ () => {
   const nodes = [];
-  const React = {createElement(type, props, ...children) {const value = {type, props: props || {}, children}; nodes.push(value); return value;}};
-  const helpers = {...state, status: value => value, table: () => null, sceneName: value => value};
+  const React = {/** 将 React 调用记录为普通节点，供阶段展示测试遍历断言。 */ createElement(type, props, ...children) {const value = {type, props: props || {}, children}; nodes.push(value); return value;}};
+  const helpers = {...state, /** 保留测试状态值，便于从组件树检查阶段状态。 */ status: value => value, /** 省略与当前断言无关的表格渲染。 */ table: () => null, /** 保留测试场景名称，避免名称转换影响阶段推导断言。 */ sceneName: value => value};
   const {StageProgress} = createProgressComponents({React, helpers});
   StageProgress({stage: STAGES[2], pipeline: {steps: [{stage: 'S2', state: 'completed'}]},
     scene: null, record: {value: {scenes: {runs: []}}}, artifacts: previews,
+    /** 保留或查询测试本地化键，便于断言状态文案。 */
     t: key => dictionaries.zh[key] || key});
   assert.equal(nodes.filter(node => node.type === 'progress').length, 0);
   assert.ok(nodes.some(node => node.props['data-collection-preview']));
 });
 
-test('scene quality review still observes a capture whose historical name was corrected', () => {
+test('scene quality review still observes a capture whose historical name was corrected', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：scene quality review still observes a capture whose historical name was corrected。 */ () => {
   const receipt = pendingCapture([
     {type: 'turn/start', data: {turn: 1}},
     {type: 'tool/call', data: {callId: 'capture', name: 'benchmarkforge_capture', arguments: '{}'}},

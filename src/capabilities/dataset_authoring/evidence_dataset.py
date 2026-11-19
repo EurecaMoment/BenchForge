@@ -11,6 +11,7 @@ from storage.artifacts import write_json as write
 from storage.artifacts import write_jsonl as jsonl
 
 
+# 将题目绑定到唯一证据，分离公开材料与私有来源并构建基准数据集。
 def build(args, directory):
     records = rows(args["evidence"])
     evidence = {r["id"]: r for r in records}

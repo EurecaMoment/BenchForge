@@ -13,6 +13,7 @@ from database.access import AccessScope
 from service_access.access_scope import TrustedAccess
 
 
+# 把 JSON 文档编码为最小对齐 GLB 容器，供依赖引用解析测试。
 def glb(document):
     raw = json.dumps(document).encode()
     raw += b" " * (-len(raw) % 4)
@@ -20,11 +21,13 @@ def glb(document):
 
 
 class LibraryClosureTests(unittest.TestCase):
+    # 创建独立临时资源目录，隔离清单闭包与发布快照测试。
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
 
+    # 验证外部、绝对及编码后的父目录依赖引用全部被拒绝。
     def test_external_absolute_and_encoded_parent_references_are_rejected(self):
         path = self.root / "mesh.gltf"
         for reference in ("../secret.png", "%2e%2e/secret.png", "file:///etc/passwd", "https://host/a.png", "/other/image.png"):
@@ -32,6 +35,7 @@ class LibraryClosureTests(unittest.TestCase):
             with self.assertRaises((ValueError, FileNotFoundError), msg=reference):
                 verify_reference_closure(path)
 
+    # 验证资源的全部纹理依赖都经过存在性校验并纳入内容摘要。
     def test_all_texture_files_are_verified_and_hashed(self):
         (self.root / "textures").mkdir()
         (self.root / "textures/base.png").write_bytes(b"texture")
@@ -44,6 +48,7 @@ class LibraryClosureTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             verify_bundle(self.root)
 
+    # 验证发布复制不可变快照，并只授予当前所有者而非默认公开。
     def test_publication_snapshots_files_and_grants_owner_not_public(self):
         source = self.root / "generated"
         source.mkdir()
@@ -55,6 +60,7 @@ class LibraryClosureTests(unittest.TestCase):
         workspace = self.root / "workspace"
         workspace.mkdir()
         access = TrustedAccess(AccessScope("host", "session", "workspace", "owner", 1, 1), str(workspace))
+        # 恢复测试快照文件的可写权限，确保临时目录能够正常清理。
         def writable_cleanup():
             for file in self.root.rglob("*"):
                 if file.is_file():
@@ -76,6 +82,7 @@ class LibraryClosureTests(unittest.TestCase):
         (source / "mesh.json").write_text('{"tampered":true}')
         self.assertNotIn("tampered", (saved / "mesh.json").read_text())
 
+    # 验证输入快照拒绝链接，并将完整依赖闭包保存在私有暂存区。
     @unittest.skipUnless(os.name == "posix", "Descriptor-confined input copying requires Linux")
     def test_input_snapshot_rejects_symlink_and_keeps_reference_closure_private(self):
         workspace = self.root / "workspace"

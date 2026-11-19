@@ -13,6 +13,7 @@ from capabilities.dataset_authoring.source_binding import validate_source_bindin
 from capabilities.task_catalog.benchmark import all_templates
 
 
+# 核对复用场景与新采集设计均属于已保存评估计划，禁止越过用户场景选择。
 def validate_planned_scenes(accepted, assessment):
     """Keep reused identities and newly captured designs bound to the saved plan."""
     scenes = assessment.get('scenes', {})
@@ -30,6 +31,7 @@ def validate_planned_scenes(accepted, assessment):
             raise ValueError('S2 capture does not match a saved scene design; capture the planned scene or explicitly select an accepted revision')
 
 
+# 收集并验证源场景生产验收回执，缺少真实来源时返回需要证据的阶段状态。
 def scene_acceptance(arguments, directory, environment, client):
     sources = arguments.get('scene_sources') or []
     evidence = arguments.get('evidence')
@@ -59,6 +61,7 @@ def scene_acceptance(arguments, directory, environment, client):
     return {**receipt, 'artifacts': [{'path': str(path.resolve()), 'title': '场景验收回执', 'stage': 'S2'}]}
 
 
+# 验证实际采集证据与注释来源及计划契约；缺失数据时明确要求补齐。
 def validate_collection(arguments, directory, environment, client, *, legacy=False):
     """Validate actual collected sources; this operation does not acquire missing data."""
     source = arguments.get('evidence')
@@ -140,6 +143,7 @@ def validate_collection(arguments, directory, environment, client, *, legacy=Fal
     return {**value, 'annotations_path' if legacy else 'collection_path': str(path.resolve())}
 
 
+# 兼容已保存旧配方中的证据验证操作，同时复用当前采集验证规则。
 def validate_evidence(arguments, directory, environment, client):
     """Retain the operation and artifact location of already-saved S3 plans."""
     return validate_collection(arguments, directory, environment, client, legacy=True)

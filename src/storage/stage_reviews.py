@@ -18,10 +18,12 @@ from storage.review_progress import POLICY_VERSION, WAIT_SECONDS, RELEASED, chec
 from storage.access_identity import workspace_namespace
 
 
+# 复用工作区对应的数据库引擎。
 def _engine(workspace):
     return engine_for(resolve_workspace_url(workspace))
 
 
+# 初始化评审存储并锁定工作区会话的评审实体，串行修改其状态。
 @contextmanager
 def _database(workspace, session):
     root = Path(workspace).resolve()
@@ -33,6 +35,7 @@ def _database(workspace, session):
         yield connection, namespace
 
 
+# 读取指定或最新评审，兼容旧评审编号映射并可按需加行锁。
 def _row(connection, namespace, session, review_id=None, *, lock=False):
     query = select(reviews).where(reviews.c.workspace_id == namespace, reviews.c.session == session)
     query = query.where(reviews.c.id == review_id) if review_id is not None else query.order_by(reviews.c.id.desc()).limit(1)
@@ -58,6 +61,7 @@ def _row(connection, namespace, session, review_id=None, *, lock=False):
     return value
 
 
+# 在一致的只读事务中读取已提交评审快照，避免争用评审修改锁。
 def read_current(workspace, session, review_id=None, *, now=None):
     """Read one committed snapshot without taking the review mutation lock."""
     if not isinstance(session, str) or not re.fullmatch(r"[\w-]{1,160}", session):
@@ -77,6 +81,7 @@ def read_current(workspace, session, review_id=None, *, now=None):
         return _public(row, time.time() if now is None else now)
 
 
+# 保存可变评审状态与进度，并递增版本供并发检查比较。
 def _save(connection, row):
     connection.execute(update(reviews).where(reviews.c.id == row["id"]).values(
         artifact=row["artifact"], deadline=row["deadline"], state=row["state"],
@@ -84,6 +89,7 @@ def _save(connection, row):
         revision=reviews.c.revision + 1, progress=row["progress"]))
 
 
+# 生成面向调用方的评审状态、进度和下一步提示，隐藏内部存储字段。
 def _public(row, clock):
     if row is None:
         return {"state": "none", "wait_seconds": WAIT_SECONDS, "can_continue": False}
@@ -107,6 +113,7 @@ def _public(row, clock):
     return result
 
 
+# 处理评审开启、暂停、用户指令、重试及继续操作，校验状态转换和会话身份。
 def review(workspace, session, action="status", *, stage=None, key=None, artifact=None,
            review_id=None, instruction="", now=None):
     if not session or not re.fullmatch(r"[\w-]{1,160}", session):
@@ -179,6 +186,7 @@ def review(workspace, session, action="status", *, stage=None, key=None, artifac
         return _public(_row(connection, namespace, session, row["id"]), clock)
 
 
+# 锁定读取指定评审，若已有更新评审则将该快照标记为已取代。
 def snapshot(workspace, session, review_id):
     with _database(workspace, session) as (connection, namespace):
         row = _row(connection, namespace, session, review_id, lock=True)
@@ -188,6 +196,7 @@ def snapshot(workspace, session, review_id):
         return row
 
 
+# 仅对版本仍匹配的最新评审应用检查回执，防止慢检查覆盖用户的新操作。
 def complete_check(workspace, expected, reason, receipt, *, now=None):
     clock = time.time() if now is None else now
     with _database(workspace, expected["session"]) as (connection, namespace):

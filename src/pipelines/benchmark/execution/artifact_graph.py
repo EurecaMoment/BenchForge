@@ -19,10 +19,12 @@ from typing import Any
 STATUSES = {"draft", "candidate", "verified", "rejected", "superseded"}
 
 
+# 返回用于产物记录的 UTC ISO 时间戳。
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# 递归遍历字典和列表，产出所有带键的后代值。
 def _walk(value: Any):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -33,6 +35,7 @@ def _walk(value: Any):
             yield from _walk(child)
 
 
+# 提取参数中声明的来源路径并去重，不读取或推断文件内容。
 def evidence_refs(arguments: dict[str, Any]) -> list[str]:
     """Return declared source paths without inspecting their contents."""
     keys = {
@@ -50,6 +53,7 @@ def evidence_refs(arguments: dict[str, Any]) -> list[str]:
     return result
 
 
+# 递归提取延迟绑定引用的根步骤名称，保持首次出现顺序。
 def binding_roots(value: Any) -> list[str]:
     roots = []
     if isinstance(value, str) and value.startswith("$"):
@@ -69,6 +73,7 @@ def binding_roots(value: Any) -> list[str]:
     return roots
 
 
+# 优先采用显式产物类型，否则按操作语义推断已知类型。
 def artifact_type(operation: str, declared: str | None = None) -> str:
     if declared:
         return declared
@@ -83,10 +88,12 @@ def artifact_type(operation: str, declared: str | None = None) -> str:
     return "pipeline.output"
 
 
+# 构造统一的契约检查记录，标注通过状态与说明。
 def _check(name: str, passed: bool, message: str) -> dict[str, Any]:
     return {"id": name, "status": "passed" if passed else "failed", "message": message}
 
 
+# 只验证仓库拥有的产物结构契约；未知类型明确标为不适用，不当作真实性证明。
 def contract_result(kind: str, result: Any) -> dict[str, Any]:
     """Apply only shape-level contracts owned by this repository.
 
@@ -128,10 +135,12 @@ class ArtifactRecord:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_now)
 
+    # 校验产物状态属于允许集合，拒绝无效账本记录。
     def __post_init__(self):
         if self.status not in STATUSES:
             raise ValueError(f"Unknown artifact status: {self.status}")
 
+    # 将产物记录转换为带版本标识的可持久化字典。
     def to_dict(self) -> dict[str, Any]:
         return {"schema": "benchforge.artifact/v1", **asdict(self)}
 
@@ -139,6 +148,7 @@ class ArtifactRecord:
 class ArtifactGraph:
     """Append-only lineage manifest for one persisted pipeline run."""
 
+    # 绑定运行目录及产物、修复日志，并加载已有产物记录。
     def __init__(self, run_root: str | Path):
         self.root = Path(run_root).resolve()
         self.path = self.root / "artifacts.jsonl"
@@ -149,11 +159,13 @@ class ArtifactGraph:
             with self.path.open(encoding="utf-8") as stream:
                 self.records = [json.loads(line) for line in stream if line.strip()]
 
+    # 取得同一步骤下一产物版本号，使重复执行保留历史。
     def next_version(self, step_id: str) -> int:
         versions = [row.get("version", 0) for row in self.records
                     if row.get("metadata", {}).get("step_id") == step_id]
         return max(versions, default=0) + 1
 
+    # 将产物记录追加到 JSONL 账本并同步内存索引。
     def append(self, record: ArtifactRecord) -> dict[str, Any]:
         payload = record.to_dict()
         with self.path.open("a", encoding="utf-8") as stream:
@@ -161,16 +173,19 @@ class ArtifactGraph:
         self.records.append(payload)
         return payload
 
+    # 把修复方案追加到独立日志，保留此前修复决策。
     def append_repair(self, plan: dict[str, Any]) -> dict[str, Any]:
         with self.repair_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(plan, ensure_ascii=False) + "\n")
         return plan
 
+    # 按产物身份筛选账本；未指定身份时返回全部记录副本。
     def find(self, artifact_id: str | None = None) -> list[dict[str, Any]]:
         if artifact_id is None:
             return list(self.records)
         return [row for row in self.records if row.get("artifact_id") == artifact_id]
 
+    # 汇总产物数量与各状态计数，并提供账本路径。
     def summary(self) -> dict[str, Any]:
         counts = {status: 0 for status in sorted(STATUSES)}
         for row in self.records:
@@ -181,6 +196,7 @@ class ArtifactGraph:
                 "path": str(self.path)}
 
 
+# 根据结构契约决定候选或拒绝状态，操作完成本身不代表质量已验证。
 def record_status(result: Any, contract: dict[str, Any]) -> str:
     if contract.get("status") == "failed":
         return "rejected"
@@ -189,6 +205,7 @@ def record_status(result: Any, contract: dict[str, Any]) -> str:
     return "candidate"
 
 
+# 结合操作、父产物、结果及错误构造带版本的产物记录并追加到账本。
 def make_record(*, graph: ArtifactGraph, run_id: str, step_id: str,
                 operation: str, arguments: dict[str, Any], result: Any,
                 parent_ids: list[str], declared_type: str | None = None,
@@ -217,6 +234,7 @@ def make_record(*, graph: ArtifactGraph, run_id: str, step_id: str,
     return graph.append(record)
 
 
+# 按运行、产物身份及状态读取产物图，返回记录与摘要。
 def inspect(args, directory=None, config=None):
     graph = ArtifactGraph(args["run"])
     rows = graph.find(args.get("artifact_id"))

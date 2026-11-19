@@ -24,6 +24,7 @@ from service_access.request_context import check_cancelled
 from storage.files import write_json
 
 
+# 按摘要冻结场景上传输入，复用已验证上传回执或登记新的不可变资产。
 def _asset(client, source, directory):
     receipt = directory / 'asset.json'
     with source.open('rb') as stream:
@@ -40,6 +41,7 @@ def _asset(client, source, directory):
     return {key: value[key] for key in ('asset_id', 'relative_path')}
 
 
+# 分页读取原生场景节点，限制总量并拒绝不前进的游标。
 def _inspect(requests, identity):
     prims, cursor = [], None
     for page in range(100):
@@ -55,6 +57,7 @@ def _inspect(requests, identity):
     raise ValueError('Native scene inspection exceeds 200000 prims')
 
 
+# 依据编译清单导入原生资产，并通过显式编辑恢复场景尺寸、姿态和物理设置。
 def _native_imports(requests, identity, compiled):
     for index, item in enumerate(compiled['imports']):
         obj = item['object']
@@ -67,6 +70,7 @@ def _native_imports(requests, identity, compiled):
         compiled['entities'][obj['id']]['articulation_roots'] = imported.get('articulation_roots', [])
 
 
+# 恢复队列任务的访问身份后编译场景，确保无HTTP上下文时仍按所有权消费原生句柄。
 def _compile_for_task(store, task, program, settings):
     """Restore queued ownership before consuming native handles without HTTP context."""
     if not native_references(program):
@@ -78,6 +82,7 @@ def _compile_for_task(store, task, program, settings):
         return compile_scene(program, store.root / 'generated_assets', settings)
 
 
+# 以持久回执组织原生场景创建、仿真、渲染和下载，支持取消及中断后恢复。
 def execute_capture(store, task, stop, *, config, client=None):
     unit = task['unit']
     directory = store.directory(task['id'], unit['revision'])

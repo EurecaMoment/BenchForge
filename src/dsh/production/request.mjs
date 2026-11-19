@@ -1,4 +1,5 @@
 /** Recognize the composer's explicit execution contract, never incidental task keywords. */
+/** 检查用户消息是否同时包含规范的执行模式、数量契约和实际生产指令。 */
 export function isProductionRequest(message) {
   if (message?.source?.kind !== 'user') return false;
   const text = (message.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n');

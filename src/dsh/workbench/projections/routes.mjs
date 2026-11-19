@@ -1,7 +1,8 @@
 import {ApiError} from '../../host/session_scope.mjs';
 
+/** 组合工作台只读路由，复用发现、进度、运行和数据集读取实现。 */
 export function createWorkbenchReadRoutes({discover, productionProgress, readRun, sceneArtifacts, sceneMedia, readDataset, readMedia}) {
-  return async function dispatch({view, request, url, roots, limits, scoped, scope, sessions}) {
+  return /** 根据视图选择对应读取器，并传入统一工作区、会话范围和取消信号。 */ async function dispatch({view, request, url, roots, limits, scoped, scope, sessions}) {
     if (view === 'summary') return discover(roots, limits, request.signal, scope);
     if (view === 'progress') return productionProgress(roots, scoped, url, request.signal);
     if (view === 'run') return readRun(url.searchParams.get('run'), roots, limits, request.signal, scope);

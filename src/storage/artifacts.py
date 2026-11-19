@@ -20,10 +20,12 @@ else:
     from json_io import atomic_text as atomic_text, write_json, write_jsonl
 
 
+# 读取兼容 UTF-8 BOM 的 JSON 文件并返回解析值。
 def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
+# 逐行解析非空 JSONL 记录，兼容 UTF-8 BOM。
 def read_jsonl(path):
     with Path(path).open(encoding="utf-8-sig") as stream:
         return [json.loads(line) for line in stream if line.strip()]
@@ -35,6 +37,7 @@ write = write_json
 jsonl = write_jsonl
 
 
+# 启动配置指定的 Python 脚本，记录命令及标准输出错误，并检查超时和退出码。
 def run(script, argv, directory, *, config=None, env=None, timeout=600, name=None, accepted=(0,)):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -62,6 +65,7 @@ def run(script, argv, directory, *, config=None, env=None, timeout=600, name=Non
     return result.returncode
 
 
+# 按指定字段建立记录索引，遇到缺失或重复身份立即报错。
 def unique(values, key='id'):
     result={}
     for row in values:
@@ -72,6 +76,7 @@ def unique(values, key='id'):
     return result
 
 
+# 按照 RFC 6901 JSON 指针遍历对象或数组，处理转义后的键名。
 def select(raw, pointer):
     if pointer and not pointer.startswith('/'):
         raise ValueError('Selectors use RFC 6901 JSON pointers')

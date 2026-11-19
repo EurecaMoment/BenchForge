@@ -12,6 +12,7 @@ from capabilities.isaac_sim.evidence import measured_entities, save_frame
 from storage.files import write_json
 
 
+# 构造含双相机、材质与刚体的示例场景，供原生编译和证据适配验证。
 def scene_program(name='contract'):
     return {'schema': 'benchforge.scene/v1', 'scene_id': name, 'title': 'Two cameras',
         'assumptions': ['Synthetic test geometry'],
@@ -27,11 +28,14 @@ def scene_program(name='contract'):
 
 
 class EvidenceContractTests(unittest.TestCase):
+    # 验证原生资源导入保留质量、摩擦等物理参数及源坐标轴语义。
     def test_native_import_keeps_physical_parameters_and_source_axis(self):
         class Requests:
+            # 初始化模拟原生请求的调用记录。
             def __init__(self):
                 self.calls = []
 
+            # 记录扩展操作及参数，并返回最小关节根回执以驱动导入测试。
             def extension(self, key, operation, arguments):
                 self.calls.append((operation, arguments))
                 return None, {'articulation_roots': []}
@@ -55,6 +59,7 @@ class EvidenceContractTests(unittest.TestCase):
         self.assertEqual(imported['source_up_axis'], 'Y')
         self.assertEqual(requests.calls[1][0], 'scene.edit')
 
+    # 验证可移植场景编译保留相机、材质和真实刚体物理声明。
     def test_portable_scene_preserves_cameras_materials_and_real_physics(self):
         compiled = compile_scene(scene_program(), Path('.'), {})
         self.assertEqual(len(compiled['cameras']), 2)
@@ -68,6 +73,7 @@ class EvidenceContractTests(unittest.TestCase):
             program['render_environment'] = {'renderer': 'RaytracedLighting'}
             compile_scene(program, Path('.'), {})
 
+    # 验证证据读取采用仿真步进后的变换，而非编译时初始位姿。
     def test_post_step_native_transform_is_used_instead_of_initial_pose(self):
         compiled = compile_scene(scene_program(), Path('.'), {})
         compiled['entities'] = {'cube': compiled['entities']['cube']}
@@ -85,6 +91,7 @@ class EvidenceContractTests(unittest.TestCase):
         np.testing.assert_allclose(measured['world_aabb']['min'], [-.1, -.1, 0], atol=1e-7)
         self.assertIn('world meters', measured['world_transform_convention'])
 
+    # 验证原生标注适配继续满足工作台展示与相机标定契约。
     def test_native_annotations_keep_the_existing_workbench_and_calibration_contract(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

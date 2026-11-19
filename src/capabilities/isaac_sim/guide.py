@@ -1,6 +1,7 @@
 """Model-readable tool usage joined with the simulator's live public discovery."""
 
 
+# 结合实时能力目录生成调用指引，保持实时模式权威并区分发现能力与执行验收。
 def usage(capabilities, catalog, *, operation=None, feature_id=None):
     """Keep live schemas authoritative and distinguish discovery from acceptance."""
     operations = capabilities.get('capabilities', [])

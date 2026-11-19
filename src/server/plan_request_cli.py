@@ -12,6 +12,7 @@ from pipelines.benchmark.design.plan_versions import current
 from pipelines.reviews.service import review
 from server.database_scope import command_database
 
+# 校验会话和请求所属计划，幂等应用用户编辑并生成新的生产计划回执。
 def submit(workspace, session, request_path):
     if not re.fullmatch(r'[\w-]{1,160}', session):
         raise ValueError('A valid native session is required')
@@ -36,6 +37,7 @@ def submit(workspace, session, request_path):
         runtime.close()
 
 
+# 以 UTF-8 读取命令行计划请求，在正确数据库上下文提交并输出结构化结果或错误。
 def main():
     sys.stdin.reconfigure(encoding='utf-8')
     sys.stdout.reconfigure(encoding='utf-8')

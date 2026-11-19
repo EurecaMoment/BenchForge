@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {WorkbenchRemote} from './lib/types/index.js';
 
+/** 创建具有指定调用方身份的原生远程服务实例，测试所有者访问限制。 */
 function service(dispatch, kind = 'owner') {
   const remote = new WorkbenchRemote(dispatch);
   remote.ctx = {invocation: {peer: {principal: {kind}}}};
   return remote;
 }
 
-test('typed workbench routes retain session identity, cancellation and backend state', async () => {
+test('typed workbench routes retain session identity, cancellation and backend state', /** 验证原生远程接口的身份与响应契约在该用例中的具体边界，完成准备、调用和结果断言。用例：typed workbench routes retain session identity, cancellation and backend state。 */ async () => {
   const signal = new AbortController().signal;
   const review = {state: 'check_failed', can_continue: false, wait_seconds: 300,
     checks_completed: 1, check_failure: {error: 'Missing real evidence'}};
@@ -21,7 +22,7 @@ test('typed workbench routes retain session identity, cancellation and backend s
   assert.deepEqual(await remote.stageReview({session_id: 'session-owner', workspace_path: '/workspace'}, signal), review);
 });
 
-test('typed artifact and progress routes reject missing projections and require the owner', async () => {
+test('typed artifact and progress routes reject missing projections and require the owner', /** 验证原生远程接口的身份与响应契约在该用例中的具体边界，完成准备、调用和结果断言。用例：typed artifact and progress routes reject missing projections and require the owner。 */ async () => {
   const query = {session_id: 'session-owner', workspace_path: '/workspace'};
   const remote = service(async () => ({state: 'completed'}));
   await assert.rejects(remote.sceneArtifacts({...query, scene: 'sf_one'}, undefined), /Invalid scene artifact/);
@@ -32,9 +33,10 @@ test('typed artifact and progress routes reject missing projections and require 
   assert.equal(called, false);
 });
 
-test('workspace migration is owner-only for both preview and explicit selection', async () => {
+test('workspace migration is owner-only for both preview and explicit selection', /** 验证原生远程接口的身份与响应契约在该用例中的具体边界，完成准备、调用和结果断言。用例：workspace migration is owner-only for both preview and explicit selection。 */ async () => {
   const query = {view: 'workspace_migration', session_id: 'session-legacy'};
   let calls = 0;
+  /** 断言会话查询参数保留后记录远程分发次数，并回显请求方法。 */
   const dispatch = async (url, request) => {
     calls++;
     assert.equal(url.searchParams.get('session_id'), 'session-legacy');

@@ -4,15 +4,18 @@ import {isDeepStrictEqual} from 'node:util';
 import {z} from 'zod';
 import {prepareConversation, relocate} from './archive.mjs';
 
-const relativePath = z.string().min(1).refine(value => !value.includes('\\') &&
+const relativePath = z.string().min(1).refine(/** 校验清单路径为不含盘符、反斜杠或上级跳转的 POSIX 相对路径。 */ value => !value.includes('\\') &&
   !path.posix.isAbsolute(value) && !value.split('/').some(part => part === '..' || part === '.') && !value.includes(':'));
 const Manifest = z.object({schema: z.literal('benchforge.example-bootstrap/v1'), id: z.literal('spatialforge-v1'),
   sessionId: z.string().regex(/^session-[a-zA-Z0-9-]+$/), title: z.string().min(1),
   conversation: relativePath, pathRoots: z.array(z.string().min(1)),
   artifacts: z.array(z.object({path: relativePath, title: z.string().min(1)})).min(1)});
+/** 检查示例路径是否存在，仅将文件不存在转换为否。 */
 const exists = async file => {try {await fs.access(file); return true;} catch (error) {if (error.code === 'ENOENT') return false; throw error;}};
+/** 按相对路径判断候选是否仍在示例根目录之内。 */
 const inside = (root, file) => {const relative = path.relative(root, file); return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);};
 
+/** 核对示例文件的真实路径和普通文件类型，拒绝目录越界。 */
 async function verifyFile(root, relative) {
   // Compare canonical paths on both sides (Windows temp paths may use aliases).
   const canonicalRoot = await fs.realpath(root);
@@ -21,6 +24,7 @@ async function verifyFile(root, relative) {
   return file;
 }
 
+/** 递归重定位文本类示例资源中的路径，拒绝资源树内的符号链接。 */
 async function relocateAssets(directory, roots, destination) {
   for (const entry of await fs.readdir(directory, {withFileTypes: true})) {
     const file = path.join(directory, entry.name);
@@ -33,6 +37,7 @@ async function relocateAssets(directory, roots, destination) {
   }
 }
 
+/** 在临时目录准备示例资源后安装到工作区；已有目录必须具有匹配的示例回执。 */
 async function installAssets(source, workspace, roots, id) {
   const receipt = path.join(workspace, '.benchforge-example.json');
   if (await exists(workspace)) {
@@ -46,6 +51,7 @@ async function installAssets(source, workspace, roots, id) {
   try {
     const target = path.join(stage, 'example', 'SpatialForge');
     await fs.cp(source, target, {recursive: true,
+      /** 在递归复制前拒绝符号链接，防止示例资源引用外部文件。 */
       filter: async file => {if ((await fs.lstat(file)).isSymbolicLink()) throw new Error('Example assets must not contain symlinks'); return true;}});
     await relocateAssets(target, roots, path.join(workspace, 'example', 'SpatialForge'));
     await fs.writeFile(path.join(stage, '.benchforge-example.json'), JSON.stringify({id}));
@@ -56,6 +62,7 @@ async function installAssets(source, workspace, roots, id) {
   }
 }
 
+/** 为导入会话写入经过身份核验的工作台清单和请求绑定。 */
 async function publishWorkbench(source, workspace, sessionId, roots) {
   const asset = path.join(workspace, 'example', 'SpatialForge');
   const manifest = JSON.parse(await fs.readFile(path.join(source, 'bootstrap.json'), 'utf8'));
@@ -72,6 +79,7 @@ async function publishWorkbench(source, workspace, sessionId, roots) {
 }
 
 /** One-time import through DSH services; a durable receipt also preserves user archival/deletion. */
+/** 幂等导入预置示例的资源、会话与工作台投影，使用持久化步骤记录支持启动恢复。 */
 export async function bootstrapExample({sourceDirectory, home, persistence, registry, table, publishSummary, now = Date.now}) {
   const key = 'spatialforge-v1';
   let record = table.get(key);

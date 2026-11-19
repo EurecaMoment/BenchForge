@@ -14,6 +14,7 @@ from storage.shared_assets import publish_version, grant_version, revoke_grant, 
 
 
 class SharedAssetPostgresTests(unittest.TestCase):
+    # 创建真实数据库中的多会话身份及资源清单，供不可变版本与授权测试。
     def setUp(self):
         self.engine = engine_for(use_postgres(self))
         directory = tempfile.TemporaryDirectory()
@@ -27,10 +28,12 @@ class SharedAssetPostgresTests(unittest.TestCase):
                 owner_id="owner", root_path=root))
         self.files = [{"path": "mesh.glb", "sha256": "a" * 64, "bytes": 100}]
 
+    # 用固定已验证存储引用发布一个资源版本，可覆盖来源与依赖等参数。
     def publish(self, scope, **extra):
         return publish_version(self.engine, scope, name="object", kind="mesh", manifest=self.files,
                                storage_ref="verified/mesh", **extra)
 
+    # 验证资源版本不可变，跨会话访问需显式授权且撤销后立即失效。
     def test_versions_immutable_grants_explicit_and_revocable(self):
         a, b = self.scopes
         one = self.publish(a)
@@ -57,6 +60,7 @@ class SharedAssetPostgresTests(unittest.TestCase):
                 connection.execute(asset_versions.update().where(asset_versions.c.asset_version_id == one["asset_version_id"])
                                    .values(storage_ref="replaced"))
 
+    # 验证共享顶层资源不会自动授权其私有依赖。
     def test_sharing_top_level_never_grants_dependencies(self):
         a, b = self.scopes
         dependency = self.publish(a)
@@ -72,6 +76,7 @@ class SharedAssetPostgresTests(unittest.TestCase):
         listing = list_versions(self.engine, b, enforce_role=False)
         self.assertFalse(next(row for row in listing["items"] if row["asset_version_id"] == parent["asset_version_id"])["available"])
 
+    # 验证个人资源库允许同所有者未来会话读取，并隔离其他所有者。
     def test_owner_library_is_available_to_future_same_owner_sessions_only(self):
         a, b = self.scopes
         version = self.publish(a, provenance={"run_id": "run-a", "operation_id": "op-a"})

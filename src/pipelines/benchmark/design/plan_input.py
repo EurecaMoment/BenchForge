@@ -12,6 +12,7 @@ FIELDS = {
 CONTROL_FIELDS = {'validate_only'}
 
 
+# 读取工作区中的有界 JSON 请求文件，要求文件存在且正文为对象。
 def _document(source, workspace, field):
     if not isinstance(source, str) or not source.strip():
         raise ValueError(f'{field} must name an existing JSON file')
@@ -30,6 +31,7 @@ def _document(source, workspace, field):
     return value, str(path)
 
 
+# 合并请求文件与内联输入，拒绝字段来源冲突并保留宿主可信上下文。
 def resolve_request(args, workspace):
     """File fields never override inline fields or the host's trusted context."""
     request = deepcopy(args)
@@ -45,6 +47,7 @@ def resolve_request(args, workspace):
         for key in CONTROL_FIELDS:
             if key in value and type(value[key]) is not bool:
                 raise ValueError(key + ' must be a boolean')
+        # 调用级校验开关优先于文件默认值，原计划内容仍只能来自一个来源。
         request = {**value, **request}
     if 'assessment_path' in request:
         if 'assessment' in request:

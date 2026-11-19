@@ -4,6 +4,7 @@ import json
 from storage.files import write_json
 
 
+# 按恢复模式准备采集修订，保留旧尝试历史并处理退役协议迁移。
 def prepare_retry(directory, unit, mode, *, retired_protocol=False):
     if retired_protocol:
         if mode == 'resume':

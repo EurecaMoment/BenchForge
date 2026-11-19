@@ -13,6 +13,7 @@ from service_access.runtime_config import environment_value
 from storage.confined_files import open_read
 
 
+# 核验文件属于当前会话工作区或已授权私有资源，返回安全路径及描述符读取根。
 def _resource(engine, artifact_root, file, *, must_exist):
     access = current_access()
     path = Path(file).expanduser()
@@ -54,11 +55,13 @@ def _resource(engine, artifact_root, file, *, must_exist):
     return resolved, root
 
 
+# 只解析并授权资源位置；实际读取字节须使用防竞争的打开接口。
 def resolve_owned_resource(engine, artifact_root, file, *, must_exist=True):
     """Authorize a location; consumers must use open_owned_resource for bytes."""
     return _resource(engine, artifact_root, file, must_exist=must_exist)[0]
 
 
+# 在授权后通过固定根目录打开资源，提供生命周期受控的二进制流。
 @contextmanager
 def open_owned_resource(file, *, engine=None, artifact_root=None):
     path, root = _resource(engine, artifact_root, file, must_exist=True)
@@ -70,6 +73,7 @@ def open_owned_resource(file, *, engine=None, artifact_root=None):
             yield stream
 
 
+# 受限读取同一文件描述符的完整快照，并返回对应大小及修改时间版本。
 def read_owned_resource(file, *, limit, engine=None, artifact_root=None):
     """Return a bounded snapshot and the version of that same file descriptor."""
     with open_owned_resource(file, engine=engine, artifact_root=artifact_root) as stream:
@@ -80,6 +84,7 @@ def read_owned_resource(file, *, limit, engine=None, artifact_root=None):
     return content, [metadata.st_size, metadata.st_mtime_ns]
 
 
+# 打开已授权资源后从同一文件描述符取得大小和修改时间版本。
 def owned_resource_version(file, *, engine=None, artifact_root=None):
     with open_owned_resource(file, engine=engine, artifact_root=artifact_root) as stream:
         metadata = os.fstat(stream.fileno())

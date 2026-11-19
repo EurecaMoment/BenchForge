@@ -24,6 +24,7 @@ _OPAQUE = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tif', '.tiff',
            '.exr', '.hdr', '.npy', '.npz', '.bin', '.ply', '.stl'}
 
 
+# 只接受上传资产内的普通相对依赖路径，按需允许内嵌数据URI并拒绝转义与展开语法。
 def _relative(value, *, embedded=False):
     if embedded and isinstance(value, str) and value.startswith('data:'):
         return
@@ -35,6 +36,7 @@ def _relative(value, *, embedded=False):
     return value
 
 
+# 递归检查JSON中的uri字段，确保其是合法包内引用或允许的内嵌数据。
 def _json_references(value):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -47,6 +49,7 @@ def _json_references(value):
             _json_references(child)
 
 
+# 校验GLB头、块长度及类型，只解析JSON引用而不加载其外部依赖。
 def _glb(path):
     with path.open('rb') as stream:
         header = stream.read(12)
@@ -76,6 +79,7 @@ def _glb(path):
             raise ValueError('GLB has no JSON document')
 
 
+# 解析惰性的URDF或MJCF，拒绝文档类型与实体，并检查机器人资源路径。
 def _xml(path, suffix):
     raw = path.read_bytes()
     if b'<!DOCTYPE' in raw.upper() or b'<!ENTITY' in raw.upper():
@@ -89,6 +93,7 @@ def _xml(path, suffix):
                 _relative(value)
 
 
+# 检查OBJ和MTL的材质与纹理引用，拒绝命令指令和不便携的依赖写法。
 def _wavefront(path, suffix):
     for line in path.read_text(encoding='utf-8-sig').splitlines():
         parts = shlex.split(line, comments=True)
@@ -112,6 +117,7 @@ def _wavefront(path, suffix):
                 _relative(name)
 
 
+# 仅解析单个USD图层并遍历资产引用，不组合场景或追踪尚未授权的依赖。
 def _usd(path):
     try:
         from pxr import Sdf
@@ -123,6 +129,7 @@ def _usd(path):
     if layer is None:
         raise ValueError('Uploaded USD layer cannot be parsed')
 
+    # 递归验证USD资产路径、引用、载荷及列表操作中的外部文件地址。
     def value(item):
         if isinstance(item, Sdf.AssetPath):
             if item.path:
@@ -141,6 +148,7 @@ def _usd(path):
                 for child in getattr(item, name):
                     value(child)
 
+    # 检查图层规格中的元数据与子层引用，区分场景目标路径和外部资产路径。
     def inspect(spec_path):
         spec = layer.GetObjectAtPath(spec_path)
         if spec is None:
@@ -162,6 +170,7 @@ def _usd(path):
     layer.Traverse('/', inspect)
 
 
+# 在受限临时目录逐项验证USDZ成员，拒绝超量、重复、加密、链接及嵌套压缩包。
 def _usdz(path):
     with ZipFile(path) as archive, TemporaryDirectory(prefix='benchforge-usdz-') as directory:
         members = archive.infolist()
@@ -191,6 +200,7 @@ def _usdz(path):
             _validate(member, suffix)
 
 
+# 按文件格式选择惰性依赖解析器，未支持且非不透明数据格式时拒绝上传。
 def _validate(path, suffix):
     if suffix in {'.usd', '.usda', '.usdc'}:
         _usd(path)
@@ -208,6 +218,7 @@ def _validate(path, suffix):
         raise ValueError('This asset format has no safe dependency parser; convert it to a supported format')
 
 
+# 校验服务器实际接收的文件名和冻结字节，限制文件大小并验证其格式依赖。
 def validate_upload(path, relative_path=None):
     """Validate the exact immutable bytes and name that the server will receive."""
     path = Path(path)
@@ -217,6 +228,7 @@ def validate_upload(path, relative_path=None):
     _validate(path, PurePosixPath(name).suffix.lower())
 
 
+# 将授权工作区文件复制到私有临时区并验证快照，再仅向上传调用者提供该路径。
 @contextmanager
 def snapshot_upload(path, relative_path=None):
     """Yield a private validated snapshot; never expose its path to task code."""

@@ -2,6 +2,7 @@
 import math
 
 
+# 验证机器人推物动作的目标、位姿、路点、观察和接触声明。
 def validate_robot_action(action, objects):
     required = {'id', 'action', 'object_id', 'robot_id', 'robot_base_position', 'waypoints'}
     optional = {'robot_base_orientation_wxyz', 'end_effector_orientation_wxyz',
@@ -10,6 +11,7 @@ def validate_robot_action(action, objects):
         raise ValueError('robot_push needs id, object_id, robot_id, robot_base_position and waypoints')
     if not objects[action['object_id']]['dynamic']:
         raise ValueError('robot_push needs a dynamic target')
+    # 校验固定长度有限向量，四元数还必须为单位wxyz形式。
     def vector(value, length):
         if not isinstance(value, list) or len(value) != length or not all(type(v) in (int, float) and math.isfinite(v) for v in value):
             raise ValueError('invalid robot vector')
@@ -40,5 +42,6 @@ def validate_robot_action(action, objects):
         raise ValueError('robot observe_seconds must be positive')
 
 
+# 按120Hz累加机器人准备、路点和观察时长所需仿真步数。
 def robot_step_count(action):
     return 120 + sum(math.ceil(w['duration_s']*120) for w in action['waypoints']) + math.ceil(action.get('observe_seconds', 1.5)*120)

@@ -24,6 +24,7 @@ from capabilities.scene_authoring.validation.program import validate_program
 
 
 
+# 根据相机位置、目标和向上方向构建USD行向量约定的世界变换矩阵。
 def camera_matrix(camera):
     import numpy as np
     position = np.asarray(camera['position'], dtype=float)
@@ -39,6 +40,7 @@ def camera_matrix(camera):
     return matrix.tolist()
 
 
+# 合并命名材质、父材质和对象外观，拒绝不能忠实映射的材质字段。
 def material(program, obj, parent=None):
     named = next((item for item in program.get('materials', []) if item['id'] == obj.get('material_id')), {})
     settings = {**(parent or {}), **named, **obj.get('appearance', {})}
@@ -51,6 +53,7 @@ def material(program, obj, parent=None):
 
 
 
+# 生成刚体启用和质量的USD声明，需原生协议设置的阻尼参数会被拒绝。
 def physics_lines(obj):
     settings = obj.get('physics', {})
     result = []
@@ -61,6 +64,7 @@ def physics_lines(obj):
     return result
 
 
+# 将场景程序编译为USD与显式输入清单，真实执行证据仍由后续原生回执提供。
 def compile_scene(program, assets_root, settings):
     """Return USD bytes plus declared inputs; only later native receipts are evidence."""
     validate_program(program)
@@ -68,6 +72,7 @@ def compile_scene(program, assets_root, settings):
     environment = program.get('render_environment', {})
     spp = environment.get('samples_per_pixel', settings.get('samples_per_pixel', 32))
     meshes = {}
+    # 按资产标识缓存已登记网格记录，避免编译时重复读取。
     def load(identity):
         if identity not in meshes:
             meshes[identity] = json.loads((Path(assets_root) / identity / 'mesh.json').read_text())

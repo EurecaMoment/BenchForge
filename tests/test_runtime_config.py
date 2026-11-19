@@ -10,6 +10,7 @@ from service_access.configuration import selected_model, validate_providers
 
 
 class RuntimeConfigTests(unittest.TestCase):
+    # 验证 FastQwen 直接使用统一模型角色，不伪装为另一提供方身份。
     def test_fastqwen_uses_the_shared_model_roles_without_a_fake_dspark_identity(self):
         config = {'providers': {'FastQwen': {'url':'http://127.0.0.1:8000/v1', 'model':'qwen-flash-next',
             'roles':{'scene':{'reasoning_effort':'high'}}}}}
@@ -20,11 +21,13 @@ class RuntimeConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'one primary'):
             validate_providers(config)
 
+    # 创建独立配置目录，隔离多服务运行配置加载测试。
     def setUp(self):
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
 
+    # 验证顺序加载两个服务配置不会改写全局环境或串用凭据和路径。
     def test_loading_two_configs_does_not_contaminate_environment(self):
         policy = self.root / "policy.json"
         policy.write_text('{"enabled":true,"enforce_realism":true}')

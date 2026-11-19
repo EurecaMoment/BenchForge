@@ -17,6 +17,7 @@ from storage.artifacts import unique
 from storage.artifacts import run
 
 
+# 按点分隔路径读取嵌套字典，路径缺失时返回默认值。
 def field(row,path,default=None):
     value=row
     for key in path.split('.'):
@@ -25,6 +26,7 @@ def field(row,path,default=None):
     return value
 
 
+# 将图片目录、JSON或JSONL按字段映射规范化为统一输入记录。
 def normalize(args,directory,config):
     source=source_path(args['input'])
     kind=args.get('format','jsonl' if source.suffix=='.jsonl' else source.suffix.lstrip('.'))
@@ -97,6 +99,7 @@ def normalize(args,directory,config):
     return {'input':str(directory/'normalized.jsonl'),'inventory':inventory,'rejected':str(directory/'rejected.jsonl')}
 
 
+# 验证下载地址及单文件名，保存来源回执并规范化下载或本地输入。
 def acquire(args,directory,config):
     if args.get('url'):
         if urlsplit(args['url']).scheme not in ('http','https'):
@@ -114,6 +117,7 @@ def acquire(args,directory,config):
     return normalize(args,directory,config)
 
 
+# 校验样本标识和媒体可读性，分离有效与拒绝记录并保存清理报告。
 def clean(args,directory,config):
     source=source_path(args['input']);data=rows(source)
     backend=args.get('backend','native')

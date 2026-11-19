@@ -46,22 +46,26 @@ PRESETS = {
 }
 MODEL_TOOLS = ['model_infer']
 DEFAULT_SERVICE_CONFIG = Path('config/generated/benchforge-client.local.json')
+# 集中设置预设声明编号和展示元数据，使身份与工具组合保持一致。
 def set_identity(row, preset_id):
     """Keep preset metadata in one place, independent of tool composition."""
     row['id'] = 'preset-' + preset_id
     row['config'].update(id=preset_id, **PRESETS[preset_id])
 
 
+# 便携包使用相对配置引用，具体部署覆盖则使用规范绝对路径。
 def config_reference(path, package_imports=False):
     """Bundle defaults stay relative; deployment overlays use absolute paths."""
     path = Path(path)
     return path.as_posix() if package_imports else str(path.resolve())
 
 
+# 返回指定仓库根下的默认生成服务配置路径。
 def default_service_config(root=Path('.')):
     return root / DEFAULT_SERVICE_CONFIG
 
 
+# 通过 DSH 包公开导出解析官方预设资源，源码根仅用作包查找位置。
 def load_sources(dsh_root=None, node=None, resolve_from=None):
     """Resolve official preset assets through the package's supported exports."""
     if resolve_from is None:
@@ -88,11 +92,13 @@ process.stdout.write(readFileSync(asset, 'utf8'));"""
     return yaml.load(result.stdout, Loader=Loader)
 
 
+# 为构建入口添加 DSH 查找根、公开包解析位置和 Node 解释器参数。
 def add_source_arguments(parser):
     parser.add_argument('--dsh-root',type=Path,help='Compatibility lookup root for an existing DSH source installation')
     parser.add_argument('--dsh-resolve-from',type=Path,help='Package manifest used as the Node public-package lookup location')
     parser.add_argument('--node',help='DSH-compatible Node executable (or BENCHFORGE_DSH_NODE)')
 
+# 从统一模型配置投影 DSH 角色的提供方及默认模型声明。
 def model_patches(config_path):
     """Project the DSH model role from the operator's shared registry."""
     path = Path(config_path)
@@ -125,6 +131,7 @@ def model_patches(config_path):
             {'id': 'agent-default-model', 'config': selection}]
 
 
+# 按便携构建模式或标注模型是否完整配置，决定启用哪些模型工具。
 def model_tools(config_path, *, portable=False):
     if portable:
         return MODEL_TOOLS
@@ -136,11 +143,13 @@ def model_tools(config_path, *, portable=False):
     return MODEL_TOOLS if annotation.get('url') and annotation.get('model') else []
 
 
+# 只从具有插件列表的预设配置中提取稳定预设编号。
 def preset_id(row):
     config = row.get('config')
     return config.get('id') if isinstance(config, dict) and isinstance(config.get('plugins'), list) else None
 
 
+# 在加载插件前迁移旧预设别名、默认选择及已退役附加项声明。
 def refresh_preset_identity(profile):
     """Update saved profile declarations before DSH loads their plugins."""
     previous_addons = {'benchforge-tool-executor', 'persistent-shell', 'tool-presentation'}
@@ -163,6 +172,7 @@ def refresh_preset_identity(profile):
             plugins[:] = [plugin for plugin in plugins if plugin.get('id') not in previous_addons]
 
 
+# 刷新已保存预设的身份、宿主配置、模型选择及 BenchForge 工具选项。
 def refresh_model_patches(preset_path, config_path, *, refresh_host=None):
     """Refresh model selection and generated BenchForge plugin options."""
     preset_path = Path(preset_path)
@@ -195,6 +205,7 @@ def refresh_model_patches(preset_path, config_path, *, refresh_host=None):
         temporary.replace(preset_path)
 
 
+# 在宿主 profile 中更新或移除 BenchForge 提供方及默认模型覆盖。
 def refresh_host_models(profile, patches):
     """Refresh the BenchForge model provider in the host's profile."""
     changed = False
@@ -226,6 +237,7 @@ def refresh_host_models(profile, patches):
     return changed
 
 
+# 从官方 patch 中复制标准预设声明，避免修改原始装配资源。
 def compose_standard(standard):
     return deepcopy(next(row for patch in standard for row in patch.get('insert', [])
                          if row['id'] == 'preset-standard'))

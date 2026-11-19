@@ -13,6 +13,7 @@ from service_access.progress import record_progress
 TOOLS = {*MODEL_PROVIDERS, 'mesh_import'}
 
 
+# 解析生产输入文件并规范化各生成工具的请求参数。
 def validate_generation_request(tools, name, parameters):
     """Resolve production input files and normalize tool parameters."""
     if name not in TOOLS:
@@ -71,6 +72,7 @@ def validate_generation_request(tools, name, parameters):
     return value
 
 
+# 恢复已完成的工作阶段时复用既有登记身份，避免重复发布资产。
 def _published(tools, spec, work, source, frame, provenance, status, image=None, mask=None):
     """Retain registration identity when a completed worker stage is resumed."""
     work.mkdir(parents=True, exist_ok=True)
@@ -82,6 +84,7 @@ def _published(tools, spec, work, source, frame, provenance, status, image=None,
     return tools._publish(spec, work, source, frame, provenance, status, image, mask)
 
 
+# 执行排队的资产生成阶段，将模型输出、登记结果和阶段回执写入任务目录。
 def execute_generation_stage(store, task, stop):
     tools = GenerationTools(store.root, engine=store.repo.engine, task_id=task['id'])
     intent = task['unit']['intent']
@@ -145,6 +148,7 @@ def execute_generation_stage(store, task, stop):
              'source_frame': frame}, 'imported')
         result['assets'] = [{'asset_id': registration['asset_id'], 'source_path': str(source),
                              'registration': registration}]
+    # 优先识别分割掩码，再按文件扩展名归类阶段回执中的产物类型。
     def kind(path):
         if path in masks:
             return 'mask'

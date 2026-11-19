@@ -5,15 +5,20 @@ const SCHEMA = 'benchforge.synthesis-sessions/v1';
 const MAX_RECORDS = 8, MAX_METADATA = 64, MAX_FILES = 3, MAX_BYTES = 2 * 1024 * 1024;
 const TEXT_FILES = /\.(?:py|js|mjs|ts|md|json|ya?ml)$/i;
 const SECRET = /^(?:answers?|answer_?key|correct_?answer|reference_?answer|ground_?truth|gt|authority|gold|oracle|token|password|api_?key|solution)(?:_|$)/i;
+/** 判断准备产物路径是否位于已接纳的工作区内。 */
 const inside = (root, value) => {
   const relative = path.relative(root, value);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
+/** 构造带 HTTP 状态的准备产物读取错误。 */
 function failure(message, status = 403) { return Object.assign(new Error(message), {status}); }
+/** 转义文本中的 HTML 特殊字符，供有界预览安全展示。 */
 const escape = value => String(value).replace(/[&<>"']/g, character => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
+/** 递归移除敏感字段，同时保留公开的权威来源说明。 */
 const clean = value => Array.isArray(value) ? value.map(clean) : value && typeof value === 'object'
   ? Object.fromEntries(Object.entries(value).filter(([key]) => key === 'authority_source' || !SECRET.test(key)).map(([key, child]) => [key, clean(child)])) : value;
 
+/** 通过文件句柄读取大小受限的普通文本文件，并持续检查取消状态。 */
 async function text(file, signal) {
   signal?.throwIfAborted();
   const handle = await fs.open(file, 'r');
@@ -34,28 +39,35 @@ async function text(file, signal) {
   } finally { await handle.close(); }
 }
 
+/** 解析并校验真实目录，拒绝离开已接纳工作区的准备路径。 */
 async function directory(root, value) {
   const resolved = await fs.realpath(value);
   if (!inside(root, resolved) || !(await fs.stat(resolved)).isDirectory()) throw failure('Preparation directory leaves its admitted workspace');
   return resolved;
 }
+/** 把批次键编码为安全文件名，定位准备任务持久化记录。 */
 const recordFile = (dir, key) => path.join(dir, 'batch-' + Buffer.from(key, 'utf8').toString('base64url') + '.json');
 
 /** Read registered preparation outputs. Nothing here starts work or accepts a stage. */
+/** 创建准备子任务产物读取与预览服务，缓存已核验的回执及发现结果。 */
 export function createPreparationProducts({validatePlan}) {
   const receipts = new Map(), discovery = new Map();
+  /** 根据会话范围生成准备产物缓存键。 */
   const scopeKey = (root, parentId) => root.path + '\0' + parentId;
+  /** 保存已验证的准备回执，供后续预览查找同一批次。 */
   function remember(root, parentId, receipt) {
     if (receipt?.parentId === parentId && typeof receipt.batchKey === 'string' && receipt.recordPath) {
       receipts.set(scopeKey(root, parentId), receipt);
       if (receipts.size > 32) receipts.delete(receipts.keys().next().value);
     }
   }
+  /** 从准备记录确认父会话与批次归属，形成允许读取的范围。 */
   async function recordScope(root, parentId) {
     const canonical = await fs.realpath(root.path);
     const dir = await directory(canonical, path.join(canonical, '.benchforge', 'synthesis-sessions'));
     return {canonical, dir, key: scopeKey(root, parentId)};
   }
+  /** 从准备批次与子工作区发现可展示的候选文件。 */
   async function candidates(root, parentId, signal) {
     const {canonical, dir, key} = await recordScope(root, parentId);
     const hint = receipts.get(key);
@@ -79,6 +91,7 @@ export function createPreparationProducts({validatePlan}) {
     }
     return {canonical, dir, files: [...new Set([known, ...cached.files].filter(Boolean))].slice(0, MAX_RECORDS)};
   }
+  /** 核对候选产物和子会话工作区绑定，建立可读取的真实路径关系。 */
   async function binding(root, parentId, file, signal) {
     const {canonical, dir} = await recordScope(root, parentId);
     const actual = await fs.realpath(file);
@@ -102,6 +115,7 @@ export function createPreparationProducts({validatePlan}) {
     if (plan !== record.planPath) throw failure('The frozen preparation plan changed its real path');
     return {record, canonical};
   }
+  /** 读取单个准备任务的产物与原生状态，整理为工作台展示条目。 */
   async function worker(root, parentId, file, childId, signal, bound) {
     const {record, canonical} = bound || await binding(root, parentId, file, signal);
     const task = record.tasks.find(row => row.childId === childId);
@@ -112,6 +126,7 @@ export function createPreparationProducts({validatePlan}) {
     if (output === canonical || output !== path.resolve(original.outputDirectory)) throw failure('The worker output changed its admitted real path');
     const entries = (await fs.readdir(output, {withFileTypes: true})).filter(entry =>
       (entry.isFile() || entry.isSymbolicLink()) && TEXT_FILES.test(entry.name) && !/^(?:answers?|authority|ground_truth|gold|dataset|collection)(?:[._-]|$)/i.test(entry.name));
+    /** 为准备产物预览排序，优先展示更适合作为设计和说明入口的文件。 */
     const priority = name => name.toLowerCase() === 'summary.md' ? 0 : name.toLowerCase() === 'manifest.json' ? 1 : 2;
     entries.sort((a, b) => priority(a.name) - priority(b.name) || a.name.localeCompare(b.name));
     const files = [];
@@ -131,6 +146,7 @@ export function createPreparationProducts({validatePlan}) {
       reasoningSelection: task.reasoningSelection || record.reasoningSelection,
       status: 'preparing', accepted: false, files};
   }
+  /** 读取当前会话拥有的准备批次及产物目录。 */
   async function read(root, parentId, children, signal) {
     if (!children.length) return new Map();
     let selected;
@@ -150,6 +166,7 @@ export function createPreparationProducts({validatePlan}) {
     }
     return products;
   }
+  /** 按已验证的批次及文件标识打开有界预览，拒绝越界与未经登记的文件。 */
   async function open(root, parentId, children, {batchKey, childId, file}, signal) {
     if (!children.some(child => child.id === childId)) throw failure('Preparation child is not in the verified parent family');
     if (typeof batchKey !== 'string' || !batchKey || typeof file !== 'string' || path.basename(file) !== file || file.includes('\\'))

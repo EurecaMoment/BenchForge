@@ -23,11 +23,13 @@ SELECTION_SCHEMA = 'benchforge.scene-selection/v1'
 
 
 class LibraryError(ValueError):
+    # 构建场景库错误并保存供调用端转换的状态码。
     def __init__(self, message, status=400):
         super().__init__(message)
         self.status = status
 
 
+# 要求已登记绝对工作区，创建其场景库并拒绝链接目录。
 def library_folder(workspace):
     workspace = Path(workspace)
     if not workspace.is_absolute() or not workspace.is_dir():
@@ -39,6 +41,7 @@ def library_folder(workspace):
     return folder
 
 
+# 验证会话标识并定位该会话的场景选择文件，拒绝链接目录。
 def selection_file(folder, session):
     if not re.fullmatch(r'session-[a-zA-Z0-9-]+', session):
         raise LibraryError('A conversation is required', 403)
@@ -49,18 +52,21 @@ def selection_file(folder, session):
     return directory / (session + '.json')
 
 
+# 读取场景库JSON或返回默认值，拒绝符号链接文件。
 def read_json(path, fallback):
     if path.is_symlink():
         raise LibraryError('Invalid library file', 403)
     return json.loads(path.read_text(encoding='utf-8')) if path.is_file() else fallback
 
 
+# 场景库保留目标链接检查，序列化和原子发布使用统一存储实现。
 def write_json(path, value):
     if path.is_symlink():
         raise LibraryError('Invalid library file', 403)
     publish_json(path, value)
 
 
+# 使用有超时和过期恢复的文件锁保护界面选择写入。
 @contextmanager
 def locked(folder):
     path = folder / '.write.lock'
@@ -86,6 +92,7 @@ def locked(folder):
         path.unlink(missing_ok=True)
 
 
+# 分页读取共享场景任务元数据，供后续核验冻结证据。
 def completed_tasks(config):
     """Read shared scene metadata in pages before checking the saved evidence."""
     rows = []
@@ -103,6 +110,7 @@ def completed_tasks(config):
         value = {'after': cursor}
 
 
+# 共享终结器的操作系统目录锁，保护场景目录最终提交。
 @contextmanager
 def catalog_locked(folder):
     """Share the finalizer's OS lock; .write.lock only protects UI selections."""
@@ -130,6 +138,7 @@ def catalog_locked(folder):
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
+# 验证任务、修订及规范来源目录一致，返回可信原生身份。
 def native_identity(row, source_root):
     task = row.get('task_id')
     revision = row.get('revision')
@@ -150,6 +159,7 @@ def native_identity(row, source_root):
         return None
 
 
+# 保留终结器写入的登记元数据，重新计算资格与准入结果。
 def registration_metadata(previous, fresh, folder, source_root):
     """Retain finalizer metadata, never its cached eligibility or admission."""
     identity = native_identity(fresh, source_root)
@@ -193,6 +203,7 @@ def registration_metadata(previous, fresh, folder, source_root):
         return {}
 
 
+# 扫描已完成任务并复核排除策略、验收和修复关系，构建当前场景条目。
 def scanned_items(config, folder, previous, tasks=None):
     source_root = Path(config['artifacts']).resolve()
     policy = load_policy(folder.parent)
@@ -261,6 +272,7 @@ def scanned_items(config, folder, previous, tasks=None):
     return items
 
 
+# 重扫场景并在提交锁内合并最新登记，避免覆盖并发终结器更新。
 def sync_catalog(config, folder, *, project_catalog=None):
     path = folder / 'catalog.json'
     previous = read_json(path, {'schema': SCHEMA, 'items': []})
@@ -313,6 +325,7 @@ def sync_catalog(config, folder, *, project_catalog=None):
         return catalog
 
 
+# 列出限定数量的公开采集帧及有效缓存视频，返回场景媒体可用性。
 def public_media(config, row):
     source = Path(row['source_directory'])
     capture = source / 'capture'
@@ -335,6 +348,7 @@ def public_media(config, row):
             'frame_count': len(frames), 'program_path': program}
 
 
+# 校验所选场景修订仍有效且具备生产资格与媒体，返回精确来源引用。
 def selected_sources(config, catalog, selected):
     by_id = {row['id']: row for row in catalog['items']}
     result = []
@@ -352,6 +366,7 @@ def selected_sources(config, catalog, selected):
     return result
 
 
+# 读取或初始化会话选择，并剔除被排除或失去生产资格的场景。
 def load_selection(config, folder, session, catalog):
     path = selection_file(folder, session)
     saved = read_json(path, None)
@@ -374,6 +389,7 @@ def load_selection(config, folder, session, catalog):
     return {**saved, 'selection_path': str(path), 'catalog_path': str(folder / 'catalog.json')}
 
 
+# 用版本号检查并发冲突，验证所选场景后保存新的会话选择。
 def save_selection(config, folder, session, catalog, value):
     current = load_selection(config, folder, session, catalog)
     if type(value.get('version')) is not int or value['version'] != current['version']:
@@ -392,6 +408,7 @@ def save_selection(config, folder, session, catalog, value):
     return load_selection(config, folder, session, catalog)
 
 
+# 处理场景库列表、选择、文件及产物操作，统一执行会话和版本访问检查。
 def operate(config, workspace, session, action='list', value=None, page=1, size=12, query='', origin='all',
             task_id=None, revision=None, file=None, *, project_catalog=None):
     folder = library_folder(workspace)
@@ -427,6 +444,7 @@ def operate(config, workspace, session, action='list', value=None, page=1, size=
                 'selection': selection, 'catalog_path': str(folder / 'catalog.json')}
 
 
+# 解析场景库命令行请求，载入配置并输出结构化操作结果。
 def main(*, project_catalog=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)

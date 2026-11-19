@@ -7,6 +7,7 @@ from database.config import configured_database_url
 from service_access.runtime_config import load_service_config
 
 
+# 校验命令行过滤参数，查询指定工作区的操作历史并输出 JSON。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True)

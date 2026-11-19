@@ -1,6 +1,8 @@
 // Stable response families shared by the service, with room for its evidence
 // and operation-specific fields. Do not require fields an endpoint omits.
+/** 将结构化工具结果序列化为模型可读文本。 */
 const textRender=(_args,value)=>[{type:'text',text:JSON.stringify(value)}];
+/** 为对象形工具结果建立宽松输出结构和统一文本渲染器。 */
 const object=(properties)=>({schema:{type:'object',additionalProperties:true,properties},render:textRender});
 const string={type:'string',required:true};
 
@@ -13,6 +15,7 @@ export const preflightOutput = {
     repair_groups: {type:'array', required:true, items:{type:'object', additionalProperties:true}},
     skipped_checks: {type:'array', required:true, items:{type:'object', additionalProperties:true}},
   }),
+  /** 保留完整诊断与分组信息，同时从模型返回内容中省略已保存的大体积几何预览。 */
   render: (_args, value) => {
     // Full issue/group lists remain visible; bulky geometry lives in the saved report.
     const {geometry_preview, checked, ...diagnostics} = value;

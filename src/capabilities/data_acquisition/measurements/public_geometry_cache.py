@@ -11,6 +11,7 @@ from threading import RLock
 from typing import NamedTuple
 
 
+# 递归把公开标定中的字典与列表冻结为稳定可哈希值。
 def freeze_public_value(value):
     if isinstance(value, dict):
         return tuple(sorted((key, freeze_public_value(item)) for key, item in value.items()))
@@ -19,6 +20,7 @@ def freeze_public_value(value):
     return value
 
 
+# 使用全部有效重建输入、公开文件版本和参考传感器构造几何缓存键。
 def public_geometry_key(card, frames, local_axes, label, asset_version):
     """Use every effective reconstruction input and the actual reference sensor."""
     reference = frames[0] if frames else {}
@@ -56,6 +58,7 @@ class GeometryResult(NamedTuple):
     point_count: int
 
 
+# 将几何中心、尺寸和点数冻结为不可变结果，防止调用方修改缓存。
 def freeze_geometry(geometry, point_count):
     return GeometryResult(tuple(float(value) for value in geometry['center']),
                           tuple(float(value) for value in geometry['size']),
@@ -64,17 +67,20 @@ def freeze_geometry(geometry, point_count):
 
 class PublicGeometryCache:
     """LRU of immutable results, bounded by entries and conservative Python size."""
+    # 建立同时受条目数和估计字节数约束的线程安全几何缓存。
     def __init__(self, max_entries=128, max_bytes=2*1024*1024):
         self.max_entries, self.max_bytes = max_entries, max_bytes
         self.values = OrderedDict()
         self.bytes = self.hits = self.misses = 0
         self.lock = RLock()
 
+    # 递归估算不可变缓存键和值占用的Python对象内存。
     @staticmethod
     def _weight(value):
         return sys.getsizeof(value) + (sum(PublicGeometryCache._weight(part) for part in value)
                                       if isinstance(value, tuple) else 0)
 
+    # 优先复用几何结果，未命中时加载并按最近使用顺序淘汰超限条目。
     def load(self, key, loader):
         with self.lock:
             if key in self.values:
@@ -96,6 +102,7 @@ class PublicGeometryCache:
                 self.bytes -= removed
         return result
 
+    # 在锁内返回几何缓存容量、内存估算及命中统计。
     def stats(self):
         with self.lock:
             return {'entries': len(self.values), 'bytes': self.bytes,

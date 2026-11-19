@@ -6,6 +6,7 @@ from pathlib import Path
 MESH_SUFFIXES = frozenset({'.glb', '.gltf', '.obj', '.ply', '.stl'})
 
 
+# 在排队或启动转换前拒绝不支持的网格容器与输入格式。
 def validate_mesh_input(source):
     """Reject unsupported containers before scheduling or spawning conversion."""
     suffix = Path(source).suffix.lower()

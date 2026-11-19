@@ -1,3 +1,4 @@
+/** 创建计划、阶段复核、报告和交付数量回执组件。 */
 export function createProductComponents({React, helpers, components}) {
   const h = React.createElement;
   const {status, button, card, empty, json, sceneName, questionText, planValue, planMarkdown,
@@ -10,6 +11,7 @@ export function createProductComponents({React, helpers, components}) {
   const {TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress,
     StageProgress, PublicObservation, QuestionDialog, sceneProjects, SceneGallery, SceneVideo,
     SceneLibrary, PreviewDialog, ArtifactGallery} = components;
+  /** 展示阶段复核状态与等待倒计时，并提供当前允许的用户操作。 */
   function StageReviewPanel({value, act, change, t}) {
     const [tick,setTick] = React.useState(Date.now());
     React.useEffect(() => {const timer=setInterval(() => setTick(Date.now()),1000); return () => clearInterval(timer);},[]);
@@ -34,6 +36,7 @@ export function createProductComponents({React, helpers, components}) {
       value.check_failure?.error && h('p',{className:'bfw-error',role:'status'},value.check_failure.error),
       value.instruction && h('p',null,value.instruction));
   }
+  /** 展示已保存计划，管理 Markdown 编辑、保存及把新版本应用到生产会话的状态。 */
   function PlanProduct({plan, source, artifacts, preview, request, save, applyEdit, scenes = [],template, t}) {
     const [draft,setDraft]=React.useState(null);
     const [busy,setBusy]=React.useState(false);
@@ -41,12 +44,15 @@ export function createProductComponents({React, helpers, components}) {
     const [pending,setPending]=React.useState(null);
     const draftRef=React.useRef(null);
     const lock=React.useRef(false);
+    /** 从当前计划建立编辑草稿，并保存原始正文与基础版本用于冲突核验。 */
     const begin=()=>{const markdown=planMarkdown(plan),value={markdown,base_markdown:markdown,split:plan.inputs?.split || 'train',base:source?.plan_path};
       draftRef.current=value;setDraft(value);setError('');};
+    /** 请求应用已保存的新计划；失败时保留待应用版本供用户重试。 */
     const apply=async(path)=>{let message='',ok=false;
       try{ok=await applyEdit(path,(value)=>{message=value;});}catch(error){message=error.message;}
       if(!ok) setError('计划已保存，制作变更尚未提交。'+(message || '请点击“应用已保存修改”重试。'));
       else {setPending(null);setError('');}return ok;};
+    /** 通过互斥标记防止重复保存，保存成功后按需提交计划应用请求。 */
     const commit=async()=>{
       if(lock.current)return;lock.current=true;setBusy(true);setError('');
       try {const value=draftRef.current;const result=await save({plan_path:value.base,markdown:value.markdown,base_markdown:value.base_markdown,split:value.split});
@@ -60,6 +66,7 @@ export function createProductComponents({React, helpers, components}) {
     const document = plan.assessment;
     const labels=Object.fromEntries((plan.template_contracts || []).map((row)=>[row.id,row.title || row.task_name]));
     const sections = PLAN_SECTIONS.filter(([key]) => document?.[key]);
+    /** 把用户指令与当前已保存计划的准确定位一起发送，避免作用于其他版本。 */
     const operate = (text) => request('本次操作对象是当前页面展示的已保存计划：' +
       (source?.plan_path || source?.operation_id || source?.run_id || plan.objective) + '\n请先读取该计划及其准确合同，再应用以下要求：\n' + text);
     return h('article', {key:draft ? 'editing' : 'saved',className: 'bfw-plan-document', 'data-assessment-document': document?.schema || 'legacy_summary'},
@@ -77,12 +84,13 @@ export function createProductComponents({React, helpers, components}) {
       draft && select('制作分区',draft.split,(value)=>{draftRef.current={...draftRef.current,split:value};setDraft({...draftRef.current});},['train','dev','test','sealed'].map(value=>[value,value])),
       typeof plan.user_markdown !== 'string' && h('h3', null, document ? planValue(document.title,null,['title'],labels) : (typeof plan.objective === 'string' ? plan.objective : plan.title || t('blueprint'))),
       scenes.length>0 && h('div',{className:'bfw-plan-scenes','data-plan-scene-previews':true},scenes.slice(0,3).map((row)=>h('button',{
-        type:'button',className:'bfw-plan-scene',key:row.id,onClick:()=>preview({...row,title:row.name,kind:'scene'})},
+        type:'button',className:'bfw-plan-scene',key:row.id,/** 打开计划所引用场景的预览。 */ onClick:()=>preview({...row,title:row.name,kind:'scene'})},
         row.frames?.[0]?.url && h('img',{src:row.frames[0].url,alt:sceneName(row.name),loading:'lazy'}),h('span',null,sceneName(row.name)),h('small',null,row.planCurrent ? '本会话已采集场景' : '已采集参考场景')))),
       draft ? h('textarea', {className:'bfw-input bfw-plan-markdown-editor', 'data-plan-markdown-editor':true,
         'aria-label':t('planMarkdownEditor'), rows:32, spellCheck:false,
         style:{minHeight:'min(70vh, 50rem)',fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:'.8rem',lineHeight:1.55,whiteSpace:'pre',overflow:'auto'},
         value:draft.markdown,
+        /** 同步更新编辑草稿的引用与界面状态，保留最新 Markdown 正文。 */
         onChange:(event)=>{const value={...draftRef.current,markdown:event.target.value};draftRef.current=value;setDraft(value);}}) : typeof plan.user_markdown === 'string' ? planMarkdownView(plan.user_markdown) : document ? h(React.Fragment, null, h('p', {className: 'bfw-plan-summary'}, planValue(document.summary,null,['summary'],labels)),
         h('small', {className: 'bfw-hint'}, t('planDesignNote')),
         h('nav', {className: 'bfw-plan-toc', 'aria-label': t('completePlan')}, sections.map(([key, title], index) =>
@@ -100,10 +108,11 @@ export function createProductComponents({React, helpers, components}) {
       !draft && artifacts.length > 0 && h(ArtifactGallery, {items: artifacts, selected: [], preview, t}),
       !draft && h('details', null, h('summary', null, t('plan')), json(plan)));
   }
+  /** 展示内嵌或按链接读取的报告内容，切换报告时取消旧请求并清除旧错误。 */
   function ReportProduct({item, observedAt, t}) {
     const [data, setData] = React.useState(item?.data || null);
     const [error, setError] = React.useState('');
-    React.useEffect(() => {
+    React.useEffect(/** 优先使用内嵌报告，否则按链接读取；切换或卸载时取消旧请求。 */ () => {
       setError('');
       if (!item) {setData(null); return;}
       if (item.data) {setData(item.data); return;}
@@ -140,6 +149,7 @@ export function createProductComponents({React, helpers, components}) {
         [({train:'训练',dev:'开发验证',test:'测试',sealed:'封存'})[split] || split,count])),
       h('details', null, h('summary', null,'数据详情'), json(data)));
   }
+  /** 展示质量报告、交付满足情况和按题型划分的统计证据。 */
   function Quality({report, t, templateName=(id)=>id}) {
     if (!report) return empty(t('noReport'));
     return h(React.Fragment, null,
@@ -154,6 +164,7 @@ export function createProductComponents({React, helpers, components}) {
       card(t('rejections'), report.rejections?.length ? json(report.rejections) : empty(t('noRejections'))));
   }
 
+  /** 根据数量契约与后端回执展示目标、实得和缺口，缺少数量信息时不显示。 */
   function DeliveryReceipt({receipt, t}) {
     if (!receipt || !['exact', 'minimum', 'best_effort'].includes(receipt.quantity_contract) &&
         receipt.target_items == null && receipt.target_reached == null && receipt.delivery_satisfied == null && !receipt.delivery_status) return null;

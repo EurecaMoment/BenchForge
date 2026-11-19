@@ -9,15 +9,18 @@ CLASSIFIER_VERSION = 4
 EXCLUDED_SCENE = 'This cube/proxy scene was removed by the user and cannot be reused'
 
 
+# 延迟加载场景设计解析模块，避免模块初始化时形成循环依赖。
 def scene_design_parser():
     from capabilities.scene_authoring.contracts import scene_design
     return scene_design
 
 
+# 读取场景计划中精确绑定的几何简化例外声明。
 def planned_geometry(program, policy=None):
     return scene_design_parser().geometry_exception(program, policy)
 
 
+# 按前景对象的实际表示检查简单盒体占位风险，并标明仍需视觉验收。
 def classify(program):
     props = [obj for obj in program.get('objects', []) if isinstance(obj, dict) and not STRUCTURE.search(str(obj.get('id', '')))]
     detailed = [obj for obj in props if obj.get('kind') == 'mesh' or str(obj.get('kind', '')).startswith('office_') or obj.get('kind') == 'mug']
@@ -32,6 +35,7 @@ def classify(program):
             'scope': 'program representation check; captured appearance still requires visual acceptance'}
 
 
+# 结合细分结构与显式几何例外判断计划表示资格，保留分类依据。
 def classify_planned(program, policy=None):
     # Detailed multi-part furniture and real open containers remain subject to
     # captured identity/support checks; the old removal classifier is stricter.
@@ -51,6 +55,7 @@ def classify_planned(program, policy=None):
     return verdict
 
 
+# 读取存在的JSON策略文件，未配置或不存在时返回空策略。
 def _read_policy(file):
     path = Path(file) if file else None
     if path is None or not path.is_file():
@@ -58,6 +63,7 @@ def _read_policy(file):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+# 按工作区和服务配置选择与生产服务一致的来源策略。
 def load_policy(workspace, service_config=None):
     """Load the same policy selected by the BenchForge service config."""
     if service_config:
@@ -88,10 +94,12 @@ def load_policy(workspace, service_config=None):
     return policy
 
 
+# 使用统一场景设计规则判断来源路径是否位于排除范围。
 def excluded_path(policy, value):
     return scene_design_parser().path_is_excluded(value, policy)
 
 
+# 策略启用时拒绝已排除任务、运行、场景组或来源文件。
 def check_source(policy, *, task_id=None, run_id=None, scene_group=None, source_path=None):
     if not policy.get('enabled'):
         return
@@ -100,6 +108,7 @@ def check_source(policy, *, task_id=None, run_id=None, scene_group=None, source_
         raise ValueError(EXCLUDED_SCENE)
 
 
+# 在真实性策略下核验服务验收及固定分区，返回可用于生产的证据回执。
 def check_evidence(workspace, record, evidence_path, service_config=None, *, receipts=None, policy=None):
     policy=policy or load_policy(workspace, service_config)
     if not policy.get('enabled') or not policy.get('enforce_realism'):return

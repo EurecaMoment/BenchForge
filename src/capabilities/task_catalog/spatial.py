@@ -6,21 +6,25 @@ from functools import lru_cache
 ROOT = Path(__file__).resolve().parent / 'resources'
 
 
+# 读取空间能力图的节点和关联数据。
 @lru_cache(maxsize=1)
 def graph():
     return json.loads((ROOT / 'capability_graph.json').read_text(encoding='utf8'))
 
 
+# 读取空间任务模板注册表。
 @lru_cache(maxsize=1)
 def _templates():
     return json.loads((ROOT / 'spatial_templates.json').read_text(encoding='utf8'))
 
 
+# 返回全部空间模板，或仅保留指定主能力的模板。
 def templates(capability=None):
     rows = _templates()
     return [row for row in rows if capability is None or capability in row['primary_capabilities']]
 
 
+# 查询空间能力图或按能力与文字筛选并分页返回模板。
 def catalog(args, directory=None, config=None):
     if args.get('section', 'graph') == 'graph':
         return graph()

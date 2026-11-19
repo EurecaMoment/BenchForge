@@ -12,9 +12,11 @@ from storage.access_queries import query_records
 
 
 class AccessContractTests(unittest.TestCase):
+    # 构造固定合法作用域，供不可变身份和查询契约测试。
     def setUp(self):
         self.scope = AccessScope("host-a", "session-a", "workspace-a", "owner-a", 1, 1)
 
+    # 验证作用域不能修改，并拒绝不合法的身份及代次。
     def test_scope_is_immutable_and_rejects_unknown_identity_syntax(self):
         with self.assertRaises(AttributeError):
             self.scope.workspace_id = "workspace-b"
@@ -24,6 +26,7 @@ class AccessContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             AccessScope("h", "s", "w", "o", True, 1)
 
+    # 验证事务身份始终用绑定参数及局部设置写入，避免注入或连接池泄漏。
     def test_transaction_scope_uses_only_bound_values_and_local_settings(self):
         connection = MagicMock()
         set_scope(connection, self.scope)
@@ -34,6 +37,7 @@ class AccessContractTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             set_scope(connection, {"workspace_id": "forged"})
 
+    # 验证固定查询在连接数据库前拒绝任意 SQL 和越界分页参数。
     def test_fixed_queries_reject_sql_and_unbounded_pages_before_connecting(self):
         engine = MagicMock()
         for resource in ("SELECT * FROM reviews", "schema_versions", "all"):
@@ -44,6 +48,7 @@ class AccessContractTests(unittest.TestCase):
                 query_records(engine, self.scope, "runs", limit=limit)
         engine.connect.assert_not_called()
 
+    # 验证表创建依赖无环，关键身份具有数据库约束。
     def test_schema_has_no_create_time_cycles_and_identity_constraints(self):
         for table in metadata.sorted_tables:
             self.assertTrue(str(CreateTable(table).compile(dialect=postgresql.dialect())))
@@ -51,6 +56,7 @@ class AccessContractTests(unittest.TestCase):
         self.assertTrue(metadata.tables["workspace_sessions"].foreign_key_constraints)
         self.assertTrue(metadata.tables["asset_versions"].foreign_key_constraints)
 
+    # 验证私有表的行级策略不存在无作用域的公开读入口。
     def test_rls_has_no_unscoped_private_read_policy(self):
         policies = policy_expressions()
         self.assertNotIn("legacy_review_ids", policies)

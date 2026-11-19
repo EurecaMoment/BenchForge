@@ -4,6 +4,7 @@ from collections import Counter
 from capabilities.task_catalog.allocation import counts_for
 
 
+# 解析每个生产步骤的模板配额，要求总分配与计划选择完全一致。
 def step_allocations(steps, selections):
     expected = counts_for(selections)
     if not expected:

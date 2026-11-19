@@ -6,6 +6,7 @@ import urllib.request
 from service_access.runtime_config import environment_value
 from service_access.request_context import RunContext
 from service_access.request_context import check_cancelled
+# 从普通文本或代码围栏中提取 JSON，对带说明文字的对象响应进行有界解析。
 def _json_text(value):
     value = value.strip()
     if value.startswith('```'):
@@ -42,6 +43,7 @@ def _json_text(value):
         raise
 
 
+# 解析已保存的模型响应；解析失败时写出可追踪的诊断回执。
 def _parse_saved(saved, path):
     try:
         return _json_text(saved['content'])
@@ -60,6 +62,7 @@ def _parse_saved(saved, path):
         raise
 
 
+# 从环境配置读取模型凭据并构造请求头，引用的凭据缺失时明确报错。
 def model_request_headers():
     headers = {'Content-Type': 'application/json'}
     name = environment_value('BENCHFORGE_MODEL_API_KEY_ENV')
@@ -71,6 +74,7 @@ def model_request_headers():
     return headers
 
 
+# 最多三次重试格式错误的 JSON 响应，避免重复使用已损坏的完成缓存。
 def completion(
     prompt,
     trace_dir,
@@ -99,6 +103,7 @@ def completion(
                 raise
 
 
+# 执行一次可取消的多模态模型请求，复用有效回执并记录请求响应以支持恢复。
 def _completion_once(
     prompt,
     trace_dir,

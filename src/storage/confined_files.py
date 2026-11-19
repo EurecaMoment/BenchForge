@@ -8,6 +8,7 @@ import stat
 import uuid
 
 
+# 把输入路径拆成可信根内的相对分量，拒绝越界、歧义路径及禁止的根目录引用。
 def _parts(root, file, *, allow_root=False):
     candidate = Path(file)
     if isinstance(root, int):
@@ -27,6 +28,7 @@ def _parts(root, file, *, allow_root=False):
     return root, relative.parts
 
 
+# 逐级以目录描述符固定可信根下的目录，可按需创建父目录且不跟随符号链接。
 @contextmanager
 def open_directory(root, directory='.', *, create=False):
     """Pin a directory below a trusted root; optionally create missing parents."""
@@ -52,12 +54,14 @@ def open_directory(root, directory='.', *, create=False):
         os.close(descriptor)
 
 
+# 通过已固定的父目录创建任务目录，防止目录替换或符号链接改变写入位置。
 def mkdir(root, directory):
     """Create task directories without following a mutable parent symlink."""
     with open_directory(root, directory, create=True):
         pass
 
 
+# 固定各级父目录后打开普通输入文件，防止重命名与符号链接竞争造成越界读取。
 @contextmanager
 def open_read(root, file):
     """Hold every parent by descriptor so rename/symlink races cannot escape."""
@@ -75,6 +79,7 @@ def open_read(root, file):
                 os.close(file_descriptor)
 
 
+# 在固定父目录内写临时文件，成功后原子替换目录项，避免写入链接指向的文件。
 @contextmanager
 def open_write(root, file):
     """Atomically replace a task file via its pinned parent, never its target inode.
@@ -103,6 +108,7 @@ def open_write(root, file):
                 pass
 
 
+# 受限读取普通文件；读取量超过 limit 时拒绝返回不完整输入。
 def read_bytes(root, file, *, limit):
     with open_read(root, file) as stream:
         value = stream.read(limit + 1)
@@ -111,6 +117,7 @@ def read_bytes(root, file, *, limit):
     return value
 
 
+# 将经过根目录约束和大小检查的输入复制到调用方控制的私有暂存位置。
 def copy_input(root, source, destination, *, limit=512 * 1024 * 1024):
     """Destination must be a private service staging path, never model-selected."""
     destination = Path(destination)
@@ -123,6 +130,7 @@ def copy_input(root, source, destination, *, limit=512 * 1024 * 1024):
     return destination
 
 
+# 把可信二进制流按大小限制原子发布到任务目录，流的位置与关闭由调用方负责。
 def copy_output(root, source, destination, *, limit=512 * 1024 * 1024):
     """Publish a trusted binary stream into a mutable task tree atomically.
 

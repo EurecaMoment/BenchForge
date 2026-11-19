@@ -5,15 +5,19 @@ import {executePython} from '../../host/python_process.mjs';
 import {Readable} from 'node:stream';
 import {ApiError, assertSessionDirectory, inside, readJson, resolveToken, scopeOf} from '../../host/session_scope.mjs';
 
+/** 通过可注入的执行器运行场景查询辅助 Python 进程。 */
 const execute = (config, args, options) =>
   (config._executePython || executePython)(config.productionPython, args, options);
 
+/** 创建场景库、采集关联、阶段产物和媒体读取接口，统一会话身份和工作区校验。 */
 export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
+  /** 将配置、工作区和媒体身份参数组合为预览缓存键。 */
   function previewMediaKey(config, roots, url) {
     return JSON.stringify([config.productionConfig, roots.map((root) => root.path),
       ...['session_id', 'scene', 'run', 'task', 'revision', 'library'].map((key) => url.searchParams.get(key) || '')]);
   }
 
+  /** 校验工作区和会话后读取或保存场景库选择，并为可公开产物补充工作台链接。 */
   async function sceneLibrary(config, roots, url, signal, selection) {
     const session = url.searchParams.get('session_id') || '';
     if (roots.length !== 1 || !config.productionConfig || !/^session-[a-zA-Z0-9-]+$/.test(session)) {
@@ -30,7 +34,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     const cached = action === 'list' && config._libraryCache.get(key);
     if (cached && cached.expires > Date.now()) return cached.value;
     const previous = config._libraryQueue.get(roots[0].path) || Promise.resolve();
-    const job = previous.catch(() => {}).then(async () => {
+    const job = previous.catch(() => {}).then(/** 串行执行场景库索引与选择操作；读取可取消，原子选择写入需完成后返回。 */ async () => {
       if (action === 'list' && signal?.aborted) throw new DOMException('Aborted', 'AbortError');
       // Finish atomic index/selection writes even if a search query or tab is replaced.
       const {stdout} = await execute(config, args, {timeout: 20000, maxBuffer: 3 * 1024 * 1024});
@@ -43,6 +47,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     if (action !== 'list') {config._libraryCache.clear(); return value;}
     const scenes = [];
     const result = {...value, items: value.items.map((row) => {
+      /** 为当前场景产物生成绑定会话、任务和修订号的媒体链接。 */
       const link = (file) => workbenchUrl({view: 'stage_media', library: '1', scene: row.run_id, session_id: session,
         task: row.task_id, revision: String(row.revision), file}, roots[0].path);
       let video = null;
@@ -62,6 +67,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     return result;
   }
 
+  /** 按成功任务及修订号去重安排场景视频生成，对近期失败保留重试间隔。 */
   function scheduleSceneMovies(config, session, scenes, runIds = []) {
     if (!config.productionConfig || !config._previewJobs || !/^session-[a-zA-Z0-9-]+$/.test(session)) return;
     for (const scene of scenes.filter((row) => /^sf_[a-zA-Z0-9_-]+$/.test(row.run_id) &&
@@ -73,7 +79,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
       config._previewJobs.set(key, job);
       if (config._previewJobs.size > 96) config._previewJobs.delete(config._previewJobs.keys().next().value);
       // One CPU encoder at a time, started by the production observation rather than a preview click.
-      config._previewQueue = config._previewQueue.then(async () => {
+      config._previewQueue = config._previewQueue.then(/** 在预览队列中运行场景视频辅助进程，并缓存其媒体结果或失败时间。 */ async () => {
         const helper = 'capabilities.scene_library.scene_preview_video';
         const {stdout} = await execute(config, ['-B', '-m',helper, '--config', config.productionConfig,
           '--session', session, '--scene', scene.run_id, '--run-ids', JSON.stringify(runIds)],
@@ -84,6 +90,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     }
   }
 
+  /** 读取并核验当前会话持久化的采集关联，补充投影之外的运行定位。 */
   async function associatedCaptures(roots, scope, associations) {
     if (scope.history || !/^session-[A-Za-z0-9-]+$/.test(scope.session_id)) return [];
     await associations?.warm(scope.session_id);
@@ -98,6 +105,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
     return [...new Set(captures.reverse())];
   }
 
+  /** 验证会话与场景身份后查询阶段产物；媒体读取沿相同归属检查路径执行。 */
   async function sceneArtifacts(config, roots, url, signal, media = false) {
     const session = url.searchParams.get('session_id') || '', scene = url.searchParams.get('scene') || '';
     if (!roots.length || !config.productionConfig || !/^session-[a-zA-Z0-9-]+$/.test(session) || !/^sf_[a-zA-Z0-9_-]+$/.test(scene)) {
@@ -141,6 +149,7 @@ export function createSceneQueries({workbenchUrl, pipelineSceneIds}) {
         revision: String(row.revision), file: row.file}, roots[0].path)})), snapshot_at: new Date().toISOString()};
   }
 
+  /** 返回经归属验证的场景媒体，支持预览缓存和请求中的字节范围。 */
   async function sceneMedia(config, roots, url, request) {
     const cached = url.searchParams.get('file') === 'preview/scene.mp4' && config._previewMedia?.get(previewMediaKey(config, roots, url));
     const file = cached && cached.expires > Date.now() ? cached : await sceneArtifacts(config, roots, url, request.signal, true);

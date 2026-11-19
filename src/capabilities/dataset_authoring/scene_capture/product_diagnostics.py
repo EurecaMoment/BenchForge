@@ -6,6 +6,7 @@ import json
 from capabilities.dataset_authoring.scene_capture.spatial_tasks import comparison_family
 
 
+# 按模板统计答案分布和常量基线，标明该诊断不等同模型评测。
 def _template_statistics(groups):
     result = {}
     for template, rows in groups.items():
@@ -25,6 +26,7 @@ def _template_statistics(groups):
     return result
 
 
+# 统计模板覆盖、重复比较和答案捷径，为数据选择复核提供依据。
 def collection_diagnostics(public, authority, evidence, candidates, selected, target, scene_family):
     """Measure coverage, repeated comparisons, and answer shortcuts for review."""
     frames = {frame['frame_id']: frame for frame in evidence['frames']}

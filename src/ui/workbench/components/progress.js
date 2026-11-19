@@ -1,3 +1,4 @@
+/** 创建模板参考、运行详情、并行进度和生产阶段导航组件。 */
 export function createProgressComponents({React, helpers}) {
   const h = React.createElement;
   const {status, button, card, empty, json, sceneName, questionText, planValue, planMarkdown,
@@ -7,13 +8,14 @@ export function createProgressComponents({React, helpers}) {
   registeredCollectionProgress, currentGeneration, sceneCollectionProgress, annotationProducts,
   stageState, recordedStageState,
   STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries} = helpers;
+  /** 展示带搜索、能力筛选和分页的任务模板参考目录。 */
   function TemplateCatalog({catalog, catalogQuery, setCatalogQuery, catalogPage, setCatalogPage,
     capability, setCapability, retry, t}) {
     return h('details', {'data-template-reference': true}, h('summary', null, t('templateCatalog')),
       h('small', {className: 'bfw-hint'}, t('catalogDesign')),
       h('div', {className: 'bfw-toolbar'},
         h('input', {className: 'bfw-input', 'aria-label': t('searchTemplates'), value: catalogQuery,
-          placeholder: t('searchTemplates'), onChange: (e) => {setCatalogQuery(e.target.value); setCatalogPage(1);}}),
+          placeholder: t('searchTemplates'), /** 更新模板搜索词并返回第一页。 */ onChange: (e) => {setCatalogQuery(e.target.value); setCatalogPage(1);}}),
         select(t('capability'), capability, (id) => {setCapability(id); setCatalogPage(1);},
           [['', t('all')], ...(catalog.value?.capabilities || []).map((id) => [id, id])])),
       catalog.loading ? empty(t('loading')) : catalog.error ? h('div', null,
@@ -28,6 +30,7 @@ export function createProgressComponents({React, helpers}) {
         h('span', null, catalogPage + ' / ' + (catalog.value?.pages || 1)),
         button(t('nextPage'), () => setCatalogPage(catalogPage + 1), {disabled: catalog.loading || !catalog.value || catalogPage >= catalog.value.pages})));
   }
+  /** 展示选中运行的状态、下一步、产物和修复记录。 */
   function RunDetails({record, t}) {
     if (!record) return empty(t('chooseRun'));
     const artifacts = record.artifacts || [];
@@ -58,6 +61,7 @@ export function createProgressComponents({React, helpers}) {
             h('p', null, t('repairScope') + ': ' + repair.scope),
             h('p', null, t('newRun') + ': ' + t(repair.requires_new_run ? 'yes' : 'no')))) : empty(t('noRepairs'))))));
   }
+  /** 综合当前生成任务和并行活动任务，确定界面应强调的实际执行阶段。 */
   function executionStage(viewed, states, running, parallelTasks = [], generation = null) {
     const generated = currentGeneration(generation);
     if (generated?.state === 'running' && generated.fresh) return STAGES.find((row) => row.id === 'S4');
@@ -67,6 +71,7 @@ export function createProgressComponents({React, helpers}) {
       STAGES.find((row) => active.some((task) => task.stage === row.id)) ||
       STAGES.find((row) => states[row.id] === 'waiting') || {id: 'execution', key: 'productionProgress'};
   }
+  /** 从后端已报告的字节或条目计数计算真实进度，忽略中断或无效计数。 */
   function reportedProgress(value) {
     if (!value || value.interrupted) return null;
     const pairs = [['bytes_received', 'total_bytes', 'progressUpload'], ['completed', 'total', 'progressItems']];
@@ -78,10 +83,12 @@ export function createProgressComponents({React, helpers}) {
     }
     return null;
   }
+  /** 将真实进度计数格式化为 MB 或条目数文本。 */
   function progressAmount(detail) {
     return detail.bytes ? (detail.done / 1048576).toFixed(1) + ' / ' + (detail.total / 1048576).toFixed(1) + ' MB' :
       detail.done + ' / ' + detail.total;
   }
+  /** 按阶段展示并行子任务的状态、真实进度及公开产物。 */
   function ParallelProgress({tasks = [], stage, titleKey = 'parallelTasks', t}) {
     const rows = tasks.filter((row) => !row.stage || stage.id === 'execution' || row.stage === stage.id).map((row, index) => ({...row,
       display_name: row.display_name || row.label || row.name || t('parallelTask') + ' ' + (index + 1)}));
@@ -90,11 +97,13 @@ export function createProgressComponents({React, helpers}) {
     const active = rows.filter((row) => lifecycle(row.state) !== 'completed');
     const caption = completed.length ? t('parallelCompleted') + ' ' + completed.length :
       t('parallelRunning') + ' ' + rows.filter((row) => lifecycle(row.state) === 'running').length;
+    /** 提取并行任务中可直接展示的公开文件引用。 */
     const publicFiles = (row) => (row.public_artifacts || []).filter((file) => {
       if (typeof file.url !== 'string' || file.url.includes('\\')) return false;
       const match = /^\/?api\/benchforge\/workbench\?(.+)$/.exec(file.url);
       return match && ['run_product', 'stage_media', 'media'].includes(new URLSearchParams(match[1]).get('view'));
     });
+    /** 渲染一个并行任务的状态、进度、错误和可用产物入口。 */
     const renderTask = (row) => {
       const state = lifecycle(row.state);
       const detail = reportedProgress(row.progress) || reportedProgress(row);
@@ -116,6 +125,7 @@ export function createProgressComponents({React, helpers}) {
       completed.length > 0 && h('details', {className: 'bfw-parallel-completed', open: false},
         h('summary', null, t('parallelCompleted') + ' ' + completed.length), h('div', {className: 'bfw-parallel-grid'}, completed.map(renderTask))));
   }
+  /** 展示当前生产活动和后台进度的可读摘要。 */
   function ProductionActivity({value,t}) {
     const [clock,setClock]=React.useState(Date.now());
     const current=value?.active&&value.running&&value.workflowTurn===value.turn;
@@ -136,6 +146,7 @@ export function createProgressComponents({React, helpers}) {
       silent?' · '+t('productionAwaitingUpdate'):'',
       value.error?h('span',null,' · '+t('productionRecentFailure')):null);
   }
+  /** 展示五阶段导航、各阶段状态及当前执行位置。 */
   function StageProgress({stage, pipeline, scene, record, activity, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t}) {
     const collection = stage.id === 'S2' && (collectionPlan?.assessment?.scenes || collectionPlan?.inputs?.target_scene_count || record.value?.current_collection)
       ? sceneCollectionProgress(collectionPlan, record.value?.scenes?.runs || [], record.value?.current_collection) : null;

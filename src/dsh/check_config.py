@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from service_access.scene_service import resolve_service_config_file
 
 
+# 递归查找启用的 BenchForge 工具所引用的服务配置，跳过禁用插件。
 def service_config_paths(value):
     if isinstance(value, list):
         for child in value:
@@ -25,6 +26,7 @@ def service_config_paths(value):
             yield from service_config_paths(child)
 
 
+# 以不执行自定义标签的 YAML 读取器解析预设，并去重校验引用服务配置。
 def check_preset(preset):
     # BaseLoader treats !!js and all other scalar tags as text; it executes nothing.
     profile = yaml.load(Path(preset).read_text(encoding='utf-8'), Loader=yaml.BaseLoader)
@@ -48,6 +50,7 @@ def check_preset(preset):
     return checked
 
 
+# 解析待检查预设路径，报告配置错误或已校验的服务配置数量。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preset', required=True, type=Path)

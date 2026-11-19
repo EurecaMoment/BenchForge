@@ -6,6 +6,7 @@ import test from 'node:test';
 import {workspaceReference, resolveReadArguments} from './workspace.mjs';
 import {canonicalToolName, resolveToolName} from './identifiers.mjs';
 
+/** 创建模拟部署工作区、可读文件和外部路径，供文件引用规范化测试使用。 */
 async function files(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-reference-'));
   t.after(() => fs.rm(directory, {recursive: true, force: true}));
@@ -17,9 +18,9 @@ async function files(t) {
   return {directory, cwd, relative, target, typo};
 }
 
-test('known spellings resolve only to an admitted canonical tool', () => {
+test('known spellings resolve only to an admitted canonical tool', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：known spellings resolve only to an admitted canonical tool。 */ () => {
   const visible = new Set(['benchforge_pipeline_catalog', 'benchforge_isaac_sim']);
-  const tools = {executable: name => visible.has(name)};
+  const tools = {/** 只把测试预先登记的工具名称视为当前可执行工具。 */ executable: name => visible.has(name)};
   for (const name of ['pipeline_catalog', 'benchmarkforge_pipeline_catalog', 'benchmarkforge_isaac_sim'])
     assert.equal(resolveToolName(tools, {name}), canonicalToolName(name));
   for (const name of ['benchmarkforge_missing', 'benchforch_pipeline_catalog', 'run', 'bash'])
@@ -30,7 +31,7 @@ test('known spellings resolve only to an admitted canonical tool', () => {
   assert.equal(resolveToolName(tools, {name: 'benchmarkforge_pipeline_catalog'}), 'benchmarkforge_pipeline_catalog');
 });
 
-test('a missing ancestor can resolve an exact existing workspace image', async t => {
+test('a missing ancestor can resolve an exact existing workspace image', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：a missing ancestor can resolve an exact existing workspace image。 */ async t => {
   const {cwd, relative, target, typo} = await files(t);
   assert.deepEqual(await workspaceReference(typo, cwd), {absolute: target, relative});
   assert.deepEqual(await resolveReadArguments('read_image', {file_path: typo}, cwd), {file_path: target});
@@ -38,7 +39,7 @@ test('a missing ancestor can resolve an exact existing workspace image', async t
   assert.equal(await workspaceReference(target, cwd), undefined);
 });
 
-test('no guessing missing filenames, existing external files, traversal or writes', async t => {
+test('no guessing missing filenames, existing external files, traversal or writes', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：no guessing missing filenames, existing external files, traversal or writes。 */ async t => {
   const {cwd, target, typo} = await files(t);
   assert.equal(await workspaceReference(typo.replace('depth.png', 'depth2.png'), cwd), undefined);
   assert.equal(await workspaceReference(typo.replace('case', '..'), cwd), undefined);
@@ -51,7 +52,7 @@ test('no guessing missing filenames, existing external files, traversal or write
   assert.equal(await fs.readFile(target, 'utf8'), 'image');
 });
 
-test('workspace reference cannot follow a symlink outside its root', async t => {
+test('workspace reference cannot follow a symlink outside its root', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：workspace reference cannot follow a symlink outside its root。 */ async t => {
   if (process.platform === 'win32') return t.skip('Symlink test runs in the Linux deployment environment');
   const {directory, cwd, target, typo} = await files(t);
   const external = path.join(directory, 'external.png');
@@ -61,7 +62,7 @@ test('workspace reference cannot follow a symlink outside its root', async t => 
   assert.equal(await workspaceReference(typo, cwd), undefined);
 });
 
-test('reference resolution respects cancellation', async t => {
+test('reference resolution respects cancellation', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：reference resolution respects cancellation。 */ async t => {
   const {cwd, typo} = await files(t);
   const controller = new AbortController();
   controller.abort();

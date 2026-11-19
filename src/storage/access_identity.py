@@ -12,16 +12,19 @@ from database.schema import workspaces, workspace_sessions, runs
 from database.transactions import lock_entity
 
 
+# 从登记记录提取 AccessScope 所需字段，恢复不可缺失的访问身份。
 def _scope(row):
     return AccessScope(**{name: row[name] for name in AccessScope.__dataclass_fields__})
 
 
+# 按宿主和会话联合查询已登记的工作区身份。
 def _query(host_id, session_id):
     return select(workspaces, workspace_sessions.c.session_id).join(
         workspace_sessions, workspaces.c.workspace_id == workspace_sessions.c.workspace_id
     ).where(workspace_sessions.c.host_id == host_id, workspace_sessions.c.session_id == session_id)
 
 
+# 在宿主授权后登记会话工作区及继承关系，不从旧文件推断所有权。
 def register_session_workspace(engine, *, host_id, session_id, owner_id, root_path,
                                workspace_id=None, parent_session_id=None, legacy_namespace=None):
     """Called only after Host authorization; never infer ownership from old files."""
@@ -57,6 +60,7 @@ def register_session_workspace(engine, *, host_id, session_id, owner_id, root_pa
         return _scope(connection.execute(_query(host_id, session_id)).mappings().one())
 
 
+# 验证所有者、活动状态与可选代次后解析当前有效访问作用域。
 def resolve_access_scope(engine, *, host_id, session_id, owner_id, policy_epoch=None, root_generation=None):
     for value in (host_id, session_id, owner_id):
         identifier(value)
@@ -69,6 +73,7 @@ def resolve_access_scope(engine, *, host_id, session_id, owner_id, policy_epoch=
     return _scope(row)
 
 
+# 撤销工作区并递增策略代次，使后续请求失效；活跃资源由调用方回收。
 def revoke_scope(engine, scope):
     """Invalidate new access; caller must also reclaim live processes/mounts."""
     with engine.begin() as connection:
@@ -78,6 +83,7 @@ def revoke_scope(engine, scope):
                            .values(state="revoked", policy_epoch=scope.policy_epoch + 1))
 
 
+# 校验访问身份后将已创建运行绑定到会话，拒绝接管其他会话运行。
 def bind_run_scope(engine, scope, run_id):
     """Bind a freshly created/verified run, never trust a run ID from a model."""
     identifier(run_id, "run")
@@ -97,6 +103,7 @@ def bind_run_scope(engine, scope, run_id):
             workspace_id=scope.workspace_id, session_id=scope.session_id))
 
 
+# 在管理员核实历史归属后登记旧工作区命名空间，并防止映射冲突。
 def approve_legacy_namespace(engine, scope, previous_root):
     """Explicit administrative mapping after verifying historical session ownership."""
     namespace = legacy_workspace_id(previous_root)
@@ -110,6 +117,7 @@ def approve_legacy_namespace(engine, scope, previous_root):
     return resolve_access_scope(engine, host_id=scope.host_id, session_id=scope.session_id, owner_id=scope.owner_id)
 
 
+# 供可信服务解析登记命名空间；宿主根路径有歧义时要求显式会话身份。
 def workspace_namespace(engine, root_path, *, host_id=None, session_id=None):
     """Trusted UI/service lookup, not authorization for a model-supplied root.
 

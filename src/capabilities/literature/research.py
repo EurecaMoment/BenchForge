@@ -14,6 +14,7 @@ from storage.artifacts import jsonl
 from storage.artifacts import unique
 
 
+# 合并显式来源与arXiv检索结果，下载可访问论文并建立可追踪文本索引。
 def literature(args,directory,config):
     candidates=list(args.get('sources',[]))
     if args.get('query'):
@@ -60,6 +61,7 @@ def literature(args,directory,config):
             'next':'Read extracted full text through host file tools; submit claims and exact supporting passages to research_review. Downloading does not establish reading.'}
 
 
+# 核查主张引用的原文片段是否确实存在，输出审计记录并保留语义蕴含待审范围。
 def review(args,directory,config):
     papers=unique([{**r,'id':str(r['id'])} for r in rows(args['index'])])
     claims=args['claims'] if isinstance(args['claims'],list) else rows(args['claims'])
@@ -81,6 +83,7 @@ def review(args,directory,config):
             'status':'incomplete' if failures or not audited else 'source_passages_verified'}
 
 
+# 验证能力、来源、模板与指标的显式绑定，生成基准规范和可追踪矩阵。
 def design(args,directory,config):
     spec=args['spec'] if isinstance(args['spec'],dict) else read(args['spec'])
     spec=dict(spec)
@@ -111,6 +114,7 @@ def design(args,directory,config):
             'traceability':str(directory/'traceability.jsonl'),'templates':len(templates),'status':'design_validated'}
 
 
+# 汇总事件中的会话与模型请求用量，保留提供方原始计数避免重复相加。
 def usage(args,directory,config):
     paths=args['events'] if isinstance(args['events'],list) else [args['events']]
     records=[]

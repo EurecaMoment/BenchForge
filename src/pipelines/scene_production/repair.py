@@ -58,6 +58,7 @@ def resume_service_wait(record, config, post):
         if target == 'capturing':
             task = post('/inspect', {'run_id': record['run_id']})['tasks'][0]
             if task['state'] == 'FAILED_FINAL':
+                # /retry 在服务端重新发现原任务的完整采集能力后才重新入队。
                 post('/retry', {'task_id': record['task_id']})
             elif task['state'] == 'CANCELED':
                 record['state'] = 'failed_final'
@@ -76,6 +77,7 @@ def resume_service_wait(record, config, post):
     return True
 
 
+# 发送有界场景编写请求并复用保存响应，不改变模型或服务配置。
 def author_completion(prompt, directory, images, max_tokens=14000):
     """Bounded authoring request; does not alter the model or its service."""
     import os
@@ -100,6 +102,7 @@ def author_completion(prompt, directory, images, max_tokens=14000):
     return _json_text(message['message']['content'])
 
 
+# 先写待发布 JSON 文件再原子替换，保留中文且避免半写状态。
 def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.pending.json')
@@ -107,6 +110,7 @@ def save(path, value):
     temporary.replace(path)
 
 
+# 将服务 HTTP 错误恢复成结构化预检异常或可诊断的服务调用错误。
 def raise_service_error(route, error):
     body = error.read().decode(errors='replace')
     try:payload = json.loads(body)
@@ -122,6 +126,7 @@ def raise_service_error(route, error):
     raise ValueError(route+': '+detail) from error
 
 
+# 优先使用最近采集或反馈对应程序作为修复基线，避免回退到过时编写草稿。
 def repair_baseline(row, folder, attempt=0, feedback=None):
     """Use the captured predecessor rather than an obsolete authoring draft."""
     source=Path(row['source_directory'])
@@ -133,6 +138,7 @@ def repair_baseline(row, folder, attempt=0, feedback=None):
     return program_path,context,frozen
 
 
+# 从选定基线生成并预检场景修复，保存程序、要求及可评审计划。
 def revise(config, row, folder, attempt=0, feedback=None):
     from pipelines.scene_production.planning import apply_scene_replacements
     from capabilities.scene_authoring.catalog.native import ASSETS
@@ -238,6 +244,7 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
     raise ValueError('Candidate still fails authoring admission: ' + str(last_error))
 
 
+# 加载修复批次配置，按计划或执行动作并行处理所选场景并管理恢复回执。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True);parser.add_argument('--workspace', required=True)
@@ -260,6 +267,7 @@ def main():
         targets = [by_id[scene_id] for scene_id in dict.fromkeys(args.ids)]
         save(targets_file, targets)
     if args.action == 'plan':
+        # 为单个场景生成修复计划，保留已有可恢复状态并防止慢失败覆盖新计划。
         def plan_one(row):
             folder = root / row['id']
             existing = folder / 'status.json'
@@ -282,6 +290,7 @@ def main():
     from service_access.scene_service import post_service_json
 
     url = config.get('service_url') or 'http://127.0.0.1:' + str(config.get('port', 3841))
+    # 按路由选择请求超时并调用修复服务，将 HTTP 错误转换为领域异常。
     def post(route, value):
         try:
             return post_service_json(url, route, value, token=config['operator_token'],

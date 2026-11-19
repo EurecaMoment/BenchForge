@@ -4,10 +4,12 @@ import {randomUUID} from 'node:crypto';
 import {AccessError} from './workspaces.mjs';
 
 /** Copy only packaged documentation/support files, never source directory grants. */
+/** 将随包资源复制到新的只读发布目录；拒绝符号链接并限制文件数和单文件体积。 */
 export async function publishResources(source, resourceRoot, label, extensions) {
   const target = path.join(resourceRoot, 'shared', label + '-' + randomUUID());
   await fs.mkdir(target, {recursive: true, mode: 0o700});
   let count = 0;
+  /** 递归复制符合扩展名限制的普通资源文件，并将副本设为只读。 */
   async function copy(directory, destination) {
     for (const entry of await fs.readdir(directory, {withFileTypes: true})) {
       const from = path.join(directory, entry.name), to = path.join(destination, entry.name);

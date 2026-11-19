@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {databaseEnvironment} from './database_environment.mjs';
 
-test('only the selected database credential crosses the Host subprocess seam', async t => {
+test('only the selected database credential crosses the Host subprocess seam', /** 验证宿主进程、取消信号和资源清理在该用例中的具体边界，完成准备、调用和结果断言。用例：only the selected database credential crosses the Host subprocess seam。 */ async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bf-database-env-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
   const config = path.join(root, 'client.json');

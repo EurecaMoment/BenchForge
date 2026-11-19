@@ -15,12 +15,14 @@ from capabilities.dataset_authoring.answer_contracts import validate_answer
 from capabilities.dataset_authoring.answer_contracts import validate_contract_declaration
 
 
+# 计算两个二维检测框的交并比，面积并集为空时返回零。
 def iou(a: Sequence[float], b: Sequence[float]) -> float:
     intersection = max(0, min(a[2], b[2])-max(a[0], b[0]))*max(0, min(a[3], b[3])-max(a[1], b[1]))
     union = (a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-intersection
     return intersection/union if union > 0 else 0
 
 
+# 按类别和至少0.5的交并比贪心匹配预测框，统计命中与未匹配对象。
 def _match_detections(
     truth: Mapping[str, Any], prediction: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -45,6 +47,7 @@ def _match_detections(
     }
 
 
+# 仅按模板明确选择的注册确定性合同为单个答案评分。
 def score(
     gold: Mapping[str, Any], prediction: Any, template: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -108,6 +111,7 @@ def score(
     return {'success': prediction[field] == truth[field], 'metric': scorer}
 
 
+# 在计算分数前检查记录必需字段与标识唯一性，拒绝非法提交。
 def _index_records(
     records: Iterable[Mapping[str, Any]], *, kind: str, required_fields: Sequence[str]
 ) -> dict[str, dict[str, Any]]:
@@ -128,6 +132,7 @@ def _index_records(
     return indexed
 
 
+# 验证预测提交并输出确定性的逐题分数及汇总指标。
 def evaluate(
     args: Mapping[str, Any], directory: str | Path, config: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:

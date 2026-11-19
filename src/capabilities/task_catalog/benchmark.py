@@ -9,21 +9,25 @@ from service_access.tool_names import NAMES
 ROOT = Path(__file__).with_name('resources')
 
 
+# 读取基准模板目录文档。
 @lru_cache(maxsize=1)
 def document():
     return json.loads((ROOT / 'benchmark_templates.json').read_text(encoding='utf-8'))
 
 
+# 展开所有任务模板，并补上任务名、操作、能力链接及协议元数据。
 def all_templates():
     return [{**template, 'task_name': task['name'], 'operation': task['operation'],
              'catalog_capability_links': task['catalog_capability_links'],
              'protocol': task['new_protocol']} for task in document()['tasks'] for template in task['templates']]
 
 
+# 读取基准能力概览目录。
 def overview():
     return json.loads((ROOT / 'capabilities.json').read_text(encoding='utf-8'))
 
 
+# 将能力编号或名称解析为目录中的规范编号，未知能力时报错。
 def capability_id(value):
     value = value.strip()
     if re.fullmatch(r'N\d{1,2}', value, re.I):
@@ -35,6 +39,7 @@ def capability_id(value):
     return match
 
 
+# 按明确模板、任务和能力筛选模板，并拒绝未知选择。
 def selected_templates(args):
     rows = all_templates()
     ids = args.get('template_ids', [])
@@ -56,6 +61,7 @@ def selected_templates(args):
     return rows
 
 
+# 用中英文词片与标识的文字匹配计算目录相关度。
 def relevance(row, query):
     text = (row.get('task_name', row.get('name', '')) + ' ' + row.get('title', '') + ' ' + row.get('description', '')).casefold()
     query = query.casefold()
@@ -64,6 +70,7 @@ def relevance(row, query):
     return sum(3 if token == row.get('id', '').casefold() else 1 for token in set(tokens) if token in text or token in row.get('id', '').casefold())
 
 
+# 按条目标识及查询相关度筛选，再返回分页结果与下一页偏移。
 def page(rows, args):
     if args.get('item_id'):
         rows = [row for row in rows if row['id'] == args['item_id']]
@@ -80,6 +87,7 @@ def page(rows, args):
     }
 
 
+# 返回协议、能力、任务或模板目录，并应用对应筛选分页。
 def catalog(args):
     section = args.get('section', 'templates')
     if section == 'protocol':

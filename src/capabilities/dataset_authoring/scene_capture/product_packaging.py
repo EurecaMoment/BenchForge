@@ -6,6 +6,7 @@ import zipfile
 from service_access.request_context import check_cancelled
 
 
+# 解析采集目录内非空证据文件，拒绝绝对路径和目录越界。
 def capture_file(capture, relative):
     path = capture / relative
     if (
@@ -19,6 +20,7 @@ def capture_file(capture, relative):
     return path
 
 
+# 打包已录制场景与动作文件，并记录复现所需依赖。
 def package_capture(directory, release, evidence, *, stop=None):
     """Package recorded scene/action files and expose installed dependencies."""
     capture = directory / 'capture'

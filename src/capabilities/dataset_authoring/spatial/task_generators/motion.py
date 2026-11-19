@@ -8,6 +8,7 @@ from capabilities.dataset_authoring.spatial.task_generators.geometry import resu
 from capabilities.dataset_authoring.spatial.task_generators.geometry import distance
 
 
+# 构造任务所需的时序观察或变换视图，并保留跨视图对象对应关系。
 def observed_scenes(scene,nid):
     if nid=='N09':
         rng=random.Random(scene['seed']+19);permutation=list(range(len(scene['objects'])));rng.shuffle(permutation)
@@ -42,6 +43,7 @@ def observed_scenes(scene,nid):
     return frames,None
 
 
+# 依据私有运动轨迹和相机位姿计算运动类任务的题面与答案。
 def task(scene,nid,op):
     m=scene['motion'];positions=m['positions'];times=m['times'];delta=[positions[-1][i]-positions[0][i] for i in range(2)]
     velocities=[[(b[j]-a[j])/(times[i+1]-times[i]) for j in range(2)] for i,(a,b) in enumerate(zip(positions,positions[1:]))]

@@ -8,6 +8,7 @@ from database.engine import dispose_engines, engine_for
 from database.migrations import initialize_schema
 
 
+# 解析数据库管理命令，检查或初始化结构并按需配置独立的只读角色。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["check", "initialize", "grant-reader", "provision-reader"])

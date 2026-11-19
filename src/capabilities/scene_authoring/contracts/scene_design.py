@@ -12,20 +12,24 @@ _UNRESOLVED_DESIGN = object()
 DETAIL_FIELDS = ('purpose', 'reason', 'simplifications', 'retained_constraints', 'excluded_claims')
 
 
+# 受限读取有所有权的JSON资源，同时返回该读取版本。
 def _document(path, root=None):
     raw, version = read_owned_resource(path, limit=2 * 1024 * 1024, artifact_root=root)
     return json.loads(raw.decode('utf-8-sig')), version
 
 
+# 按当前访问范围解析自有资源路径，并按需要求文件存在。
 def _resource(path, root=None, *, must_exist=True):
     return resolve_owned_resource(None, root, path, must_exist=must_exist)
 
 
+# 判断解析后的路径是否位于策略明确排除的任一目录下。
 def path_is_excluded(path, policy):
     source = Path(path).resolve()
     return any(source.is_relative_to(Path(root).resolve()) for root in policy.get('excluded_paths', []))
 
 
+# 递归检查声明是否引用已排除的任务、运行、场景组或文件路径。
 def references_excluded_source(value, policy):
     if isinstance(value, dict):
         return any(references_excluded_source(child, policy) for child in value.values())
@@ -41,6 +45,7 @@ def references_excluded_source(value, policy):
 
 
 
+# 验证设计与几何简化例外的绑定、对象声明及资产表示要求。
 def validate_geometry_declarations(scenes):
     from capabilities.scene_authoring.contracts.requirements import validate_asset_requirements
     declarations = scenes.get('geometry_exceptions', [])
@@ -72,6 +77,7 @@ def validate_geometry_declarations(scenes):
     return declarations
 
 
+# 解析场景唯一关联的已保存生产计划，并验证路径、排除策略及设计身份。
 def saved_design(program, policy=None):
     references = [row for row in program.get('provenance', {}).get('sources', [])
                   if isinstance(row, dict) and row.get('kind') == 'scene_plan']
@@ -103,6 +109,7 @@ def saved_design(program, policy=None):
     return scenes, next(row for row in scenes['designs'] if row['id'] == design), path
 
 
+# 读取当前场景精确匹配的几何简化声明，附上计划版本并标明其声明性质。
 def geometry_exception(program, policy=None, *, resolved_design=_UNRESOLVED_DESIGN):
     saved = saved_design(program, policy) if resolved_design is _UNRESOLVED_DESIGN else resolved_design
     if not saved:return None
@@ -120,6 +127,7 @@ def geometry_exception(program, policy=None, *, resolved_design=_UNRESOLVED_DESI
 _REVIEW_DIRECTIONS = {'left', 'right', 'front', 'back', 'above', 'below'}
 
 
+# 将空间参考向量校验为三个有限坐标，排除布尔与非数值输入。
 def _review_reference_vector(value, name):
     if (not isinstance(value, (list, tuple)) or len(value) != 3 or
             any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in value)):
@@ -127,10 +135,12 @@ def _review_reference_vector(value, name):
     return tuple(float(v) for v in value)
 
 
+# 计算两个空间参考向量的点积。
 def _review_reference_dot(a, b):
     return sum(x*y for x, y in zip(a, b))
 
 
+# 将非退化空间参考向量归一化为单位方向。
 def _review_reference_unit(a, name):
     length = math.sqrt(_review_reference_dot(a, a))
     if length <= 1e-8:
@@ -138,6 +148,7 @@ def _review_reference_unit(a, name):
     return tuple(v/length for v in a)
 
 
+# 验证文字或结构化空间参考，检查世界向上方向、命名坐标系和对象绑定。
 def validate_reference(design, object_ids=None):
     reference = design.get('spatial_reference')
     if reference is None:
@@ -185,6 +196,7 @@ def validate_reference(design, object_ids=None):
     return reference
 
 
+# 汇总场景简报中的标题、布局、硬性要求、物理假设和空间参考问题。
 def validate_scene_brief(design, object_ids=None):
     from capabilities.scene_authoring.contracts.requirements import requirement_stages
     problems = []
@@ -238,6 +250,7 @@ def validate_scene_brief(design, object_ids=None):
     return design
 
 
+# 根据冻结的生产证据校验修订简报继承的硬性要求，允许软性设计调整。
 def validate_brief_revision(design, path, root=None):
     """A declared revision inherits hard requirements from frozen production.
 
@@ -306,6 +319,7 @@ def validate_brief_revision(design, path, root=None):
     if directory.resolve()==path.parent.resolve():raise ValueError('Preserve prior capture evidence in a separate revision')
 
 
+# 已知父场景存在时要求保留其简报继承关系，防止省略修订信息绕过约束。
 def require_prior_brief(brief, directory, root=None):
     """A known captured parent cannot be detached by omitting revision metadata."""
     directory=_resource(directory,root,must_exist=False)
@@ -315,6 +329,7 @@ def require_prior_brief(brief, directory, root=None):
         raise ValueError('Scene revision must reference the frozen brief of its captured parent')
 
 
+# 解析已准入的冻结场景目录，即使尚未产生采集也允许恢复该输入。
 def capture_retry_directory(root, task_id, revision=None):
     """Admitted frozen input can be recovered before any capture exists."""
     if not re.fullmatch(r'sf_[a-zA-Z0-9_-]+\.scene\d+',str(task_id)):
@@ -332,6 +347,7 @@ def capture_retry_directory(root, task_id, revision=None):
     return directory
 
 
+# 解析重审目录，并要求其中已有准入的原生采集回执。
 def review_retry_directory(root, task_id):
     directory=capture_retry_directory(root,task_id)
     report=directory/'capture/report.json'
@@ -340,6 +356,7 @@ def review_retry_directory(root, task_id):
     return directory
 
 
+# 比较计划版本或场景设计快照，判断既有验收是否仍适用于当前设计。
 def plan_declaration_current(declaration):
     """Reuse acceptance after edits that do not change this scene's design.
 
@@ -366,6 +383,7 @@ def plan_declaration_current(declaration):
         return False
 
 
+# 从已保存设计解析并验证场景简报，保留父场景要求和计划来源。
 def scene_brief(program, policy=None, root=None, *, resolved_design=_UNRESOLVED_DESIGN):
     saved = saved_design(program, policy) if resolved_design is _UNRESOLVED_DESIGN else resolved_design
     if not saved:

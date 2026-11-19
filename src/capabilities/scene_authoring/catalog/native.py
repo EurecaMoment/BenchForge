@@ -9,6 +9,7 @@ import re
 from service_access.runtime_config import environment_value
 
 
+# 读取并校验原生资产目录中的标识、受限相对路径及坐标和尺寸声明。
 def load_native_assets():
     path = Path(environment_value('BENCHFORGE_NATIVE_CATALOG', Path(__file__).resolve().parents[1] / 'resources/native_assets.json'))
     if not path.exists():
@@ -27,6 +28,7 @@ def load_native_assets():
     return records
 
 
+# 读取原生材质目录，验证纹理槽位及登记根目录内的相对文件路径。
 def load_native_materials():
     path=Path(environment_value('BENCHFORGE_NATIVE_MATERIAL_CATALOG',Path(__file__).resolve().parents[1] / 'resources/native_materials.json'))
     if not path.exists():return {}
@@ -59,6 +61,7 @@ ASSETS = {
 ASSETS.update(load_native_assets())
 NATIVE_MATERIALS = load_native_materials()
 
+# 将注册原生资产的两种引用写法规范为同一形式，保留原始输入。
 def normalize_native_asset_references(program):
     """Canonicalize the two spellings of a registered native asset, preserving input."""
     result=deepcopy(program)

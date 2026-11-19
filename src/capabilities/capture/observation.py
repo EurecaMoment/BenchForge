@@ -5,11 +5,13 @@ import time
 TERMINAL={'SUCCEEDED','FAILED_FINAL','CANCELED'}
 
 
+# 提取可唤醒等待者的阶段与错误标记，字节进度只用于展示。
 def progress_marker(progress):
     """Wake on a new stage or error; byte progress remains display data."""
     return {k:progress[k] for k in ('stage','error','errors','interrupted') if k in progress}
 
 
+# 从任务目录提取质量检查结论，并结合完成状态标明结果可用性。
 def quality_outcome(folder, complete):
     review_path=folder/'scene_review.json'
     review=json.loads(review_path.read_text(encoding='utf8')) if review_path.is_file() else {}
@@ -37,6 +39,7 @@ def quality_outcome(folder, complete):
     return result
 
 
+# 压缩采集结果为可观察事实，避免重复返回完整资产和材质清单。
 def capture_result(folder, result):
     """Expose capture facts without repeating the full asset/material inventory."""
     source=folder/'capture/report.json'
@@ -61,6 +64,7 @@ def capture_result(folder, result):
     return {**result,'report':summary,'views':views}
 
 
+# 读取采集运行及其子任务状态，形成带游标的统一观察结果。
 def observe(store, run_id):
     snap=store.snapshot(run_id);rows=[]
     for task in snap['tasks']:
@@ -127,6 +131,7 @@ def observe(store, run_id):
             'tasks':rows,'cursor':cursor,'next_poll_seconds':0 if snap['state'] in TERMINAL else 60}
 
 
+# 等待采集游标变化或超时，等待期间检查取消状态。
 def wait_for_change(store,run_id,cursor=None,timeout_seconds=60,stop=None):
     if type(timeout_seconds) is not int or not 1<=timeout_seconds<=60:raise ValueError('timeout_seconds must be 1..60')
     started=time.monotonic();value=observe(store,run_id)

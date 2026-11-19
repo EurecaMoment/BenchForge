@@ -31,6 +31,7 @@ for arg in "$@"; do
   esac
 done
 
+# 校验保存的PID与预期命令一致后停止所属进程组，等待退出并在必要时强制结束。
 stop_process() {
   local name="$1" pidfile="$2" expected pid command group target matched=0
   shift 2

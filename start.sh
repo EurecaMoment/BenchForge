@@ -19,6 +19,7 @@ DB_PROJECT_FILE="$RUN_DIR/database-project"
 
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
+# 向标准错误输出启动失败原因，并以失败状态终止脚本。
 die() { echo "错误: $*" >&2; exit 1; }
 
 for path in "$PY" "$PRESET" "$STATE/runtime.json"; do
@@ -27,8 +28,10 @@ done
 SERVICE_PY="$("$PY" benchforge_app.py setting backend.python)"
 [ -x "$SERVICE_PY" ] || die "缺少 $SERVICE_PY，请先运行 python benchforge_app.py setup"
 
+# 检查指定TCP端口是否正在监听，供启动和健康等待流程判断。
 port_open() { ss -ltn 2>/dev/null | grep ":$1 " > /dev/null; }
 
+# 核对已保存的进程编号；进程仍存活但端口未就绪时要求重启处理。
 check_previous_process() {
   local name="$1" pidfile="$2" port="$3" pid
   if [ -f "$pidfile" ]; then
@@ -73,6 +76,7 @@ fi
 
 "$PY" benchforge.py start --port "$WEB_PORT" --config-synced --check-config
 
+# 每秒检查一次端口，在指定秒数内监听成功则返回，否则返回失败。
 wait_port() {
   local port="$1" timeout="$2" i
   for ((i = 0; i < timeout; i++)); do
@@ -83,6 +87,7 @@ wait_port() {
 }
 
 # DSH 绑定端口后还要等 Loader 装载完成才打印 token；卡住时 token 永远不出现。
+# 统计DSH日志中的令牌就绪行；首次启动尚无日志时返回零。
 token_line_count() {
   local count
   count="$(grep -c 'dsh web: .*token=' "$LOG_DIR/dsh.log" 2>/dev/null || true)"
@@ -90,6 +95,7 @@ token_line_count() {
   printf '%s\n' "${count:-0}"
 }
 
+# 等待令牌日志行数超过启动前计数，确认本次加载器已完成初始化。
 wait_new_token() {
   local before="$1" timeout="$2" i
   for ((i = 0; i < timeout; i++)); do
@@ -99,12 +105,15 @@ wait_new_token() {
   return 1
 }
 
+# 从当前DSH日志提取最后一个匹配配置端口的本机令牌访问地址。
 latest_url() {
   grep -oE "http://127.0.0.1:${WEB_PORT}/?\\?token=[A-Za-z0-9_-]+" "$LOG_DIR/dsh.log" 2>/dev/null | tail -n 1 || true
 }
 
+# 请求给定地址并返回HTTP状态码，用于验证令牌访问地址已经可用。
 url_status() { curl -s -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true; }
 
+# 向失败启动的进程组或进程发送终止信号，并移除该启动尝试的PID记录。
 fail_start() {
   local pidfile="$1" pid
   pid="$(<"$pidfile")"

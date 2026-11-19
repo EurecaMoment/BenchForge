@@ -12,6 +12,7 @@ from database.transactions import insert_missing, transaction
 from storage.access_identity import workspace_namespace
 
 
+# 幂等登记数据组的固定分区，并拒绝将已有数据组改派到其他分区。
 def claim_partition(workspace, group, split):
     root = Path(workspace).resolve()
     engine = engine_for(resolve_workspace_url(root))

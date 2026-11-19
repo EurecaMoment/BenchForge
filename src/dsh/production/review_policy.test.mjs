@@ -4,7 +4,7 @@ import {createReviewPolicy, reviewDenial} from './review_policy.mjs';
 
 const pending = {stage: 'S1', state: 'waiting_user'};
 
-test('pending reviews block shell, direct simulation, production and delegation routes', () => {
+test('pending reviews block shell, direct simulation, production and delegation routes', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：pending reviews block shell, direct simulation, production and delegation routes。 */ () => {
   for (const name of ['bash', 'run_code', 'shell_write', 'shell_start', 'benchforge_task_code',
     'benchforge_capture', 'benchforge_run', 'benchforge_pipeline_run', 'benchforge_prepare',
     'subagent', 'benchforge_isaac_sim']) {
@@ -14,7 +14,7 @@ test('pending reviews block shell, direct simulation, production and delegation 
   assert.ok(reviewDenial({name: 'benchforge_stage_review', arguments: {action: 'instruction'}}, pending, '/workspace'));
 });
 
-test('reads, status, previews, validated plans and bounded draft edits remain usable', () => {
+test('reads, status, previews, validated plans and bounded draft edits remain usable', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：reads, status, previews, validated plans and bounded draft edits remain usable。 */ () => {
   for (const name of ['read', 'read_image', 'glob', 'grep', 'present', 'benchforge_pipeline_catalog',
     'benchforge_scene_evidence', 'benchforge_wait', 'benchforge_pipeline_plan']) {
     assert.equal(reviewDenial({name}, pending, '/workspace'), undefined, name);
@@ -31,7 +31,7 @@ test('reads, status, previews, validated plans and bounded draft edits remain us
   }
 });
 
-test('released reviews and ordinary chats do not reduce tool concurrency or capability', () => {
+test('released reviews and ordinary chats do not reduce tool concurrency or capability', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：released reviews and ordinary chats do not reduce tool concurrency or capability。 */ () => {
   for (const review of [null, {state: 'elapsed'}, {state: 'continued'}]) {
     assert.equal(reviewDenial({name: 'bash'}, review, '/workspace'), undefined);
   }
@@ -39,25 +39,27 @@ test('released reviews and ordinary chats do not reduce tool concurrency or capa
   assert.ok(reviewDenial({name: 'bash'}, {stage: 'S2', state: 'needs_input'}, '/workspace'));
 });
 
-test('child operations use the verified parent identity and workspace', async () => {
+test('child operations use the verified parent identity and workspace', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：child operations use the verified parent identity and workspace。 */ async () => {
   const observed = [];
   const parent = {id: 'parent', session: {header: {cwd: '/workspace'}}};
   const guard = createReviewPolicy({agents: new Map([['parent', parent]]),
+    /** 返回用例控制的复核快照，并在需要时记录实际读取的会话归属。 */
     readReview: (workspace, id) => {observed.push([workspace, id]); return pending;}});
   assert.ok(await guard({name: 'bash', agent: {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}}}));
   assert.deepEqual(observed, [['/workspace', 'parent']]);
 });
 
-test('an unloaded parent cannot hide its review behind a child working directory', async () => {
-  const guard = createReviewPolicy({agents: new Map(), readReview: () => null});
+test('an unloaded parent cannot hide its review behind a child working directory', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：an unloaded parent cannot hide its review behind a child working directory。 */ async () => {
+  const guard = createReviewPolicy({agents: new Map(), /** 返回用例控制的复核快照，并在需要时记录实际读取的会话归属。 */ readReview: () => null});
   const agent = {id: 'child', session: {header: {cwd: '/workspace/synthesis/child', parentSession: 'parent'}}};
   assert.ok(await guard({name: 'bash', agent}));
   assert.equal(await guard({name: 'read', agent}), undefined);
 });
 
-test('independent child drafts use the child root while production reads the parent review', async () => {
+test('independent child drafts use the child root while production reads the parent review', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：independent child drafts use the child root while production reads the parent review。 */ async () => {
   const observed = [], parent = {id: 'parent', session: {header: {cwd: '/managed/parent'}}};
   const guard = createReviewPolicy({agents: new Map([['parent', parent]]),
+    /** 返回用例控制的复核快照，并在需要时记录实际读取的会话归属。 */
     readReview: (workspace, id) => {observed.push([workspace, id]); return pending;}});
   const agent = {id: 'child', session: {header: {cwd: '/managed/child', parentSession: 'parent'}}};
   assert.equal(await guard({name: 'write', arguments: {file_path: '/managed/child/tasks/draft.py'}, agent}), undefined);

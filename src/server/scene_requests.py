@@ -9,6 +9,7 @@ from capabilities.scene_authoring.validation.policy import policy_for
 from capabilities.scene_authoring.validation.policy import resolve_execution_mode
 
 
+# 校验单个场景意图的必填字段、允许字段、数量约定及程序引用。
 def scene_intent(intent):
     required = {"name", "description", "split"}
     allowed = required | {
@@ -45,6 +46,7 @@ def scene_intent(intent):
     return intent
 
 
+# 补齐请求级执行模式和数量约定，校验意图并加载工作区对应策略。
 def _scene_intent(value, request):
     intent = dict(value)
     if "execution_mode" not in intent:
@@ -58,6 +60,7 @@ def _scene_intent(value, request):
     return intent
 
 
+# 解析外部运行上下文，并在派生操作中补齐父运行身份。
 def context_from_request(request, parent_run_id=None):
     value = request.get("context")
     context = RunContext.from_request(value)
@@ -72,6 +75,7 @@ def context_from_request(request, parent_run_id=None):
     return context
 
 
+# 规范有限批次的场景意图，校验显式程序及参考后幂等提交生产运行。
 def start_scene_request(
     store,
     value,
@@ -119,6 +123,7 @@ def start_scene_request(
     }
 
 
+# 校验指定 SceneProgram 与执行策略，提交只采集的场景任务。
 def start_capture_request(
     store,
     value,
@@ -156,6 +161,7 @@ def start_capture_request(
     }
 
 
+# 检查父场景的工作流和完成状态，保留来源关系并提交修订场景。
 def refine_scene_request(
     store,
     value,
@@ -244,6 +250,7 @@ def refine_scene_request(
     }
 
 
+# 要求父场景已成功采集，在原修订产物基础上提交扩展任务。
 def extend_scene_request(
     store,
     value,

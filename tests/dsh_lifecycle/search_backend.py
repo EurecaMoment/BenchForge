@@ -15,6 +15,7 @@ from server import http_api
 from tests.database_fixtures import use_postgres
 
 
+# 在独立测试数据库上启动搜索后端，写出临时连接配置并处理退出清理。
 def main():
     case = unittest.TestCase()
     try:
@@ -23,6 +24,7 @@ def main():
         config = {'artifacts': str(destination.parent / 'search-artifacts'),
                   'operator_token': 'isolated-search-fixture', 'port': 0}
         store = SimpleNamespace(root=Path(config['artifacts']), repo=SimpleNamespace(engine=engine))
+        # 将测试 HTTP 服务绑定到随机本机端口，并把实际地址写给生命周期测试。
         def factory(_address, handler):
             server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
             destination.write_text(json.dumps({
@@ -30,6 +32,7 @@ def main():
                 'service_url': 'http://127.0.0.1:' + str(server.server_address[1]),
             }), encoding='utf8')
             return server
+        # 把进程停止信号转换为中断，使测试后端正常进入清理路径。
         def stopped(_signum, _frame):
             raise KeyboardInterrupt
         signal.signal(signal.SIGTERM, stopped)

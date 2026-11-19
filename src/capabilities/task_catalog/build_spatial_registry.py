@@ -46,6 +46,7 @@ FAMILY={**{f'N{i:02}':'geometry' for i in range(1,28)},
         **{f'N{i:02}':'graph' for i in [17,23,25]},
         **{f'N{i:02}':'execution' for i in [22,24,26,27]}}
 
+# 依据能力、操作和场景配置构建空间能力图及模板注册文件。
 def main():
     nodes=[];rows=[]
     for i,name in enumerate(NAMES,1):

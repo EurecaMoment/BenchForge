@@ -1,10 +1,12 @@
 import css from './composer.module.css';
 import {PRODUCTION_SOURCE} from '../production-input.js';
 
+/** 按宿主 React 和组件库创建生产输入设置组件。 */
 export function createComposerComponents({React, ui}) {
   const h = React.createElement;
   const {Button, Input, Switch} = ui;
 
+  /** 展示并编辑当前会话的生产设置，将配置块与原生输入框状态保持同步。 */
   function ProductionComposer({t, sessionId, useInput, inputActions, useStore, actions, hero,
     canSubmit, configureProduction, openScenes}) {
     const demand = useStore((value) => value.demand);
@@ -14,10 +16,12 @@ export function createComposerComponents({React, ui}) {
     const [error, setError] = React.useState('');
     const [advanced, setAdvanced] = React.useState(false);
     const advancedId = React.useId();
+    /** 启用或关闭生产配置块，并把输入忙碌等失败显示给用户。 */
     const toggle = (checked) => {
       try {configureProduction(demand, checked); setError('');}
       catch (reason) {setError(reason.message);}
     };
+    /** 先验证并更新原生生产配置，再保存需求字段和清除旧错误。 */
     const change = (patch) => {
       const next = {...demand, ...patch};
       try {
@@ -25,15 +29,19 @@ export function createComposerComponents({React, ui}) {
         actions.changeDemand(patch); setError('');
       } catch (reason) {setError(reason.message);}
     };
+    /** 把已保存目标文本插回当前输入位置，成功后清空独立目标字段。 */
     const restore = () => {
       const span = inputActions.captureInsertion();
       if (!inputActions.insertText(demand.objective + '\n', {...span, end: span.start})) {setError(t('draftBusy')); return;}
       actions.changeDemand({objective: ''});
     };
+    /** 生成绑定需求字段的带标签输入框。 */
     const field = (key, label, attributes = {}, className = css.field) => h('label', {className}, h('span', null, t(label)),
-      h(Input, {...attributes, value: demand[key], onChange: (event) => change({[key]: event.target.value})}));
+      h(Input, {...attributes, value: demand[key], /** 把文本框当前值合并到指定生产需求字段。 */ onChange: (event) => change({[key]: event.target.value})}));
+    /** 生成绑定需求字段的选项列表，并使用本地化标题。 */
     const select = (key, label, options) => h('select', {
       className: css.select, 'aria-label': t(label), title: t(label), value: demand[key],
+      /** 将用户选择写回对应生产设置字段。 */
       onChange: (event) => change({[key]: event.target.value}),
     }, options.map(([value, title]) => h('option', {key: value, value}, t(title))));
     const append = demand.mode === 'append';
@@ -52,7 +60,7 @@ export function createComposerComponents({React, ui}) {
           !append && select('quantityContract', 'quantityContract', [['exact', 'exactQuantityShort'], ['minimum', 'minimumQuantityShort'], ['best_effort', 'bestEffortQuantity']]),
           h(Button, {size: 'sm', variant: 'ghost', onClick: openScenes}, t('sceneLibrary')),
           !append && h(Button, {size: 'sm', variant: 'ghost', 'aria-expanded': advanced,
-            'aria-controls': advancedId, onClick: () => setAdvanced(!advanced)}, t('moreProductionSettings')))),
+            'aria-controls': advancedId, /** 切换高级生产设置的展开状态。 */ onClick: () => setAdvanced(!advanced)}, t('moreProductionSettings')))),
       enabled && !append && advanced && h('fieldset', {id: advancedId, className: css.advanced,
         disabled: busy, 'data-production-advanced': true},
         h('legend', {className: css.srOnly}, t('moreProductionSettings')),

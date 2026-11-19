@@ -17,6 +17,7 @@ const sdk = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'));
 const {default: SystemPrompt} = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-system-prompt')));
 const {createScope} = await import(pathToFileURL(sdk.resolve('@deepseek-ai/dsh-scope')));
 
+/** 创建真实工具注册、提示词和执行器上下文，提供可追踪的测试会话与统一释放。 */
 async function runtime(t) {
   const ctx = new Context();
   const prompt = ctx.plugin(SystemPrompt, {}); await prompt;
@@ -25,14 +26,18 @@ async function runtime(t) {
   t.after(async () => {await plugin.dispose(); await registry.dispose(); await prompt.dispose();});
   const executor = new BenchForgeExecutor(ctx);
   const events = [], invocations = [];
+  /** 注册具有工作区参数的测试生产工具，收集执行器最终传入的名称和参数。 */
   const register = (name, options = {}) => ctx.tools.register(defineTool({name,
     description: 'Test production operation',
     parameters: {workspace: {type: 'string', required: true}, section: {type: 'string', enum: ['tasks'], required: true}},
-    output: {schema: {type: 'object', additionalProperties: true}, render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]},
+    output: {schema: {type: 'object', additionalProperties: true}, /** 将测试工具结果转换为原生文本块，供执行管线结算。 */ render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]},
+    /** 记录实际执行参数和工具名，并返回固定成功回执。 */
     execute: async (args, exec) => {invocations.push({args, name: exec.name}); return {ok: true};},
   }), options);
   const agent = {id: 'test', session: {header: {cwd: '/home/operator/repo/.deployment/node/workspace'},
+    /** 为测试会话追加带连续序号的原生执行事件。 */
     append(type, data, options) {const event = {seq: events.length, type, data, ...options}; events.push(event); return event;}}};
+  /** 按原生批次结构执行一个工具调用，允许测试覆盖 Agent、信号和工具集合。 */
   const call = (name, args = {section: 'tasks'}, extra = {}) => ctx.tools.execute({
     calls: [{type: 'tool-call', id: 'call-1', name, arguments: typeof args === 'string' ? args : JSON.stringify(args)}],
     signal: new AbortController().signal, agent, log: {turn: 1, step: 1}, ...extra,
@@ -40,7 +45,7 @@ async function runtime(t) {
   return {ctx, executor, events, invocations, register, agent, call};
 }
 
-test('real native pipeline handles the reported typo once and logs both identities', async t => {
+test('real native pipeline handles the reported typo once and logs both identities', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：real native pipeline handles the reported typo once and logs both identities。 */ async t => {
   const {executor, ctx, register, call, invocations, events} = await runtime(t);
   register('benchforge_pipeline_catalog');
   const schema = executor.describe(ctx.tools.definitions()).schemas[0];
@@ -55,7 +60,7 @@ test('real native pipeline handles the reported typo once and logs both identiti
   assert.equal(additionalContexts.length, 1);
 });
 
-test('configured gRPC tools share correction without duplicate registrations', async t => {
+test('configured gRPC tools share correction without duplicate registrations', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：configured gRPC tools share correction without duplicate registrations。 */ async t => {
   const {register, call, invocations, agent} = await runtime(t);
   register('benchforge_isaac_sim');
   const result = await call('benchmarkforge_isaac_sim', {section: 'tasks', workspace: '/typo/root'});
@@ -63,7 +68,7 @@ test('configured gRPC tools share correction without duplicate registrations', a
   assert.deepEqual(invocations, [{name: 'benchforge_isaac_sim', args: {section: 'tasks', workspace: agent.session.header.cwd}}]);
 });
 
-test('normal calls bind workspace without a repetitive correction notice', async t => {
+test('normal calls bind workspace without a repetitive correction notice', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：normal calls bind workspace without a repetitive correction notice。 */ async t => {
   const {register, call, invocations} = await runtime(t);
   register('benchforge_pipeline_catalog');
   const result = await call('benchforge_pipeline_catalog');
@@ -72,7 +77,7 @@ test('normal calls bind workspace without a repetitive correction notice', async
   assert.equal(invocations.length, 1);
 });
 
-test('corrected calls retain native validation and never execute invalid arguments', async t => {
+test('corrected calls retain native validation and never execute invalid arguments', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：corrected calls retain native validation and never execute invalid arguments。 */ async t => {
   const {register, call, invocations} = await runtime(t);
   register('benchforge_pipeline_catalog');
   for (const args of [{section: 'wrong'}, {section: 'tasks', workspace: 42}, '{invalid']) {
@@ -82,7 +87,7 @@ test('corrected calls retain native validation and never execute invalid argumen
   assert.equal(invocations.length, 0);
 });
 
-test('canonical guards cannot be bypassed using the misspelled prefix', async t => {
+test('canonical guards cannot be bypassed using the misspelled prefix', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：canonical guards cannot be bypassed using the misspelled prefix。 */ async t => {
   const {ctx, register, call, invocations} = await runtime(t);
   register('benchforge_pipeline_run');
   ctx.tools.guard(exec => exec.name === 'benchforge_pipeline_run' ? 'Parent only' : undefined);
@@ -92,11 +97,12 @@ test('canonical guards cannot be bypassed using the misspelled prefix', async t 
   assert.equal(invocations.length, 0);
 });
 
-test('a plan and a dependent call in the same native batch cannot bypass the review', async t => {
+test('a plan and a dependent call in the same native batch cannot bypass the review', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：a plan and a dependent call in the same native batch cannot bypass the review。 */ async t => {
   const {ctx, agent, register, invocations} = await runtime(t);
   let review = null;
   ctx.tools.register(defineTool({name: 'benchforge_pipeline_plan', description: 'Open a review', parameters: {},
-    output: {schema: {type: 'object', additionalProperties: true}, render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]},
+    output: {schema: {type: 'object', additionalProperties: true}, /** 将测试工具结果转换为原生文本块，供执行管线结算。 */ render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]},
+    /** 执行该用例配置的测试工具行为，返回可控结果以验证原生执行边界。 */
     execute: async () => {review = {stage: 'S1', state: 'waiting_user'}; return {saved: true};}}));
   register('benchforge_pipeline_run');
   ctx.tools.guard(exec => reviewDenial(exec, review, '/workspace'));
@@ -109,7 +115,7 @@ test('a plan and a dependent call in the same native batch cannot bypass the rev
   assert.equal(invocations.length, 0);
 });
 
-test('restrictions and conditional step admission remain authoritative', async t => {
+test('restrictions and conditional step admission remain authoritative', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：restrictions and conditional step admission remain authoritative。 */ async t => {
   const {ctx, register, call, invocations, agent} = await runtime(t);
   register('benchforge_pipeline_catalog');
   let scope;
@@ -118,13 +124,13 @@ test('restrictions and conditional step admission remain authoritative', async t
   scope.ctx.tools.restrict({deny: ['benchforge_pipeline_catalog']});
   const restricted = await call('benchmarkforge_pipeline_catalog');
   assert.equal(restricted.results[0].result.error.info.code, 'UNKNOWN_TOOL');
-  register('benchforge_pipeline_status', {when: () => false});
+  register('benchforge_pipeline_status', {/** 声明测试工具在当前条件下不可见，验证执行器遵守原生可见性。 */ when: () => false});
   const conditional = await call('benchmarkforge_pipeline_status');
   assert.equal(conditional.results[0].result.error.info.code, 'UNKNOWN_TOOL');
   assert.equal(invocations.length, 0);
 });
 
-test('unrelated unknown names keep the native error and cancellation runs no body', async t => {
+test('unrelated unknown names keep the native error and cancellation runs no body', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：unrelated unknown names keep the native error and cancellation runs no body。 */ async t => {
   const {register, call, invocations} = await runtime(t);
   register('benchforge_pipeline_catalog');
   const unknown = await call('benchmarkforge_invented');
@@ -135,7 +141,7 @@ test('unrelated unknown names keep the native error and cancellation runs no bod
   assert.equal(invocations.length, 0);
 });
 
-test('image ancestor repair runs through native policy and preserves original call logs', async t => {
+test('image ancestor repair runs through native policy and preserves original call logs', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：image ancestor repair runs through native policy and preserves original call logs。 */ async t => {
   const {ctx, call, agent, events} = await runtime(t);
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-executor-'));
   t.after(() => fs.rm(directory, {recursive: true, force: true}));
@@ -148,7 +154,8 @@ test('image ancestor repair runs through native policy and preserves original ca
   let seen;
   ctx.tools.register(defineTool({name: 'read_image', description: 'Read a real image',
     parameters: {file_path: {type: 'string', required: true}},
-    output: {schema: {type: 'string'}, render: (_args, value) => [{type: 'text', text: value}]},
+    output: {schema: {type: 'string'}, /** 将测试工具结果转换为原生文本块，供执行管线结算。 */ render: (_args, value) => [{type: 'text', text: value}]},
+    /** 执行该用例配置的测试工具行为，返回可控结果以验证原生执行边界。 */
     execute: args => fs.readFile(args.file_path, 'utf8'),
   }));
   ctx.tools.guard(exec => {seen = exec.arguments.file_path;});
@@ -160,7 +167,7 @@ test('image ancestor repair runs through native policy and preserves original ca
   assert.equal(events[1].data.meta.benchforgeInvocation.resolved.arguments.file_path, file);
 });
 
-test('native scheduling keeps batch result order and executes each corrected call once', async t => {
+test('native scheduling keeps batch result order and executes each corrected call once', /** 验证原生工具名称解析、参数绑定和调用结算在该用例中的具体边界，完成准备、调用和结果断言。用例：native scheduling keeps batch result order and executes each corrected call once。 */ async t => {
   const {ctx, register, agent, invocations} = await runtime(t);
   register('benchforge_pipeline_catalog');
   const names = ['benchmarkforge_pipeline_catalog', 'benchforge_pipeline_catalog', 'pipeline_catalog'];

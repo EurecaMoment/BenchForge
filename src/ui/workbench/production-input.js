@@ -2,8 +2,11 @@ import {canStartProduction} from './production-permissions.js';
 
 export const PRODUCTION_SOURCE = 'benchforge-production';
 
+/** 注册与原生输入框集成的生产配置来源，负责配置块更新、验证和发送时序列化。 */
 export function createProductionInput({ctx, requestWorkbench, productionRequest, productionContext, t}) {
+  /** 取得指定会话绑定的原生输入控制器。 */
   const inputFor = (sessionId) => ctx.conversation.input.for(ctx.sessions.binding(sessionId).ctx);
+  /** 只在输入框空闲且配置块位置正确时插入、替换或移除当前生产设置。 */
   const configureProduction = (sessionId, demand, enabled) => {
     const input = inputFor(sessionId);
     const state = input.state.getSnapshot();
@@ -25,10 +28,14 @@ export function createProductionInput({ctx, requestWorkbench, productionRequest,
   };
   const source = {
     trigger: '@', name: PRODUCTION_SOURCE, showGroupTitle: false,
+    /** 生产配置仅由显式界面插入，因此不提供自动补全候选。 */
     candidates: async () => [],
+    /** 保留输入来源的选择接口；生产配置由专门设置界面处理。 */
     onPick: () => undefined,
     codec: {
+      /** 提供复制配置块时使用的简短本地化占位文本。 */
       clipboardText: () => '[' + t('productionSettings') + ']',
+      /** 验证配置块版本和字段，读取当前场景约束后生成真正发送的生产指令与上下文。 */
       serialize: async (ref, signal) => {
         let value;
         try {value = JSON.parse(ref);} catch {throw new Error(t('productionConfigInvalid'));}

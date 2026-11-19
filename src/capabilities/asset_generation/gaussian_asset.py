@@ -6,6 +6,7 @@ import shutil
 import numpy as np
 
 
+# 将模型输出的高斯参数和局部到源坐标变换写入可移植的压缩文件。
 def save_gaussian(output, path, local_to_source):
     gaussian = output['gaussian'][0]
     arrays = {name: getattr(gaussian, prop).detach().float().cpu().numpy()
@@ -15,6 +16,7 @@ def save_gaussian(output, path, local_to_source):
     np.savez_compressed(path, **arrays, local_to_source=local_to_source)
 
 
+# 复制原始高斯数据并登记源坐标系变换，保持局部高斯参数不变。
 def register_gaussian(source, destination, source_frame):
     """Keep local splats intact; record the same source-frame conversion as mesh_export."""
     with np.load(source, allow_pickle=False) as data:
@@ -41,6 +43,7 @@ def register_gaussian(source, destination, source_frame):
             'physics': 'paired mesh', 'default_render_representation': 'gaussian'}
 
 
+# 按对象渲染偏好与网格是否带高斯数据选择表示，显式请求缺失高斯时拒绝。
 def render_representation(object_record, mesh_record):
     choice = object_record.get('render_representation', 'auto')
     if choice == 'auto':

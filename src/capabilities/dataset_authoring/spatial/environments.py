@@ -8,6 +8,7 @@ from capabilities.dataset_authoring.spatial.task_generators.graph import path_co
 
 
 class Manipulation:
+    # 复制操作剧本并按目标和故障配置建立夹爪、物体与装配状态。
     def __init__(self,scene,objective='insert'):
         self.spec=deepcopy(scene['episode']);self.objective=objective
         if objective=='recover_rotation':self.spec['failure']='rotation_failure'
@@ -25,6 +26,7 @@ class Manipulation:
         if profile=='multi_stage':self.state['support_clear']=False
         self.feedback='ready';self.trace=[]
 
+    # 公开操作状态、动作语义和预算，隐藏一次性故障是否已触发的内部标记。
     def observation(self):
         state={k:v for k,v in self.state.items() if k!='failure_used'}
         return {'state':state,'feedback':self.feedback,'objective':self.objective,
@@ -33,19 +35,23 @@ class Manipulation:
             'budget':self.spec['budget'],'actions':['move(home|part|slot|shelf|bin|inspection)','grasp','rotate(degrees)','wait','open','inspect','clear_support','fasten','insert','place','release'],
             'semantics':'Moves transport a held part. Grasp at the part; retrieving from a container requires open first. Rotate while holding. Insert needs open container, slot location, aligned angle and clear support. Place needs destination, alignment and clear support. Stack requires clear_support. Assembly requires fasten after insertion. Release follows insertion or placement. Inspect_then_act requires inspection before grasp. Feedback may report failed actions; pending motion requires wait.'}
 
+    # 按当前操作目标确定物体最终应到达的位置。
     @property
     def destination(self):
         return self.sort_bin if self.objective=='sort' else 'shelf' if self.objective in ['stack','place','retrieve'] else 'bin' if self.objective=='transfer' else 'slot'
 
+    # 考虑物体对称周期，判断物体与目标槽角度是否对齐。
     @property
     def aligned(self):
         return abs((self.state['angle']-self.spec['slot_angle']+self.spec['symmetry']/2)%self.spec['symmetry']-self.spec['symmetry']/2)<1e-6
 
+    # 依据目标检查对齐、插入或放置、释放及必要检查或紧固条件。
     def success(self):
         if self.objective=='align':return self.aligned and self.state['inspected']
         inserted=self.objective not in ['stack','place','retrieve','sort','transfer']
         return self.state['part_location']==self.destination and self.state['released'] and self.aligned and (self.state['inserted'] if inserted else self.state['placed']) and (self.objective!='inspect_then_act' or self.state['inspected']) and (self.objective!='assemble' or self.state['fastened'])
 
+    # 执行一个满足前置条件的操作动作，处理故障反馈并记录状态轨迹。
     def step(self,action):
         if self.state['steps']>=self.spec['budget']:raise ValueError('Episode budget exhausted')
         before=deepcopy(self.observation());s=self.state;s['steps']+=1;name=action['action'];self.feedback='ok';valid=True
@@ -89,6 +95,7 @@ class Manipulation:
         self.trace.append({'observation':before,'action':action,'response':deepcopy(response)})
         return response
 
+    # 根据当前反馈与前置条件给出下一步示范动作，处理等待和故障恢复。
     def expert_action(self):
         s=self.state
         if 'pending_angle' in s:return {'action':'wait'}
@@ -108,6 +115,7 @@ class Manipulation:
 
 
 class Navigation:
+    # 复制导航图并设置顺序目标、预算、配送要求及一次性封路故障。
     def __init__(self,scene,objective='navigate'):
         self.graph=deepcopy(scene['graph']);self.objective=objective;self.position=self.graph['start'];self.steps=0;self.cost=0;self.feedback='ready';self.trace=[];self.visited={self.position}
         self.goals=[self.graph['goal']]
@@ -124,6 +132,7 @@ class Navigation:
             if route and len(route)>1:
                 edge=next(e for e in self.graph['edges'] if {e['a'],e['b']}==set(route[:2]));self.failure_edge=(edge['a'],edge['b'])
 
+    # 返回当前位置、局部边、已知地图和导航目标的公开执行规则。
     def observation(self):
         outgoing=[{'to':e['b'] if e['a']==self.position else e['a'],'width':e['width'],'cost':e['cost'],'open':e['open']} for e in self.graph['edges'] if e['a']==self.position or not self.graph['directed'] and e['b']==self.position]
         return {'position':self.position,'goals':self.goals[:],'local_edges':outgoing,'feedback':self.feedback,
@@ -131,9 +140,11 @@ class Navigation:
             'known_map':self.graph,'carrying_delivery':self.picked_up,'scanned':sorted(self.scanned),'actions':['move(neighbor)','pickup','scan','declare_unreachable'],
             'semantics':'Move follows one traversable directed edge. Goal order matters. Collect_delivery requires pickup at the waypoint before leaving it. Explore_then_go requires scan at the waypoint. Shortest_navigation requires minimum travel cost. Budget_navigation requires total cost <= budget; declare_unreachable is valid when no path fits that remaining budget. Closed-door feedback updates the map. Other unreachable declarations need no legal path.'}
 
+    # 检查目标完成、配送或扫描要求及最短路径等任务约束。
     def success(self):
         return self.impossible or not self.goals and (self.objective!='collect_delivery' or self.picked_up) and (self.objective!='shortest_navigation' or self.cost==self.initial_optimal) and (self.objective!='explore_then_go' or self.graph['waypoint'] in self.scanned)
 
+    # 执行移动、取件、扫描或不可达声明，校验通行与预算并记录反馈。
     def step(self,action):
         before=deepcopy(self.observation());self.steps+=1;self.feedback='ok';valid=True
         if action['action']=='declare_unreachable':
@@ -163,6 +174,7 @@ class Navigation:
         self.trace.append({'observation':before,'action':action,'response':deepcopy(response)})
         return response
 
+    # 根据当前地图、任务前置条件和剩余预算选择下一步导航动作。
     def expert_action(self):
         if self.objective=='explore_then_go' and self.graph['waypoint'] not in self.scanned:
             if self.position==self.graph['waypoint']:return {'action':'scan'}
@@ -177,6 +189,7 @@ class Navigation:
 
 class Inquiry:
     """Finite hypothesis observations with actual budget and terminal diagnosis."""
+    # 构建隐藏假设、可付费传感器和查询预算，并应用噪声或分阶段观察条件。
     def __init__(self,scene,objective='identify'):
         rng=random.Random(scene['seed']);self.objective=objective;profile=scene['episode']['profile']
         profile_index=['reliable','rotation_failure','grasp_failure','blocked_route','reordered_goals','limited_budget','symmetry','distractor','delayed_feedback','multi_stage'].index(profile)
@@ -213,6 +226,7 @@ class Inquiry:
         self.goal_field={'hidden_door':'door','hidden_target':'location','discover_edge':'door','locate_change':'location','diagnose_failure':'fault'}.get(objective)
         if objective=='budget_query':self.budget=count*2
 
+    # 返回当前可用传感器、剩余假设、预算及答案字段的公开查询规则。
     def observation(self):
         visible=self.sensors if self.spent>=self.reveal_after else self.sensors[:6]
         return {'objective':self.objective,'hypotheses':self.hypotheses,'sensors':visible,'remaining':self.remaining[:],
@@ -220,6 +234,7 @@ class Inquiry:
             'answer_field':self.goal_field or 'id','confirmation_required':self.noise,'inspection_available_after_cost':self.reveal_after,'actions':['observe(sensor_id)','answer(hypothesis)','answer(value)'],
             'semantics':'A sensor reports membership in its positive set. Identify the hidden hypothesis, or its requested answer_field. Noisy-repeat tasks require two observations of a sensor before a confirmed reading; the first is explicitly unconfirmed. Two-stage tasks reveal close inspection after two cost units. All observations consume budget.'}
 
+    # 执行付费观察或终局回答，按确认反馈缩小假设集并记录轨迹。
     def step(self,action):
         if self.done:raise ValueError('Episode ended')
         before=deepcopy(self.observation())
@@ -238,12 +253,15 @@ class Inquiry:
         response={**self.observation(),'done':self.done,'success':self.correct}
         self.trace.append({'observation':before,'action':action,'response':deepcopy(response)});return response
 
+    # 返回终局诊断是否正确。
     def success(self):return self.correct
 
+    # 已能确定答案时回答，否则选择单位成本信息增益最高的传感器。
     def expert_action(self):
         if self.goal_field and len({str(self.hypotheses[h][self.goal_field]) for h in self.remaining})==1:
             return {'action':'answer','value':self.hypotheses[self.remaining[0]][self.goal_field]}
         if len(self.remaining)==1:return {'action':'answer','hypothesis':self.remaining[0]}
+        # 计算传感器对剩余假设的二元熵增益，并按查询成本归一化。
         def gain(sensor):
             p=sum(h in sensor['positive'] for h in self.remaining)/len(self.remaining)
             entropy=-(p*math.log2(p)+(1-p)*math.log2(1-p)) if 0<p<1 else 0
@@ -253,6 +271,7 @@ class Inquiry:
 
 class Goals:
     """Select a useful reachable goal, then execute its path to earn utility."""
+    # 建立可达目标及奖励、风险等属性，初始化目标选择与执行预算。
     def __init__(self,scene,objective='utility'):
         self.graph=deepcopy(scene['graph']);rng=random.Random(scene['seed']+91);self.objective=objective
         self.position=self.graph['start'];self.budget=24;self.cost=0;self.steps=0;self.selected=None;self.done=False;self.earned=0;self.feedback='ready';self.trace=[];self.completed=[]
@@ -261,6 +280,7 @@ class Goals:
         self.required_goals=2 if objective=='multi_goal' else 1
         if objective=='budget_goal':self.budget=8
 
+    # 按任务效用规则计算剩余预算内可行目标的价值。
     def utilities(self):
         result={}
         for goal in self.goals:
@@ -278,6 +298,7 @@ class Goals:
             result[goal['node']]=value
         return result
 
+    # 公开地图、目标属性、剩余预算及效用计算与执行规则。
     def observation(self):
         return {'map':self.graph,'goals':self.goals,'position':self.position,'selected':self.selected,'remaining_budget':self.budget-self.cost,
             'objective':self.objective,'feedback':self.feedback,'actions':['select(goal_node)','move(neighbor)','finish'],
@@ -289,6 +310,7 @@ class Goals:
                 'multi_goal':'reward+coverage-.1*cost'}[self.objective],
             'semantics':'Select a maximum-utility reachable goal within remaining budget and execute a feasible route to it. Finish records arrival; multi_goal repeats this until two goals, or until no further goal fits the remaining budget. If none is reachable, finish without selecting.'}
 
+    # 执行最优目标选择、合法移动或完成确认，累计成本并记录已完成目标。
     def step(self,action):
         before=deepcopy(self.observation());self.steps+=1;self.feedback='ok'
         if action['action']=='select':
@@ -310,8 +332,10 @@ class Goals:
         response={**self.observation(),'done':self.done or self.steps>=40,'success':self.done,'utility':self.earned if self.done else 0}
         self.trace.append({'observation':before,'action':action,'response':deepcopy(response)});return response
 
+    # 返回目标执行流程是否已按要求结束。
     def success(self):return self.done
 
+    # 选择当前效用最大的可行目标，并沿最短可行路径执行到达与完成。
     def expert_action(self):
         if self.selected is None:
             choices=self.utilities()
@@ -321,10 +345,12 @@ class Goals:
         return {'action':'move','destination':route[1]}
 
 
+# 按能力编号创建对应的操作、导航、主动查询或目标选择环境。
 def environment(scene,nid,query):
     return {'N22':Manipulation,'N24':Manipulation,'N25':Navigation,'N26':Inquiry,'N27':Goals}[nid](scene,query)
 
 
+# 最多执行四十步专家动作，返回初始观察、完整轨迹和最终成功状态。
 def demonstration(env):
     initial=deepcopy(env.observation())
     for _ in range(40):

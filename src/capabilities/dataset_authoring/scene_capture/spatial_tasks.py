@@ -17,6 +17,7 @@ SCENE_TEMPLATE_IDS=('T021','T022','T023','T024','T025','T034','T035')
 COLORS=['#e53935','#007fd4','#158238','#ad5700']
 
 
+# 在原图叠加对象框、中心圆点及字母标签，并尽量避开已有标签。
 def render(image_path,objects,path):
     image=Image.open(image_path).convert('RGB');draw=ImageDraw.Draw(image)
     size=max(10,min(24,round(min(image.size)*.035)))
@@ -41,6 +42,7 @@ def render(image_path,objects,path):
     path.parent.mkdir(parents=True,exist_ok=True);image.save(path)
 
 
+# 依据可见框中心生成位置、距离和排序题目，保留测量依据与确定性标识。
 def generate_spatial(record,image_path,spec,output=None):
     requested=set(spec.template_ids) or {'T021','T023','T025','T034'}
     if requested-set(SCENE_TEMPLATE_IDS):
@@ -60,6 +62,7 @@ def generate_spatial(record,image_path,spec,output=None):
     rng=random.Random(str(spec.seed)+record.record_id);rng.shuffle(objects)
     pairs=list(itertools.combinations(objects,2));rng.shuffle(pairs)
     rows=[];counts=Counter();limit=max(8,min(spec.target_items*2,32))
+    # 添加单个满足数量上限的题目候选，保存输出合同及真值推导记录。
     def add(tid,chosen,question,answer,kind='single_choice',values=None):
         if tid not in requested or counts[tid]>=limit:return
         counts[tid]+=1;iid=f'{record.record_id}_{tid}_v2_{counts[tid]:04d}'
@@ -98,17 +101,20 @@ def generate_spatial(record,image_path,spec,output=None):
     return rows
 
 
+# 计算两个二维框的交并比，并保护零面积分母。
 def _iou(a,b):
     area=max(0,min(a[2],b[2])-max(a[0],b[0]))*max(0,min(a[3],b[3])-max(a[1],b[1]))
     return area/max(1,(a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-area)
 
 
+# 按模板、来源和答案覆盖贪心选择候选，去除等价比较而不改变真值。
 def select_diverse(candidates,target):
     """Greedy coverage across template, source and answer; never changes GT."""
     remaining=list(candidates);chosen=[];templates=Counter();sources=Counter();answers=Counter();used=set()
     while remaining and len(chosen)<target:
         remaining=[pair for pair in remaining if _signature(*pair) not in used]
         if not remaining:break
+        # 优先选择当前模板、来源和答案覆盖较少的候选，并以题目标识稳定排序。
         def priority(pair):
             row,record=pair;tid=row['template_id'];gold=json.dumps(row['answer'],sort_keys=True)
             return templates[tid],sources[record.record_id],answers[(tid,gold)],row['item_id']
@@ -118,6 +124,7 @@ def select_diverse(candidates,target):
     return chosen
 
 
+# 将互为反向的水平或垂直关系题归为同一比较族。
 def comparison_family(template_id):
     if template_id in {'T021', 'T022'}:
         return 'horizontal'
@@ -126,6 +133,7 @@ def comparison_family(template_id):
     return template_id
 
 
+# 用源帧、比较族和无序对象集合识别等价题目。
 def _signature(row,record):
     # Reversed objects and reciprocal questions describe the same comparison.
     return record.record_id,comparison_family(row['template_id']),tuple(sorted(row['task_contract']['objects']))

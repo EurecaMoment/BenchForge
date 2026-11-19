@@ -7,10 +7,12 @@ import {artifactProjection} from './projection.mjs';
 import {conversationProducts, openConversationArtifact} from './files.mjs';
 import {resolveArtifactRoots} from './scope.mjs';
 
+/** 向真实产物投影写入一次带 JSON 参数的工具调用事件。 */
 function call(state, name, args, seq = 1) {
   return artifactProjection.apply(state, {type: 'tool/call', seq, data: {name, callId: 'c1', arguments: JSON.stringify(args)}});
 }
 
+/** 写入与调用匹配的工具结果，允许控制错误标记、事件序号和执行元数据。 */
 function result(state, receipt, {seq = 2, error = false, meta} = {}) {
   return artifactProjection.apply(state, {type: 'tool/result', seq, data: {message: {
     source: {kind: 'tool', callId: 'c1'}, toolCallId: 'c1', isError: error,
@@ -18,7 +20,7 @@ function result(state, receipt, {seq = 2, error = false, meta} = {}) {
   }, ...(meta ? {meta} : {})}});
 }
 
-test('custom collection step IDs retain S3 outputs by receipt schema', () => {
+test('custom collection step IDs retain S3 outputs by receipt schema', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：custom collection step IDs retain S3 outputs by receipt schema。 */ () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchforge_pipeline_run', {});
   state = result(state, {state: 'waiting_user', steps: {sensors: {state: 'completed', result: {
@@ -30,7 +32,7 @@ test('custom collection step IDs retain S3 outputs by receipt schema', () => {
   ]);
 });
 
-test('scene preflight reports and program snapshots belong to S2 without asserting acceptance', () => {
+test('scene preflight reports and program snapshots belong to S2 without asserting acceptance', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：scene preflight reports and program snapshots belong to S2 without asserting acceptance。 */ () => {
   let state=artifactProjection.init({cwd:'/workspace'});
   state=call(state,'benchforge_scene_preflight',{});
   state=result(state,{schema:'benchforge.scene-diagnostics/v1',status:'blocked',passed:false,
@@ -44,7 +46,7 @@ test('scene preflight reports and program snapshots belong to S2 without asserti
   assert.equal(state.view.files.at(-1).stage,'S5');
 });
 
-test('declared episode media are displayed in collection while delivery reports stay in S5', async t => {
+test('declared episode media are displayed in collection while delivery reports stay in S5', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：declared episode media are displayed in collection while delivery reports stay in S5。 */ async t => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-collection-'));
   t.after(() => fs.rm(folder, {recursive: true, force: true}));
   const names = ['episodes/one/rgb_0.png', 'trajectory.json', 'collection_report.json'];
@@ -63,7 +65,7 @@ test('declared episode media are displayed in collection while delivery reports 
   assert.ok(products.items.every(row => row.url));
 });
 
-test('production receipts and capture ids are scoped to successful calls', () => {
+test('production receipts and capture ids are scoped to successful calls', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：production receipts and capture ids are scoped to successful calls。 */ () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchforge_pipeline_plan', {workspace: '/tmp/work'}, 1);
   state = artifactProjection.apply(state, {type: 'turn/end', seq: 2, data: {}});
@@ -80,7 +82,7 @@ test('production receipts and capture ids are scoped to successful calls', () =>
   assert.equal(failed.view.files.some((file) => file.path.endsWith('failed.json')), false);
 });
 
-test('resolved invocation metadata preserves canonical artifact scope after a typo', () => {
+test('resolved invocation metadata preserves canonical artifact scope after a typo', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：resolved invocation metadata preserves canonical artifact scope after a typo。 */ () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchmarkforge_pipeline_plan', {workspace: '/tmp/wrok'});
   state = result(state, {state: 'planned', plan: 'operations/one/plan.json'}, {meta: {
@@ -91,7 +93,7 @@ test('resolved invocation metadata preserves canonical artifact scope after a ty
   assert.deepEqual(state.view.files.map(file => file.path), ['/tmp/work/operations/one/plan.json']);
 });
 
-test('waiting pipeline receipts expose step outputs without inventing missing stages', () => {
+test('waiting pipeline receipts expose step outputs without inventing missing stages', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：waiting pipeline receipts expose step outputs without inventing missing stages。 */ () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchforge_pipeline_run', {workspace: '/tmp/work'}, 1);
   state = result(state, {state: 'waiting_user', steps: {
@@ -114,7 +116,7 @@ test('waiting pipeline receipts expose step outputs without inventing missing st
   assert.equal(Object.hasOwn(state.view, 'state'), false);
 });
 
-test('nested task and watch receipts ignore input paths and prose', () => {
+test('nested task and watch receipts ignore input paths and prose', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：nested task and watch receipts ignore input paths and prose。 */ () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'benchforge_pipeline_status', {workspace: '/tmp/work'});
   state = result(state, {
@@ -131,7 +133,7 @@ test('nested task and watch receipts ignore input paths and prose', () => {
   ]);
 });
 
-test('native Isaac Sim downloads use the ordinary artifact projection without a UI protocol client', () => {
+test('native Isaac Sim downloads use the ordinary artifact projection without a UI protocol client', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：native Isaac Sim downloads use the ordinary artifact projection without a UI protocol client。 */ () => {
   let state = call(artifactProjection.init({cwd: '/tmp/work'}), 'benchforge_isaac_sim', {action: 'download'});
   state = result(state, {action: 'download', job: {job_id: 'native', state: 'SUCCEEDED', operation: 'extension.world.collect'},
     artifacts: [{path: '/tmp/work/artifacts/isaac_sim/native/image/render.png', title: 'Isaac Sim · render.png', stage: 'S3'},
@@ -147,14 +149,14 @@ test('native Isaac Sim downloads use the ordinary artifact projection without a 
   assert.deepEqual(state.view.captureIds, []);
 });
 
-test('failed pipeline calls do not authorize nested output references', () => {
+test('failed pipeline calls do not authorize nested output references', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：failed pipeline calls do not authorize nested output references。 */ () => {
   const state = call(artifactProjection.init({cwd: '/tmp/work'}), 'benchforge_pipeline_run', {workspace: '/tmp/work'});
   const receipt = {state: 'failed', steps: {questions: {result: {report: 'untrusted.json'}}}};
   assert.deepEqual(result(state, receipt).view.files, []);
   assert.deepEqual(result(state, {...receipt, state: 'completed'}, {error: true}).view.files, []);
 });
 
-test('successful direct writes and DSH deliveries become file references', () => {
+test('successful direct writes and DSH deliveries become file references', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：successful direct writes and DSH deliveries become file references。 */ () => {
   let state = artifactProjection.init({cwd: '/tmp/work'});
   state = call(state, 'write', {file_path: 'outputs/questions.json', content: '[]'}, 1);
   state = result(state, {ok: true}, {seq: 2, meta: {path: '/tmp/work/outputs/questions.json'}});
@@ -168,7 +170,7 @@ test('successful direct writes and DSH deliveries become file references', () =>
   });
 });
 
-test('workspace resolution accepts registered roots and rejects unrelated paths', async (t) => {
+test('workspace resolution accepts registered roots and rejects unrelated paths', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：workspace resolution accepts registered roots and rejects unrelated paths。 */ async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-products-'));
   t.after(() => fs.rm(directory, {recursive: true, force: true}));
   const registered = path.join(directory, 'registered');
@@ -181,7 +183,7 @@ test('workspace resolution accepts registered roots and rejects unrelated paths'
   assert.deepEqual(roots.map((root) => root.path), [await fs.realpath(registered)]);
 });
 
-test('artifact reads expose only declared files contained by authorized workspaces', async (t) => {
+test('artifact reads expose only declared files contained by authorized workspaces', /** 验证原生产物证据、文件归属和资源读取在该用例中的具体边界，完成准备、调用和结果断言。用例：artifact reads expose only declared files contained by authorized workspaces。 */ async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-products-'));
   t.after(() => fs.rm(directory, {recursive: true, force: true}));
   const rootPath = path.join(directory, 'workspace');

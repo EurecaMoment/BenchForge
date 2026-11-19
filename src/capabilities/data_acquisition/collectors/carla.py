@@ -19,6 +19,7 @@ import carla
 import numpy as np
 
 
+# 解析CARLA连接、地图、相机和采集数量等命令行配置。
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Collect RGB frames from one or more CARLA maps."
@@ -125,12 +126,14 @@ def parse_args():
     return parser.parse_args()
 
 
+# 从CARLA地图资源路径中提取短地图名。
 def normalize_map_name(name):
     if "/" in name:
         return name.rsplit("/", 1)[-1]
     return name
 
 
+# 按全部地图、显式列表或当前世界的优先级确定待采集地图。
 def resolve_maps(client, world, args):
     if args.all_maps:
         maps = []
@@ -146,6 +149,7 @@ def resolve_maps(client, world, args):
     return [normalize_map_name(world.get_map().name)]
 
 
+# 轮询等待服务端口可连接，超过指定时间后报错。
 def wait_for_port(host, port, timeout):
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -157,6 +161,7 @@ def wait_for_port(host, port, timeout):
     raise TimeoutError(f"Timed out waiting for {host}:{port} to listen")
 
 
+# 用短连接检查端口是否已有服务监听。
 def port_is_listening(host, port):
     try:
         with socket.create_connection((host, port), timeout=0.5):
@@ -165,6 +170,7 @@ def port_is_listening(host, port):
         return False
 
 
+# 按固定步长寻找连续未监听端口，供CARLA服务启动使用。
 def reserve_port_block(host, start_port, block_size=2, step=10, attempts=200):
     candidate = start_port
     for _ in range(attempts):
@@ -179,6 +185,7 @@ def reserve_port_block(host, start_port, block_size=2, step=10, attempts=200):
     raise RuntimeError(f"Could not find a free port block starting from {start_port}")
 
 
+# 重试建立CARLA客户端，直到世界RPC可用或就绪等待超时。
 def connect_client(host, port, ready_timeout):
     deadline = time.time() + ready_timeout
     last_error = None
@@ -196,6 +203,7 @@ def connect_client(host, port, ready_timeout):
     )
 
 
+# 以独立运行目录和日志启动CARLA实例，并等待客户端就绪。
 def start_server(args, rpc_port, map_name):
     log_dir = os.path.abspath(args.output_dir)
     os.makedirs(log_dir, exist_ok=True)
@@ -225,6 +233,7 @@ def start_server(args, rpc_port, map_name):
         raise
 
 
+# 终止CARLA实例，超时后强制结束，并关闭日志句柄。
 def stop_server(process, log_handle):
     if process.poll() is None:
         process.terminate()
@@ -236,6 +245,7 @@ def stop_server(process, log_handle):
     log_handle.close()
 
 
+# 临时启动CARLA获取地图列表，并确保探测实例被关闭。
 def bootstrap_maps(args):
     rpc_port = reserve_port_block(args.host, args.port)
     bootstrap_args = argparse.Namespace(**vars(args))
@@ -251,6 +261,7 @@ def bootstrap_maps(args):
         stop_server(process, log_handle)
 
 
+# 仅在目标地图不同时加载世界，并等待地图稳定。
 def ensure_map_loaded(client, map_name, wait_seconds, load_world_timeout):
     world = client.get_world()
     current_map = normalize_map_name(world.get_map().name)
@@ -263,6 +274,7 @@ def ensure_map_loaded(client, map_name, wait_seconds, load_world_timeout):
     return world
 
 
+# 批量销毁非空CARLA角色，释放车辆及传感器资源。
 def destroy_actors(client, actors):
     actor_ids = [actor.id for actor in actors if actor is not None]
     if actor_ids:
@@ -271,10 +283,12 @@ def destroy_actors(client, actors):
         )
 
 
+# 从相机配置表中提取RGB传感器角色。
 def sensor_actors(camera_sensors):
     return [info["actor"] for info in camera_sensors.values()]
 
 
+# 计算两个CARLA三维位置间的欧氏距离。
 def location_distance(a, b):
     dx = a.x - b.x
     dy = a.y - b.y
@@ -282,12 +296,14 @@ def location_distance(a, b):
     return (dx * dx + dy * dy + dz * dz) ** 0.5
 
 
+# 将三维速度向量转成米每秒的标量速率。
 def speed_mps(velocity):
     return (
         velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z
     ) ** 0.5
 
 
+# 将位置转换为保留六位小数的JSON兼容坐标。
 def serialize_location(location):
     return {
         "x": round(location.x, 6),
@@ -296,6 +312,7 @@ def serialize_location(location):
     }
 
 
+# 将俯仰、偏航和滚转角转换为JSON兼容记录。
 def serialize_rotation(rotation):
     return {
         "pitch": round(rotation.pitch, 6),
@@ -304,6 +321,7 @@ def serialize_rotation(rotation):
     }
 
 
+# 组合角色的位置与旋转序列化结果。
 def serialize_transform(transform):
     return {
         "location": serialize_location(transform.location),
@@ -311,6 +329,7 @@ def serialize_transform(transform):
     }
 
 
+# 从可用相机名中筛选需要输出对象元数据的相机。
 def resolve_metadata_cameras(args, camera_names):
     value = args.metadata_cameras.strip().lower()
     if value == "all":
@@ -321,6 +340,7 @@ def resolve_metadata_cameras(args, camera_names):
     return {name for name in selected if name in camera_names}
 
 
+# 根据图像宽高及水平视场角构建相机内参，可处理相机后方的投影符号。
 def build_projection_matrix(width, height, fov, is_behind_camera=False):
     focal = width / (2.0 * np.tan(fov * np.pi / 360.0))
     k = np.identity(3)
@@ -330,6 +350,7 @@ def build_projection_matrix(width, height, fov, is_behind_camera=False):
     return k
 
 
+# 把世界坐标转到CARLA光学坐标后投影为像素，零深度时返回空。
 def get_image_point(loc, k, world_to_camera):
     point = np.array([loc.x, loc.y, loc.z, 1.0])
     point_camera = np.dot(world_to_camera, point)
@@ -344,6 +365,7 @@ def get_image_point(loc, k, world_to_camera):
     return point_img[0:2]
 
 
+# 把角色的三维包围盒投影到相机画面，保留可绘制的顶点与边。
 def project_actor_bbox_3d(actor, camera_actor, width, height, fov):
     world_to_camera = np.array(camera_actor.get_transform().get_inverse_matrix())
     k = build_projection_matrix(width, height, fov)
@@ -407,6 +429,7 @@ def project_actor_bbox_3d(actor, camera_actor, width, height, fov):
     }
 
 
+# 从CARLA实例分割字节中解出语义类别和角色编号。
 def decode_instance_segmentation(image):
     img = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
         (image.height, image.width, 4)
@@ -416,6 +439,7 @@ def decode_instance_segmentation(image):
     return semantic_labels, actor_ids
 
 
+# 读取角色当前速度并计算其标量大小。
 def actor_speed(actor):
     velocity = actor.get_velocity()
     return math.sqrt(
@@ -423,6 +447,7 @@ def actor_speed(actor):
     )
 
 
+# 依据实例分割统计可见角色、语义像素及其几何和运动元数据。
 def collect_visible_actor_metadata(camera_info, instance_image, world):
     semantic_labels, actor_ids = decode_instance_segmentation(instance_image)
     unique_actor_ids = np.unique(actor_ids)
@@ -496,6 +521,7 @@ def collect_visible_actor_metadata(camera_info, instance_image, world):
     }
 
 
+# 根据车辆包围盒布置前后侧面及俯视相机的相对位姿。
 def camera_mounts(vehicle):
     bbox = vehicle.bounding_box
     center = bbox.location
@@ -534,6 +560,7 @@ def camera_mounts(vehicle):
     }
 
 
+# 创建随机车辆并挂载RGB与实例分割传感器，建立采集监听。
 def setup_vehicle_and_camera(
     world, traffic_manager, blueprints, spawn_points, args, rng
 ):
@@ -611,6 +638,7 @@ def setup_vehicle_and_camera(
     return vehicle, sensors
 
 
+# 随机尝试地图出生点，返回首个成功生成的车辆。
 def spawn_vehicle(world, vehicle_bp, spawn_points, rng):
     shuffled_points = list(spawn_points)
     rng.shuffle(shuffled_points)
@@ -621,6 +649,7 @@ def spawn_vehicle(world, vehicle_bp, spawn_points, rng):
     raise RuntimeError("Failed to spawn vehicle after trying all spawn points")
 
 
+# 开启世界和交通管理器的同步模式，并设置固定仿真步长。
 def configure_world(world, traffic_manager, delta_seconds):
     settings = world.get_settings()
     settings.synchronous_mode = True
@@ -629,6 +658,7 @@ def configure_world(world, traffic_manager, delta_seconds):
     traffic_manager.set_synchronous_mode(True)
 
 
+# 恢复世界和交通管理器的异步模式，清理失败时输出提示。
 def reset_world(world, traffic_manager):
     try:
         settings = world.get_settings()
@@ -640,6 +670,7 @@ def reset_world(world, traffic_manager):
         print(f"warning: failed to reset world cleanly: {exc}")
 
 
+# 在单张地图中驱动车辆并同步采集多相机图像与可见对象记录。
 def capture_map(client, world, map_name, args, rng):
     client.set_timeout(60.0)
     traffic_manager = client.get_trafficmanager(args.tm_port)
@@ -658,6 +689,7 @@ def capture_map(client, world, map_name, args, rng):
     vehicle = None
     camera_sensors = {}  # {cam_name: {"actor": cam, "queue": q}}
 
+    # 停止旧传感器并销毁采集车，再重新建立车辆和相机组合。
     def respawn_rig():
         nonlocal vehicle, camera_sensors
         if camera_sensors:
@@ -890,6 +922,7 @@ def capture_map(client, world, map_name, args, rng):
     }
 
 
+# 组织地图采集、可选逐地图重启和清理，保存总采集清单。
 def main():
     args = parse_args()
     rng = random.Random(args.seed)

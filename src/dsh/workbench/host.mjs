@@ -39,14 +39,14 @@ export const Config = z.object({
 });
 
 const STATUSES = ['draft', 'candidate', 'verified', 'rejected', 'superseded'];
-
+/** 按字段白名单复制记录，构建面向界面的公开结果。 */
 const pick = (row, fields) => Object.fromEntries(fields.filter((key) => key in row).map((key) => [key, row[key]]));
-
+/** 为所有已知操作状态创建零计数汇总。 */
 const counts = () => Object.fromEntries(STATUSES.map((key) => [key, 0]));
-
+/** 通过可替换的受管 Python 执行器运行工作台辅助查询。 */
 const execute = (config, args, options) =>
   (config._executePython || executePython)(config.productionPython, args, options);
-
+/** 组合工作台查询参数，并按需绑定显式工作区路径。 */
 function workbenchUrl(params, workspacePath) {
   const query = new URLSearchParams(params);
   if (workspacePath) query.set('workspace_path', workspacePath);
@@ -60,13 +60,13 @@ const {sceneLibrary, sceneArtifacts, sceneMedia, scheduleSceneMovies, associated
   createSceneQueries({workbenchUrl, pipelineSceneIds});
 const productionProgress = createProductionProgress({scheduleSceneMovies, workbenchUrl});
 const readRun = createRunReader({manifest, tailJsonl, publicPlan, runProducts});
-const dispatchWorkbenchRead = createWorkbenchReadRoutes({ discover: (...args) => discover(...args),
+const dispatchWorkbenchRead = createWorkbenchReadRoutes({/** 扫描当前授权范围内的流水线与公开数据集，汇总可见记录和最近计划。 */ discover: (...args) => discover(...args),
+  /** 聚合当前会话的原生操作、流水线和采集进度，保留来源与快照时间。 */
+  productionProgress: (...args) => productionProgress(...args), /** 解析运行标识并校验会话归属，读取流水线状态、产物清单、修复记录和计划。 */ readRun: (...args) => readRun(...args),
+  /** 转发场景阶段产物查询，沿用统一会话范围校验。 */
+  sceneArtifacts: (...args) => sceneArtifacts(...args), /** 转发场景媒体读取，保留原始请求的取消与范围信息。 */ sceneMedia: (...args) => sceneMedia(...args), readDataset, readMedia});
 
-  productionProgress: (...args) => productionProgress(...args),  readRun: (...args) => readRun(...args),
-
-  sceneArtifacts: (...args) => sceneArtifacts(...args),  sceneMedia: (...args) => sceneMedia(...args), readDataset, readMedia});
-
-
+/** 核验数据集归属后，为前几个有效样本关联交付场景预览。 */
 async function deliveryScenePreviews(root, dataset, previews, scope, itemCount = Number.MAX_SAFE_INTEGER) {
   if (typeof dataset !== 'string' || !Array.isArray(previews)) return [];
   if (!Number.isSafeInteger(itemCount) || itemCount < 1) return [];
@@ -94,10 +94,10 @@ async function deliveryScenePreviews(root, dataset, previews, scope, itemCount =
   });
 }
 
-
+/** 将流水线计划、配置和步骤结果整理为按阶段展示的公开产物。 */
 async function runProducts(id, root, directory, state, plan, scope) {
   const items = [], saved = publicPlan(plan);
-
+  /** 为运行中的指定产品生成包含阶段与会话范围的访问链接。 */
   const link = (product, step = '') => workbenchUrl({view: 'run_product', run: id, product, step, ...scopeParams(scope)}, root.path);
   if (saved) {
     items.push({stage: 'S1', title: '评测计划', kind: 'json', data: saved, url: link('plan')});
@@ -138,7 +138,7 @@ async function runProducts(id, root, directory, state, plan, scope) {
   return items;
 }
 
-
+/** 校验正整数分页参数，空值使用默认值并限制最大范围。 */
 function integer(value, fallback, maximum) {
   if (value === null) return fallback;
   const number = Number(value);
@@ -146,7 +146,7 @@ function integer(value, fallback, maximum) {
   return number;
 }
 
-
+/** 按关键词和能力筛选任务模板，计算分页及能力统计。 */
 async function templateCatalog(url, catalog) {
   const query = (url.searchParams.get('q') || '').trim().toLocaleLowerCase();
   const capability = url.searchParams.get('capability') || '';
@@ -166,7 +166,7 @@ async function templateCatalog(url, catalog) {
     items: filtered.slice((page - 1) * size, page * size), execution_status: 'catalog_design; check adapters before production'};
 }
 
-
+/** 逐行读取 JSONL 记录并提供连续行索引，在退出时关闭流和行读取器。 */
 async function* jsonLines(file, signal) {
   const stream = createReadStream(file, {encoding: 'utf8', signal});
   const lines = createInterface({input: stream, crlfDelay: Infinity});
@@ -178,7 +178,7 @@ async function* jsonLines(file, signal) {
     }
   } finally { lines.close(); stream.destroy(); }
 }
-
+/** 流式统计产物清单状态，并按界面预算截取可返回条目。 */
 async function manifest(directory, limit, signal) {
   const file = path.join(directory, 'artifacts.jsonl');
   if (!await exists(file)) return {artifacts: [], counts: null, total: null, truncated: false};
@@ -191,7 +191,7 @@ async function manifest(directory, limit, signal) {
   }
   return {artifacts, counts: byStatus, total, truncated: total > limit};
 }
-
+/** 流式保留 JSONL 文件最后若干行，同时统计总记录数。 */
 async function tailJsonl(file, limit, signal) {
   if (!await exists(file)) return {rows: [], total: 0};
   const rows = [];
@@ -202,12 +202,12 @@ async function tailJsonl(file, limit, signal) {
   return {rows, total};
 }
 
-
+/** 扫描当前授权范围内的流水线与公开数据集，汇总可见记录和最近计划。 */
 async function discover(roots, config, signal, scope) {
   const runs = new Map(), datasets = new Map(), sources = [];
   let latestPlan = null, planSource = null;
   let unassociatedRecords = 0;
-
+  /** 在源策略和会话归属校验后登记公开数据集，兼容标准和打包后的公开目录。 */
   const addDataset = async (root, directory, producer, runId) => {
     if (!directory) return;
     const policy=await readJson(path.join(root.path,'scene-library','policy.json'));
@@ -295,18 +295,18 @@ async function discover(roots, config, signal, scope) {
     snapshot_at: new Date().toISOString()};
 }
 
-
+/** 创建统一工作台路由分发器，绑定会话范围、资源缓存及受限生产写入接口。 */
 function createWorkbenchDispatcher(config, registered, family, synthesisFactory, execution, associations, readEvidence) {
   const exampleWorkbench = createExampleWorkbench({publicPlan});
   const limits = {maxRuns: 60, maxArtifacts: 300, productionPython:process.env.PYTHON || (process.platform==='win32' ? 'python' : 'python3'), ...config};
   limits._previewJobs = new Map(); limits._previewQueue = Promise.resolve(); limits._previewMedia = new Map();
   limits._libraryCache = new Map(); limits._libraryQueue = new Map();
-  limits._preparation = createPreparationProducts({ validatePlan: async (root, planPath, parentId) => {
+  limits._preparation = createPreparationProducts({/** 解析计划真实文件，并确认其目录属于指定父会话。 */ validatePlan: async (root, planPath, parentId) => {
     const file = await inside(root, planPath);
     await assertSessionDirectory(root, path.dirname(file), {session_id: parentId, session_ids: [], history: false});
     return file;
   }});
-  return  async (url, request) => {
+  return /** 按视图分发工作台请求，解析原生会话族与授权根目录后执行相应读写路径。 */ async (url, request) => {
     const view = url.searchParams.get('view') || 'summary';
     if (view === 'runtime') return {ui_revision: limits.uiRevision || '',
       preset_id: 'benchforge', preset_name: 'BenchForge'};
@@ -447,9 +447,9 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
   };
 }
 
-
+/** 将工作台分发结果转为禁止缓存的响应，并规范业务错误状态。 */
 function fetchWorkbench(dispatch) {
-  return  async (request) => {
+  return /** 把普通工作台结果包装为禁止缓存的响应，将已知业务异常转换为适当 HTTP 状态。 */ async (request) => {
     try {
       const value = await dispatch(new URL(request.url), request);
       return value instanceof Response ? value : Response.json(value, {headers: {'cache-control': 'no-store'}});
@@ -460,18 +460,18 @@ function fetchWorkbench(dispatch) {
   };
 }
 
-
+/** 创建供 HTTP 接入使用的工作台处理器，注入已注册工作区及会话族查询。 */
 export function createWorkbenchHandler(config, registered = () => [], family = async () => [], synthesisFactory, execution, associations) {
   return fetchWorkbench(createWorkbenchDispatcher(config, registered, family, synthesisFactory, execution, associations));
 }
 
-
+/** 装配宿主工作台、原生远程入口、资源投影和受管 Python 生命周期。 */
 export async function apply(ctx, config) {
   const environment = await databaseEnvironment(config.productionConfig, launchEnvironmentOf(ctx));
   const processes = createPythonProcessScope();
   ctx.effect(() => () => processes.dispose(), 'benchforge-workbench: Python process lifecycle');
   config = {...config, productionConfig: config.productionConfig ? path.resolve(config.productionConfig) : '',
-
+    /** 把数据库环境与请求环境合并后，通过当前宿主持有的进程作用域执行 Python。 */
     _executePython: (python, args, options = {}) => processes.execute(python, args,
       {...options, env: {...environment, ...options.env}})};
   const {execution, preparation} = ctx.benchforgeSessions;
@@ -480,7 +480,7 @@ export async function apply(ctx, config) {
   await ctx.sessionProjections.register(artifactProjection);
   const baseDispatch = createWorkbenchDispatcher(config, () => ctx.workspaceRegistry.list(), sessionFamilyReader(ctx),
     preparation, execution, associations, readEvidence);
-
+  /** 执行统一工作台路由，并在阶段复核写入后立即协调生产续接状态。 */
   const dispatch = async (url, request) => {
     const result = await baseDispatch(url, request);
     if(request.method==='POST'&&url.searchParams.get('view')==='stage_review') {
@@ -489,15 +489,15 @@ export async function apply(ctx, config) {
     return result;
   };
   const migration = createWorkspaceMigration({
-
+    /** 通过官方查询服务观察指定会话，保留调用方的读取选项。 */
     observe: (id, options) => ctx.sessionQuery.observeSession(id, options),
-
+    /** 读取指定根目录与会话的有界操作记录，用于迁移和产物核验。 */
     readOperations: (root, id, signal) => workspaceOperations(config, {path: root}, {session_id: id}, {limit: 201, signal}),
     access: ctx.benchforgeAccess, sessions: ctx.sessionController, agents: ctx.agents, createMessage: createUserMessage,
   });
   // Migration is reachable only through the Remote's owner principal check, not
   // the file-fetch route or any model tool, and never accepts a filesystem manifest.
-  ctx.provide('benchforgeWorkbench', new WorkbenchRemote( async (url, request) => {
+  ctx.provide('benchforgeWorkbench', new WorkbenchRemote(/** 在原生远程入口分流工作区迁移的预览与提交，其余请求交给统一工作台路由。 */ async (url, request) => {
     if (url.searchParams.get('view') !== 'workspace_migration') return dispatch(url, request);
     const id = url.searchParams.get('session_id');
     if (request.method === 'GET') return migration.preview(id, request.signal);

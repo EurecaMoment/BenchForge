@@ -7,6 +7,7 @@ WAIT_SECONDS = 60
 RELEASED = ('elapsed', 'continued')
 
 
+# 根据评审状态、轮次和等待期限决定是否需要初检、修复、重试或继续检查。
 def check_reason(row, now, *, retry=False):
     if row['policy_version'] != POLICY_VERSION or row['state'] in ('paused', 'needs_input', 'superseded'):
         return None
@@ -28,6 +29,7 @@ def check_reason(row, now, *, retry=False):
     return None
 
 
+# 应用真实检查回执并推进评审轮次；新一轮等待从本次检查时间开始计时。
 def checked(row, reason, receipt, now):
     """A check never backdates a new wait, even after a long process outage."""
     progress = deepcopy(row['progress'])
@@ -57,6 +59,7 @@ def checked(row, reason, receipt, now):
     return state, deadline, progress
 
 
+# 计算对外展示的检查轮次、等待次数、失败信息和剩余时间。
 def public_progress(row, now):
     progress = row['progress']
     rounds = progress.get('rounds', [])

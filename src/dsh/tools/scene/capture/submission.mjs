@@ -3,6 +3,7 @@ import {captureRunId} from './capture_watch.mjs';
 const trackedRoutes = new Set(['/capture','/refine','/start','/extend','/retry']);
 
 /** Once accepted by the service, a submission must always return its identity. */
+/** 为已提交采集登记后台续接；追踪登记失败时保留服务回执，避免诱发重复昂贵任务。 */
 export async function trackCaptureSubmission(receipt, route, args, exec, tracking) {
   const run_id = receipt.run_id || (route === '/retry' ? captureRunId(receipt.task_id || args.task_id) : '');
   if (!trackedRoutes.has(route) || !run_id) return receipt;

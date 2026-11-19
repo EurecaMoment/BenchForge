@@ -14,6 +14,7 @@ from capabilities.scene_authoring.contracts.requirements import scene_requiremen
 
 from pipelines.scene_production.planning import _strict_policy
 
+# 检查采集报告、真实证据与场景质量，保存验收回执或修复反馈并响应取消。
 def review_scene(store,task,stop,*,capture_only=False):
     if stop.is_set():
         if getattr(stop, 'canceled', False):
@@ -150,6 +151,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
     interaction=evidence.get('interaction',{})
     review['interaction']=interaction
     results={row.get('id'):row for row in interaction.get('action_results',[]) if isinstance(row,dict)}
+    # 核对施力动作的成功身份及轨迹、前后图像回执文件均真实存在。
     def action_has_receipt(action):
         result=results.get(action['id'],{})
         return (result.get('success') is True and result.get('action')=='apply_force' and result.get('object_id')==action['object_id']

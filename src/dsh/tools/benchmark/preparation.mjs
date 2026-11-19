@@ -1,10 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/** 判断计划或会话目录是否位于显式工作区之内。 */
 const inside = (root, value) => {
   const relative = path.relative(root, value);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
+/** 读取准备记录的 JSON 内容；文件尚不存在时返回空值。 */
 async function readJson(file) {
   try { return JSON.parse(await fs.readFile(file, 'utf8')); }
   catch (error) { if (error.code === 'ENOENT') return null; throw error; }
@@ -12,6 +14,7 @@ async function readJson(file) {
 
 // Native tools supply exec.agent; a model cannot select another parent identity.
 // The saved plan uses the same conversation association as workbench edits.
+/** 核验准备计划和父 Agent 的真实工作区、会话归属及源排除策略，返回可用于委派的绑定。 */
 export async function savedPreparationPlan(workspace, planPath, agent, signal) {
   signal?.throwIfAborted();
   if (!agent || agent.id !== agent.session?.header?.id) throw new Error('Preparation needs the current parent Agent');
@@ -35,8 +38,9 @@ export async function savedPreparationPlan(workspace, planPath, agent, signal) {
   throw new Error('The saved plan is not associated with the current parent conversation');
 }
 
+/** 从已保存并验证的父计划建立准备子任务，传递批次标识、任务清单和取消信号。 */
 export function createPreparationHandler(preparation) {
-  return async (args, exec) => {
+  return /** 先验证父会话保存计划的归属，再按显式批次和任务清单启动原生准备子任务。 */ async (args, exec) => {
     const scope = await savedPreparationPlan(args.workspace, args.plan_path, exec.agent, exec.signal);
     return preparation(scope.workspacePath).start({
       parentId: scope.parentId, planPath: scope.planPath, batchKey: args.batch_key, tasks: args.tasks,

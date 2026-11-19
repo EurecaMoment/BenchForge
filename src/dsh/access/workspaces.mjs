@@ -5,19 +5,24 @@ import {createWriteStream} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
 
 export class AccessError extends Error {
+  /** 创建带稳定业务错误码的访问异常，供宿主识别迁移和工作区授权失败。 */
   constructor(message, code = 'BENCHFORGE_ACCESS_DENIED') { super(message); this.code = code; }
 }
+/** 按路径分段判断候选是否位于根目录内，防止上级跳转和绝对路径逃逸。 */
 export const within = (root, value) => {
   const relative = path.relative(root, value);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
+/** 校验持久化会话标识的类型、长度和控制字符，拒绝无效归属信息。 */
 const identity = value => {
   if (typeof value !== 'string' || !value || value.length > 256 || /[\0\r\n]/.test(value))
     throw new AccessError('Invalid session identity');
   return value;
 };
+/** 复制绑定记录，避免调用方直接修改持久化状态。 */
 const copy = value => structuredClone(value);
 
+/** 通过受限文件句柄读取工作区内的有界普通文件，并核对真实路径仍属于源工作区。 */
 async function readOwnedFile(root, source, limit = 16 * 1024 * 1024) {
   const actual = await fs.realpath(source);
   if (!within(root, actual)) throw new AccessError('Input leaves its owning workspace');
@@ -41,6 +46,7 @@ async function readOwnedFile(root, source, limit = 16 * 1024 * 1024) {
   } finally { await handle.close(); }
 }
 
+/** 复制已批准的工作区文件，同时核验文件版本、真实归属及取消状态。 */
 async function copyOwnedFile(root, source, destination, signal, version) {
   const actual = await fs.realpath(source);
   if (!within(root, actual)) throw new AccessError('Migration file leaves its approved source workspace');
@@ -62,10 +68,12 @@ async function copyOwnedFile(root, source, destination, signal, version) {
 
 /** Durable Host-owned bindings; no model file or path is an ownership record. */
 export class WorkspaceBindings {
+  /** 保存绑定表、宿主及所有者身份和两个受管根目录，并初始化每会话的串行队列。 */
   constructor({table, hostId, ownerId, workspaceRoot, resourceRoot}) {
     Object.assign(this, {table, hostId, ownerId, workspaceRoot, resourceRoot});
     this.pending = new Map();
   }
+  /** 创建并解析受管工作区和资源根目录，确保两个根目录互不包含。 */
   async initialize() {
     for (const key of ['workspaceRoot', 'resourceRoot']) {
       if (!path.isAbsolute(this[key])) throw new AccessError('Managed roots must be absolute');
@@ -75,17 +83,20 @@ export class WorkspaceBindings {
     if (within(this.workspaceRoot, this.resourceRoot) || within(this.resourceRoot, this.workspaceRoot))
       throw new AccessError('Workspace and read-only resource roots must be disjoint');
   }
+  /** 按会话串行执行绑定变更；先前失败不会阻断后续任务，完成后清理队列。 */
   async serial(sessionId, operation) {
     identity(sessionId);
     const task = (this.pending.get(sessionId) || Promise.resolve()).catch(() => {}).then(operation);
     this.pending.set(sessionId, task);
     try { return await task; } finally { if (this.pending.get(sessionId) === task) this.pending.delete(sessionId); }
   }
+  /** 读取会话绑定的副本；没有受管工作区时要求显式迁移。 */
   get(sessionId) {
     const row = this.table.get(identity(sessionId));
     if (!row) throw new AccessError('This conversation has no managed workspace; explicit migration is required.', 'BENCHFORGE_WORKSPACE_MIGRATION_REQUIRED');
     return copy(row);
   }
+  /** 为新会话建立独立目录与保留状态；重入时核对父会话归属并复用已有绑定。 */
   async reserve(sessionId, parentSessionId) {
     return this.serial(sessionId, async () => {
       const prior = this.table.get(sessionId);
@@ -108,6 +119,7 @@ export class WorkspaceBindings {
       return copy(row);
     });
   }
+  /** 确认工作区真实目录仍匹配持久化身份，拒绝丢失、替换或越界的目录。 */
   async verifyRoot(row) {
     let actual;
     try { actual = await fs.realpath(row.rootPath); }
@@ -117,6 +129,7 @@ export class WorkspaceBindings {
       throw new AccessError('Managed workspace identity changed');
     return actual;
   }
+  /** 核对会话头中的目录和父会话绑定，将通过校验的预留工作区标为激活。 */
   async activate(header) {
     return this.serial(header.id, async () => {
       const row = this.get(header.id);
@@ -128,6 +141,7 @@ export class WorkspaceBindings {
     });
   }
   /** Freeze one parent-owned input before a child starts; never grant the parent root. */
+  /** 仅在子会话尚未激活时发布父输入的只读快照，并将授权记录绑定到该子会话。 */
   async snapshotInput(childId, parentId, source) {
     return this.serial(childId, async () => {
       const child = this.get(childId), parent = this.get(parentId);
@@ -146,6 +160,7 @@ export class WorkspaceBindings {
     });
   }
   /** Publish a bounded text-only preparation handoff after the Host observes child idle. */
+  /** 校验父子绑定后把准备产物复制到父会话草稿目录，并限制文件类型与复制预算。 */
   async exportPreparation(childId, parentId, destination) {
     const child = this.get(childId), parent = this.get(parentId);
     if (child.parentSessionId !== parentId || child.state !== 'active') throw new AccessError('Unknown preparation child');
@@ -175,6 +190,7 @@ export class WorkspaceBindings {
     return {files: files.map(file => path.join(target, file.name)), accepted: false};
   }
   /** Host-derived manifest, after the owner selected native/PG-proven candidates. */
+  /** 只向全新预留工作区迁入已批准且版本一致的文件，并在提交前再次验证源会话。 */
   async migrateFiles(newSessionId, sourceHeader, sourceRevision, files, signal, verifySource = async () => {}) {
     return this.serial(newSessionId, async () => {
       const row = this.get(newSessionId);
@@ -226,6 +242,7 @@ export class WorkspaceBindings {
       return {...copy(row), importedFiles: entries.length, productionAuthorityTransferred: false};
     });
   }
+  /** 从已激活且目录匹配的绑定生成冻结的访问凭据，包含宿主、所有者和策略代际。 */
   scope(session) {
     const row = this.get(session.header.id);
     if (row.state !== 'active' || session.header.cwd !== row.rootPath)

@@ -10,6 +10,7 @@ from capabilities.dataset_authoring.spatial.task_generators.geometry import area
 from capabilities.dataset_authoring.spatial.task_generators.graph import task as graph_task
 
 
+# 按坐标变换、动力学和反事实规则生成推理任务及可重算答案。
 def task(scene,nid,op):
     a,b=scene['objects'][:2];p,q=a['position'],b['position'];w,h=a['size'];rw,rh=b['size']
     trans=scene['transform'];angle=trans['angle'];origin=trans['origin']

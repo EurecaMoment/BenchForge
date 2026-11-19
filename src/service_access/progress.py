@@ -4,6 +4,7 @@ from pathlib import Path
 import time
 
 
+# 定位当前修订目录并原子更新带纳秒时间的阶段进度；非修订目录不写入。
 def record_progress(directory,stage,**details):
     folder=Path(directory)
     if not folder.name.startswith('revision_'):

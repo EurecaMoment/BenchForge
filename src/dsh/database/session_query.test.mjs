@@ -2,19 +2,20 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import PostgresSessionQuery from './session_query.mjs';
 
+/** 构造无需真实数据库的会话查询实例，提供可控索引代际与分页服务响应。 */
 function provider() {
   const value = Object.create(PostgresSessionQuery.prototype);
   Object.assign(value, {lifetime: new AbortController(), queue: Promise.resolve(), hostId: 'a'.repeat(64), generation: 'v1'});
-  value.filterSessions = async () => [{header: {id: 'session-a'}, sources: ['live']}];
-  value.synchronize = async () => value.generation;
-  value.client = async () => async (_route, args) => {
+  value.filterSessions = /** 只返回夹具授权的单一会话，验证搜索请求不会扩大范围。 */ async () => [{header: {id: 'session-a'}, sources: ['live']}];
+  value.synchronize = /** 返回测试当前指定的索引代际。 */ async () => value.generation;
+  value.client = /** 记录发送给服务的搜索参数，并根据偏移量生成确定性的分页响应。 */ async () => async (_route, args) => {
     value.last = args;
     return {items: [{sessionId: 'session-a', seq: args.offset}], hasMore: args.offset === 0};
   };
   return value;
 }
 
-test('search pagination is bound to request and indexed generation', async () => {
+test('search pagination is bound to request and indexed generation', /** 验证会话搜索分页与索引代际在该用例中的具体边界，完成准备、调用和结果断言。用例：search pagination is bound to request and indexed generation。 */ async () => {
   const query = provider(), request = {sessionId: 'session-a', query: '场景', limit: 1};
   const first = await query.searchEvents(request);
   assert.equal(first.session.id, 'session-a');
@@ -24,7 +25,7 @@ test('search pagination is bound to request and indexed generation', async () =>
   await assert.rejects(query.searchEvents({...request, query: '其它', cursor: first.nextCursor}), {code: 'SESSION_QUERY_INVALID_CURSOR'});
 });
 
-test('search validates limits, query and official inclusive filters', async () => {
+test('search validates limits, query and official inclusive filters', /** 验证会话搜索分页与索引代际在该用例中的具体边界，完成准备、调用和结果断言。用例：search validates limits, query and official inclusive filters。 */ async () => {
   const query = provider();
   await assert.rejects(query.searchSessions({query: 'x', limit: 0}), {code: 'SESSION_QUERY_INVALID_LIMIT'});
   await assert.rejects(query.searchSessions({query: 3}), {code: 'SESSION_QUERY_INVALID_QUERY'});
@@ -33,7 +34,7 @@ test('search validates limits, query and official inclusive filters', async () =
   assert.equal(page.items[0].bestMatch.sessionId, 'session-a');
 });
 
-test('queued search cancels immediately without waiting for previous search', async () => {
+test('queued search cancels immediately without waiting for previous search', /** 验证会话搜索分页与索引代际在该用例中的具体边界，完成准备、调用和结果断言。用例：queued search cancels immediately without waiting for previous search。 */ async () => {
   const query = provider(), pending = Promise.withResolvers(), abort = new AbortController();
   query.queue = pending.promise;
   const call = query.searchSessions({query: '场景'}, {signal: abort.signal});

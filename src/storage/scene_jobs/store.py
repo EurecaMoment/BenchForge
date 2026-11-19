@@ -15,16 +15,19 @@ from service_access.access_scope import current_access
 from service_access.runtime_config import resolve_database_url
 
 
+# 生成带业务前缀的随机短编号，区分不同实体类型。
 def uid(prefix): return prefix+'_'+uuid.uuid4().hex[:16]
 
 
 class Store:
+    # 绑定任务生命周期、工作目录和数据库仓库，准备幂等请求索引。
     def __init__(self, root, harness=None, database_url=None, *, lifecycle):
         self.lifecycle = lifecycle
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         self.repo=Repository(resolve_database_url(harness,database_url))
         self.keys=request_keys
 
+    # 校验场景意图与调用上下文，按请求键幂等提交运行和工作项。
     def submit(self,key,intents,workflow='scene',submitted_programs=None,context=None):
         if workflow == 'dataset':
             raise ValueError('Legacy dataset jobs are retired. Use data.capability or submit a scene with target_items.')
@@ -91,6 +94,7 @@ class Store:
             self.repo.event(c,rid,None,'benchforge.submitted',{'intents':intents})
             return rid
 
+    # 读取并确认 BenchForge 运行快照，误传工作项编号时提供纠正提示。
     def snapshot(self,rid):
         if isinstance(rid,str) and '.scene' in rid and rid.startswith('sf_'):
             raise ValueError(f'Expected run_id, received task_id {rid}; use run_id={rid.split(".")[0]} for status/wait/inspect/cancel, and the full task_id for evidence/retry')
@@ -99,6 +103,7 @@ class Store:
             raise ValueError('not a BenchForge run')
         return value
 
+    # 锁定工作项后按预期状态和租约所有者更新字段，拒绝过期执行者写入。
     def update(self,tid,*,expected_state=None,expected_owner=None,**fields):
         with self.repo.transaction() as c:
             old=c.execute(select(tasks).where(tasks.c.id==tid).with_for_update()).mappings().one()
@@ -126,6 +131,7 @@ class Store:
                 raise ValueError(f'task {tid} changed before update')
             self.repo.event(c,old['run_id'],tid,'benchforge.transition',{'state':fields.get('state',old['state']),'phase':fields.get('unit',old['unit']).get('phase')})
 
+    # 原子领取待执行阶段或恢复租约已过期阶段，确保同一时刻仅有一个有效所有者。
     def claim_stage(self, tid, owner, lease_seconds=60):
         """Atomically claim or recover any pipeline stage for a single owner."""
         now = time.time()
@@ -177,6 +183,7 @@ class Store:
             )
             return dict(claimed)
 
+    # 只为仍在运行且尚未过期的本所有者租约续期，返回是否成功。
     def renew_stage(self, tid, owner, lease_seconds=60):
         now = time.time()
         with self.repo.transaction() as c:
@@ -192,6 +199,7 @@ class Store:
             )
             return result.rowcount == 1
 
+    # 保留历史尝试并重试失败阶段，按指定模式恢复或重启采集，保留成功产物。
     def retry(self,tid,feedback=None,capture_mode='auto'):
         """Retain old attempts and retry the failed stage; never mutate successful products."""
         if capture_mode not in {'auto','resume','restart'}:
@@ -213,6 +221,7 @@ class Store:
         return {'task_id':tid,'revision':unit['revision'],'phase':unit['phase'],
                 **({'capture_recovery_mode':unit['capture_recovery_mode']} if phase=='capture' and 'capture_recovery_mode' in unit else {})}
 
+    # 查询当前代码协议下未终结运行的所有工作项，可复用调用方事务。
     def all_work(self, connection=None):
         query=select(tasks).join(runs,tasks.c.run_id==runs.c.id).where(runs.c.code_revision=='benchforge-0.2.0',runs.c.state.notin_(['CANCELED','SUCCEEDED','FAILED_FINAL']))
         if connection is not None:
@@ -220,11 +229,13 @@ class Store:
         with self.repo.engine.connect() as c:
             return [dict(r) for r in c.execute(query).mappings()]
 
+    # 安全创建并返回指定工作项及修订号的产物目录。
     def directory(self,tid,revision):
         directory=safe_path(self.root,f'{tid}/revision_{revision}')
         directory.mkdir(parents=True,exist_ok=True)
         return directory
 
+    # 在有效任务租约保护下发布采集文件并推进阶段，防止过期执行者覆盖结果。
     def publish_capture(self, tid, token, incoming, *, expected_owner):
         """Fence filesystem publication and stage transition with the task lease."""
         with self.repo.transaction() as connection:
@@ -248,6 +259,7 @@ class Store:
             self.repo.event(connection, task['run_id'], tid, 'benchforge.capture_committed',
                             {'report': report, 'protocol': 'a100sim.v1.Simulator'})
 
+    # 逐个锁定并汇总运行内工作项状态，更新终态且避免丢失并发重试。
     def settle_runs(self):
         terminal = {'CANCELED', 'SUCCEEDED', 'FAILED_FINAL'}
         with self.repo.engine.connect() as c:
@@ -273,6 +285,7 @@ class Store:
                 if state != previous:
                     c.execute(runs.update().where(runs.c.id == rid).values(state=state))
 
+    # 按统一锁顺序标记运行取消并取消未开始工作项，追加取消事件。
     def cancel(self,rid):
         self.snapshot(rid)
         with self.repo.transaction() as c:

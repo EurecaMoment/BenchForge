@@ -8,6 +8,7 @@ from capabilities.data_acquisition.source_files import (
 )
 
 
+# 导入并去重证据记录，重新从声明来源提取非预测事实并验证引用文件。
 def import_evidence(args, directory):
     source = source_path(args["input"])
     accepted = []

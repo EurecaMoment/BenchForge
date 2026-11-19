@@ -16,14 +16,17 @@ export const REPORT_FIELDS = [...QUALITY_FIELDS, 'model_api_calls', 'scope', 'me
   'missing', 'status', 'capabilities', 'limitations', 'body_markdown', 'public_verified_count', 'contract_eligible_count',
   'source_scene_count', 'captured_view_count'];
 
+/** 创建公开计划和报告投影器，使用字段白名单并递归去除内部敏感数据。 */
 export function createPublicArtifactProjector({pick, taskTemplates}) {
   const planTemplateTitles = new Map((taskTemplates?.tasks || [])
     .flatMap((task) => task.templates.map((row) => [row.id, row.title])));
+  /** 递归移除私有字段，保留可向工作台公开的结构化值。 */
   const stripPrivate = (value, allowAuthoritySource = false) => Array.isArray(value) ? value.map((child) => stripPrivate(child, allowAuthoritySource)) :
     value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) =>
       allowAuthoritySource && key === 'authority_source' || !/^(?:answers?|answer_?key|correct_?answer|reference_?answer|ground_?truth|gt|authority|gold|oracle|token|password|api_?key|solution)(?:_|$)/i.test(key))
       .map(([key, child]) => [key, stripPrivate(child, allowAuthoritySource)])) : value;
 
+  /** 按公开计划字段白名单构建可展示的生产计划。 */
   function publicPlan(plan) {
     if (!plan) return null;
     const assessment = plan.assessment ? stripPrivate(plan.assessment, true) : undefined;
@@ -40,10 +43,12 @@ export function createPublicArtifactProjector({pick, taskTemplates}) {
       steps: (plan.steps || []).map((step) => pick(step, ['id', 'uses', 'pipeline_id', 'artifact_type', 'await_terminal']))};
   }
 
+  /** 按公开报告字段白名单构建评测结果，缺失报告返回空值。 */
   function publicReport(report) { return report ? stripPrivate(pick(report, REPORT_FIELDS)) : null; }
   return {publicPlan, publicReport};
 }
 
+/** 流式解析公开数据集 JSONL，并在退出或取消时关闭读取资源。 */
 async function* jsonLines(file, signal) {
   const stream = createReadStream(file, {encoding: 'utf8', signal});
   const lines = createInterface({input: stream, crlfDelay: Infinity});
@@ -56,6 +61,7 @@ async function* jsonLines(file, signal) {
   } finally { lines.close(); stream.destroy(); }
 }
 
+/** 校验数据集目录的会话归属，定位标准或打包格式中的公开问题文件。 */
 async function datasetFiles(id, roots, scope, exists) {
   const {root, directory} = await resolveToken(id, roots);
   await assertSessionDirectory(root, directory, scope);
@@ -66,7 +72,9 @@ async function datasetFiles(id, roots, scope, exists) {
   return {root, directory, publicRoot, questions};
 }
 
+/** 创建公开数据集分页和媒体读取接口，限制参数并只暴露允许公开的字段。 */
 export function createDatasetReader({exists, readJson, pick, publicFields = PUBLIC_FIELDS}) {
+  /** 校验数据集分页参数的正整数和最大值约束。 */
   function integer(value, fallback, maximum) {
     if (value === null) return fallback;
     const number = Number(value);
@@ -75,6 +83,7 @@ export function createDatasetReader({exists, readJson, pick, publicFields = PUBL
   }
   const mediaTypes = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
     '.svg': 'image/svg+xml', '.gif': 'image/gif', '.json': 'application/json', '.md': 'text/markdown; charset=utf-8', '.npy': 'application/octet-stream'};
+  /** 为样本中的公开媒体或资产生成按索引寻址的会话范围链接。 */
   function mediaReferences(row, id, index, workspacePath, scope, field = 'media') {
     return (Array.isArray(row[field]) ? row[field] : []).map((_, media) => {
       const params = new URLSearchParams({view: 'media', dataset: id, item: String(index),
@@ -83,6 +92,7 @@ export function createDatasetReader({exists, readJson, pick, publicFields = PUBL
       return 'api/benchforge/workbench?' + params;
     });
   }
+  /** 流式筛选数据集样本并分页，附加公开媒体链接与筛选统计。 */
   async function readDataset(url, roots, signal, sessions = []) {
     const id = url.searchParams.get('dataset'), scope = scopeOf(url, sessions);
     const {directory, questions} = await datasetFiles(id, roots, scope, exists);
@@ -115,6 +125,7 @@ export function createDatasetReader({exists, readJson, pick, publicFields = PUBL
       authority_exposed: false};
   }
 
+  /** 按样本和媒体索引定位公开资源，校验真实路径、文件类型及访问归属。 */
   async function readMedia(url, roots, signal, sessions = []) {
     const id = url.searchParams.get('dataset'), scope = scopeOf(url, sessions);
     const {root, publicRoot, questions} = await datasetFiles(id, roots, scope, exists);

@@ -6,6 +6,7 @@ from storage.artifacts import read_jsonl as rows
 from storage.artifacts import write_jsonl as jsonl
 
 
+# 按唯一预测标识对照私有标准答案执行精确匹配，记录缺失及逐题结果。
 def evaluate(args, directory):
     gold = rows(Path(args["authority"]) / "gold.jsonl")
     predictions = rows(args["predictions"])

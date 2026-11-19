@@ -3,16 +3,22 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {AccessError, within} from './workspaces.mjs';
 
+/** 构造带 HTTP 状态的工作区迁移访问错误。 */
 const fail = (message, status = 409) => Object.assign(new AccessError(message), {status});
+/** 优先读取观察结果的正式版本，没有版本时以事件游标作为一致性标记。 */
 const revisionOf = observation => observation.revision ?? {cursor: observation.cursor};
+/** 比较可序列化的迁移版本或清单是否完全一致。 */
 const equal = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+/** 将文件相对路径、类型与版本编码为迁移候选标识，使文件变化能够被检测。 */
 const candidateId = file => Buffer.from(JSON.stringify([
   file.relativePath, file.kind, file.version.size, file.version.mtimeMs,
 ])).toString('base64url');
 
 /** Host-only administration. Selections are looked up in fresh native/PG evidence. */
+/** 创建迁移预览和执行接口；只有用户选择且版本仍一致的源会话文件可以迁入新工作区。 */
 export function createWorkspaceMigration({observe, readOperations, access, sessions, agents, createMessage,
   projectionKey = 'benchforgeArtifacts'}) {
+  /** 检查源会话已停止且具有原生产物投影，返回可迁移文件及当前源版本。 */
   async function preview(sessionId, signal) {
     if (typeof sessionId !== 'string' || !/^session-[A-Za-z0-9-]+$/.test(sessionId))
       throw fail('A source conversation ID is required', 400);
@@ -26,6 +32,7 @@ export function createWorkspaceMigration({observe, readOperations, access, sessi
       const declaredRoot = path.resolve(header.cwd);
       // Rebase the trusted root alias, preserving every task-controlled child
       // component so the regular-file/link check below still rejects links.
+      /** 把声明根目录中的文件路径映射到经过解析的真实源工作区。 */
       const resolveSource = value => {
         const file = path.resolve(root, value);
         return within(declaredRoot, file) ? path.resolve(root, path.relative(declaredRoot, file)) : file;
@@ -59,6 +66,7 @@ export function createWorkspaceMigration({observe, readOperations, access, sessi
     } finally { observation[Symbol.dispose](); }
   }
 
+  /** 验证显式候选选择和源版本，在维护作用域内创建并完成独立会话迁移。 */
   async function migrate(sessionId, selection, signal) {
     if (!selection || typeof selection !== 'object' || Array.isArray(selection) ||
         Object.keys(selection).some(key => !['source_revision', 'selected'].includes(key)) ||
@@ -66,6 +74,7 @@ export function createWorkspaceMigration({observe, readOperations, access, sessi
         selection.selected.some(id => typeof id !== 'string') ||
         new Set(selection.selected).size !== selection.selected.length || selection.source_revision === undefined)
       throw fail('Select candidate IDs and the source revision returned by migration preview', 400);
+    /** 合并请求与维护取消信号，重新核验候选文件后创建目标会话并复制批准的输入。 */
     const operation = async maintenanceSignal => {
       const combined = signal && maintenanceSignal ? AbortSignal.any([signal, maintenanceSignal]) : signal || maintenanceSignal;
       const current = await preview(sessionId, combined);

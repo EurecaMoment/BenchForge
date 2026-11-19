@@ -24,10 +24,12 @@ SECTIONS = {
 }
 
 
+# 将目录响应编码为紧凑UTF-8 JSON，拒绝非有限数值。
 def _encoded(value):
     return json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf8')
 
 
+# 把字典或列表目录统一转换为带稳定标识和值的条目列表。
 def _rows(value):
     if isinstance(value, dict):
         return [{'id': key, 'value': child} for key, child in value.items()]
@@ -35,6 +37,7 @@ def _rows(value):
             for i, v in enumerate(value)]
 
 
+# 返回操作者目录索引、查询规则和场景生成工作流说明。
 def _overview():
     return {
         'name': 'BenchForge', 'catalog_schema': 'benchforge.operator-catalog/v2',
@@ -63,6 +66,7 @@ def _overview():
     }
 
 
+# 按目录分区读取工具、合同、资源或模式条目，可加载选定条目的完整信息。
 def _load_rows(store, section, item_id, settings=None):
     if section=='generation_tools':
         tools = {
@@ -122,6 +126,7 @@ def _load_rows(store, section, item_id, settings=None):
     raise ValueError('Unknown BenchForge catalog section: ' + section)
 
 
+# 把筛选后的完整目录快照写入授权工作区，返回文件与条目数量回执。
 def _copy(store, workspace_id, section, rows, filters):
     if not isinstance(workspace_id, str) or not re.fullmatch('[a-z][a-z0-9_-]{0,63}', workspace_id):
         raise ValueError('invalid workspace_id')
@@ -137,6 +142,7 @@ def _copy(store, workspace_id, section, rows, filters):
             'items': len(rows), 'scope': 'lossless copy of all matches before pagination; original registries unchanged'}
 
 
+# 验证目录查询、筛选和分页参数，在字节预算内返回结果或保存完整副本。
 def catalog_response(store, request, *, settings=None):
     if not isinstance(request, dict) or set(request) - {'section', 'query', 'item_id', 'offset', 'limit', 'workspace_id'}:
         raise ValueError('catalog parameters: section, query, item_id, offset, limit, workspace_id')

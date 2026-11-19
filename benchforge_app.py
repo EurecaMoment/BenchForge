@@ -29,6 +29,7 @@ PYTHON_PATH = Path('venv/Scripts/python.exe' if os.name == 'nt' else 'venv/bin/p
 write = settings.write
 
 
+# 合并 DSH、数据库投影与进程环境，并确保托管数据库及只读连接使用一致配置。
 def build_environment(*, database=True):
     environment = settings.read_env(CONFIG / 'dsh.env', shell=True)
     projected = settings.read_env(GENERATED / 'database.env') if database else {}
@@ -43,19 +44,23 @@ def build_environment(*, database=True):
     return environment
 
 
+# 返回本安装私有后端 Python 解释器的位置。
 def backend_python():
     return STATE / PYTHON_PATH
 
 
+# 读取并解析本地部署配置的当前有效值。
 def _configuration():
     return settings.read_configuration(CONFIG)[0]
 
 
+# 以环境覆盖优先取得并校验 Web 监听端口。
 def configured_web_port():
     value = os.environ.get('BENCHFORGE_WEB_PORT')
     return settings.port(value if value is not None else _configuration()['web']['port'],
                          'web.port')
 
+# 展开本地配置的默认工作区路径；未指定工作区时返回空值。
 def configured_default_workspace():
     value, _, environment = settings.read_configuration(CONFIG)
     workspace = value['web']['default_workspace']
@@ -64,14 +69,17 @@ def configured_default_workspace():
     return (CONFIG / Path(settings.expand_environment(workspace, environment)).expanduser()).resolve()
 
 
+# 根据当前数据库设置判断是否由本安装管理 PostgreSQL。
 def database_is_managed():
     return settings.database_is_managed(_configuration()['database'])
 
 
+# 把部署配置同步为服务、客户端和数据库使用的运行投影。
 def sync_configuration(*, overrides=None):
     return settings.sync_configuration(CONFIG, GENERATED, SERVER, STATE, overrides=overrides)
 
 
+# 检查配置版本及必要投影，缺失或过期时重新同步。
 def _ensure_runtime_configuration():
     config = settings.read_object(CONFIG / 'benchforge.local.json', optional=True)
     projections = (SERVER, *(GENERATED / name for name in ('database.env', settings.CLIENT_CONFIG)))
@@ -80,6 +88,7 @@ def _ensure_runtime_configuration():
         sync_configuration()
 
 
+# 只收集用户显式指定的端口和项目覆盖，再同步初始化配置。
 def _init_configs(port=None, db_port=None, project=None, *, web_port=None):
     requested = {
         'web': {'port': web_port},
@@ -91,6 +100,7 @@ def _init_configs(port=None, db_port=None, project=None, *, web_port=None):
     sync_configuration(overrides=overrides)
 
 
+# 按命令行查询键读取当前运行设置，供启动脚本复用。
 def _setting(name):
     readers = {
         'web.port': configured_web_port,
@@ -105,6 +115,7 @@ def _setting(name):
     return readers[name]()
 
 
+# 按已保存项目身份启动或停止托管数据库，保留投影环境值的字面语义。
 def _database_command(project, stop):
     env_file = GENERATED / 'database.env'
     if not stop:
@@ -128,6 +139,7 @@ def _database_command(project, stop):
     subprocess.run(command, env=environment, check=True)
 
 
+# 临时合并启动环境来解析后端配置，完成后完整恢复原进程环境。
 def _read_runtime_server():
     _ensure_runtime_configuration()
     # Reuse the backend's env/token/policy resolution without changing the
@@ -142,6 +154,7 @@ def _read_runtime_server():
         os.environ.update(original)
 
 
+# 向本机服务指定操作发送带操作者令牌的 JSON 请求。
 def api(config, operation, value):
     return post_service_json(
         f'http://127.0.0.1:{config["port"]}', '/' + operation, value,
@@ -149,6 +162,7 @@ def api(config, operation, value):
     )
 
 
+# 管理私有环境安装、配置初始化、数据库、服务和客户端命令，统一使用部署投影。
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest='command', required=True)

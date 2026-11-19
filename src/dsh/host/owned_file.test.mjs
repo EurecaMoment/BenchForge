@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {openOwnedFile} from './owned_file.mjs';
 
-test('artifact streaming stays on the approved inode after path replacement', {skip: process.platform !== 'linux'}, async t => {
+test('artifact streaming stays on the approved inode after path replacement', {skip: process.platform !== 'linux'}, /** 验证宿主进程、取消信号和资源清理在该用例中的具体边界，完成准备、调用和结果断言。用例：artifact streaming stays on the approved inode after path replacement。 */ async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-owned-read-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
   const workspace = path.join(root, 'workspace');
@@ -22,7 +22,7 @@ test('artifact streaming stays on the approved inode after path replacement', {s
   } finally { await handle.close(); }
 });
 
-test('artifact reads reject a linked ancestor and an external regular file', {skip: process.platform !== 'linux'}, async t => {
+test('artifact reads reject a linked ancestor and an external regular file', {skip: process.platform !== 'linux'}, /** 验证宿主进程、取消信号和资源清理在该用例中的具体边界，完成准备、调用和结果断言。用例：artifact reads reject a linked ancestor and an external regular file。 */ async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-owned-read-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
   const workspace = path.join(root, 'workspace');

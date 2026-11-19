@@ -14,6 +14,7 @@ HOST_IDS = {base.WORKBENCH_PLUGIN_ID, base.CAPTURE_PLUGIN_ID, base.SESSION_OPERA
             base.EXAMPLES_PLUGIN_ID, base.SESSION_QUERY_PLUGIN_ID, 'benchforge-access'}
 
 
+# 为已安装的自有预设补齐缺失的访问、示例、工作台及会话宿主服务。
 def insert_host_dependencies(profile):
     """Attach the Host services used by generated presets."""
     rows = [row for patch in profile for row in patch.get('insert', [])]
@@ -40,12 +41,14 @@ def insert_host_dependencies(profile):
         profile.append({'insert': entries})
 
 
+# 合并对象形式的旧新配置，非对象配置直接采用新声明。
 def _merge_configuration(old, new):
     if isinstance(old, dict) and isinstance(new, dict):
         return {**old, **new}
     return new
 
 
+# 更新预设插件同时保留允许的用户选项与自定义附加插件。
 def _merge_preset(row, previous):
     incoming = row['config']
     prior = previous.get('config', {})
@@ -72,6 +75,7 @@ def _merge_preset(row, previous):
             'config': {**prior, **incoming, 'plugins': plugins}}
 
 
+# 把生成预设及宿主选项合并进既有 profile，迁移旧身份并保持声明唯一。
 def migrate_profile(profile, generated, revision=None):
     """Merge the generated presets and Host options into an existing profile."""
     profile = deepcopy(profile or [])
@@ -79,6 +83,7 @@ def migrate_profile(profile, generated, revision=None):
     base.refresh_preset_identity(profile)
     entries = next(patch['insert'] for patch in generated if 'insert' in patch)
 
+    # 对共享宿主入口采用 Loader 编号，对预设采用稳定预设身份进行匹配。
     def identity(row):
         return row['id'] if row.get('id') in HOST_IDS else base.preset_id(row)
 

@@ -6,6 +6,7 @@ import unittest
 
 
 class SourceBoundaryTests(unittest.TestCase):
+    # 验证自有模块遵守层次导入边界，且模块依赖图不存在循环。
     def test_modules_follow_layering_without_import_cycles(self):
         root = Path(__file__).resolve().parents[1] / "src"
         modules = {}
@@ -61,6 +62,7 @@ class SourceBoundaryTests(unittest.TestCase):
                     )
         visited, active = set(), []
 
+        # 深度遍历导入图并跟踪活动路径，发现循环时报告完整依赖链。
         def visit(name):
             self.assertNotIn(name, active, "Import cycle: " + " -> ".join([*active, name]))
             if name in visited:

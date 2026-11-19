@@ -18,6 +18,7 @@ _lock = RLock()
 _pid = os.getpid()
 
 
+# 读取连接池整数配置，低于允许下限时立即报错。
 def _setting(name, default, minimum=1):
     value = int(os.environ.get("BENCHFORGE_DB_" + name, default))
     if value < minimum:
@@ -25,6 +26,7 @@ def _setting(name, default, minimum=1):
     return value
 
 
+# 创建带连接检测、连接池限额及数据库超时的服务引擎。
 def _create(url):
     options = make_url(url).query.get("options", "")
     return create_engine(
@@ -39,6 +41,7 @@ def _create(url):
     )
 
 
+# 按地址复用进程级连接池，并在进程身份变化后丢弃继承的连接。
 def engine_for(url=None):
     """Acquire a process pool, never one pool per request or workspace."""
     global _pid
@@ -59,6 +62,7 @@ def engine_for(url=None):
         return engine
 
 
+# 释放当前进程缓存的连接池，供退出清理和隔离测试使用。
 def dispose_engines():
     """Release pools at process shutdown or from isolated test fixtures."""
     with _lock:
@@ -70,6 +74,7 @@ def dispose_engines():
 atexit.register(dispose_engines)
 
 
+# 对规范化工作区绝对路径求摘要，生成稳定且不暴露路径的命名空间。
 def workspace_id(workspace):
     """Return a stable opaque namespace for per-workspace rows in shared tables."""
     canonical = os.path.normcase(str(Path(workspace).expanduser().resolve()))

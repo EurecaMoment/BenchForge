@@ -15,6 +15,7 @@ from database.schema import workspaces
 
 
 class ReaderProvisionPostgresTests(unittest.TestCase):
+    # 验证真实 PostgreSQL 读角色配置可重复执行，且角色无写权限。
     def test_reader_provision_is_idempotent_and_rejects_writes(self):
         url = use_postgres(self)
         owner = engine_for(url)
@@ -24,6 +25,7 @@ class ReaderProvisionPostgresTests(unittest.TestCase):
         role = 'bf_reader_test_' + uuid.uuid4().hex
         query_url = make_url(url).set(username=role, password=secrets.token_urlsafe(32)).render_as_string(hide_password=False)
 
+        # 清理测试创建的专用角色，并释放与其相关的连接池。
         def cleanup():
             engine_for(query_url).dispose()
             with owner.begin() as connection:

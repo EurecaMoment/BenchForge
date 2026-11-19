@@ -11,6 +11,7 @@ from pipelines.benchmark.design.plan_versions import current
 ASSESSMENT_BLOCK = re.compile(r'^```assessment-yaml\s*\r?\n(.*?)^```\s*$', re.M | re.S)
 
 
+# 从大小受限的 Markdown 中解析唯一的 assessment-yaml 区块并校验其对象结构。
 def assessment_from_markdown(markdown, *, required=True):
     if not isinstance(markdown, str) or not markdown.strip():
         raise ValueError('The edited Markdown document is empty')
@@ -33,6 +34,7 @@ def assessment_from_markdown(markdown, *, required=True):
     return value
 
 
+# 校验会话及基础计划版本后保存用户编辑，更新派生计划绑定并标记待应用状态。
 def save_edit(workspace,session,base_plan,assessment=None,split=None,*,markdown=None,base_markdown=None):
     markdown_edit = markdown is not None
     if markdown_edit:
@@ -57,6 +59,7 @@ def save_edit(workspace,session,base_plan,assessment=None,split=None,*,markdown=
         raise ValueError('The displayed plan has been replaced. Refresh before editing.')
     old=read(base)
     parsed=assessment_from_markdown(markdown,required=False) if markdown_edit else assessment
+    # 递归合并用户编辑的字典及列表值，未编辑字段保留原内容。
     def merge(original, edited):
         if isinstance(original,dict) and isinstance(edited,dict):
             return {**original,**{key:merge(original.get(key),child) for key,child in edited.items()}}
@@ -105,6 +108,7 @@ def save_edit(workspace,session,base_plan,assessment=None,split=None,*,markdown=
     if inputs.get('split')!=old['inputs'].get('split'):changes.append('split')
     if not changes:return {'state':'unchanged','plan':str(base)}
     steps=deepcopy(old['steps'])
+    # 递归更新计划中已冻结的输入绑定，同时保留以变量引用表达的延迟绑定。
     def update_bindings(value):
         if isinstance(value,list):return [update_bindings(child) for child in value]
         if not isinstance(value,dict):return value

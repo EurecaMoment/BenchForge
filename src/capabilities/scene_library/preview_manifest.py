@@ -9,6 +9,7 @@ PREVIEW_FILE = "preview/scene.mp4"
 FORMAT_VERSION = 1
 
 
+# 校验任务与非负修订身份，返回独立场景预览目录。
 def preview_folder(config, task_id, revision):
     if (
         not re.fullmatch(r"sf_[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+", task_id)
@@ -19,6 +20,7 @@ def preview_folder(config, task_id, revision):
     return Path(config["artifacts"]) / "scene-previews" / task_id / ("revision_" + str(revision))
 
 
+# 验证预览清单身份和视频大小等条件，返回有效缓存或空值。
 def cached_preview(config, task_id, revision):
     folder = preview_folder(config, task_id, revision)
     try:

@@ -3,6 +3,7 @@
 from database.config import database_context, normalize_database_url, resolve_database_url, resolve_workspace_url
 
 
+# 按需加载数据库入口，使轻量客户端校验配置时无需预先安装 SQLAlchemy。
 def __getattr__(name):
     # Keep configuration validation usable in lightweight clients that do not
     # install the production SQLAlchemy extra.

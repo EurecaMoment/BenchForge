@@ -3,6 +3,7 @@ from copy import deepcopy
 from capabilities.benchmark_design.stages import CONTRACT, STAGES, COLLECTION_OPERATIONS
 
 
+# 在模板生产前补齐场景验收和采集验证步骤，并保留受保留步骤编号约束。
 def complete_production_steps(steps):
     steps = deepcopy(steps)
     index = next((i for i, step in enumerate(steps) if step['uses'] == 'templates.produce'), None)
@@ -23,6 +24,7 @@ def complete_production_steps(steps):
     return steps
 
 
+# 按操作语义验证生产阶段顺序与依赖，禁止用展示阶段标签绕过真实产物要求。
 def validate_production_steps(steps, selections=None):
     """Only semantic operations establish stages; review_stage cannot relabel them."""
     if selections is not None:
@@ -59,6 +61,7 @@ def validate_production_steps(steps, selections=None):
         raise ValueError('Production needs S2 scene.acceptance, S3 collection.validate, S4 templates.produce and S5 data.package')
 
 
+# 返回生产阶段、场景来源及默认配方的公开执行契约。
 def execution_contract():
     return {
         'schema': CONTRACT['schema'],

@@ -8,10 +8,12 @@ from storage.json_io import write_json
 from capabilities.dataset_authoring.spatial.environments import environment
 
 
+# 从UTF-8 JSONL文件读取所有非空记录。
 def read_rows(path):
     with Path(path).open(encoding='utf8') as handle:return [json.loads(line) for line in handle if line.strip()]
 
 
+# 按固定数据分区评估静态答案或在交互环境执行动作序列，输出逐题及能力指标。
 def evaluate(args,directory,config=None):
     dataset=Path(args['dataset']);partition=args.get('partition','curriculum_dev')
     questions=read_rows(dataset/partition/'questions.jsonl');authority={r['id']:r for r in read_rows(dataset/partition/'authority.jsonl')}

@@ -19,6 +19,7 @@ OPERATORS = {
 }
 
 
+# 按失败代码和产物类型选择局部修复、重绑定、重生成或重新执行策略。
 def choose_operator(failure_code: str | None, artifact_type: str | None = None) -> str:
     code = (failure_code or "").casefold()
     if code in {"missing_binding", "missing_field", "invalid_request"}:
@@ -36,6 +37,7 @@ def choose_operator(failure_code: str | None, artifact_type: str | None = None) 
     return "final_rejection"
 
 
+# 生成包含失败原因、目标产物、修复算子及可追踪时间的修复方案。
 def create_plan(*, run: str | Path, artifact: dict[str, Any] | None = None,
                 failure_code: str | None = None, reason: str | None = None) -> dict[str, Any]:
     row = artifact or {}
@@ -57,12 +59,14 @@ def create_plan(*, run: str | Path, artifact: dict[str, Any] | None = None,
     }
 
 
+# 在持久私有输出上下文中创建修复方案，并将路径转为公开逻辑路径。
 def repair_plan(args, directory=None, config=None):
     from storage.operation_outputs import persistent_outputs, logical_value
     with persistent_outputs(args['run'], config) as root:
         return logical_value(_repair_plan({**args, 'run': str(root)}))
 
 
+# 定位指定或最近被拒绝的产物，生成修复方案并追加到运行修复账本。
 def _repair_plan(args):
     graph = ArtifactGraph(args['run'])
     rows = graph.find(args.get("artifact_id"))

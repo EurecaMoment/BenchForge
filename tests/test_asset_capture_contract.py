@@ -19,6 +19,7 @@ from test_isaac_sim_evidence import scene_program
 
 
 class AssetCaptureContractTests(unittest.TestCase):
+    # 建立独立数据库、临时资源目录和固定网格身份，供导出与采集契约验证。
     def setUp(self):
         self.database_url = use_postgres(self)
         self.temp = TemporaryDirectory()
@@ -28,12 +29,14 @@ class AssetCaptureContractTests(unittest.TestCase):
         self.asset = self.root / self.identity
         self.asset.mkdir()
 
+    # 保存指定网格元数据并替换示例对象，编译成实际采集场景。
     def compile(self, record):
         (self.asset / "mesh.json").write_text(json.dumps(record), encoding="utf-8")
         program = scene_program()
         program["objects"][1].update(kind="mesh", asset_id=self.identity)
         return compile_scene(program, self.root, {})
 
+    # 验证真实无纹理 PLY 导出后可编译，且材质参数不丢失。
     def test_real_untextured_ply_export_compiles_and_preserves_material(self):
         source = self.root / "mesh.ply"
         trimesh.creation.icosphere(subdivisions=1).export(source)
@@ -53,6 +56,7 @@ class AssetCaptureContractTests(unittest.TestCase):
         self.assertEqual(colors.GetInterpolation(), "faceVarying")
         self.assertEqual(len(colors.Get()), len(record["faces"]) * 3)
 
+    # 验证包含纹理的网格不能在缺少必要数据时被静默按纯色处理。
     def test_texture_data_cannot_be_silently_dropped(self):
         record = {
             "vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -63,6 +67,7 @@ class AssetCaptureContractTests(unittest.TestCase):
         with self.assertRaises(UnsupportedScene):
             self.compile(record)
 
+    # 验证无纹理 GLB 的颜色因子在导出和编译链路只应用一次。
     def test_untextured_glb_factor_is_applied_once(self):
         mesh = trimesh.creation.icosphere(subdivisions=1)
         mesh.visual = trimesh.visual.texture.TextureVisuals(
@@ -83,6 +88,7 @@ class AssetCaptureContractTests(unittest.TestCase):
             colors = UsdGeom.PrimvarsAPI(geometry).GetPrimvar("displayColor").Get()
             self.assertTrue(np.allclose(colors[0], np.array([128, 64, 32]) / 255, atol=1e-5))
 
+    # 验证逐面角点法线在原生场景中保持 face-varying 语义。
     def test_corner_normals_remain_face_varying(self):
         record = {
             "vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -98,6 +104,7 @@ class AssetCaptureContractTests(unittest.TestCase):
         self.assertEqual(mesh.GetNormalsInterpolation(), "faceVarying")
         self.assertEqual(len(mesh.GetNormalsAttr().Get()), 6)
 
+    # 验证原生导出依据真实网格点计算几何，并要求可用碰撞体。
     def test_native_export_measures_actual_points_and_requires_colliders(self):
         file = self.root / "native.usdc"
         stage = Usd.Stage.CreateNew(str(file))
@@ -121,6 +128,7 @@ class AssetCaptureContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "colliders"):
             exported_entities(file, declared)
 
+    # 验证当前适配器不支持的场景动作在入队前就被拒绝。
     def test_unsupported_scene_actions_are_rejected_before_queueing(self):
         store = create_store(self.root, database_url=self.database_url)
         self.addCleanup(store.repo.engine.dispose)

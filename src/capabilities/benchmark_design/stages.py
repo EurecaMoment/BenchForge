@@ -7,6 +7,7 @@ STAGES = tuple(row['id'] for row in CONTRACT['stages'])
 COLLECTION_OPERATIONS = frozenset(CONTRACT['collection_operations'])
 
 
+# 把生产步骤映射到所属的基准设计阶段。
 def stage_of(step):
     operation = step.get('uses', '')
     required = CONTRACT['required_operations'].get(operation)
@@ -17,5 +18,6 @@ def stage_of(step):
     return CONTRACT['default_operations'].get(operation)
 
 
+# 按指定语言返回生产阶段及其工作说明。
 def stage_summary(language='zh'):
     return ' → '.join(row['id'] + ' ' + row[language]['name'] for row in CONTRACT['stages'])

@@ -16,6 +16,7 @@ from storage.access_identity import workspace_namespace
 
 
 class NativeJobs:
+    # 绑定工作区、原生任务回执位置及共享数据库命名空间。
     def __init__(self, workspace):
         self.root = Path(workspace).resolve()
         self.file = self.root / ".benchforge" / "isaac_sim" / "receipts"
@@ -23,6 +24,7 @@ class NativeJobs:
         initialize_schema(self.engine)
         self.workspace_id = workspace_namespace(self.engine, self.root)
 
+    # 幂等登记远端任务与会话、请求的绑定，拒绝与已有归属不一致的回执。
     def remember(self, endpoint, job, session):
         values = {"workspace_id": self.workspace_id, "endpoint": endpoint, "job_id": job.job_id,
                   "session_id": session, "request_id": job.request_id}
@@ -34,6 +36,7 @@ class NativeJobs:
             if row != (session, job.request_id):
                 raise PermissionError("Native job is already associated with another session or request")
 
+    # 确认远端任务属于指定会话，必要时仅从可验证的历史回执恢复归属。
     def require(self, endpoint, job_id, session):
         with self.engine.connect() as connection:
             row = connection.execute(select(native_jobs.c.session_id, native_jobs.c.request_id).where(
@@ -45,6 +48,7 @@ class NativeJobs:
             raise PermissionError("Native job is not registered to this session and simulator endpoint")
         return row[1]
 
+    # 核对不可变请求身份后恢复旧任务归属，避免仅凭任务编号接管资源。
     def _recover_receipt(self, endpoint, job_id, session):
         """Recover an old ownership receipt only after checking its immutable request."""
         expected_session = "" if session == "local-cli" else session

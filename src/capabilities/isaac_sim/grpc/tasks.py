@@ -15,15 +15,18 @@ from service_access.request_context import RunCancelled
 from storage.files import write_json
 
 
+# 由命名空间和操作键生成稳定请求标识，供远程服务实现幂等提交。
 def request_id(namespace, key):
     return 'benchforge-' + hashlib.sha256((namespace + '\0' + key).encode()).hexdigest()
 
 
 class DurableTasks:
+    # 绑定远程客户端、回执目录、取消信号和状态回调。
     def __init__(self, client, directory, namespace, *, stop=None, on_status=lambda job: None):
         self.client, self.directory, self.namespace = client, Path(directory), namespace
         self.stop, self.on_status = stop, on_status
 
+    # 冻结请求身份与内容，在回执锁内复用或提交远程任务。
     def submit(self, key, payload, *, feature=False):
         if not re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_.-]{0,159}', key):
             raise ValueError('Invalid Isaac Sim receipt key')
@@ -59,8 +62,10 @@ class DurableTasks:
             write_json(receipt, document(job))
         return job
 
+    # 等待远程任务终态，并在版本或状态变化时持久化回执。
     def wait(self, key, job, *, timeout=None):
         previous = None
+        # 仅在任务标识、修订或状态变化时更新回执并通知上层。
         def changed(current):
             nonlocal previous
             stamp = (current.job_id, current.revision, current.state)
@@ -70,12 +75,15 @@ class DurableTasks:
                 previous = stamp
         return self.client.wait(job, stop=self.stop, on_status=changed, timeout=timeout)
 
+    # 提交并等待一个持久任务，返回原生任务与JSON结果。
     def run(self, key, payload, *, feature=False):
         job = self.wait(key, self.submit(key, payload, feature=feature))
         return job, document(job)['result']
 
+    # 把扩展操作及参数封装成持久任务执行。
     def extension(self, key, operation, arguments):
         return self.run(key, {'extension': {'operation': operation, 'arguments': arguments}})
 
+    # 将已完成任务的产物下载到对应回执的独立目录。
     def download(self, key, job):
         return self.client.download(job, self.directory / key / 'artifacts', stop=self.stop)

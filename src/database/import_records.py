@@ -17,6 +17,7 @@ from database.schema import (active_plans, dataset_groups, native_jobs, operatio
 from database.transactions import insert_statement, lock_entity
 
 
+# 逐行读取旧工作区的 JSONL 导出表，只接受对象记录。
 def _read(root, table):
     file = root / "database-import" / (table + ".jsonl")
     if not file.is_file():
@@ -30,10 +31,12 @@ def _read(root, table):
                 yield row
 
 
+# 兼容字符串化 JSON 与已解析值；空值使用调用方提供的默认值。
 def _json(value, default):
     return json.loads(value) if isinstance(value, str) and value else value or default
 
 
+# 从旧记录或受大小及路径限制的请求文件恢复会话身份。
 def _session(root, row):
     if row.get("session_id") is not None:
         return row["session_id"]
@@ -49,6 +52,7 @@ def _session(root, row):
     return ""
 
 
+# 按唯一键幂等插入旧记录，并返回本次是否实际新增。
 def _import(connection, table, values, keys):
     result = connection.execute(insert_statement(connection, table).values(**values)
                                 .on_conflict_do_nothing(index_elements=keys)
@@ -56,6 +60,7 @@ def _import(connection, table, values, keys):
     return result.first() is not None
 
 
+# 导入场景运行、工作项及事件历史，同时核对已有记录的业务身份。
 def _scene_history(connection, root, namespace):
     counts = dict(runs=0, work_items=0, events=0, request_keys=0)
     json_fields = {"runs": {"plan"}, "work_items": {"unit", "result", "artifact", "failure"}}
@@ -88,6 +93,7 @@ def _scene_history(connection, root, namespace):
     return counts
 
 
+# 把已停止工作区的旧数据导入共享数据库，返回计数及评审编号映射。
 def migrate_workspace(workspace, database_url):
     """Import a stopped workspace; report counts and remapped legacy review IDs."""
     root = Path(workspace).resolve(strict=True)

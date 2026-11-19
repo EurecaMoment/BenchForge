@@ -1,3 +1,4 @@
+/** 创建公开观察、场景库、产物画廊和预览对话框组件。 */
 export function createGalleryComponents({React, helpers}) {
   const h = React.createElement;
   const {status, button, card, empty, json, sceneName, questionText, planValue, planMarkdown,
@@ -7,10 +8,11 @@ export function createGalleryComponents({React, helpers}) {
   registeredCollectionProgress, currentGeneration, sceneCollectionProgress, annotationProducts,
   stageState, recordedStageState,
   STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries} = helpers;
+  /** 按媒体类型展示公开观察；JSON 异步读取，图片与视频保留加载错误和重试状态。 */
   function PublicObservation({src, type = 'image/*', label, compact = false, t}) {
     const [record, setRecord] = React.useState({loading: type === 'application/json', data: null, error: ''});
     const [attempt, setAttempt] = React.useState(0);
-    React.useEffect(() => {
+    React.useEffect(/** 在公开观察地址或类型变化时重置内容，按需读取 JSON，并在卸载时取消旧请求。 */ () => {
       setRecord({loading: type === 'application/json', data: null, error: ''});
       if (type !== 'application/json') return;
       const controller = new AbortController();
@@ -27,13 +29,16 @@ export function createGalleryComponents({React, helpers}) {
         button(t('retry'), () => setAttempt((value) => value + 1))) : type === 'application/json' ?
         record.loading ? empty(t('loading')) : json(record.data) : type.startsWith('image/') ?
           h('img', {className: 'bfw-observation', key: attempt, src, alt: label, loading: compact ? 'lazy' : undefined,
+            /** 将媒体加载失败转换为当前观察组件的可读错误状态。 */
             onError: () => setRecord({loading: false, data: null, error: t('readFailed')})}) :
           h('p', {className: 'bfw-muted'}, t('unsupportedObservation')));
   }
+  /** 优先选择样本媒体列表中的首张图片，兼容没有类型清单的旧数据。 */
   function firstImage(item) {
     const index = item.media_types ? item.media_types.findIndex((type) => type.startsWith('image/')) : 0;
     return item.media?.[index];
   }
+  /** 在模态对话框中展示题目及公开观察，关闭时把焦点还给打开按钮。 */
   function QuestionDialog({item,close,t}) {
     const ref=React.useRef(null);
     const presentation=item.question_presentation;
@@ -44,7 +49,8 @@ export function createGalleryComponents({React, helpers}) {
     },[]);
     const title='题目 '+(item.row_index+1);
     return h('dialog',{ref,className:'bfw-preview-dialog bfw-question-dialog','data-question-dialog':true,'aria-label':title,
-      onCancel:event=>{event.preventDefault();close();},onClick:event=>{if(event.target===ref.current)close();}},
+      /** 接管浏览器取消事件，通过组件统一关闭题目预览。 */
+      onCancel:event=>{event.preventDefault();close();},/** 仅在点击对话框背景时关闭预览，保留内容区交互。 */ onClick:event=>{if(event.target===ref.current)close();}},
       h('div',{className:'bfw-preview-header'},h('h2',null,title),button(t('previewClose'),close)),
       h('p',{className:'bfw-question','data-question-stem':true},presentation?.stem || questionText(item.question)),
       presentation && [['context','已知条件'],['conditions','作答规则'],['options','选项']].map(([key,label])=>
@@ -62,6 +68,7 @@ export function createGalleryComponents({React, helpers}) {
           h('a',{href:src,target:'_blank',rel:'noreferrer'},item.asset_names?.[index] || t('publicAssets')+' '+(index+1)))))),
       h('details',null,h('summary',null,t('details')),json({...item,media:undefined,media_types:undefined})));
   }
+  /** 按任务或场景把图片、视频归组为一个预览项目，补充适合展示的场景名。 */
   function sceneProjects(items) {
     const groups = new Map();
     for (const item of items.filter((row) => ['image', 'video'].includes(row.kind))) {
@@ -75,12 +82,13 @@ export function createGalleryComponents({React, helpers}) {
     for (const project of groups.values()) project.frames.sort((a, b) => (a.file || a.title || '').localeCompare(b.file || b.title || '', undefined, {numeric: true}));
     return [...groups.values()];
   }
+  /** 将场景项目显示为可打开预览的缩略卡片。 */
   function SceneGallery({items, preview, t}) {
     const projects = sceneProjects(items);
     if (!projects.length) return empty(t('artifactPending'));
     return h('div', {className: 'bfw-scene-projects'}, projects.map((project, index) => h('article', {
       className: 'bfw-preview-card bfw-scene-project', key: project.id, 'data-scene-project': project.id},
-      h('button', {type: 'button', className: 'bfw-preview-open', onClick: () => preview(project),
+      h('button', {type: 'button', className: 'bfw-preview-open', /** 打开当前场景项目的完整媒体预览。 */ onClick: () => preview(project),
         'aria-label': t('preview') + ' ' + t('sceneProject') + ' ' + (index + 1)},
         h('span', {className: 'bfw-scene-poster'}, project.video ? h('video', {src: project.video.url,
           poster: project.frames[0]?.url, preload: 'auto', muted: true, playsInline: true, 'aria-label': project.title}) :
@@ -90,6 +98,7 @@ export function createGalleryComponents({React, helpers}) {
         h('span', {className: 'bfw-muted'}, t(project.video ? 'sceneTour' : 'sceneViews') + ' · ' + t('recordedViews') + ': ' + project.frames.length)),
       h('p', {className: 'bfw-code'}, displayRef(project.title)))));
   }
+  /** 展示场景巡览视频及逐帧回退预览，切换项目时重置视图和错误状态。 */
   function SceneVideo({project, t}) {
     const [view, setView] = React.useState(0);
     const [error, setError] = React.useState('');
@@ -108,15 +117,17 @@ export function createGalleryComponents({React, helpers}) {
         project.frames.length > 0 && h('span', {className: 'bfw-muted'}, ' · 已切换到实拍视角')),
       hasVideo ? h('video', {key: videoUrl + ':' + attempt, src: videoUrl, poster: project.frames[0]?.url, preload: 'auto',
         controls: true, autoPlay: true, loop: true, muted: true, playsInline: true,
-        'aria-label': t('sceneTour'), onLoadedData: () => setError(''), onError: () => setError(t('artifactReadFailed'))}) : frameViews,
+        'aria-label': t('sceneTour'), /** 视频成功加载后清除旧的媒体错误。 */ onLoadedData: () => setError(''), /** 记录巡览加载失败，使组件展示可用帧及重试入口。 */ onError: () => setError(t('artifactReadFailed'))}) : frameViews,
       h('p', {className: 'bfw-muted'}, t(project.video ? 'sceneTour' : 'sceneViews') + ' · ' + t('recordedViews') + ': ' + project.frames.length));
   }
+  /** 展示可筛选分页的场景库，管理已选场景修订和是否允许新增场景。 */
   function SceneLibrary({record, selection, saving, error, choose, query, search, origin, filter, page, refresh, preview, t}) {
     const data = record.value;
     if (!data) return h('div', null, record.error ? h('p', {className: 'bfw-error', role: 'alert'}, record.error) : empty(t('loading')),
       button(t('retry'), refresh));
     const selected = selection?.selected || [];
     const busy = saving || record.loading;
+    /** 只增删当前页符合生产条件的场景，保留其他页已有选择。 */
     const changePage = (checked) => {
       const ids = new Set(data.items.map((row) => row.id));
       const kept = selected.filter((row) => !ids.has(row.id));
@@ -130,12 +141,13 @@ export function createGalleryComponents({React, helpers}) {
 
       h('div', {className: 'bfw-toolbar bfw-library-controls'},
         h('input', {className: 'bfw-input', type: 'search', 'aria-label': t('sceneSearch'), placeholder: t('sceneSearch'), value: query,
+          /** 把场景库控件的当前值传给对应的查询或选择操作。 */
           onChange: (event) => search(event.target.value)}),
         select(t('sceneOrigin'), origin, filter, [['all', t('all')], ['current', t('currentScenes')], ['history', t('historyScenes')]]),
         button(t('selectScenePage'), () => changePage(true), {disabled: busy || !data.items.some((row) => row.available)}),
         button(t('clearScenePage'), () => changePage(false), {disabled: busy || !selected.length})),
       h('label', {className: 'bfw-consent bfw-library-policy'}, h('input', {type: 'checkbox', checked: !!selection?.allow_new_scenes,
-        disabled: busy, onChange: (event) => choose(selected, event.target.checked)}), t('allowNewScenes')),
+        disabled: busy, /** 把场景库控件的当前值传给对应的查询或选择操作。 */ onChange: (event) => choose(selected, event.target.checked)}), t('allowNewScenes')),
       h('small', {className: 'bfw-hint'}, t('sceneSelectionHelp')),
       selection?.notice && h('small', {className: 'bfw-hint', role: 'status'}, selection.notice),
       error && h('p', {className: 'bfw-error', role: 'alert'}, error),
@@ -146,11 +158,11 @@ export function createGalleryComponents({React, helpers}) {
         return h('article', {className: 'bfw-preview-card bfw-scene-project' + (checked ? ' bfw-scene-selected' : ''), key: row.id,
           'data-scene-project': row.id, 'data-scene-selected': String(checked)},
           h('label', {className: 'bfw-scene-select'}, h('input', {type: 'checkbox', checked, disabled: busy || !row.available || row.production_eligible===false,
-            'aria-label': t('useScene') + ' ' + name, onChange: (event) => choose(event.target.checked
+            'aria-label': t('useScene') + ' ' + name, /** 按当前行和修订号更新场景选择，避免同一场景重复登记。 */ onChange: (event) => choose(event.target.checked
               ? [...selected.filter((reference) => reference.id !== row.id), {id: row.id, revision: row.revision}]
               : selected.filter((reference) => reference.id !== row.id), selection.allow_new_scenes)}), row.production_eligible===false ? '待物理与生活合理性验收' : t('useScene')),
           row.scene_style==='simplified_geometry' ? h('p', {className: 'bfw-muted'}, '简化几何实验 · ' + (row.geometry_purpose || '按计划测量')) : null,
-          h('button', {type: 'button', className: 'bfw-preview-open', disabled: !row.available, onClick: () => preview(project),
+          h('button', {type: 'button', className: 'bfw-preview-open', disabled: !row.available, /** 打开当前场景库条目的媒体预览。 */ onClick: () => preview(project),
             'aria-label': t('preview') + ' ' + name},
             h('span', {className: 'bfw-scene-poster'}, row.video ? h('video', {src: row.video.url, poster: row.frames[0]?.url,
               preload: 'metadata', muted: true, playsInline: true}) : row.frames.length ? h('img', {src: row.frames[0].url, alt: row.name, loading: 'lazy'}) :
@@ -168,17 +180,18 @@ export function createGalleryComponents({React, helpers}) {
       h('details', {className: 'bfw-library-location'}, h('summary', null, t('sceneStorage')),
         h('p', {className: 'bfw-code'}, data.catalog_path), h('p', {className: 'bfw-code'}, selection?.selection_path)));
   }
+  /** 根据产物类型显示媒体或结构化内容，管理异步加载并恢复触发元素焦点。 */
   function PreviewDialog({item, close, t}) {
     const ref = React.useRef(null);
     const [content, setContent] = React.useState(null);
     const [error, setError] = React.useState('');
-    React.useEffect(() => {
+    React.useEffect(/** 按预览内容设置模态焦点及可取消读取；清理时关闭对话框或结束旧请求。 */ () => {
       const dialog = ref.current;
       const trigger = document.activeElement;
       dialog.showModal();
       return () => {dialog.close(); trigger?.focus();};
     }, []);
-    React.useEffect(() => {
+    React.useEffect(/** 按预览内容设置模态焦点及可取消读取；清理时关闭对话框或结束旧请求。 */ () => {
       if (item.data || !item.url || ['image', 'video', 'file'].includes(item.kind)) return;
       const controller = new AbortController();
       fetch(item.url, {signal: controller.signal}).then(async (response) => {
@@ -189,7 +202,8 @@ export function createGalleryComponents({React, helpers}) {
     }, [item]);
     const data = item.data || content;
     return h('dialog', {ref, className: 'bfw-preview-dialog', 'aria-label': t('preview') + ' · ' + item.title,
-      onCancel: (event) => {event.preventDefault(); close();}, onClick: (event) => {if (event.target === ref.current) close();}},
+      /** 使用组件关闭流程响应预览对话框的取消操作。 */
+      onCancel: (event) => {event.preventDefault(); close();}, /** 仅在点击预览背景时关闭对话框。 */ onClick: (event) => {if (event.target === ref.current) close();}},
       h('div', {className: 'bfw-preview-header'}, h('h2', null, item.title), button(t('previewClose'), close)),
       item.kind === 'file' ? h('a', {href: item.url, download: true}, t('downloadFile')) :
         item.kind === 'scene' ? h(SceneVideo, {project: item, t}) : item.kind === 'image' ? h('img', {src: item.url, alt: item.title}) : item.kind === 'video' ?
@@ -208,6 +222,7 @@ export function createGalleryComponents({React, helpers}) {
               table(['物体','图像位置（像素）'],data.visible_objects.map((row,index)=>[row.label || '物体 '+(index+1),row.bbox_2d?.xyxy?.join(', ') || '—']))),
             h('details',null,h('summary',null,t('details')),json(data)))) : empty(t('loading')));
   }
+  /** 将阶段图片、视频和结构化产物整理为带可读标题的预览卡片。 */
   function ArtifactGallery({items, preview, t}) {
     if (!items.length) return empty(t('artifactPending'));
     return h('div', {className: 'bfw-gallery'}, items.map((saved,index) => {
@@ -216,7 +231,7 @@ export function createGalleryComponents({React, helpers}) {
       const item={...saved,title:(view ? '视角 '+(Number(view[1])+1)+' · '+kind : saved.title || kind+' '+(index+1))};
       return h('article', {className: 'bfw-preview-card', key: item.url || item.title,
       'data-preview-kind': item.kind},
-      h('button', {type: 'button', className: 'bfw-preview-open', onClick: () => preview(item), 'aria-label': t('preview') + ' ' + item.title},
+      h('button', {type: 'button', className: 'bfw-preview-open', /** 打开当前产物卡片对应的详细预览。 */ onClick: () => preview(item), 'aria-label': t('preview') + ' ' + item.title},
         item.kind === 'image' || item.image_url ? h('img', {src: item.image_url || item.url, loading: 'lazy', alt: item.title}) : item.kind === 'video' ?
           h('video', {src: item.url, preload: 'metadata', muted: true, 'aria-label': item.title}) :
           h('div', {className: 'bfw-document-thumb'}, h('span', null, item.kind === 'json' ? '{ }' : '≡'), h('span', null, item.title)),

@@ -9,9 +9,11 @@ export {Config};
 export const inject = [...pythonServices, 'benchforgeSessions'];
 export const name = 'benchmark-workflows-tools';
 
+/** 注册评测生产 Python 工具、原生准备委派入口和轮次结束时的交付文件复核。 */
 export function apply(ctx, config) {
   registerPythonTools(ctx, config, {definitions, schemas, module: 'server.cli'});
   const output = {schema: {type: 'object', additionalProperties: true},
+    /** 将准备操作的结构化结果转换为文本工具输出。 */
     render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]};
   ctx.on('agent/turn-stopping',createDeliveryFileReview({createMessage:createUserMessage}));
   ctx.tools.register(defineTool({name:'benchforge_prepare',description:'Prepare independent scene designs, annotation scripts or question shards in native continuable subagents. Binds the current parent and its saved plan, resolves the actual supported reasoning effort, preserves the model route and returns durable startup receipts. Create distinct output directories first. Workers only prepare; the parent merges, captures, verifies and opens the single user window for each completed stage. Startup acceptance is not a completed artifact.',parameters:{

@@ -2,6 +2,7 @@
 from copy import deepcopy
 
 
+# 复制并升级受支持的旧配置版本，合并规范提供方名称时拒绝冲突。
 def migrate_configuration(value):
     result = deepcopy(value)
     version = result.get('config_version')

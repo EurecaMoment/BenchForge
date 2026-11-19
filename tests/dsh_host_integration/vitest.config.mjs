@@ -11,12 +11,13 @@ const {defineConfig} = await import(pathToFileURL(require.resolve('vitest/config
 const ts = require('typescript');
 const config = ts.parseConfigFileTextToJson('tsconfig.base.json', readFileSync(path.join(native, 'tsconfig.base.json'), 'utf8'));
 if (config.error) throw new Error('Cannot read the native DSH source aliases');
+/** 转义路径中的正则特殊字符，构造精确的集成测试匹配规则。 */
 const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // Explicit source aliases also apply to BenchForge .mjs outside DSH's tree.
 // Loading old lib/ in that half of the graph would duplicate Cordis identities.
 const alias = Object.entries(config.config.compilerOptions.paths)
-  .sort(([a], [b]) => b.length - a.length)
-  .map(([name, values]) => ({find: new RegExp('^' + name.split('*').map(escape).join('(.*)') + '$'),
+  .sort(/** 优先匹配更长的原生源码别名，避免宽泛别名覆盖具体包路径。 */ ([a], [b]) => b.length - a.length)
+  .map(/** 将原生 TypeScript 路径转换为测试源码别名，避免混用旧构建产物造成模块身份重复。 */ ([name, values]) => ({find: new RegExp('^' + name.split('*').map(escape).join('(.*)') + '$'),
     replacement: path.resolve(native, values[0]).replaceAll('\\', '/').replace('*', '$1')}));
 alias.push({find: /^vitest$/, replacement: path.join(path.dirname(require.resolve('vitest/package.json')), 'dist/index.js')});
 alias.push({find: /^zod$/, replacement: require.resolve('zod')});

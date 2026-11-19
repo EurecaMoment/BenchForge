@@ -21,6 +21,7 @@ MODEL_FIELDS = {
 HTTP_FIELDS = {'url', 'model', 'token_env', 'timeout_seconds', 'request_defaults'}
 
 
+# 选择唯一配置了主模型的语言模型提供方，多主提供方同时启用时报错。
 def llm_provider_name(config):
     providers = config.get('providers', {})
     active = [name for name in LLM_PROVIDERS if providers.get(name, {}).get('model')]
@@ -29,24 +30,29 @@ def llm_provider_name(config):
     return active[0] if active else LLM_PROVIDER
 
 
+# 合并主模型设置与指定角色覆盖，返回独立配置对象。
 def selected_model(config, role):
     spec = dict(config.get('providers', {}).get(llm_provider_name(config), {}))
     roles = spec.pop('roles', {})
     return {**spec, **roles.get(role, {})}
 
 
+# 去除聊天完成端点后缀，得到兼容接口的基础地址。
 def llm_base_url(url):
     return url.rstrip('/').removesuffix('/chat/completions')
 
 
+# 按工具与模型提供方映射取得对应服务配置。
 def model_settings(config, tool):
     return config.get('providers', {}).get(MODEL_PROVIDERS[tool], {})
 
 
+# 取得规范 Isaac Sim 提供方的设置，未配置时返回空对象。
 def isaac_config(config):
     return config.get('providers', {}).get(ISAAC_PROVIDER, {})
 
 
+# 校验 gRPC 主机与端口并规范 IPv6 地址，返回可连接的端点。
 def isaac_endpoint(grpc):
     host = grpc.get('host')
     if (not isinstance(host, str) or not host or host.upper().startswith('YOUR_')
@@ -67,10 +73,12 @@ def isaac_endpoint(grpc):
     return f'{host}:{port}'
 
 
+# 读取原生采集超时，未指定时使用默认秒数。
 def capture_timeout(isaac):
     return isaac.get('capture_timeout_seconds', 1800)
 
 
+# 校验绝对 HTTP 服务基础地址，拒绝凭据、查询参数及片段。
 def _configured_url(value, field):
     try:
         parts = urlsplit(value) if isinstance(value, str) else None
@@ -83,6 +91,7 @@ def _configured_url(value, field):
     raise ValueError(f'{field} must be an absolute HTTP or HTTPS base URL without credentials')
 
 
+# 校验已知模型与仿真提供方的配置结构、端点、模型及允许字段。
 def validate_providers(config):
     providers = config['providers']
     if not isinstance(providers, dict):
@@ -159,11 +168,13 @@ def validate_providers(config):
         raise ValueError(f'providers.{ISAAC_PROVIDER}.capture_timeout_seconds must be a positive number')
 
 
+# 拒绝配置对象中超出指定允许集合的字段，指出出错配置位置。
 def _validate_fields(config, name, fields):
     if unknown := config.keys() - fields:
         raise ValueError(f'{name} has unknown settings: {", ".join(sorted(unknown))}')
 
 
+# 要求凭据通过合法环境变量名引用，拒绝直接嵌入令牌或 API 密钥。
 def _validate_token(config, name):
     token = config.get('token_env')
     if token is not None and (not isinstance(token, str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', token)):

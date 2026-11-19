@@ -23,6 +23,7 @@ from pipelines.scene_production.preflight import inspect_capture_program, read_c
 from service_access.access_scope import TrustedAccess, access_context, current_access
 
 
+# 构造使用显式上传原生机器人引用的场景夹具。
 def scene():
     return {'schema': 'benchforge.scene/v2', 'scene_id': 'native_test', 'title': 'Native uploaded robot',
             'objects': [{'id': 'robot', 'label': 'Uploaded robot', 'kind': 'native',
@@ -34,6 +35,7 @@ def scene():
 
 
 class NativeReferenceTests(unittest.TestCase):
+    # 创建临时工作区、仿真端点及可信访问身份，隔离原生引用归属测试。
     def setUp(self):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -42,6 +44,7 @@ class NativeReferenceTests(unittest.TestCase):
         self.access = TrustedAccess(AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1),
                                     str(self.root))
 
+    # 验证原生对象必须声明安全的上传引用，且校验不改动静态资源目录。
     def test_contract_requires_explicit_safe_upload_reference(self):
         original_catalog = deepcopy(ASSETS)
         program = scene()
@@ -67,6 +70,7 @@ class NativeReferenceTests(unittest.TestCase):
         self.assertIn('/objects/0/native_asset', {row['path'] for row in program_contract_issues(candidate)})
         self.assertEqual(ASSETS, original_catalog)
 
+    # 验证已授权上传资源无需绑定静态目录也能通过预检。
     def test_owned_native_asset_preflights_without_static_catalog_binding(self):
         program = scene()
         with access_context(self.access), patch('capabilities.isaac_sim.resource_access.NativeResources') as owner:
@@ -76,6 +80,7 @@ class NativeReferenceTests(unittest.TestCase):
             owner.return_value.require.assert_called_once_with('asset', 'upload-robot')
             self.assertEqual(report['runtime_checks']['status'], 'not_evaluated')
 
+    # 验证所有适配入口在资源归属校验失败时一致拒绝访问。
     def test_ownership_failure_blocks_all_adapter_entry_points(self):
         program = scene()
         with access_context(self.access), patch('capabilities.isaac_sim.resource_access.NativeResources') as owner:
@@ -89,6 +94,7 @@ class NativeReferenceTests(unittest.TestCase):
             report = inspect_capture_program(self.root, program, settings=self.settings, policy={})
             self.assertFalse(report['passed'])
 
+    # 验证原生资源身份可满足角色声明，但不自动证明关节控制能力。
     def test_native_identity_satisfies_declared_role_without_certifying_articulation(self):
         program = scene()
         design = {'id': 'robot_design', 'name': 'Uploaded robot', 'summary': 'A real robot on the floor',
@@ -108,6 +114,7 @@ class NativeReferenceTests(unittest.TestCase):
         report = inspect_capture_program(self.root, program, settings=self.settings, policy={'enforce_realism': True})
         self.assertIn('native_asset_scale', {row['code'] for row in report['issues']})
 
+    # 验证直接提交在任何持久写入前核对原生资源所有权。
     def test_direct_admission_checks_native_ownership_before_persistence(self):
         config = self.root / 'models.json'
         config.write_text(json.dumps({'providers': {'IsaacSim4A100': self.settings}}))
@@ -120,6 +127,7 @@ class NativeReferenceTests(unittest.TestCase):
                                                 [{'program': scene()}])
             owner.assert_called_once_with('127.0.0.1:50051')
 
+    # 验证后台编译恢复原任务所有者，并拒绝猜测的资源句柄。
     def test_queued_compile_recovers_owner_and_denies_guessed_handles(self):
         store = SimpleNamespace(root=self.root, repo=SimpleNamespace(engine=object()))
         task = {'id': 'run-a.scene0'}
@@ -133,6 +141,7 @@ class NativeReferenceTests(unittest.TestCase):
             owner.return_value.require.assert_called_once_with('asset', 'upload-robot')
             self.assertIsNone(current_access())
 
+    # 验证原生导入沿用现有 gRPC 契约并按源坐标轴解释尺寸。
     def test_native_import_uses_existing_grpc_contract_and_source_axis_dimensions(self):
         program = scene()
         obj = program['objects'][0]
@@ -153,6 +162,7 @@ class NativeReferenceTests(unittest.TestCase):
         self.assertEqual(changes[0]['scale'], [2, 2, 2])
         self.assertEqual(compiled['entities']['robot']['articulation_roots'], ['/World/Scene/Objects/robot/base'])
 
+    # 验证带 asset 前缀的原生句柄不会被误当成生成网格。
     @unittest.skipUnless(os.name == 'posix', 'Confined submission read requires Linux descriptors')
     def test_native_handle_named_asset_prefix_is_not_a_generated_mesh(self):
         program = scene()

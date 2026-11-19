@@ -19,12 +19,15 @@ const STAGES = [
   ['S3', /annotat|depth|normal|semantic|instance|ground.?truth|trajectory|episode|sensor|observation|(?:^|[_.-])collection(?:[_.-]|$)/i],
   ['S4', /question|dataset|benchmark|synthesi/i],
 ];
+/** 对产物拥有者与文件路径计算稳定摘要，作为当前会话中的文件标识。 */
 const identity = (owner, file) => createHash('sha256').update(JSON.stringify([owner, file])).digest('base64url');
+/** 判断真实文件路径是否位于指定工作区根目录内。 */
 const contains = (root, file) => {
   const relative = path.relative(root.path, file);
   return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
 
+/** 为产物选择最具体的授权根目录，并同时执行路径归属和场景删除策略校验。 */
 async function locate(ref, roots) {
   const file = await fs.realpath(ref.path);
   const root = roots.filter((row) => contains(row, file)).sort((a, b) => b.path.length - a.path.length)[0];
@@ -42,6 +45,7 @@ async function locate(ref, roots) {
   return {root, file, stat};
 }
 
+/** 解析所有授权根目录的真实路径，忽略已不存在的目录。 */
 async function canonicalRoots(roots) {
   return (await Promise.all(roots.map(async (root) => {
     try { return {...root, path: await fs.realpath(root.path)}; }
@@ -49,6 +53,7 @@ async function canonicalRoots(roots) {
   }))).filter(Boolean);
 }
 
+/** 合并会话族的显式文件证据；重复路径以父会话事实优先，再按事件序号排序。 */
 function references(evidence) {
   const files = new Map();
   for (const owner of evidence) for (const ref of owner.files) {
@@ -60,6 +65,7 @@ function references(evidence) {
   return [...files.values()].sort((a, b) => b.seq - a.seq);
 }
 
+/** 将原生会话文件证据转换为有界产物目录，附加格式、可读性及文件访问链接。 */
 export async function conversationProducts({sessionId, evidence, roots, maxArtifacts = 300, signal}) {
   roots = await canonicalRoots(roots);
   const refs = references(evidence), items = [];
@@ -90,6 +96,7 @@ export async function conversationProducts({sessionId, evidence, roots, maxArtif
 }
 
 /** Serve only a file proven by the current conversation projection; never accept a browser path. */
+/** 仅打开当前会话明确产生或交付的文件，校验归属并支持安全的媒体范围读取。 */
 export async function openConversationArtifact(id, {evidence, roots, request}) {
   const ref = references(evidence).find((row) => row.id === id);
   if (!ref) throw new ApiError('This file was not produced or delivered in the current conversation', 404);
@@ -122,6 +129,7 @@ export async function openConversationArtifact(id, {evidence, roots, request}) {
   } catch (error) { await handle.close(); throw error; }
 }
 
+/** 返回标准的不可满足字节范围响应，并声明文件完整大小。 */
 function rangeFailure(headers, size) {
   headers.set('content-range', 'bytes */' + size);
   return new Response(null, {status: 416, headers});

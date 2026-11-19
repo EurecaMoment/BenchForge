@@ -5,6 +5,7 @@ import path from 'node:path';
 export const fileReviewKind = 'benchforge-delivery-files';
 const sceneTools = new Set(['benchforge_capture', 'benchforge_refine', 'benchforge_run', 'benchforge_extend']);
 
+/** 检查交付文件及其目录中的视图元数据，识别未附带必要采集证据的交付。 */
 export async function inspectDeliveryFiles(files, cwd, signal) {
   const directories = new Set();
   const metadata = new Set();
@@ -16,6 +17,7 @@ export async function inspectDeliveryFiles(files, cwd, signal) {
     // A file presented at workspace root is not a declaration of the whole repo.
     if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) directories.add(directory);
   }
+  /** 递归查找交付目录中的视图元数据，并在每层响应取消。 */
   async function walk(directory) {
     signal.throwIfAborted();
     for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
@@ -48,8 +50,9 @@ export async function inspectDeliveryFiles(files, cwd, signal) {
   return { views, issues };
 }
 
+/** 在生产轮次结束时检查本轮已呈现的交付文件，发现缺少证据时向 Agent 发出修复提示。 */
 export function createDeliveryFileReview({ createMessage, inspect = inspectDeliveryFiles }) {
-  return async ({ agent, turn, signal }) => {
+  return /** 只复核本轮场景生产实际呈现的交付文件，缺失采集证据时注入修复通知。 */ async ({ agent, turn, signal }) => {
     signal.throwIfAborted();
     const events = agent.session.snapshotEvents();
     if (!events.some(e => e.type === 'tool/call' && sceneTools.has(e.data.name))) return;

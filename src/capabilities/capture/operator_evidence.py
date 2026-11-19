@@ -8,6 +8,7 @@ PUBLIC_RELEASE_FILES = {'release/'+name for name in (
     'model_bundle.json', 'model_bundle.zip', 'scene_bundle.zip', 'interaction_bundle.zip')}
 
 
+# 判断请求文件是否属于可向操作者公开的采集证据类型。
 def _allowed(name):
     return (name in {'program.json','submitted_program.json','program_handoff.json','proposal.json','repair_seed.json','scene_review.json','progress.json','geometry_preview.json','repair_context.json','repair_changes.json','data_selection.json','generation_stage.json',
                      'scene_preflight.json','scene_admission.json','scene_acceptance.json','scene_brief.json','scene_brief_alignment.json',
@@ -23,6 +24,7 @@ def _allowed(name):
             or bool(re.fullmatch(r'generation/[a-zA-Z0-9_-]+/(?:reference\.png|input_mask\.png)',name)))
 
 
+# 在任务、版本和工作区权限范围内列出或读取采集证据文件。
 def evidence(store,task_id,revision=None,file=None,workspace_id=None):
     snapshot=store.snapshot(task_id.split('.')[0])
     task=next((t for t in snapshot['tasks'] if t['id']==task_id),None)

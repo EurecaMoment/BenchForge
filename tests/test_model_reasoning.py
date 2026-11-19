@@ -12,6 +12,7 @@ from service_access.runtime_config import apply_runtime_environment, load_servic
 
 
 class ModelReasoningTests(unittest.TestCase):
+    # 验证配置的推理强度传至有界评审请求，且不会关闭模型思考。
     def test_configured_effort_reaches_bounded_review_without_disabling_thinking(self):
         with TemporaryDirectory() as temporary, patch.dict(os.environ, {}, clear=True):
             root = Path(temporary)
@@ -23,6 +24,7 @@ class ModelReasoningTests(unittest.TestCase):
             config.write_text(json.dumps({'execution_mode': 'exploration', 'models_config': 'models.json'}))
             apply_runtime_environment(load_service_config(config, required_tokens=()))
             bodies = []
+            # 捕获模型请求正文并返回最小流式 JSON 完成事件，供推理参数断言。
             def respond(request, **_):
                 bodies.append(json.loads(request.data))
                 event = {'choices': [{'delta': {'content': '{"passed":true}'}, 'finish_reason': 'stop'}]}

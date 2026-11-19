@@ -1,12 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/** 读取已配置的模型提供方列表；配置未指定或文件不存在时返回空映射。 */
 export async function configuredProviders(configPath) {
   if (!configPath) return {};
   try { return JSON.parse(await fs.readFile(path.resolve(configPath), 'utf8')).providers || {}; }
   catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
 }
 
+/** 选择唯一的主语言模型提供方，再叠加指定角色的配置覆盖。 */
 export function modelRole(providers, role) {
   const configured = ['DSpark4A100','FastQwen'].map(name=>providers[name]).filter(spec=>spec?.model);
   if (configured.length > 1) throw new Error('Configure one primary language model provider; use roles for overrides');
@@ -15,6 +17,7 @@ export function modelRole(providers, role) {
 }
 
 // Only the tool consuming this provider receives its configured credential.
+/** 校验模型凭据变量名，并从可信环境快照补入该凭据。 */
 export function providerEnvironment(base, snapshot, tokenName) {
   if (!tokenName) return base;
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tokenName)) throw new Error('Invalid provider credential variable');

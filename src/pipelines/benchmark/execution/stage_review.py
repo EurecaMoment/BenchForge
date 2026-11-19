@@ -7,6 +7,7 @@ from capabilities.benchmark_design.stages import STAGES
 from storage.operation_outputs import operation_workspace
 
 
+# 处理工具层阶段评审请求，开启时由实际产物计算身份并调用统一评审服务。
 def call(args, directory, config=None):
     workspace = str(operation_workspace(directory))
     session = args.get('_dsh_context',{}).get('session_id')

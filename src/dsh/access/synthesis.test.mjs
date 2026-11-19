@@ -6,11 +6,11 @@ import test from 'node:test';
 import {WorkspaceBindings} from './workspaces.mjs';
 import {createSynthesisSessions} from '../workbench/sessions/synthesis.mjs';
 
-test('preparation starts a native child in its independent root with only frozen explicit inputs', async t => {
+test('preparation starts a native child in its independent root with only frozen explicit inputs', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：preparation starts a native child in its independent root with only frozen explicit inputs。 */ async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'bf-preparation-'));
   t.after(() => fs.rm(temp, {recursive: true, force: true}));
   const rows = new Map(), bindings = new WorkspaceBindings({
-    table: {get: key => rows.get(key), put: async (key, value) => rows.set(key, structuredClone(value))},
+    table: {/** 按测试键读取内存记录或模拟服务。 */ get: key => rows.get(key), /** 保存测试记录的副本，模拟持久化写入并防止引用共享。 */ put: async (key, value) => rows.set(key, structuredClone(value))},
     hostId: 'host', ownerId: 'owner', workspaceRoot: path.join(temp, 'workspaces'), resourceRoot: path.join(temp, 'resources'),
   });
   await bindings.initialize();
@@ -23,10 +23,10 @@ test('preparation starts a native child in its independent root with only frozen
   await fs.writeFile(plan, '{"frozen":true}'); await fs.writeFile(draft, 'print(1)');
   const starts = [], services = {
     agents: new Map([['parent', parent]]), benchforgeAccess: bindings,
-    llm: {resolveModelInfo: async () => ({reasoning: {efforts: [{id: 'low'}]}})},
-    subagents: {startActivation: async spec => {starts.push(spec); return {childId: spec.childId, messageId: 'message'};}},
+    llm: {/** 返回用例声明的模型推理能力，验证子任务的能力选择。 */ resolveModelInfo: async () => ({reasoning: {efforts: [{id: 'low'}]}})},
+    subagents: {/** 记录原生子会话激活请求，并回显确定的子会话与消息标识。 */ startActivation: async spec => {starts.push(spec); return {childId: spec.childId, messageId: 'message'};}},
   };
-  const preparation = createSynthesisSessions({ctx: {get: key => services[key]}, workspacePath: root});
+  const preparation = createSynthesisSessions({ctx: {/** 按测试键读取内存记录或模拟服务。 */ get: key => services[key]}, workspacePath: root});
   const request = {parentId: 'parent', batchKey: 'one', planPath: plan,
     tasks: [{key: 'task', label: 'Task', prompt: 'Repair input', outputDirectory: output, inputFiles: [draft]}]};
   const result = await preparation.start(request);

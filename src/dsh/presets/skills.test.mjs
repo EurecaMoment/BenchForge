@@ -9,7 +9,7 @@ import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../skills');
 
-test('native DSH discovery loads packaged component skills and their references', async () => {
+test('native DSH discovery loads packaged component skills and their references', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：native DSH discovery loads packaged component skills and their references。 */ async () => {
   const ctx = new Context();
   try {
     await ctx.plugin(SkillRegistry);

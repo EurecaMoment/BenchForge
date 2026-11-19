@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createWorkbenchRequest} from './api.js';
 
-test('workbench queries use typed Remote methods; mutations retain the write contract', async () => {
+test('workbench queries use typed Remote methods; mutations retain the write contract', /** 验证工作台数据读取、生产配置和阶段展示在该用例中的具体边界，完成准备、调用和结果断言。用例：workbench queries use typed Remote methods; mutations retain the write contract。 */ async () => {
   const calls = [], signal = new AbortController().signal;
   const remote = {benchforgeWorkbench: Object.fromEntries(
     ['stageReview', 'progress', 'sceneArtifacts', 'write'].map(method => [method, async (...args) => {

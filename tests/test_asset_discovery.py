@@ -12,6 +12,7 @@ from capabilities.asset_generation.mesh_input import validate_mesh_input
 
 
 class AssetDiscoveryTests(unittest.TestCase):
+    # 验证目录仅把部署已绑定的原生资源标为可用，避免将内置名称当成安装证明。
     def test_catalog_does_not_claim_unbound_assets_are_installed(self):
         request = {'section': 'native_assets', 'item_id': 'mug'}
         store = SimpleNamespace(root=Path('.'))
@@ -26,6 +27,7 @@ class AssetDiscoveryTests(unittest.TestCase):
         self.assertEqual(bound['availability'], 'configured')
         self.assertIn('require native evidence', bound['availability_basis'])
 
+    # 验证静态网格导入在快照和转换前拒绝可能丢失关节语义的 USD 输入。
     def test_usd_rejected_before_input_snapshot_or_conversion(self):
         tools = Mock()
         with self.assertRaisesRegex(ValueError, 'does not preserve articulation'):
@@ -35,6 +37,7 @@ class AssetDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'native_asset'):
                 GenerationTools.import_asset(tools, 'drone.usd', {}, '.', Mock())
 
+    # 验证静态网格支持格式大小写兼容，并明确拒绝原生容器和未知扩展名。
     def test_static_formats_have_explicit_support(self):
         for suffix in ('GLB', 'gltf', 'obj', 'ply', 'stl'):
             validate_mesh_input('asset.' + suffix)

@@ -10,6 +10,7 @@ const released = new Set(['elapsed','continued']);
 const gateStates = new Set(['planned','running','incomplete',...pending]);
 
 /** Only domain receipts supply state; a local clock never releases a review. */
+/** 合并并校验阶段复核快照，只保留已知状态及有效标识和版本字段。 */
 export function reviewSnapshot(receipt, previous) {
   if (!receipt || ![...pending,...released,'superseded'].includes(receipt.state)) return null;
   const parsed = ReviewSnapshot.safeParse({...previous,...receipt,
@@ -18,11 +19,13 @@ export function reviewSnapshot(receipt, previous) {
   return parsed.success ? parsed.data : null;
 }
 
+/** 将有效复核快照包装为通知来源，并保存前一次复核标识。 */
 export function reviewNotice(receipt, previous) {
   const review = reviewSnapshot(receipt, previous);
   return review ? {review, previousReviewId:previous?.review_id} : {};
 }
 
+/** 判断通知是否仍对应当前复核，拒绝旧复核或较低版本覆盖新状态。 */
 export function currentReviewSnapshot(current, review, {previousReviewId, allowNewReview=false}={}) {
   if (!current) return allowNewReview;
   if (current.review_id !== review.review_id)
@@ -32,6 +35,7 @@ export function currentReviewSnapshot(current, review, {previousReviewId, allowN
     review.revision !== undefined && review.revision >= current.revision;
 }
 
+/** 仅把仍然有效的复核通知合入当前视图，并同步门禁相关的生产状态。 */
 export function reviewChanges(view, source) {
   const current = view.review, parsed = ReviewSnapshot.safeParse(source?.review);
   if (!current || !parsed.success) return {};

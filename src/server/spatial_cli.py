@@ -21,9 +21,11 @@ OPERATIONS = {
 }
 
 class Runtime(WorkspaceJobs):
+    # 将空间学习工具请求分派给登记的操作实现并传入配置。
     def execute(self, tool, args, directory):
         return OPERATIONS[tool](args, directory, self.config)
 
+# 解析空间学习命令和 JSON 输入，在指定工作区执行并输出结果。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('tool', choices=[*OPERATIONS, 'status'])

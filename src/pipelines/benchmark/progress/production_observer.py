@@ -18,6 +18,7 @@ from service_access.scene_service import production_observation
 from capabilities.scene_library.observations import saved_scene_identity
 
 
+# 在指定字节上限内读取并解析进度 JSON，超出上限时报错。
 def bounded_json(path, limit=2 * 1024 * 1024):
     with Path(path).open('rb') as handle:
         data = handle.read(limit + 1)
@@ -26,12 +27,14 @@ def bounded_json(path, limit=2 * 1024 * 1024):
     return json.loads(data)
 
 
+# 返回规范路径、文件大小和纳秒修改时间，标识进度输入版本。
 def file_version(path):
     path = Path(path).resolve()
     stat = path.stat()
     return {'path': str(path), 'bytes': stat.st_size, 'mtime_ns': stat.st_mtime_ns}
 
 
+# 将进度引用限制在指定工作区内，拒绝符号链接及越界路径。
 def workspace_file(workspace, value):
     workspace = Path(workspace).resolve()
     path = Path(value)
@@ -44,6 +47,7 @@ def workspace_file(workspace, value):
     return path
 
 
+# 跨平台检查正整数进程号是否仍存活，在 Linux 排除僵尸和已终止进程。
 def process_alive(pid):
     if type(pid) is not int or pid < 1:
         return False
@@ -65,6 +69,7 @@ def process_alive(pid):
     return None
 
 
+# 依据计划目标及已登记来源读取生成计数，限制目录范围以避免扫描完整采集树。
 def generation_progress(workspace, session, plan, reference, family=None):
     expected = plan.get('inputs', {}).get('target_items')
     if type(expected) is not int or expected < 1:
@@ -164,6 +169,7 @@ def generation_progress(workspace, session, plan, reference, family=None):
     return None
 
 
+# 读取当前计划的有界登记与计数，生成集合和问题生成进度而不遍历大型采集。
 def current_production_progress(config, workspace, session):
     """Read bounded current-plan registrations and counters without scanning captures."""
     if not workspace or not re.fullmatch(r'session-[a-zA-Z0-9-]+', session):
@@ -246,6 +252,7 @@ def current_production_progress(config, workspace, session):
         return fallback
 
 
+# 合并本地登记与服务运行观测，限制运行数并在部分查询失败时保留可用进度。
 def observe(config, session, run_ids, sessions=(), workspace=None):
     local = current_production_progress(config, workspace, session)
     registered = [row['run_id'] for row in local.get('current_collection', {}).get('rows', []) if row.get('run_id')]
@@ -260,6 +267,7 @@ def observe(config, session, run_ids, sessions=(), workspace=None):
     ids = list(dict.fromkeys(registered + [row['id'] for row in rows] + run_ids))[:12]
     workflows = {row['id']: row['workflow'] or 'scene' for row in rows}
 
+    # 读取单次运行的生产生命周期字段，过滤可能含私有答案的完整结果。
     def read(run_id):
         try:
             value = production_observation(config, run_id)

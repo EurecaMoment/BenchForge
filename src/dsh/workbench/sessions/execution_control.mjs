@@ -1,21 +1,27 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/** 检查会话工作目录是否位于请求指定的真实工作区内。 */
 const within = (root, value) => {
   const relative = path.relative(root, value);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
+/** 只保留模型提供方、模型及推理强度字段，形成可比较的请求路由。 */
 const route = value => value && Object.fromEntries(['provider','model','reasoningEffort'].filter(key => value[key] !== undefined).map(key => [key,value[key]]));
+/** 比较两个模型请求路由的提供方、模型和推理强度是否一致。 */
 const same = (a,b) => a?.provider === b?.provider && a?.model === b?.model && a?.reasoningEffort === b?.reasoningEffort;
 
 // One deliberate change at the next native request. A later user's model
 // selection is left to DSH; no default-model setting or second selection
 // middleware is installed. The admitted request/header is the proof of use.
+/** 创建父生产会话的推理强度与历史压缩控制器，持久化状态并绑定宿主清理。 */
 export function createExecutionTuning({ctx, pairing}) {
   const records = new Map(), files = new Map(), writes = new Map(), compacting = new Set();
   const forwardedSummaries=new WeakSet();
   const controller = new AbortController();
+  /** 构造带响应状态的执行配置错误。 */
   const error = (message,status=400) => Object.assign(new Error(message),{status});
+  /** 串行且原子地保存单个会话的执行配置状态，避免并发覆盖。 */
   async function save(id, value) {
     records.set(id,value);
     const file=files.get(id), previous=writes.get(id) || Promise.resolve();
@@ -29,6 +35,7 @@ export function createExecutionTuning({ctx, pairing}) {
     writes.set(id,operation);
     try {await operation;} finally {if(writes.get(id)===operation)writes.delete(id);}
   }
+  /** 核验原生父 Agent 可用且属于指定工作区，防止调整其他会话或子会话。 */
   async function owner(root,id) {
     if(!/^session-[A-Za-z0-9-]+$/.test(id || ''))throw error('A current production conversation is required');
     const agent=ctx.get('agents')?.get(id);
@@ -42,6 +49,7 @@ export function createExecutionTuning({ctx, pairing}) {
     }
     return agent;
   }
+  /** 等待已登记会话真正空闲后执行历史压缩，并确认 Agent 身份仍未变化。 */
   async function compactWhenIdle(agent) {
     const id=agent.id, record=records.get(id);
     if(!record?.compact || record.compact.state !== 'waiting_for_idle' || compacting.has(id))return;
@@ -73,6 +81,7 @@ export function createExecutionTuning({ctx, pairing}) {
       await save(id,{...records.get(id),compact:{state:e.code==='busy'?'waiting_for_idle':'failed',error:e.message,finished_at:Date.now()}});
     } finally {compacting.delete(id);}
   }
+  /** 在原生步骤边界按当前计量执行历史压缩，能力不可用时转为空闲后处理。 */
   async function compactAtBoundary({agent,signal}) {
     const id=agent.id,record=records.get(id);
     if(record?.compact?.state !== 'waiting_for_boundary' || compacting.has(id))return;
@@ -109,7 +118,7 @@ export function createExecutionTuning({ctx, pairing}) {
     } finally {compacting.delete(id);}
   }
   const disposers=[
-    ctx.on('llm/stream',function(options,next) {
+    ctx.on('llm/stream',/** 仅为当前压缩引擎的辅助请求追加摘要长度要求，保留原路由、历史前缀和提供方流。 */ function(options,next) {
       const record=records.get(options.sessionId);
       if(forwardedSummaries.has(options) || options.purpose!=='compaction' || Object.isFrozen(options) ||
         !['waiting_for_boundary','waiting_for_idle','running'].includes(record?.compact?.state) ||
@@ -125,10 +134,10 @@ export function createExecutionTuning({ctx, pairing}) {
       forwardedSummaries.add(replaced);
       return this.stream(replaced);
     },{prepend:true}),
-    ctx.on('agent/pre-step',async(input,next)=>{
+    ctx.on('agent/pre-step',/** 在步骤边界执行已登记的安全历史压缩，然后继续原生准入链。 */ async(input,next)=>{
       await compactAtBoundary(input);return next();
     },{prepend:true}),
-    ctx.on('agent/request',async({agent,turn,step,signal},next)=>{
+    ctx.on('agent/request',/** 仅在模型路由仍匹配登记版本时应用目标推理强度，并保存待确认状态。 */ async({agent,turn,step,signal},next)=>{
       const resolved=await next(), record=records.get(agent.id);
       if(!record || !['requested','prepared'].includes(record.state))return resolved;
       if(!same(route(resolved),record.from)) {
@@ -139,16 +148,17 @@ export function createExecutionTuning({ctx, pairing}) {
       await save(agent.id,{...record,state:'prepared',prepared_turn:turn,prepared_step:step});
       return {...resolved,reasoningEffort:record.selected.reasoningEffort};
     },{prepend:true}),
-    ctx.on('session/event',async(session,event)=>{
+    ctx.on('session/event',/** 原生请求头确实采用目标路由后，将执行调整标记为已生效。 */ async(session,event)=>{
       const record=records.get(session.id);
       if(event.type==='request/header' && record?.state==='prepared' && same(route(event.data.header.config),record.selected))
         await save(session.id,{...record,state:'applied',applied_at:event.time,request_seq:event.seq});
     }),
-    ctx.on('agent/status',({agent,status})=>{
+    ctx.on('agent/status',/** Agent 转为空闲时尝试完成已登记的空闲压缩。 */ ({agent,status})=>{
       if(status==='idle')void compactWhenIdle(agent);
     }),
   ];
   return {
+    /** 验证模型支持目标推理强度后登记调整，并按请求安排安全的历史压缩。 */
     async arm(root,id,{reasoning_effort,compact_history=false},signal) {
       if(typeof reasoning_effort !== 'string' || !reasoning_effort.trim() || reasoning_effort.length>64)
         throw error('A supported reasoning effort is required');
@@ -170,10 +180,12 @@ export function createExecutionTuning({ctx, pairing}) {
       if(agent.status==='idle')void compactWhenIdle(agent);
       return {...record,receipt_path:files.get(id)};
     },
+    /** 读取当前模型配置、可选推理强度和最近执行调整状态。 */
     async observe(root,id) {
       const agent=await owner(root,id), events=agent.session.snapshotEvents().slice(-100);
       const config=agent.session.requestHeader?.()?.config;
       const sharedLlm=ctx.get('llm'), sessionLlm=agent.ctx?.get('llm') || sharedLlm;
+      /** 从指定模型注册表查询当前模型支持的推理强度，查询失败时返回未知。 */
       const efforts=async llm=>{
         try {
           if(!config?.provider || !config?.model || !llm?.resolveModelInfo)return [];
@@ -256,6 +268,7 @@ export function createExecutionTuning({ctx, pairing}) {
         current_activity:current,
         last_event:events.length?{type:events.at(-1).type,time:events.at(-1).time}:null};
     },
+    /** 取消后台调整、释放事件订阅，并等待已发起的状态写入结束。 */
     async dispose() {
       controller.abort();for(const dispose of disposers)dispose();
       await Promise.allSettled([...writes.values()]);

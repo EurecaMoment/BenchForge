@@ -23,6 +23,7 @@ from capabilities.scene_authoring.contracts.requirements import scene_requiremen
 
 
 class ProductionContractTests(unittest.TestCase):
+    # 验证场景验收保留原生身份要求，把轨迹与样本要求留给真实采集阶段。
     def test_scene_review_keeps_identity_but_defers_trajectory_evidence_to_collection(self):
         design = {'hard_requirements':['Import a recognizable articulated robot','Record 100 trajectories','Deliver the archive'],
                   'requirement_stages':['S2','S3','S5']}
@@ -31,6 +32,7 @@ class ProductionContractTests(unittest.TestCase):
             scene_requirements({**design,'requirement_stages':['S3']})
         self.assertEqual(len(scene_requirements({'hard_requirements':['A furnished room']})),1)
 
+    # 验证机器人测量要求显式资源身份，同时允许声明清楚的几何实验。
     def test_robot_measurement_requires_explicit_asset_identity_without_banning_geometry_experiments(self):
         scenes = {'designs':[{'id':'room','object_roles':[{'object_id':'dog','role':'Robot'}]}]}
         with self.assertRaisesRegex(ValueError, 'articulated_robot'):
@@ -44,16 +46,19 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'cannot replace required native assets'):
             validate_asset_requirements(scenes,robot_locomotion=True)
 
+    # 建立独立生产契约数据库与临时产物目录。
     def setUp(self):
         self.database_url = use_postgres(self)
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.addCleanup(self.temp.cleanup)
 
+    # 构造最小问题生产和打包步骤，供自动阶段补全测试。
     def recipe(self):
         return [{'id': 'questions', 'uses': 'templates.produce', 'arguments': {'evidence': '$inputs.evidence'}},
                 {'id': 'package', 'uses': 'data.package', 'arguments': {'dataset': '$questions.dataset'}}]
 
+    # 验证默认补全计划具有所有生产阶段及必要依赖。
     def test_default_plan_has_all_stage_dependencies(self):
         steps = complete_production_steps(self.recipe())
         validate_production_steps(steps)
@@ -62,6 +67,7 @@ class ProductionContractTests(unittest.TestCase):
         self.assertEqual(steps[2]['arguments']['evidence'], '$collection.evidence')
         self.assertEqual(steps[1]['uses'], 'collection.validate')
 
+    # 验证 S2 按唯一场景计数，不能用修订、轨迹或条目数量充数。
     def test_s2_counts_scenes_not_revisions_trajectories_or_items(self):
         sources = [{'task_id': 'sf_scene.scene0', 'revision': index} for index in range(100)]
         accepted = [{**row, 'scene_group_id': 'same-scene'} for row in sources]
@@ -73,6 +79,7 @@ class ProductionContractTests(unittest.TestCase):
         self.assertEqual(result['accepted'], 1)
         self.assertEqual(result['required'], 2)
 
+    # 验证阶段归属由操作语义决定，误导性 review_stage 标签不生效。
     def test_semantic_stage_wins_over_misleading_review_labels(self):
         steps = complete_production_steps(self.recipe())
         for step in steps:
@@ -81,12 +88,14 @@ class ProductionContractTests(unittest.TestCase):
         self.assertEqual(scope['members']['S3'][0]['uses'], 'collection.validate')
         self.assertEqual(scope['members']['S4'][0]['uses'], 'templates.produce')
 
+    # 验证伪造阶段标签不能掩盖缺失的验收和采集依赖。
     def test_review_labels_cannot_hide_missing_dependencies(self):
         steps = self.recipe()
         steps[0]['review_stage'] = 'S2'
         with self.assertRaisesRegex(ValueError, 'S4'):
             validate_production_steps(steps)
 
+    # 验证不满足当前生产契约的旧计划在问题生成前停止。
     def test_old_saved_plan_is_blocked_before_question_generation(self):
         file = self.root / 'plan.json'
         file.write_text(json.dumps({'steps': self.recipe(), 'assessment': {'execution': ['S1', 'S2', 'S3', 'S4', 'S5']}, 'inputs': {}}))
@@ -96,6 +105,7 @@ class ProductionContractTests(unittest.TestCase):
         self.assertEqual(result['state'], 'needs_plan_revision')
         producer.assert_not_called()
 
+    # 验证机器人轨迹目标不能通过声明关闭必需的原生回合要求。
     def test_robot_trajectory_objective_cannot_disable_native_episode_requirements(self):
         directory = self.root / 'operations' / 'plan-test'
         args = {'objective': '生产100条机器狗在室内探索的轨迹数据',
@@ -114,6 +124,7 @@ class ProductionContractTests(unittest.TestCase):
                                  'key': saved['stage_review_key'], 'artifact': result['plan']}, directory)
         self.assertEqual(reopened['review_id'], result['stage_review']['review_id'])
 
+    # 验证公开采集文件变化后，原服务验收回执失效。
     def test_public_capture_file_changes_invalidate_service_acceptance(self):
         store, folder, task = self.service()
         file = folder / 'capture/view_0.png'
@@ -124,6 +135,7 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'artifact changed'):
             accepted_scenes(store, [{'task_id': 'sf_example.scene0', 'revision': 0}])
 
+    # 构造与实际文件版本绑定的服务验收夹具，并允许模拟验收失败。
     def service(self, passed=True):
         folder = self.root / 'sf_example.scene0/revision_0'
         versions = {}
@@ -137,16 +149,19 @@ class ProductionContractTests(unittest.TestCase):
                 'result': {'scene_review': {'passed': passed, 'production_acceptance': receipt}}}
         class Store:
             root = self.root
+            # 返回本夹具任务快照，供服务权威来源验证。
             def snapshot(self, _run):
                 return {'tasks': [task]}
         return Store(), folder, task
 
+    # 验证手写本地通过标志不能覆盖生产服务报告的失败。
     def test_handwritten_acceptance_cannot_override_service_failure(self):
         store, folder, _task = self.service(passed=False)
         (folder / 'scene_acceptance.json').write_text('{"passed":true,"enforced":true}')
         with self.assertRaisesRegex(ValueError, 'service acceptance'):
             accepted_scenes(store, [{'task_id': 'sf_example.scene0', 'revision': 0}])
 
+    # 验证修改本地版本说明不能使已变化证据重新获得验收。
     def test_changed_evidence_cannot_be_reapproved_with_a_local_version_edit(self):
         store, folder, task = self.service()
         changed = folder / 'capture/evidence.json'
@@ -157,15 +172,18 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'evidence changed'):
             accepted_scenes(store, [{'task_id': 'sf_example.scene0', 'revision': 0}])
 
+    # 验证已验收场景组身份由服务回执提供。
     def test_accepted_scene_identity_comes_from_service(self):
         store, _folder, _task = self.service()
         result = accepted_scenes(store, [{'task_id': 'sf_example.scene0', 'revision': 0}])
         self.assertEqual(result['scenes'][0]['scene_group_id'], 'scene-v1:sf_example.scene0')
         self.assertEqual(result['scenes'][0]['split'], 'train')
 
+    # 验证重复引用相同场景的条目共用一次批量验收请求。
     def test_repeated_items_share_one_batched_acceptance_query(self):
         store, _folder, _task = self.service()
         calls = []
+        # 记录验收路由调用次数并转发到服务夹具。
         def call(route, value, _config):
             calls.append(route)
             return accepted_scenes(store, value['scene_sources'])
@@ -176,11 +194,13 @@ class ProductionContractTests(unittest.TestCase):
             receipts.for_record({'provenance': source})
         self.assertEqual(calls, ['/production/acceptance'])
 
+    # 验证选择题答案使用的选项编号必须出现在公开题面中。
     def test_choice_ids_must_be_visible_to_answerer(self):
         with self.assertRaisesRegex(ValueError, 'public option IDs'):
             validate_choice({'output_kind': 'choice'}, {'choice_id': 'A'}, {'options': ['左转', '右转']})
         validate_choice({'output_kind': 'choice'}, {'choice_id': 'A'}, {'options': ['A: 左转', 'B: 右转']})
 
+    # 验证已验收但未获用户选择的场景不能替换冻结选择。
     def test_accepted_but_unselected_scene_cannot_replace_saved_selection(self):
         receipt = {'task_id': 'sf_unselected.scene0', 'revision': 0, 'scene_design': {'id': 'other'}}
         assessment = {'scenes': {'allow_new_scenes': False,
@@ -188,6 +208,7 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'selection'):
             validate_planned_scenes([receipt], assessment)
 
+    # 验证新采集不仅场景编号一致，还须匹配完整设计要求。
     def test_new_capture_must_match_the_complete_scene_design(self):
         design = {'id': 'room', 'name': '室内房间', 'hard_requirements': ['保留走廊']}
         assessment = {'scenes': {'allow_new_scenes': True, 'designs': [design]}}
@@ -197,6 +218,7 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'saved scene design'):
             validate_planned_scenes([source], assessment)
 
+    # 验证静态场景或相机运动不能冒充机器人控制回合。
     def test_episode_claim_cannot_use_static_scene_or_camera_motion_as_robot_control(self):
         with self.assertRaisesRegex(ValueError, 'intermediate states'):
             validate_native_episode({'provenance': {'native_episode_id': 'walk'}}, {}, required=True)
@@ -204,6 +226,7 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Camera recording'):
             validate_native_episode({'provenance': {'native_episode_id': 'camera'}}, receipt, required=True, interaction=True)
 
+    # 验证机器人回合绑定明确原生执行体，且状态序列真实递增。
     def test_robot_episode_requires_a_named_native_actor_and_increasing_states(self):
         record = {'provenance': {'native_episode_id': 'walk', 'robot_actor_id': 'dog-1'}}
         episode = {'id': 'walk', 'action': 'robot_locomotion', 'robot_id': 'dog-1', 'succeeded': True,
@@ -221,6 +244,7 @@ class ProductionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'steps must increase'):
             validate_native_episode(record, receipt, required=True, robot_locomotion=True)
 
+    # 验证仅有轨迹端点或被重写的文件不足以获得轨迹验收。
     def test_trajectory_endpoints_and_rewritten_files_are_not_accepted(self):
         _store, folder, task = self.service()
         trajectory = folder / 'capture/trajectory.json'

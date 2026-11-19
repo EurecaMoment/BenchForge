@@ -11,6 +11,7 @@ SESSION_ID = re.compile(r'session-[A-Za-z0-9-]+')
 SCENE_PAGE_SIZE = 200
 
 
+# 提供带短语句超时的只读数据库连接，供工作台查询使用。
 @contextmanager
 def read_connection(engine):
     with engine.connect() as connection:
@@ -19,6 +20,7 @@ def read_connection(engine):
         yield connection
 
 
+# 校验主会话及至多八个关联会话后，读取最近的运行摘要。
 def recent_session_runs(connection, request):
     """Find recent runs for the supplied DSH session IDs."""
     if not isinstance(request, dict) or set(request) - {'session_id', 'related_session_ids'}:
@@ -40,6 +42,7 @@ def recent_session_runs(connection, request):
     return {'runs': [dict(row) for row in rows]}
 
 
+# 按稳定时间和任务编号游标分页读取共享场景库，并严格校验游标结构。
 def completed_scene_page(connection, request):
     """Page through the shared scene library using stable task and time keys."""
     if not isinstance(request, dict) or set(request) - {'after'}:

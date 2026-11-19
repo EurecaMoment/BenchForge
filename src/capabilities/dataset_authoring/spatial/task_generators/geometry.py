@@ -5,16 +5,21 @@ from capabilities.dataset_authoring.spatial.scenes import bbox
 from capabilities.dataset_authoring.spatial.scenes import rotate
 
 
+# 计算两个点之间的欧氏距离。
 def distance(a,b):return math.dist(a,b)
+# 由对象的二维尺寸计算矩形面积。
 def area(o):return math.prod(o['size'])
+# 读取对象声明的中心坐标。
 def center(o):return o['position']
 
 
+# 计算两个对象轴对齐边界框的相交面积。
 def intersection(a,b):
     a,b=bbox(a),bbox(b)
     return max(0,min(a[2],b[2])-max(a[0],b[0]))*max(0,min(a[3],b[3])-max(a[1],b[1]))
 
 
+# 按包含、相交、接触和分离的优先级判定二维拓扑关系。
 def relation(a,b):
     x,y=bbox(a),bbox(b)
     if all([x[0]>=y[0],x[1]>=y[1],x[2]<=y[2],x[3]<=y[3]]):return 'inside'
@@ -24,10 +29,12 @@ def relation(a,b):
     return 'disjoint'
 
 
+# 组合题面、私有答案和评分类型，并附加任务专用字段。
 def result(text,answer,kind='numeric',**extra):
     return {'question':text,'answer':answer,'scorer':kind,**extra}
 
 
+# 从私有场景计算目标与参考对象的几何关系，生成所选几何任务及评分依据。
 def task(scene,nid,op):
     obs=scene['objects'];target=next(o for o in obs if o['id']==scene['target_id']);ref=next(o for o in obs if o['id']==scene['reference_id'])
     t,r=target['id'],ref['id'];p,q=center(target),center(ref);others=[o for o in obs if o['id']!=t]

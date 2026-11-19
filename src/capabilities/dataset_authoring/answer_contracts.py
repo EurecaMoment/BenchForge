@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 
+# 将输出模式声明规范化为答案字段映射，拒绝重复或无文字描述的字段。
 def _schema_fields(schema: Mapping[str, Any]) -> dict[str, tuple[str, str]]:
     fields = {}
     for declared_name, descriptor in schema.items():
@@ -39,6 +40,7 @@ SCORERS = {
 }
 
 
+# 仅为评测框架已有明确语义的输出类型返回评分器。
 def scorer_for(output_kind):
     """Return a scorer only when this harness has explicit semantics for it."""
     try:
@@ -49,16 +51,19 @@ def scorer_for(output_kind):
         ) from exc
 
 
+# 判断值是否为有限整数或浮点数，排除布尔值。
 def _finite_number(value):
     return type(value) in (int, float) and math.isfinite(value)
 
 
+# 校验答案数组长度固定且所有元素都是有限数字。
 def _number_array(value, length, field):
     if (not isinstance(value, list) or len(value) != length or
             not all(_finite_number(part) for part in value)):
         raise AnswerContractError(f"{field} must contain {length} finite numbers")
 
 
+# 校验非空标识列表，并按需要求标识唯一。
 def _identifier_list(value, field, *, unique=False):
     if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
         raise AnswerContractError(f"{field} must be an array of nonempty IDs")
@@ -66,6 +71,7 @@ def _identifier_list(value, field, *, unique=False):
         raise AnswerContractError(f"{field} must not contain duplicate IDs")
 
 
+# 按字段描述及输出类型校验单个答案值的形状和语义边界。
 def _validate_field(field, descriptor, value, output_kind):
     if not isinstance(descriptor, str):
         raise AnswerContractError(f"Schema descriptor for {field!r} must be text")
@@ -166,6 +172,7 @@ def _validate_field(field, descriptor, value, output_kind):
     )
 
 
+# 按模板声明严格校验答案对象的字段集合与各字段基础结构。
 def validate_answer(template_or_contract: Mapping[str, Any], answer: Any) -> None:
     """Validate the exact object fields and primitive shapes declared by a template."""
     output_kind = template_or_contract.get("output_kind")
@@ -195,6 +202,7 @@ def validate_answer(template_or_contract: Mapping[str, Any], answer: Any) -> Non
         _validate_field(field, descriptor, value, output_kind)
 
 
+# 在接收或评分答案前验证输出模式与评分语义是否受支持。
 def validate_contract_declaration(template: Mapping[str, Any]) -> dict[str, Any]:
     """Reject malformed schemas before any answer is accepted or scored."""
     output_kind = template.get("output_kind")

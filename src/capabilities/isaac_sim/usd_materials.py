@@ -4,6 +4,7 @@ import json
 import math
 
 
+# 把字符串、布尔、向量或有限数字编码为USD文本字面量。
 def usd(value):
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=False)
@@ -16,10 +17,12 @@ def usd(value):
     return repr(float(value))
 
 
+# 将一组值编码为USD数组字面量。
 def array(values):
     return "[" + ", ".join(usd(value) for value in values) + "]"
 
 
+# 生成标准预览材质USD，可选择读取网格顶点颜色。
 def material_usd(name, settings, *, vertex_color=False):
     color = (
         "color3f inputs:diffuseColor.connect = </World/Materials/" + name + "/Color.outputs:result>"

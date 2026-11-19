@@ -8,6 +8,7 @@ import uuid
 from service_access.runtime_config import environment_value
 
 
+# 解析场景服务客户端命令及输入文件，调用对应服务路由并输出 JSON 结果。
 def main():
     p=argparse.ArgumentParser(description='BenchForge production client')
     project = Path(environment_value('BENCHFORGE_ROOT', Path(__file__).resolve().parents[2]))

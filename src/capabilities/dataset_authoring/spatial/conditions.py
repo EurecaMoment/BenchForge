@@ -3,6 +3,7 @@ from copy import deepcopy
 from capabilities.dataset_authoring.spatial.scenes import rotate
 
 
+# 在保持源世界和最终目标一致的前提下构造自然、提供中间结果或隔离能力条件。
 def apply_condition(public, authority, condition):
     public=deepcopy(public);authority=deepcopy(authority)
     public['condition']=condition

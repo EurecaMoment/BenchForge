@@ -5,6 +5,7 @@ from capabilities.dataset_authoring.adapters import BUILTINS, oracle
 from storage.artifacts import read, select
 
 
+# 验证答案直接来自已验收文件，或可由受支持裁判从全部已验收输入精确重算。
 def validate_source_binding(template, record, base, receipt, answer):
     """Return every source that must remain unchanged after S3 validation.
 
@@ -25,6 +26,7 @@ def validate_source_binding(template, record, base, receipt, answer):
         raise ValueError('Answer source is not covered by the service acceptance and has no supported native derivation')
     dependencies = {source}
 
+    # 递归解析派生裁判输入，每个叶子必须引用已验收JSON字段。
     def resolve(node):
         if isinstance(node, dict) and set(node) == {'path', 'selector'}:
             path = Path(node['path'])

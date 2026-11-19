@@ -17,6 +17,7 @@ REPAIR_GUIDANCE = (
 class ScenePreflightError(ValueError):
     code = 'scene_preflight_failed'
 
+    # 保留完整预检报告，并在异常中列出阻断问题与修复指引。
     def __init__(self, report):
         self.report = report
         errors = [row for row in report['issues'] if row['blocking']]
@@ -26,15 +27,18 @@ class ScenePreflightError(ValueError):
                          ) + '\n' + REPAIR_GUIDANCE)
 
 
+# 将结构化问题格式化为含对象和字段路径的简短说明。
 def format_issue(issue):
     objects = 'object ' + ', '.join(issue['object_ids']) + ' ' if issue.get('object_ids') else ''
     return f"{objects}{issue['path'] or '/'}: {issue['message']}"
 
 
+# 按支撑或固定关联归并受影响对象，便于整体复核而不指定修改方式。
 def repair_groups(issues, objects):
     """Group affected support/mount components without prescribing an edit."""
     parents = {}
 
+    # 用路径压缩查找对象所属的关联组件代表。
     def find(value):
         parents.setdefault(value, value)
         root = value
@@ -46,6 +50,7 @@ def repair_groups(issues, objects):
             value = parent
         return root
 
+    # 合并两个相互关联对象所在的组件。
     def join(left, right):
         parents[find(right)] = find(left)
 
@@ -85,11 +90,13 @@ def repair_groups(issues, objects):
 
 
 class SceneDiagnostics:
+    # 初始化问题、跳过检查及已执行检查的记录列表。
     def __init__(self):
         self.issues = []
         self.skipped = []
         self.checked = []
 
+    # 追加带证据来源、严重度和可选对象标识的诊断问题。
     def add(self, code, path, message, *, basis, severity='error', object_ids=(), **evidence):
         issue = {'code': code, 'path': path, 'message': message, 'basis': basis,
                  'severity': severity, 'blocking': severity == 'error'}
@@ -99,10 +106,12 @@ class SceneDiagnostics:
             issue['evidence'] = evidence
         self.issues.append(issue)
 
+    # 记录因依赖不可用等原因未执行的检查及解释。
     def skip(self, check, path, reason):
         self.skipped.append({'check': check, 'path': path, 'reason': reason,
                              'status': 'not_evaluated'})
 
+    # 独立执行一个检查，收集常见输入错误并记录检查是否完成。
     def attempt(self, check, path, function, *, object_ids=(), basis='declared_program'):
         try:
             value = function()
@@ -112,6 +121,7 @@ class SceneDiagnostics:
         self.checked.append({'check': check, 'path': path})
         return True, value
 
+    # 为问题分配稳定编号并汇总预检状态、统计及已检查范围。
     def finish(self, program, *, enforced, **details):
         for index, issue in enumerate(self.issues):
             issue['id'] = f'issue_{index + 1:04d}'

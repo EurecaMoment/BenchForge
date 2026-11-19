@@ -25,6 +25,7 @@ from server.operation_config import load_operation_config
 
 
 class DatabaseTests(unittest.TestCase):
+    # 创建独立数据库 schema 和临时工作区，并注册连接池清理。
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -32,6 +33,7 @@ class DatabaseTests(unittest.TestCase):
         self.root = Path(directory.name)
         self.url = use_postgres(self)
 
+    # 验证运行时缺失数据库或使用非 PostgreSQL 地址时明确拒绝启动。
     def test_runtime_requires_postgresql(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
@@ -42,6 +44,7 @@ class DatabaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 normalize_database_url(value)
 
+    # 验证嵌套请求数据库上下文正确恢复，且显式配置优先于环境。
     def test_context_is_nested_and_explicit_configuration_wins(self):
         with patch.dict(os.environ, {"BENCHFORGE_DATABASE_URL": "postgres://env/db"}):
             with database_context("postgresql://outer/db"):
@@ -55,8 +58,10 @@ class DatabaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unset environment"):
             configured_database_url({"database_url_env": "BENCHFORGE_MISSING_DATABASE_FOR_TEST"})
 
+    # 验证一次操作中的分区与计划等嵌套存储共用本运行配置的数据库。
     def test_one_runtime_uses_its_config_for_all_nested_stores(self):
         class Runtime(WorkspaceJobs):
+            # 在同一操作内写入分区与活动计划，用于发现嵌套数据库配置泄漏。
             def execute(self, tool, args, directory):
                 claim_partition(self.root, "scene", "train")
                 activate(self.root, "session-a", "plan.json")
@@ -70,7 +75,9 @@ class DatabaseTests(unittest.TestCase):
             with database_context(self.url):
                 self.assertEqual(len(query_operations(self.root, history=True)), 1)
 
+    # 验证多个线程的数据库上下文彼此隔离，结束后不污染主线程。
     def test_thread_contexts_do_not_leak(self):
+        # 在线程内临时绑定独立地址并解析工作区数据库，返回实际解析值。
         def resolve(index):
             url = f"postgres://host{index}/database"
             with database_context(url):
@@ -79,6 +86,7 @@ class DatabaseTests(unittest.TestCase):
             result = list(pool.map(resolve, range(16)))
         self.assertEqual(result, [f"postgresql+psycopg://host{i}/database" for i in range(16)])
 
+    # 验证提供方工具从引用服务配置继承数据库，而非依赖陈旧环境。
     def test_provider_tools_read_database_from_referenced_service_config(self):
         config = self.root / 'service.json'
         config.write_text(json.dumps({'execution_mode': 'exploration', 'database_url': self.url}))
@@ -89,6 +97,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(result['database_url'], self.url)
         self.assertEqual(result['providers']['FastQwen']['model'], 'qwen')
 
+    # 验证异常事务确实回滚，且共享引擎后续仍能正常使用。
     def test_failed_transaction_rolls_back_and_engine_is_reusable(self):
         engine = engine_for(self.url)
         initialize_schema(engine)
@@ -99,6 +108,7 @@ class DatabaseTests(unittest.TestCase):
         with engine.connect() as connection:
             self.assertEqual(connection.execute(select(operations)).all(), [])
 
+    # 验证读取方直接看到已提交数据库状态，不依赖文件投影同步。
     def test_reader_uses_committed_state_without_a_file_projection(self):
         with database_context(self.url):
             review(self.root, "session-a", "open", stage="S1", key="plan", artifact="plan.json")

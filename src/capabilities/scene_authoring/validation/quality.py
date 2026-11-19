@@ -11,11 +11,13 @@ DIMENSIONS = ("geometry", "render", "physics", "interaction", "semantic", "cover
 EVIDENCE_LEVELS = {"measured", "observed", "declared", "missing"}
 
 
+# 读取有效的场景对象列表，错误类型视为空以便继续质量审计。
 def _objects(scene: dict[str, Any]) -> list[dict[str, Any]]:
     value = scene.get("objects", [])
     return value if isinstance(value, list) else []
 
 
+# 构建统一证据等级记录，列出观察、能力缺口、修复建议和真值适用范围。
 def _item(level: str, observations: list[str] | None = None, gaps: list[str] | None = None, suggestions: list[str] | None = None, *, truth_scope: str = "") -> dict[str, Any]:
     if level not in EVIDENCE_LEVELS:
         raise ValueError(f"unsupported evidence level: {level}")
@@ -25,6 +27,7 @@ def _item(level: str, observations: list[str] | None = None, gaps: list[str] | N
     return result
 
 
+# 仅评估模拟器提供的几何证据，不把提案中的重叠当作执行结论。
 def _geometry(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     """Assess simulator geometry only; proposal overlap is deliberately ignored."""
     objects = _objects(scene)
@@ -41,6 +44,7 @@ def _geometry(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     return _item("missing", observations, ["scene has no object geometry"], ["provide scene geometry or explicitly declare an empty-scene task"], truth_scope="none")
 
 
+# 检查渲染视图及光照材质回执，区分可观察结果与尚未测量的响应。
 def _render(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     cameras = scene.get("cameras", []) if isinstance(scene.get("cameras", []), list) else []
     views = capture.get("views", capture.get("view_count", 0))
@@ -65,6 +69,7 @@ def _render(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     return _item("declared" if cameras else "missing", observations, ["no completed multi-view render receipt"], ["render overview, oblique and task-facing views through Isaac Sim gRPC"], truth_scope="camera_proposal_only" if cameras else "none")
 
 
+# 根据物理回执报告执行稳定证据，保留质量、摩擦等真实参数未校准的限制。
 def _physics(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     physics = capture.get("physics") if isinstance(capture.get("physics"), dict) else {}
     observations: list[str] = []
@@ -90,6 +95,7 @@ def _physics(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     return _item(level, observations, gaps, suggestions, truth_scope=scope)
 
 
+# 区分交互声明、已有动作轨迹和经过验证的原生交互证据。
 def _interaction(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     affordances = scene.get("affordances", scene.get("interactions", []))
     affordances = affordances if isinstance(affordances, list) else []
@@ -115,6 +121,7 @@ def _interaction(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, An
     return _item("missing", observations, ["scene has no interaction or navigation contract"], ["declare task-relevant affordances without restricting free-form scene composition"], truth_scope="none")
 
 
+# 依据结构化语义或实例标注判断证据等级，不把实例编号等同视觉类别正确性。
 def _semantic(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     layers = scene.get("semantic_layers", [])
     layers = layers if isinstance(layers, list) else []
@@ -136,6 +143,7 @@ def _semantic(scene: dict[str, Any], capture: dict[str, Any]) -> dict[str, Any]:
     return _item("missing", observations, ["no authoritative semantic layer or capture labels"], ["export native Isaac semantic/instance IDs as GT"], truth_scope="none")
 
 
+# 比较请求与实际采集视图，报告覆盖缺口和仍需补充的观察。
 def _coverage(scene: dict[str, Any], capture: dict[str, Any], intent: dict[str, Any] | None) -> dict[str, Any]:
     intent = intent if isinstance(intent, dict) else {}
     cameras = scene.get("cameras", []) if isinstance(scene.get("cameras", []), list) else []
@@ -153,6 +161,7 @@ def _coverage(scene: dict[str, Any], capture: dict[str, Any], intent: dict[str, 
     return _item("observed", observations, gaps, ["add missing views or mark the scene as an exploration candidate"] if gaps else [], truth_scope="captured_view_count")
 
 
+# 返回几何、渲染、物理、交互、语义与覆盖六维证据报告，不虚构数值质量分数。
 def audit_scene(scene: dict[str, Any], capture: dict[str, Any] | None = None, intent: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return a six-dimension evidence report without numeric quality claims."""
     if not isinstance(scene, dict):
@@ -169,5 +178,6 @@ def audit_scene(scene: dict[str, Any], capture: dict[str, Any] | None = None, in
     return {"schema": "benchforge.scene-quality/v2", "scene_id": scene.get("scene_id"), "tier": tier, "evidence_summary": {"observed_or_measured_dimensions": observed, "dimensions": len(dimensions), "publication_gate": "all six dimensions require simulator/official evidence"}, "dimensions": dimensions, "capability_gaps": list(dict.fromkeys(gaps)), "repair_suggestions": list(dict.fromkeys(suggestions)), "gt_authority": "native_simulator_or_official_source_only", "gt_written": False}
 
 
+# 提供场景质量审计的兼容入口，返回统一六维证据报告。
 def audit_scene_quality(scene: dict[str, Any], capture: dict[str, Any] | None = None, intent: dict[str, Any] | None = None) -> dict[str, Any]:
     return audit_scene(scene, capture, intent)

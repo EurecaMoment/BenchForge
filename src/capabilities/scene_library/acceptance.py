@@ -6,6 +6,7 @@ from capabilities.scene_library.source_policy import scene_design_parser
 from capabilities.scene_library.episodes import native_episodes
 
 
+# 验证服务任务快照与冻结采集证据，返回规范的场景采集身份。
 def verified_scene(root, task):
     """Validate a service task snapshot and return its canonical capture identity."""
     task_id, revision = task['id'], task['unit']['revision']
@@ -53,6 +54,7 @@ def verified_scene(root, task):
     }
 
 
+# 按明确任务和修订引用加载场景，逐项验证服务验收后返回可信快照。
 def accepted_scenes(store, sources):
     if not isinstance(sources, list) or not 1 <= len(sources) <= 1000:
         raise ValueError('scene_sources must contain 1..1000 task_id/revision references')

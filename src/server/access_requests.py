@@ -9,6 +9,7 @@ _START = {"/start", "/capture", "/layout", "/asset", "/diffusion", "/sam3",
 _PATHS = {"source_image", "source_mask", "source_mesh", "source_gaussian", "scene_program_path"}
 
 
+# 在读取业务运行前核对其已存工作区与会话归属，可信操作者请求沿用独立认证。
 def require_run(engine, run_id):
     access = current_access()
     if access is None:
@@ -24,6 +25,7 @@ def require_run(engine, run_id):
         raise PermissionError("Run is unavailable in this conversation")
 
 
+# 在领域处理器读取文件前校验运行、查询和输入引用，并由宿主身份注入上下文及幂等键。
 def authorize_request(store, route, value):
     access = current_access()
     if access is None:
@@ -54,6 +56,7 @@ def authorize_request(store, route, value):
             # Idempotency keys cannot collide with another session's request.
             result["request_key"] = f"dsh:{access.scope.session_id}:" + str(result["request_key"])
 
+    # 递归校验声明的来源路径；任务程序须位于会话工作区，资源输入另走已授权来源解析。
     def paths(item):
         if isinstance(item, dict):
             for key, child in item.items():

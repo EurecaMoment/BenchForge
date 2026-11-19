@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 
+# 从原生导出中提取完整实体边界，拒绝用目录尺寸包络或截断数组替代测量。
 def exported_entities(source, declared):
     """No catalog envelopes or truncated inspection arrays certify native bounds."""
     from pxr import Usd, UsdGeom, UsdPhysics

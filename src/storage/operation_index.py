@@ -14,10 +14,12 @@ from storage.access_identity import workspace_namespace
 FIELDS = ("id", "tool", "state", "artifact", "error", "session_id")
 
 
+# 按工作区和可选显式地址取得复用的数据库引擎。
 def _engine(workspace, database_url=None):
     return engine_for(resolve_workspace_url(workspace, database_url))
 
 
+# 在会话及工具过滤条件下分页读取操作索引，未授权历史查询不返回其他会话记录。
 def query_operations(workspace, *, sessions=(), history=False, limit=30, tools=(), database_url=None):
     if type(limit) is not int or not 1 <= limit <= 201:
         raise ValueError("Operation query limit must be 1..201")

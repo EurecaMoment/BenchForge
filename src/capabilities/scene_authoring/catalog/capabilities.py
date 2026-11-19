@@ -4,6 +4,7 @@ from capabilities.scene_authoring.contracts.scene_program import SCENE_V2_MAX_OB
 from capabilities.scene_authoring.contracts.scene_program import APPEARANCE_FIELDS
 from capabilities.scene_authoring.catalog.native import ASSETS
 
+# 返回场景编写合同的机器可读能力摘要，不进行运行时能力探测。
 def scene_contract_capabilities():
     """Machine-readable summary for DSH and planners; no runtime probing."""
     return {

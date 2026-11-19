@@ -2,6 +2,7 @@
 from storage.artifacts import read
 
 
+# 按评审阶段检查修复程序、场景要求或采集验收产物，返回实际检查项。
 def check_repair_artifact(file, stage):
     if stage == 'S1' and file.name == 'scene-plan.json':
         from capabilities.scene_authoring.validation.program import validate_program

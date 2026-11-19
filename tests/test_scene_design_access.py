@@ -16,6 +16,7 @@ from service_access.resource_files import read_owned_resource, resolve_owned_res
 
 
 class SceneDesignAccessTests(unittest.TestCase):
+    # 建立会话工作区、私有服务产物及可信身份，供场景设计来源授权验证。
     def setUp(self):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -27,6 +28,7 @@ class SceneDesignAccessTests(unittest.TestCase):
         self.access = TrustedAccess(
             AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1), str(self.workspace))
 
+    # 写入最小评估计划并返回引用该计划的场景程序夹具。
     def plan(self, path):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'schema': 'benchforge.assessment/v1',
@@ -34,12 +36,14 @@ class SceneDesignAccessTests(unittest.TestCase):
         return {'provenance': {'sources': [
             {'kind': 'scene_plan', 'path': str(path), 'scene_design_id': 'room'}]}}
 
+    # 验证外部会话计划在解析内容前被拒绝访问。
     def test_foreign_plan_is_denied_before_parsing(self):
         program = self.plan(self.root / 'workspace-b/plan.json')
         with access_context(self.access), patch.dict(os.environ, {'BENCHFORGE_ARTIFACTS': str(self.artifacts)}):
             with self.assertRaises(PermissionError):
                 saved_design(program)
 
+    # 验证不能从其他会话的采集目录读取设计简报。
     def test_foreign_brief_directory_is_denied(self):
         foreign = self.root / 'workspace-b/capture'
         foreign.mkdir(parents=True)
@@ -48,6 +52,7 @@ class SceneDesignAccessTests(unittest.TestCase):
         with access_context(self.access), self.assertRaises(PermissionError):
             validate_brief_revision(design, self.workspace / 'plan.json', self.artifacts)
 
+    # 验证匹配的文件版本不能替代计划所有权校验。
     def test_matching_version_cannot_bypass_plan_ownership(self):
         path = self.root / 'workspace-b/plan.json'
         self.plan(path)
@@ -56,6 +61,7 @@ class SceneDesignAccessTests(unittest.TestCase):
         with access_context(self.access):
             self.assertFalse(plan_declaration_current(declaration))
 
+    # 验证访问生产资源须由数据库确认其所属会话。
     def test_production_resource_requires_matching_database_owner(self):
         path = self.artifacts / 'sf_private.scene0/revision_0/scene_brief.json'
         path.parent.mkdir(parents=True)
@@ -72,6 +78,7 @@ class SceneDesignAccessTests(unittest.TestCase):
                 'workspace_id': 'workspace-a', 'session_id': 'session-a'}
             self.assertEqual(resolve_owned_resource(engine, self.artifacts, path), path.resolve())
 
+    # 验证当前会话自己的计划与先前证据仍能正常复用。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative file reads require Linux')
     def test_own_plan_and_prior_evidence_remain_usable(self):
         path = self.workspace / 'plan.json'
@@ -90,6 +97,7 @@ class SceneDesignAccessTests(unittest.TestCase):
             self.assertEqual(saved_design(program)[1]['id'], 'room')
             validate_brief_revision(design, path)
 
+    # 验证 Windows 短路径与长路径等价时，工作区及证据授权仍一致。
     @unittest.skipUnless(os.name == 'nt', 'Windows short-path aliases')
     def test_short_paths_preserve_workspace_and_evidence_ownership(self):
         import ctypes
@@ -119,6 +127,7 @@ class SceneDesignAccessTests(unittest.TestCase):
                     with self.assertRaises(PermissionError):
                         resolve_owned_resource(engine, self.artifacts, alias)
 
+    # 验证规范路径比较不会误授权经链接访问的自有证据。
     @unittest.skipUnless(os.name == 'posix', 'Symbolic link regression')
     def test_canonical_comparison_does_not_authorize_linked_owned_evidence(self):
         directory = self.artifacts / 'sf_owned.scene0/revision_0'
@@ -135,6 +144,7 @@ class SceneDesignAccessTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 resolve_owned_resource(engine, self.artifacts, link / path.name)
 
+    # 验证计划符号链接不能隐藏其他会话的真实来源。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative file reads require Linux')
     def test_plan_symlink_cannot_hide_foreign_file(self):
         foreign = self.root / 'workspace-b/plan.json'
@@ -145,6 +155,7 @@ class SceneDesignAccessTests(unittest.TestCase):
             saved_design({'provenance': {'sources': [
                 {'kind': 'scene_plan', 'path': str(link), 'scene_design_id': 'room'}]}})
 
+    # 验证私有自有证据通过已校验的文件描述符读取，防止检查后替换。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative file reads require Linux')
     def test_private_owned_evidence_uses_checked_file_descriptor(self):
         path = self.artifacts / 'sf_owned.scene0/revision_0/scene_brief.json'

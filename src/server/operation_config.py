@@ -6,6 +6,7 @@ from database.config import configured_database_url
 from service_access.runtime_config import load_service_config, read_json
 
 
+# 合并操作与引用服务配置，补齐数据库及产物位置并解析模型设置。
 def load_operation_config(path=None):
     config = read_json(path) if path else {}
     if path and config.get("service_config"):

@@ -5,6 +5,7 @@ from database.config import database_context
 from storage.stage_reviews import read_current
 
 
+# 校验绝对会话工作区与评审查询字段，在服务数据库上下文读取当前评审。
 def read_review_request(config, body):
     if not isinstance(body, dict) or set(body) - {"workspace", "session", "review_id"}:
         raise ValueError("Invalid stage review query")

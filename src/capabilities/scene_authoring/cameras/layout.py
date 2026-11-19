@@ -6,6 +6,7 @@ import numpy as np
 from capabilities.scene_authoring.geometry.mesh import transform_mesh_geometry
 
 
+# 依据显式相机位置、统一尺度和旋转返回重建对象放置参数，不推测真实尺度或内参。
 def camera_layout_placement(mesh, meters_per_unit, camera_position, orientation_deg_xyz=None):
     """Return placement fields without editing an asset or scene.
 

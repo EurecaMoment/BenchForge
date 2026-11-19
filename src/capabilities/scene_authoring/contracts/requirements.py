@@ -4,6 +4,7 @@ STAGES = {'S2', 'S3', 'S4', 'S5'}
 REPRESENTATIONS = {'native_asset', 'articulated_robot'}
 
 
+# 验证每项硬性要求都对应一个合法验收阶段，未声明时默认场景阶段。
 def requirement_stages(design):
     requirements = design.get('hard_requirements', [])
     stages = design.get('requirement_stages', ['S2'] * len(requirements))
@@ -13,12 +14,14 @@ def requirement_stages(design):
     return stages
 
 
+# 提取分配给场景阶段的硬性要求及其原始索引。
 def scene_requirements(design):
     return [{'index': index, 'requirement': text}
             for index, (text, stage) in enumerate(zip(design['hard_requirements'], requirement_stages(design)))
             if stage == 'S2']
 
 
+# 检查设计中的对象表示和必需资产角色，按需确保存在机器人运动所需角色。
 def validate_asset_requirements(scenes, *, robot_locomotion=False):
     robots = []
     for design in scenes.get('designs', []):

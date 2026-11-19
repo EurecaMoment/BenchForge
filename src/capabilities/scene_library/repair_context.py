@@ -19,17 +19,20 @@ GUIDANCE = ('Repair evidence distinguishes current capture, previous capture, an
             'This context never locks poses, adds retries, or changes acceptance thresholds.')
 
 
+# 读取指定修订目录中的JSON材料，文件不存在时返回空对象。
 def _read(folder, name):
     path = Path(folder) / name
     return json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
 
 
+# 在字符预算内保留结构化值，超限时以省略标记及大小信息替代。
 def _brief(value, limit=650):
     text = json.dumps(value, ensure_ascii=False)
     return value if len(text) <= limit else {'omitted_value': True, 'characters': len(text),
                                               'entries': len(value) if isinstance(value, (list, dict)) else None}
 
 
+# 按稳定对象标识比较修订差异，避免数组重排被误判为姿态改变。
 def scene_changes(before, after, older=None, max_changes=48):
     """Compare by stable object IDs; array reorder cannot mimic a changed pose."""
     left = {o['id']: o for o in before.get('objects', [])}
@@ -61,6 +64,7 @@ def scene_changes(before, after, older=None, max_changes=48):
     return result
 
 
+# 提取有限条审查结论、问题与修复建议，并记录省略数量。
 def _review(folder):
     review = _read(folder, 'scene_review.json')
     result = {key: review[key] for key in ('passed', 'acceptable', 'visual_quality', 'semantic_fidelity', 'interaction_passed') if key in review}
@@ -71,6 +75,7 @@ def _review(folder):
     return result
 
 
+# 优先选择反馈中被频繁提及的采集视图，并报告缺失视图标识。
 def _view_paths(folder, feedback, limit):
     paths = {p.stem: p for p in (Path(folder)/'capture').glob('view_*.png') if re.fullmatch(r'view_\d+', p.stem)}
     counts = Counter(re.findall(r'\bview_\d+\b', feedback))
@@ -78,6 +83,7 @@ def _view_paths(folder, feedback, limit):
     return [paths[name] for name in order[:limit]], sorted(set(counts)-set(paths))
 
 
+# 在全部附件组装后施加上下文预算，保留各类省略数量。
 def bound_repair_context(context):
     """Apply the budget after all attachments are assembled; keep omission counts."""
     execution = context.get('current_execution', {})
@@ -92,6 +98,7 @@ def bound_repair_context(context):
     return context
 
 
+# 读取当前与上一指定修订构建修复上下文，最多附六张当前和两张历史图。
 def build_repair_context(current, previous=None):
     """Read two specific revision folders, at most 6 current + 2 prior images."""
     current = Path(current)

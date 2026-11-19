@@ -32,9 +32,12 @@ import * as AccessHost from '../../src/dsh/access/host.mjs'
 import * as ComponentSkills from '../../src/dsh/access/skills.mjs'
 import {currentAccessScope} from '../../src/dsh/access/context.mjs'
 
+/** 将测试命令参数按 POSIX 单引号规则转义，保证路径包含特殊字符时仍能安全传递。 */
 const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'"
+/** 合并原生工具返回的文本块，供真实宿主集成测试断言。 */
 const text = (result: any) => result.content.filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n')
 
+/** 创建带真实原生服务的访问宿主测试环境，登记测试结束后的工作区及上下文清理。 */
 async function boot(existingRoot?: string) {
   const root = existingRoot || await realpath(await mkdtemp(join(process.env.BENCHFORGE_HOST_TEST_ROOT || homedir(), '.benchforge-host-test-')))
   const ctx = new Context()
@@ -68,16 +71,18 @@ async function boot(existingRoot?: string) {
   await ctx.plugin(AgentPresets, {default: 'benchforge'})
   const unregisterPreset = await ctx.agentPresets.register({id: 'benchforge', plugins: []})
   ctx.effect(() => unregisterPreset)
-  ctx.provide('typertGateway', {getPendingRemoteEvents: () => []} as never)
+  ctx.provide('typertGateway', {/** 为无外部网关的集成夹具返回空远程事件队列。 */ getPendingRemoteEvents: () => []} as never)
   const controller = await createSessionTestController(ctx, {
-    cwd: root, defaultModelSelection: () => ({provider: 'unused', model: 'no-model-call'}),
+    cwd: root, /** 返回不会实际调用模型的测试选择，保持会话创建契约完整。 */ defaultModelSelection: () => ({provider: 'unused', model: 'no-model-call'}),
   })
+  /** 通过官方控制器创建 BenchForge 会话，并确认已发布对应 Agent。 */
   const create = async () => {
     const result = await controller.create({agentPreset: 'benchforge'})
     const agent = ctx.agents.get(result.sessionId)
     if (!agent) throw new Error('Native controller did not publish its Agent')
     return agent
   }
+  /** 以原生工具批次执行测试调用，并取出单个实际工具结果。 */
   const call = async (agent: any, name: string, args: object) => {
     const batch = await ctx.tools.execute({agent, signal: new AbortController().signal,
       calls: [{type: 'tool-call', id: randomUUID() as never, name, arguments: JSON.stringify(args)}]})
@@ -86,8 +91,8 @@ async function boot(existingRoot?: string) {
   return {ctx, root, controller, create, call}
 }
 
-describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host services', () => {
-  it('creates isolated native sessions and enforces files, bash, skills and trusted tool scope', async () => {
+describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host services', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：BenchForge with native DSH Host services。 */ () => {
+  it('creates isolated native sessions and enforces files, bash, skills and trusted tool scope', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：creates isolated native sessions and enforces files, bash, skills and trusted tool scope。 */ async () => {
     const {ctx, root, controller, create, call} = await boot()
     const [a, b] = await Promise.all([create(), create()])
     const aRoot = a.session.header.cwd!, bRoot = b.session.header.cwd!
@@ -126,8 +131,9 @@ describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host s
     expect(text(skill)).toContain('Isaac')
 
     ctx.tools.register(defineTool({name: 'access_probe', description: 'Return Host-owned identity for this test',
-      parameters: {session_id: {type: 'string'}}, isConcurrencySafe: () => true,
-      output: {schema: {type: 'string'}, render: (_args, value) => [{type: 'text', text: value}]},
+      parameters: {session_id: {type: 'string'}}, /** 声明测试读取工具可并发，以覆盖异步作用域隔离。 */ isConcurrencySafe: () => true,
+      output: {schema: {type: 'string'}, /** 将测试工具返回值包装为原生文本块。 */ render: (_args, value) => [{type: 'text', text: value}]},
+      /** 在异步边界后读取可信作用域，验证宿主上下文能够正确传递。 */
       async execute() {await Promise.resolve(); return JSON.stringify(currentAccessScope())},
     }))
     const [aScope, bScope] = await Promise.all([
@@ -158,7 +164,7 @@ describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host s
     }
   })
 
-  it('flushes JSONL and resumes the same workspace from a fresh Host Context', async () => {
+  it('flushes JSONL and resumes the same workspace from a fresh Host Context', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：flushes JSONL and resumes the same workspace from a fresh Host Context。 */ async () => {
     const first = await boot()
     const a = await first.create(), b = await first.create()
     const originalScope = first.ctx.benchforgeAccess.scope(a.session)

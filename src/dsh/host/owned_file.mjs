@@ -3,12 +3,14 @@ import {constants} from 'node:fs';
 import path from 'node:path';
 import {ApiError} from './session_scope.mjs';
 
+/** 判断文件是否位于指定根目录之内，按路径分段处理上级跳转。 */
 const contains = (root, file) => {
   const relative = path.relative(root, file);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
 
 /** Pin an approved regular file before streaming, without reopening its path. */
+/** 打开工作区拥有的普通文件；逐级拒绝符号链接并在读取前后核对真实文件归属。 */
 export async function openOwnedFile(root, file, signal) {
   const canonicalRoot = await fs.realpath(root);
   const candidate = path.resolve(file);

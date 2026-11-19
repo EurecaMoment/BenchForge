@@ -33,6 +33,7 @@ REQUEST:
 """
 
 
+# 从生成记录、显式引用或注册目录找到可读参考图，缺失时报告错误。
 def _asset_image(asset: dict[str, Any]) -> Path:
     files = asset.get("files") or {}
     source_work = Path(asset.get("source_work", ""))
@@ -49,6 +50,7 @@ def _asset_image(asset: dict[str, Any]) -> Path:
     raise FileNotFoundError("generated asset has no readable reference.png")
 
 
+# 调用视觉模型审查参考图，并校验语义结论及修复建议的字段类型。
 def _review(prompt: dict[str, Any], image: Path, trace: Path) -> dict[str, Any]:
     text = json.dumps(prompt, ensure_ascii=False, indent=2)
     result = completion(_REVIEW_PROMPT + text, trace, [image], max_tokens=3000)
@@ -68,6 +70,7 @@ def _review(prompt: dict[str, Any], image: Path, trace: Path) -> dict[str, Any]:
     return result
 
 
+# 为候选资产附上参考图位置，兼容尚未记录注册目录的旧记录。
 def _candidate_with_image(asset: dict[str, Any], image: Path) -> dict[str, Any]:
     result = dict(asset)
     result["reference_image"] = str(image)
@@ -78,6 +81,7 @@ def _candidate_with_image(asset: dict[str, Any], image: Path) -> dict[str, Any]:
     return result
 
 
+# 审查资产可见语义，按授权最多生成一次修复候选，并持久化最终选择及质量反馈。
 def review_generated_asset(tools, spec: dict[str, Any], asset: dict[str, Any], work, stop, *, repair=True):
     """Review an asset and, at most once, create a semantically repaired candidate.
 

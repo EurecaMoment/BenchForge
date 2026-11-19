@@ -1,6 +1,7 @@
 """Small per-view checks shared by capture adapters and their consumers."""
 
 
+# 根据RGB、深度和对象可见性统计评估单个采集视图的质量。
 def assess_view(rgb, depth, objects):
     import numpy as np
 

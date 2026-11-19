@@ -22,6 +22,7 @@ _AXIS_VECTORS = {
 }
 
 
+# 从已验证资产目录读取前向轴，未知或未验证朝向时拒绝推测。
 def _front_vector(kind: str) -> Tuple[float, float]:
     record = _ASSETS.get(kind)
     axis = record.get("front_axis") if record else None
@@ -30,6 +31,7 @@ def _front_vector(kind: str) -> Tuple[float, float]:
     return _AXIS_VECTORS[axis]
 
 
+# 校验恰含两个有限坐标的二维位置。
 def _xy(value: Sequence[float], name: str) -> Tuple[float, float]:
     try:
         if isinstance(value, (str, bytes)):
@@ -43,6 +45,7 @@ def _xy(value: Sequence[float], name: str) -> Tuple[float, float]:
     return x, y
 
 
+# 计算让已验证资产前方向指向目标的偏航角，重合点或未知前向轴会报错。
 def yaw_toward(
     kind: str, source_xy: Sequence[float], target_xy: Sequence[float]
 ) -> float:
@@ -63,6 +66,7 @@ def yaw_toward(
     return yaw - 360.0 if yaw > 180.0 else yaw
 
 
+# 把已验证的资产前向轴按偏航角转成世界平面的单位方向。
 def world_forward(kind: str, yaw_deg: float) -> Tuple[float, float]:
     """Return the verified front's unit XY vector after the given yaw."""
     fx, fy = _front_vector(kind)

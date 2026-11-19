@@ -13,6 +13,7 @@ from storage.scene_jobs.metadata import runs, tasks
 MIGRATION = 'a100-grpc-v1'
 
 
+# 在旧服务停止后一次性迁移采集协议，备份与事务回执保证崩溃后可安全重试。
 def migrate_capture(store):
     """Run once before scheduling, while the previous service is stopped.
 

@@ -3,6 +3,7 @@
 QUANTITY_CONTRACTS = {"exact", "minimum", "best_effort"}
 
 
+# 验证数量合同是精确、至少或尽力交付三种受支持模式之一。
 def validate_quantity_contract(value):
     if value not in QUANTITY_CONTRACTS:
         raise ValueError(
@@ -11,6 +12,7 @@ def validate_quantity_contract(value):
     return value
 
 
+# 分别报告实际交付结果与数量合同是否达成。
 def delivery_status(accepted, target, contract="best_effort"):
     """Report execution output separately from whether its quantity was met."""
     validate_quantity_contract(contract)

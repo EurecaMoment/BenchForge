@@ -18,20 +18,25 @@ from capabilities.scene_authoring.catalog.native import ASSETS
 from capabilities.scene_authoring.catalog.native import NATIVE_MATERIALS
 from capabilities.scene_authoring.catalog.native_reference import validate_native_reference
 from capabilities.scene_authoring.catalog.environments import ENVIRONMENTS
+# 条件不成立时抛出明确的合同校验错误。
 def require(ok, message):
     if not ok: raise ValueError(message)
+# 验证以字母或下划线开头、仅含字母数字下划线的场景标识。
 def ident(value):
     require(isinstance(value, str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', value),
             f'invalid ID {value!r}: use letters, digits and underscores, starting with a letter or underscore')
     return value
+# 验证固定长度数值列表，要求有限且落在指定闭区间内。
 def numbers(value, length, lo, hi, context='vector'):
     label = 'invalid vector' if context == 'vector' else context
     require(isinstance(value, list) and len(value) == length, f'{label}: expected {length} numbers; got {value!r}')
     require(all(type(v) in (float, int) and math.isfinite(v) and lo <= v <= hi for v in value),
             f'{label}: expected finite numbers in [{lo}, {hi}]; got {value!r}')
+# 验证三个正数尺寸，限制其最大范围。
 def dimensions(value, context='size'):
     numbers(value, 3, 0, 1000, context)
     require(all(v > 0 for v in value), f'{context}: dimensions must be positive; got {value!r}')
+# 检查外观字段白名单、数值范围及已登记纹理，拒绝未实现的效果声明。
 def validate_appearance(appearance,context='appearance'):
     require(isinstance(appearance,dict),f'{context}: appearance must be an object')
     unknown=set(appearance)-APPEARANCE_FIELDS
@@ -43,6 +48,7 @@ def validate_appearance(appearance,context='appearance'):
         require(isinstance(appearance['texture_id'],str) and appearance['texture_id'] in NATIVE_MATERIALS,'texture_id must be an operator-registered material ID')
     if 'uv_scale_m' in appearance:numbers(appearance['uv_scale_m'],2,.01,100)
     if 'texture_tint' in appearance:numbers(appearance['texture_tint'],3,0,1,'appearance.texture_tint')
+# 递归追加扩展元数据，同时保留已有记录的身份和内容约束。
 def _merge_extension_value(base, added, path):
     """Append new metadata while retaining the identity of existing records."""
     if isinstance(base, dict) and isinstance(added, dict):
@@ -61,6 +67,7 @@ def _merge_extension_value(base, added, path):
         return merged
     require(base == added, f'extension overwrites existing metadata: {path}')
     return deepcopy(base)
+# 把规划器增量合并到场景副本，保持基础场景与原始提案不变。
 def merge_scene_extension(base, added):
     """Merge a planner delta without mutating the base or the raw proposal."""
     require(isinstance(added, dict), 'scene must be an object')
@@ -82,6 +89,7 @@ def merge_scene_extension(base, added):
             merged[key] = _merge_extension_value(base[key], value, key) if key in base else deepcopy(value)
     merged['schema'] = merged['schema']
     return merged
+# 校验外力动作的动态目标、力大小、仿真步数及观察和接触约束。
 def _validate_force_action(action, objects):
     required = {'id', 'action', 'object_id', 'force_newtons'}
     optional = {'duration_steps', 'observe_steps', 'min_displacement_m', 'max_displacement_m',
@@ -103,10 +111,13 @@ def _validate_force_action(action, objects):
     minimum = action.get('min_displacement_m', .02)
     maximum = action.get('max_displacement_m', 1)
     require(0 < minimum <= maximum, 'apply_force displacement bounds must satisfy 0 < min <= max')
+# 校验可选字符串出现时非空且不超过指定长度。
 def _optional_string(value, message='invalid string', max_len=200):
     require(isinstance(value, str) and 0 < len(value) <= max_len, message)
+# 校验值为列表且条目数量不超过上限。
 def _bounded_list(value, max_len, message):
     require(isinstance(value, list) and len(value) <= max_len, message)
+# 验证主动启用的原生轨迹记录配置、采样和相关约束。
 def _validate_spatialtree_recording(recording):
     """Validate the opt-in native trajectory recording settings."""
     require(isinstance(recording, dict), 'recording.spatialtree must be an object')
@@ -117,6 +128,7 @@ def _validate_spatialtree_recording(recording):
     if 'split' in recording:
         require(isinstance(recording['split'], str) and recording['split'] in {'train', 'dev', 'test', 'sealed'},
                 'recording.spatialtree.split must be train, dev, test or sealed')
+# 校验从零步开始且严格递增的相机关键帧，位置与目标不能重合。
 def _validate_camera_path(path):
     require(isinstance(path, list) and len(path) >= 2, 'recording.camera_path needs at least two keyframes')
     previous = -1
@@ -131,6 +143,7 @@ def _validate_camera_path(path):
                 'camera path position and target must differ')
         previous = frame['step']
     require(path[0]['step'] == 0, 'camera path must begin at step 0 relative to the first recording sample')
+# 验证三维尺寸或含中心与尺寸的房间式边界声明。
 def _validate_bounds(value, message='invalid bounds'):
     """Accept either [x, y, z] size or {center, size} room-style bounds."""
     if isinstance(value, list):
@@ -140,6 +153,7 @@ def _validate_bounds(value, message='invalid bounds'):
     require({'center', 'size'} <= set(value), message)
     numbers(value['center'], 3, -1000, 1000)
     dimensions(value['size'])
+# 检查场景扩展元数据结构，原生模拟器有效性仍由适配器后续验证。
 def _validate_scene_extensions(p, checks):
     """Validate open-ended v2 scene metadata without constraining generators.
 
@@ -489,6 +503,7 @@ def _validate_scene_extensions(p, checks):
                                 for item in obj[field]), message)
 
     return p
+# 收集对象种类与部件声明的全部不匹配问题，不改写场景提案。
 def part_contract_errors(p):
     """Locate all kind/parts mismatches without changing the proposed scene."""
     errors=[]
@@ -505,6 +520,7 @@ def part_contract_errors(p):
             if isinstance(part,dict) and part.get('shape') not in {'box','sphere','cylinder'}:
                 errors.append(f'{prefix}/parts/{pi}/shape: invalid part shape {part.get("shape")!r}; allowed: box, sphere, cylinder')
     return errors
+# 逐项验证对象和命名材质中的外观合同，返回所有可读错误。
 def appearance_contract_errors(p):
     errors=[]
     for section in ('objects','materials'):
@@ -518,6 +534,7 @@ def appearance_contract_errors(p):
     return errors
 
 
+# 批量校验对象字段、表示方式、尺寸、物理和关联引用的合同。
 def _validate_object_fields(obj, index, checks):
     path = f'/objects/{index}'
     if not checks.require(path, isinstance(obj, dict), 'invalid object'):
@@ -534,6 +551,7 @@ def _validate_object_fields(obj, index, checks):
                    f'Allowed optional fields={sorted(optional)}; provenance belongs to top-level, '
                    'while object notes belong in metadata/source_ref', object_id=object_id)
 
+    # 仅校验已经声明的对象字段，并为错误绑定对象标识及完整路径。
     def check(field, function, *args):
         if field not in obj:
             return False
@@ -648,6 +666,7 @@ def _validate_object_fields(obj, index, checks):
                                  part_context + '.' + field, object_id=object_id)
 
 
+# 独立校验相机字段、位姿、光学参数和位置目标不重合条件。
 def _validate_camera_fields(camera, index, checks):
     path = f'/cameras/{index}'
     if not checks.require(path, isinstance(camera, dict), f'camera {index}: must be an object'):
@@ -692,6 +711,7 @@ def _validate_camera_fields(camera, index, checks):
                        f'camera {index}.allow_external: expected a boolean')
 
 
+# 汇总场景中各独立字段和记录的合同错误，不自动修补非法提案。
 def program_contract_issues(program):
     """Batch all independent fields/records; never patch a malformed proposal."""
     from capabilities.scene_authoring.validation.contract_diagnostics import ContractDiagnostics
@@ -738,6 +758,7 @@ def program_contract_issues(program):
     return checks.issues
 
 
+# 执行完整场景合同校验，有问题时抛出结构化异常，否则返回原对象。
 def validate_program(p):
     from capabilities.scene_authoring.validation.contract_diagnostics import ProgramValidationError
     issues = program_contract_issues(p)

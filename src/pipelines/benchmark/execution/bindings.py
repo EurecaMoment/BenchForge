@@ -3,6 +3,7 @@
 class MissingBinding(ValueError):
     pass
 
+# 递归解析以美元符号开头的环境绑定引用，支持数组索引并明确报告缺失绑定。
 def bind(value, environment):
     if isinstance(value, str) and value.startswith('$'):
         current = environment

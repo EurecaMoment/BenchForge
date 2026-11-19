@@ -6,9 +6,10 @@ import {createWorkbenchState} from '../../../ui/workbench/state.js';
 import {createPrimitives} from '../../../ui/workbench/primitives.js';
 import {presentOperationCatalog} from './catalog.mjs';
 
-test('all tool and parameter descriptions use public tool identifiers', () => {
+test('all tool and parameter descriptions use public tool identifiers', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：all tool and parameter descriptions use public tool identifiers。 */ () => {
   const bare = /\b(?:pipeline_catalog|pipeline_plan|pipeline_run|pipeline_status|pipeline_artifacts|pipeline_repair_plan|pipeline_evaluate|stage_review)\b/;
   for (const text of Object.values(definitions)) assert.doesNotMatch(qualifyToolNames(text), bare);
+  /** 递归检查工具结构中的说明文字，断言业务工具引用均已限定名称。 */
   const visit = node => {
     if (!node || typeof node !== 'object') return;
     if (typeof node.description === 'string') assert.doesNotMatch(node.description, bare);
@@ -17,7 +18,7 @@ test('all tool and parameter descriptions use public tool identifiers', () => {
   visit(qualifyDescriptions(schemas));
 });
 
-test('schema qualification leaves values and example paths unchanged', () => {
+test('schema qualification leaves values and example paths unchanged', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：schema qualification leaves values and example paths unchanged。 */ () => {
   const input = {description: 'Use pipeline_catalog', enum: ['pipeline_run'],
     examples: [{description: 'pipeline_plan', path: '/work/pipeline_run/image.png'}],
     properties: {field: {type: 'string', description: 'Use pipeline_plan'}}};
@@ -28,7 +29,7 @@ test('schema qualification leaves values and example paths unchanged', () => {
   assert.equal(input.description, 'Use pipeline_catalog');
 });
 
-test('DSH catalog names only admitted tools and preserves example data', () => {
+test('DSH catalog names only admitted tools and preserves example data', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：DSH catalog names only admitted tools and preserves example data。 */ () => {
   const value = {workflow: [{area: 'production', tools: 'pipeline_plan, pipeline_run'}, {area: 'other', tools: 'model_eval'}],
     requests: {pipeline_plan: {path: '/work/pipeline_run/input.json'}, model_eval: {model: 'offline'}},
     production: {pipeline_plan: {description: 'Plan'}}, evidence_record: {id: 'pipeline_plan'}};
@@ -40,7 +41,7 @@ test('DSH catalog names only admitted tools and preserves example data', () => {
   assert.ok(value.requests.pipeline_plan);
 });
 
-test('workbench instructions qualify tools without rewriting selected files or user data', () => {
+test('workbench instructions qualify tools without rewriting selected files or user data', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：workbench instructions qualify tools without rewriting selected files or user data。 */ () => {
   const path = '/work/operations/job/pipeline_run/scene.json';
   const state = createWorkbenchState({});
   const text = state.productionContext({selection_path: path, sources: [{path}], allow_new_scenes: false}, {

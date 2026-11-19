@@ -1,7 +1,9 @@
 import {qualifyToolNames, toolName} from '../../dsh/tools/benchmark/names.mjs';
 import {stageSummary, COLLECTION_OPERATIONS} from '../../dsh/production/stages.mjs';
 
+/** 创建工作台状态推导函数，统一阶段选择、数量进度、公开产物和本地持久化默认值。 */
 export function createWorkbenchState({STAGES, sceneName}) {
+  /** 按会话读取已保存浏览位置，使用当前版本默认值兼容旧数据。 */
   function initialState(sessionId) {
     const fallback = {version: 3, stage: 'S1', run: '', production: '', dataset: '', template: '', split: '', q: '', page: 1, size: 24, layout: 'grid',
       runFilter: '', runListPage: 1, runListSize: 12, versionFilter: '', versionListPage: 1, versionListSize: 12};
@@ -19,6 +21,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
     }
     return fallback;
   }
+  /** 读取会话保存的生产需求，缺失或版本不符时使用安全默认设置。 */
   function initialDemand(sessionId) {
     const fallback = {version: 1, objective: '', count: '100', capability: '', sceneCount: '', storageBudget: '',
       mode: 'new', executionMode: 'production', quantityContract: 'minimum'};
@@ -28,6 +31,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
       executionMode: ['production', 'exploration'].includes(saved.executionMode) ? saved.executionMode : fallback.executionMode,
       quantityContract: ['exact', 'minimum', 'best_effort'].includes(saved.quantityContract) ? saved.quantityContract : fallback.quantityContract};
   }
+  /** 把已保存的场景选择转为明确指令，保留修订身份并限制允许复用的来源。 */
   function sceneConstraint(selection) {
     if (!selection) return '';
     return '\n场景使用约束（以保存的场景选择为准）：\n' + JSON.stringify({schema: selection.schema,
@@ -37,6 +41,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
       (selection.allow_new_scenes ? '允许按需求生成新场景，生成后统一登记到场景库。' : '不允许通过新建、复制或重新生成场景绕过选择。') +
       '若所选场景不足以满足要求，如实记录缺口，等待用户调整场景选择。\n';
   }
+  /** 根据新建或追加模式生成生产请求，包含执行模式、数量契约和场景约束。 */
   function productionRequest(demand, selection) {
     if (demand.mode === 'append') return '请将以下要求应用于当前会话的生产任务，保留已有产物和失败证据，并继续实际执行至完成：\n' + demand.objective.trim() + sceneConstraint(selection);
     return [
@@ -50,6 +55,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
       '使用当前已接入工具。S2 先选取或新建并验收场景，预览不等于完成正式数据采集。S3 在已验收场景中采集轨迹、传感器数据与状态，包含标注、对齐与来源校验。GT 仅来自官方、程序或仿真，公开题目不泄露答案。将各阶段真实回执和产物关联到当前会话。',
     ].filter(Boolean).join('\n') + sceneConstraint(selection);
   }
+  /** 生成五阶段复核、计划模板和场景使用约束的完整生产上下文。 */
   function productionContext(selection, template) {
     return sceneConstraint(selection) +
       '\n五阶段：' + stageSummary() + '。S3 采集包含标注。每阶段完成后展示真实产物，后端执行三轮自检，每轮检查通过后等待用户 60 秒。由计划和执行器建立阶段回执，使用 '+toolName('stage_review')+' 读取及等待持久关口；三轮均通过且无待处理指令时自动继续。普通修补保留原轮次与等待，明确暂停或自检失败不得超时放行。审核期间可读资料、看预览和编辑准备稿，不得提前采集依赖该阶段的正式数据或绕过审核另起脚本。\n' +
@@ -60,12 +66,14 @@ export function createWorkbenchState({STAGES, sceneName}) {
       (template.scene_authoring ? '\n场景标题、摘要、空间关系与双向修订合同：\n' + JSON.stringify(template.scene_authoring, null, 2) : '') +
       '\n传入 '+toolName('pipeline_plan')+'.assessment 的填写结构：\n' + JSON.stringify(template.assessment, null, 2);
   }
+  /** 从内部路径或运行标识提取适合界面显示的简短名称。 */
   function displayRef(value) {
     const parts = String(value || '').split(/[\\/]/).filter(Boolean);
     if (parts[0] === 'operations' && parts[1]) return '运行 ' + parts[1].slice(0, 8);
     const visible = parts.filter((part) => !['steps', 'questions', 'dataset', 'pipeline_run'].includes(part));
     return visible[visible.length - 1] || String(value || '—');
   }
+  /** 按可搜索文本筛选列表并限制当前页，返回分页切片和总页数。 */
   function filteredPage(items, query, page, size, searchable) {
     const needle = String(query || '').trim().toLocaleLowerCase();
     const matches = needle ? items.filter((item) => searchable(item).toLocaleLowerCase().includes(needle)) : items;
@@ -74,8 +82,10 @@ export function createWorkbenchState({STAGES, sceneName}) {
     return {items: matches.slice((current - 1) * size, current * size), total: matches.length, pages, page: current};
   }
 
+  /** 把服务原始任务状态规范为工作台统一生命周期名称。 */
   const lifecycle = (value) => ({SUCCEEDED: 'completed', FAILED_FINAL: 'failed', CANCELED: 'canceled',
     READY: 'waiting', PENDING: 'waiting', RUNNING: 'running'}[value] || value || 'unknown');
+  /** 综合流水线、并行任务、场景和生成任务状态，推断整体后台生产状态。 */
   function backgroundProductionState(value) {
     if (!value) return 'unknown';
     const states = [
@@ -88,9 +98,13 @@ export function createWorkbenchState({STAGES, sceneName}) {
     if (states.includes('running')) return 'running';
     return states.length ? 'idle' : 'unknown';
   }
+  /** 从终态和公开产物修订计算稳定刷新标记，避免普通进度变化触发无效产物刷新。 */
   function productionProductsRevision(value) {
+    /** 只保留完成、失败和取消等终态作为产物刷新依据。 */
     const terminal = (state) => ['completed', 'failed', 'canceled'].includes(lifecycle(state)) ? lifecycle(state) : null;
+    /** 按条目标识稳定排序，消除服务返回次序变化造成的误刷新。 */
     const sorted = (rows) => rows.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    /** 提取公开产物的计数、修订和链接版本，形成稳定产物变化摘要。 */
     const artifacts = (row) => [row.artifact_revision ?? null, row.artifact_count ?? null,
       sorted((row.public_artifacts || []).map((file) => [file.url, file.revision ?? file.version ?? null]))];
     // Live counters and observation timestamps do not invalidate saved products.
@@ -108,14 +122,18 @@ export function createWorkbenchState({STAGES, sceneName}) {
         value.generation.state, value.generation.written_count, value.generation.verified_count, value.generation.published_count] : null,
     ]);
   }
+  /** 根据任务阶段和工作流类型推断其对应的五阶段位置。 */
   const sceneStage = (row) => ['collect', 'collection', 'annotate'].includes(row.phase) ? 'S3' :
     row.workflow === 'scene' ? 'S2' : row.workflow === 'dataset' ? 'S4' :
     ({review: 'S5', publish: 'S5', export: 'S5', dataset: 'S4'}[row.phase] || 'S2');
+  /** 优先选择包含目标阶段的最近流水线；采集阶段可回退使用场景制作流水线。 */
   function pipelineForStage(id, pipelines) {
+    /** 按更新时间选择包含指定阶段步骤的最近流水线。 */
     const latest = (stage) => pipelines.filter((row) => row.steps?.some((step) => step.stage === stage))
       .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))[0];
     return latest(id) || (id === 'S3' ? latest('S2') : null);
   }
+  /** 从适用场景中优先选择仍活动或成功的记录，跳过已取消项。 */
   function sceneForStage(id, scenes) {
     const candidates = scenes.filter((scene) => scene.tasks?.some((task) => sceneStage(task) === id ||
       id === 'S3' && sceneStage(task) === 'S2'));
@@ -123,6 +141,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
     return usable.find((scene) => !scene.terminal && scene.state !== 'FAILED_FINAL') ||
       usable.find((scene) => scene.state === 'SUCCEEDED') || usable[0] || candidates[0];
   }
+  /** 汇总当前阶段仍在运行的场景任务并去重，使并行活动不会被单一历史场景覆盖。 */
   function progressSceneForStage(id, selected, scenes = []) {
     const active = scenes.filter((row) => !row.terminal && !['SUCCEEDED', 'FAILED_FINAL', 'CANCELED'].includes(row.state) &&
       row.tasks?.some((task) => sceneStage(task) === id));
@@ -135,6 +154,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
     });
     return {state: active.some((row) => row.state === 'RUNNING') ? 'RUNNING' : active[0].state, tasks};
   }
+  /** 按计划声明与后端登记的设计行计算场景采集完成、失败和缺口。 */
   function registeredCollectionProgress(plan, current) {
     const design = plan?.assessment?.scenes;
     const targets = design?.designs || [];
@@ -155,6 +175,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
       identityPending: !trusted, current: true, registrationStatus: current.status,
       notice: current.status === 'pending' ? 'scenePlanPending' : !trusted ? 'sceneSnapshotUnavailable' : null};
   }
+  /** 严格校验当前计划关联的生成计数与状态，拒绝越界或无明确归属的数据。 */
   function currentGeneration(value) {
     if (!value || !['current_applied_plan', 'current_plan_path_after_save'].includes(value.association) ||
         !Number.isSafeInteger(value.target_items) || value.target_items < 1 ||
@@ -170,6 +191,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
       eligible != null && eligible !== value.target_items);
     return {...value, fresh, state: incomplete || value.state === 'running' && !fresh ? 'incomplete' : value.state};
   }
+  /** 优先使用登记后的采集进度，否则从计划目标和最新场景修订推导制作状态。 */
   function sceneCollectionProgress(plan, scenes = [], current = null) {
     if (current) return registeredCollectionProgress(plan, current);
     const design = plan?.assessment?.scenes;
@@ -183,6 +205,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
     })).filter((row) => row.id);
     const targetIds = new Set(targets.map((row) => row.id));
     const boundPlan = total > 0 && targetIds.size === total;
+    /** 兼容秒、毫秒及日期字符串，将场景时间统一为毫秒排序值。 */
     const timestamp = (value) => {
       if (value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))) {
         const number = Number(value); return number < 1e12 ? number * 1000 : number;
@@ -244,11 +267,13 @@ export function createWorkbenchState({STAGES, sceneName}) {
       rows.length && rows.every((row) => row.state === 'canceled') ? 'canceled' : 'waiting';
     return {rows, total, passed, state, identityPending};
   }
+  /** 只把同任务、同修订且有对应图片的 S3 JSON 识别为可见标注产物。 */
   function annotationProducts(artifacts) {
     return artifacts.filter((row) => row.stage === 'S3' && row.kind === 'json' && artifacts.some((image) =>
       image.kind === 'image' && image.task_id === row.task_id && image.revision === row.revision &&
       image.file === row.file?.replace(/\.json$/, '.png')));
   }
+  /** 综合实际生成任务及已登记事实，推断当前阶段的展示状态。 */
   function stageState(id, pipeline, scene, operations = [], planReceipt = null, artifacts = [], collection = null, generation = null) {
     const generated = id === 'S4' ? currentGeneration(generation) : null;
     if (generated?.state === 'running' && generated.fresh) return 'running';
@@ -258,6 +283,7 @@ export function createWorkbenchState({STAGES, sceneName}) {
     if (generated?.state === 'complete' && pipeline?.steps?.some((row) => row.stage === id) && recorded !== 'unknown') return recorded;
     return generated?.state === 'complete' && recorded !== 'completed' ? 'waiting' : recorded;
   }
+  /** 依据计划回执、流水线步骤、场景和采集证据推导已经记录的阶段完成情况。 */
   function recordedStageState(id, pipeline, scene, operations = [], planReceipt = null, artifacts = [], collection = null) {
     if (id === 'S1' && planReceipt) return 'completed';
     if (id === 'S2' && collection) return collection.state;

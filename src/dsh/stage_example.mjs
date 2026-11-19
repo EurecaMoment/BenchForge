@@ -2,19 +2,21 @@ import {cp, mkdir, lstat, readFile, stat, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 /** Ship the actual public sample, without its heavyweight simulator replay assets. */
+/** 校验示例清单后按资源筛选规则复制可分发内容，生成安装所需的示例包。 */
 export async function stageExample(source, destination) {
   const manifest = JSON.parse(await readFile(path.join(source, 'bootstrap.json'), 'utf8'));
   for (const file of [manifest.conversation, ...manifest.artifacts.map(row => row.path)]) {
     if (!(await stat(path.join(source, file))).isFile()) throw new Error('Example source is incomplete: ' + file);
   }
   const metadata = /\.(json|jsonl|md|txt|zstd)$/;
+  /** 保留数据集和元数据，排除体积较大的中间场景资源。 */
   const included = relative => {
     if (relative.startsWith(manifest.workbench.dataset + '/')) return true;
     if (relative.includes('/scene_resource_')) return false;
     return metadata.test(relative) || /(?:view_\d+|reference)\.(png|jpe?g)$/.test(relative);
   };
   await mkdir(destination, {recursive: true});
-  await cp(source, destination, {recursive: true, filter: async file => {
+  await cp(source, destination, {recursive: true, /** 根据相对路径应用示例资源筛选，同时保留目录以支持递归复制。 */ filter: async file => {
     const info = await lstat(file);
     if (info.isSymbolicLink()) throw new Error('Example cannot include symbolic links: ' + file);
     return info.isDirectory() || included(path.relative(source, file).replaceAll('\\', '/'));

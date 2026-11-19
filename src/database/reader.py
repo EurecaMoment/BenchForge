@@ -14,6 +14,7 @@ from database.engine import engine_for
 from database.schema import workspaces
 
 
+# 从指定环境变量读取独立的只读连接地址，缺失时提示配置。
 def reader_url(config, *, environ=None):
     environment = os.environ if environ is None else environ
     name = config.get('reader_database_url_env', 'BENCHFORGE_READER_DATABASE_URL')
@@ -23,6 +24,7 @@ def reader_url(config, *, environ=None):
     return normalize_database_url(value)
 
 
+# 核对服务与读连接指向同一数据库，并要求读角色与所有者分离。
 def _same_database(service, reader):
     left, right = make_url(service), make_url(reader)
     if ((left.host, left.port or 5432, left.database, dict(left.query)) !=
@@ -35,6 +37,7 @@ def _same_database(service, reader):
     return right
 
 
+# 串行配置专用读角色；只创建缺失角色，避免改写已有角色的密码。
 def provision_reader(service_url, query_url, *, create=False):
     """Create only an absent dedicated role; never rotate another role's password."""
     query = _same_database(service_url, query_url)

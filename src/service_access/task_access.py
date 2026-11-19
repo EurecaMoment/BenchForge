@@ -7,6 +7,7 @@ from service_access.access_scope import TrustedAccess, current_access
 from storage.access_identity import resolve_access_scope
 
 
+# 从已存储运行与工作项恢复访问作用域，拒绝将不完整的 DSH 身份当作操作者任务。
 def task_access(engine, task_id):
     """Restore scope without treating incomplete DSH ownership as operator work."""
     with engine.connect() as connection:

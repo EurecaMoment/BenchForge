@@ -12,6 +12,7 @@ from pipelines.benchmark.execution.repair import repair_plan as pipeline_repair_
 from capabilities.evaluation.benchmark.protocol_scores import evaluate as pipeline_evaluate
 from pipelines.benchmark.execution.stage_review import call as stage_review
 
+# 按需导入 Isaac Sim 工具执行入口，使不使用原生采集的安装无需 gRPC 依赖。
 def isaac_sim(args, directory, config):
     # Catalog-only/base installations do not need the optional gRPC dependencies.
     from capabilities.isaac_sim.tool_api import execute

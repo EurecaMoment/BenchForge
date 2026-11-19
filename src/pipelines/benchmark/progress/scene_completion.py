@@ -6,6 +6,7 @@ from capabilities.scene_library.scene_library import main
 from capabilities.scene_library.scene_library import read_json
 
 
+# 依据当前活动评估计划重新计算场景完成状态，失效或待应用计划不沿用旧完成标志。
 def current_production_status(previous, items, folder):
     """Recompute scene completion against the active assessment plan."""
     status = previous.get('production_status')
@@ -50,6 +51,7 @@ def current_production_status(previous, items, folder):
         return None
 
 
+# 把重新核对的生产状态写入场景目录，无法确认时移除过期状态。
 def project_scene_completion(catalog, folder):
     status = current_production_status(catalog, catalog['items'], folder)
     if status is None:

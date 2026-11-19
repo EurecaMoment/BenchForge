@@ -5,6 +5,7 @@ BUILTINS = {
 } | {"C43-T01", "C43-T03"}
 
 
+# 报告模板是否有内置程序生成器及证据绑定能力，并明确验证范围。
 def supports(template_id):
     return {
         "program_generator": template_id in BUILTINS,

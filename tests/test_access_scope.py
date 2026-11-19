@@ -13,12 +13,14 @@ from service_access.input_policy import check_arguments, resolve_arguments
 
 
 class AccessScopeTests(unittest.TestCase):
+    # 创建临时会话工作区与不可变可信身份，供票据及文件边界验证。
     def setUp(self):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
         self.access = TrustedAccess(AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1), str(self.root))
 
+    # 验证访问票据能还原合法身份，并拒绝篡改、错密钥及到期票据。
     def test_signed_scope_tampering_and_expiration(self):
         with patch('service_access.access_scope.time.time', return_value=1000):
             ticket = sign_ticket(self.access, 'secret')
@@ -31,6 +33,7 @@ class AccessScopeTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             decode_ticket(ticket, 'other-key', now=1001)
 
+    # 验证访问上下文退出后恢复，路径穿越及伪造会话参数均被拒绝。
     def test_context_is_restored_and_paths_cannot_escape(self):
         with access_context(self.access):
             self.assertEqual(workspace_path('tasks/new.json', must_exist=False), self.root / 'tasks/new.json')
@@ -43,6 +46,7 @@ class AccessScopeTests(unittest.TestCase):
             check_arguments({'plan': 'tasks/plan.json', 'description': 'Read /etc as a textual example'})
         self.assertIsNone(current_access())
 
+    # 验证任务标签仅定位当前会话内子目录，不能选择其他会话工作区。
     @unittest.skipUnless(sys.platform == 'linux', 'Scoped task directories require Linux descriptors')
     def test_task_labels_are_not_global_workspaces(self):
         from server.task_workspace import task_directory
@@ -51,6 +55,7 @@ class AccessScopeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 task_directory('../session-b')
 
+    # 验证本地任务路径按会话根解析，远端引用与普通说明文本保持字面含义。
     def test_task_paths_resolve_in_workspace_independently_of_host_import_directory(self):
         request = {'plan': 'tasks/plan.json', 'run': 'tasks/run', 'description': '/example/text',
                    'source_image': 'https://example.test/image.png',

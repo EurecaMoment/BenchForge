@@ -7,6 +7,7 @@ from pathlib import Path
 import time
 
 
+# 安全打开锁标记；当前访问作用域内通过固定目录描述符防止路径替换。
 @contextmanager
 def _marker(path):
     from service_access.access_scope import current_access
@@ -33,6 +34,7 @@ class LockBusyError(RuntimeError):
     """Another process owns the requested marker."""
 
 
+# 跨平台锁定标记文件首字节，退出时释放；保留标记以避免锁到不同文件实体。
 @contextmanager
 def file_lock(path, *, blocking=True):
     """Lock byte zero even on an empty file; never write before acquiring it.

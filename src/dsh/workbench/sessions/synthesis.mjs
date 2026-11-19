@@ -16,30 +16,37 @@ For scene facing and functional-layout work, use only the calibrated asset-front
 The parent owns authoritative merging, capture, acceptance, export and each production stage's user window. Do not spawn more workers, create stage windows or bypass parent-owned tools through a shell, HTTP or task code. Question workers deliver S4 preparation or shards; the parent packages S5 after aggregate S4 acceptance. Update manifest.json to reflect the actual preparation outcome and quote its path in the final handoff. Preparation completion and accepted scene/data production are separate outcomes.`;
 
 class SynthesisError extends Error {
+  /** 创建带响应状态的准备子任务错误。 */
   constructor(message, status = 400) { super(message); this.status = status; }
 }
+/** 判断准备文件与记录目录是否位于受管工作区之内。 */
 const inside = (root, value) => {
   const relative = path.relative(root, value);
   return relative === '' || relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
+/** 校验必需字段为非空文本，并在错误中标明字段名。 */
 const nonempty = (value, field) => {
   if (typeof value !== 'string' || !value.trim()) throw new SynthesisError(`${field} must be non-empty text`);
   return value;
 };
+/** 验证请求为对象且没有未支持字段，避免接受含糊的委派参数。 */
 function fields(value, allowed, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new SynthesisError(`${name} must be an object`);
   const extra = Object.keys(value).filter(key => !allowed.includes(key));
   if (extra.length) throw new SynthesisError(`Unsupported ${name} fields: ${extra.join(', ')}`);
 }
+/** 读取批次 JSON 记录，尚未创建时返回空值。 */
 async function json(file) {
   try { return JSON.parse(await fs.readFile(file, 'utf8')); }
   catch (error) { if (error.code === 'ENOENT') return null; throw error; }
 }
+/** 通过唯一临时文件原子替换批次记录，并清理遗留临时文件。 */
 async function write(file, value) {
   const temporary = file + '.' + randomUUID() + '.tmp';
   try { await fs.writeFile(temporary, JSON.stringify(value, null, 2)); await fs.rename(temporary, file); }
   finally { await fs.unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
+/** 解析真实目录并校验其存在且类型正确。 */
 async function directory(value, name) {
   let resolved;
   try { resolved = await fs.realpath(value); }
@@ -50,6 +57,7 @@ async function directory(value, name) {
   if (!(await fs.stat(resolved)).isDirectory()) throw new SynthesisError(`${name} must be a directory`);
   return resolved;
 }
+/** 解析真实普通文件，缺失或类型不符时提供字段相关错误。 */
 async function existingFile(value, name) {
   let resolved;
   try { resolved = await fs.realpath(value); }
@@ -60,6 +68,7 @@ async function existingFile(value, name) {
   if (!(await fs.stat(resolved)).isFile()) throw new SynthesisError(`${name} must be a file`);
   return resolved;
 }
+/** 逐级创建准备任务记录目录，并确保每一级仍位于受管工作区内。 */
 async function recordDirectory(root) {
   let current = root;
   for (const name of ['.benchforge', 'synthesis-sessions']) {
@@ -70,6 +79,7 @@ async function recordDirectory(root) {
   }
   return current;
 }
+/** 将批次任务状态汇总为接受、失败和等待数量，并生成去重的可读错误回执。 */
 function receipt(record, recordPath, reason) {
   const acceptedCount = record.tasks.filter(task => task.state === 'accepted').length;
   const failedCount = record.tasks.filter(task => task.state === 'failed').length;
@@ -84,6 +94,7 @@ function receipt(record, recordPath, reason) {
     ...(record.reasoningSelection ? {reasoningSelection: record.reasoningSelection} : {}),
     tasks: record.tasks.map(({prompt, ...task}) => task)};
 }
+/** 按记录键串行执行批次变更，前次失败不阻断后续请求。 */
 async function serialized(key, operation) {
   const previous = queues.get(key) || Promise.resolve();
   const current = previous.catch(() => {}).then(operation);
@@ -91,6 +102,7 @@ async function serialized(key, operation) {
   try { return await current; }
   finally { if (queues.get(key) === current) queues.delete(key); }
 }
+/** 以排他文件锁持有批次操作权，并提供关闭和删除锁文件的清理函数。 */
 async function lock(file) {
   let opened;
   try {
@@ -117,11 +129,13 @@ async function lock(file) {
   }
 }
 
+/** 提取原生 Agent 活动检查异常的名称、消息和可选错误码。 */
 function activityError(error) {
   return {name: error?.name || 'Error', message: error?.message || String(error),
     ...(error?.code !== undefined ? {code: error.code} : {})};
 }
 
+/** 对 Agent 的原生空闲等待建立有界读取探针，超时后读取请求不继续无限阻塞。 */
 function nativeIdleProbe(agent) {
   const cached = nativeIdleProbes.get(agent);
   if (cached?.state === 'pending') return cached;
@@ -131,7 +145,7 @@ function nativeIdleProbe(agent) {
   // Reads await this bounded promise, never the Agent's unbounded promise.
   // Once timed out, subsequent reads of a pending probe return immediately.
   probe.readReady = new Promise(resolve => {
-    finishRead = () => { clearTimeout(timer); resolve(); };
+    finishRead = /** 清除空闲探针的读取超时并释放当前有界等待。 */ () => { clearTimeout(timer); resolve(); };
     timer = setTimeout(resolve, NATIVE_ACTIVITY_PROBE_MS);
   });
   nativeIdleProbes.set(agent, probe);
@@ -161,10 +175,13 @@ function nativeIdleProbe(agent) {
  * authentication and registered-workspace admission. The Host reserves each
  * child's independent workspace and hands off explicit input snapshots.
  */
+/** 创建受父会话计划约束的准备子任务批次接口，限制并发并持久化原生子会话归属。 */
 export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
   if (!Number.isSafeInteger(batchSize) || batchSize < 1) throw new SynthesisError('batchSize must be a positive integer');
+  /** 从当前宿主上下文获取可用原生服务。 */
   const get = name => ctx.get(name);
 
+  /** 读取原生子 Agent 的活动与空闲确认状态，用有界探针避免状态查询挂起。 */
   async function nativeActivity(agentId) {
     let agent;
     try {
@@ -187,6 +204,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     }
   }
 
+  /** 从父会话当前模型注册表确认可用于准备子任务的推理强度。 */
   async function preparationReasoning(parent, signal) {
     const llm = parent.ctx?.get('llm') || get('llm');
     if (typeof llm?.resolveModelInfo !== 'function') throw new SynthesisError('The parent model capability registry is unavailable', 503);
@@ -210,6 +228,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
             : `The model does not support ${preferredEffort}; preparation uses supported ${selectedEffort}. Provider/model and parent effort are unchanged.`};
   }
 
+  /** 校验父会话、工作区和所需原生服务，建立批次操作的可信作用域。 */
   async function scope(parentId, requireAgent = true, signal) {
     nonempty(parentId, 'parentId');
     const parent = get('agents')?.get(parentId);
@@ -228,8 +247,10 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
       throw new SynthesisError('Preparation requires the parent managed workspace', 403);
     return {root, parent, service, access, dir: await recordDirectory(root)};
   }
+  /** 将非空批次键编码为工作区记录目录下的安全文件名。 */
   const fileOf = (dir, batchKey) => path.join(dir, 'batch-' + Buffer.from(nonempty(batchKey, 'batchKey'), 'utf8').toString('base64url') + '.json');
 
+  /** 优先读取驻留子会话头，否则通过官方观察接口确认身份并释放快照。 */
   async function header(childId, signal) {
     signal?.throwIfAborted();
     const live = get('sessions')?.get(childId);
@@ -245,6 +266,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
       return {absent: ['SESSION_QUERY_SESSION_NOT_FOUND', 'session/not-found'].includes(error.code)};
     }
   }
+  /** 使用原生子 Agent 目录和会话头协调启动不确定或失败的任务，避免重复创建子会话。 */
   async function reconcile(record, signal) {
     const uncertain = record.tasks.filter(task => ['starting', 'failed'].includes(task.state));
     if (!uncertain.length) return false;
@@ -267,6 +289,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     }
     return changed;
   }
+  /** 统计工作区全部批次中仍在运行或启动中的原生子任务。 */
   async function occupied(dir) {
     let active = 0;
     for (const name of (await fs.readdir(dir)).filter(name => name.startsWith('batch-') && name.endsWith('.json'))) {
@@ -279,6 +302,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     return active;
   }
 
+  /** 验证父计划与任务清单，在互斥和并发预算内幂等创建原生准备子会话。 */
   async function start(request, signal) {
     fields(request, ['parentId', 'batchKey', 'tasks', 'planPath'], 'synthesis request');
     const {root, parent, service, access, dir} = await scope(request.parentId, true, signal);
@@ -287,7 +311,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
       path.resolve(root, nonempty(request.planPath, 'planPath')), 'planPath');
     if (planPath && !inside(root, planPath)) throw new SynthesisError('The saved plan must stay inside the workspace', 403);
     if (!Array.isArray(request.tasks) || !request.tasks.length) throw new SynthesisError('tasks must contain preparation work');
-    const tasks = await Promise.all(request.tasks.map(async task => {
+    const tasks = await Promise.all(request.tasks.map(/** 校验每个子任务字段、输出目录和输入文件，建立明确且独立的委派身份。 */ async task => {
       fields(task, ['key', 'label', 'prompt', 'outputDirectory', 'inputFiles'], 'synthesis task');
       const outputDirectory = await directory(path.resolve(root, nonempty(task.outputDirectory, 'outputDirectory')), 'outputDirectory');
       if (outputDirectory === root || !inside(root, outputDirectory)) throw new SynthesisError('Worker output must be a dedicated directory inside the workspace', 403);
@@ -311,7 +335,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     }
     const recordPath = fileOf(dir, batchKey);
     const identity = {parentId: parent.id, batchKey, workspacePath: root, ...(planPath ? {planPath} : {}), tasks};
-    return serialized(dir, async () => {
+    return serialized(dir, /** 在批次文件锁内核验幂等身份和并发预算，持久化启动状态后创建原生子任务。 */ async () => {
       const release = await lock(path.join(dir, '.startup.lock'));
       if (!release) {
         const saved = await json(recordPath);
@@ -353,8 +377,9 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
         }
         await write(recordPath, record); // Reserve durable identities before native creation.
         let saves = Promise.resolve();
+        /** 将当前批次快照串行写入记录文件，保持任务启动状态的顺序。 */
         const save = () => { saves = saves.then(() => write(recordPath, record)); return saves; };
-        await Promise.all(ready.map(async task => {
+        await Promise.all(ready.map(/** 为待启动子任务预留独立工作区、制作输入快照并调用原生激活接口。 */ async task => {
           try {
             signal?.throwIfAborted();
             const binding = await access.reserve(task.childId, parent.id);
@@ -395,10 +420,11 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
       } finally { await release(); }
     });
   }
+  /** 读取并协调指定父会话的批次记录，补充原生活动状态后返回当前回执。 */
   async function read({parentId, batchKey}, signal) {
     const {dir} = await scope(parentId, false, signal);
     const recordPath = fileOf(dir, batchKey);
-    const value = await serialized(dir, async () => {
+    const value = await serialized(dir, /** 串行读取并协调批次记录，验证父会话归属后补充原生活动状态。 */ async () => {
       const record = await json(recordPath);
       if (!record) return {parentId, batchKey, recordPath, state: 'not_started', acceptedCount: 0, tasks: []};
       if (record.parentId !== parentId) throw new SynthesisError('This batch belongs to another parent', 403);

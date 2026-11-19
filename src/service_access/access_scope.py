@@ -22,10 +22,12 @@ class TrustedAccess:
 _current = ContextVar("benchforge_access", default=None)
 
 
+# 取得当前请求已验证的宿主访问身份，未绑定时返回空值。
 def current_access():
     return _current.get()
 
 
+# 仅接受可信访问对象，在调用作用域内绑定并在退出后恢复原身份。
 @contextmanager
 def access_context(access):
     if access is not None and not isinstance(access, TrustedAccess):
@@ -37,6 +39,7 @@ def access_context(access):
         _current.reset(token)
 
 
+# 校验有界 HMAC 票据的签名、受众、有效期及身份字段；密钥由宿主与服务持有。
 def decode_ticket(ticket, secret, *, now=None):
     """Bounded HMAC ticket. The key belongs to the Host/service, not task code."""
     if not isinstance(ticket, str) or len(ticket) > 8192 or not secret:
@@ -60,6 +63,7 @@ def decode_ticket(ticket, secret, *, now=None):
         raise PermissionError("Invalid or expired workspace access ticket") from exc
 
 
+# 验证票据并核对数据库登记的当前代次，返回仍有效的工作区访问身份。
 def resolve_ticket(engine, ticket, secret):
     from storage.access_identity import register_session_workspace, resolve_access_scope
     from database.schema import workspaces
@@ -80,6 +84,7 @@ def resolve_ticket(engine, ticket, secret):
     return TrustedAccess(scope, root)
 
 
+# 相对可信会话根解析任务文件，拒绝越界以及路径中可变的链接。
 def workspace_path(value, *, must_exist=True):
     """Resolve a task file relative to the trusted conversation root."""
     access = current_access()
@@ -102,6 +107,7 @@ def workspace_path(value, *, must_exist=True):
     return resolved
 
 
+# 仅在可信命令行入口消费宿主环境票据，核对工作区后临时绑定访问身份。
 @contextmanager
 def cli_access(engine, workspace):
     """Consume the Host environment only at a trusted CLI entry point."""
@@ -118,6 +124,7 @@ def cli_access(engine, workspace):
         yield access
 
 
+# 将可信访问身份签成面向服务的短时 HMAC 票据，供跨进程请求传递。
 def sign_ticket(access, secret):
     from dataclasses import asdict
     value = {**asdict(access.scope), "root_path": access.root_path,

@@ -8,6 +8,7 @@ class RunBusyError(RuntimeError):
     """The same run is already being advanced by another caller."""
 
 
+# 持有运行目录的非阻塞本地锁，已有执行者时返回明确的忙碌错误。
 @contextmanager
 def exclusive_run(directory):
     """Reject competing local execution; distributed stages use database leases."""

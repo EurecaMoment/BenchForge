@@ -4,6 +4,7 @@ import signal
 import subprocess
 
 
+# 先温和结束当前作用域拥有的子进程及后代，宽限期后强制回收剩余进程。
 def terminate_process_tree(process, *, grace_seconds=10):
     """Stop a subprocess and descendants created inside its owned scope."""
     if process.poll() is not None:

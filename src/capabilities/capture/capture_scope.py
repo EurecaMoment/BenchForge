@@ -1,6 +1,7 @@
 """Optional output selection; scene construction and physics remain unchanged."""
 
 
+# 验证零起始且不重复的相机索引和场景导出开关，返回本次采集覆盖范围。
 def capture_scope(program, options=None):
     options = {} if options is None else options
     if not isinstance(options, dict) or set(options) - {'view_indices', 'export_scene'}:

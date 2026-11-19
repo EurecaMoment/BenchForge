@@ -6,7 +6,7 @@ import {currentAccessScope} from '../../access/context.mjs';
 import {HarnessError} from '@deepseek-ai/dsh-llm';
 
 export class ScenePreflightRejected extends HarnessError {
-
+  /** 保留场景预检失败的完整响应与 HTTP 状态，供工具和界面展示可操作诊断。 */
   constructor(response, status) {
     super(JSON.stringify(response), 'scene_preflight_failed');
     this.status = status;
@@ -14,12 +14,12 @@ export class ScenePreflightRejected extends HarnessError {
   }
 }
 
-
+/** 递归扫描 JSON 对象键，拒绝重复字段以免配置解析产生歧义。 */
 function rejectDuplicateObjectKeys(source) {
   let index = 0;
-
+  /** 前移解析游标，跳过 JSON 值之间的空白字符。 */
   const whitespace = () => { while (/\s/.test(source[index] || '') && index < source.length) index += 1; };
-
+  /** 读取含转义字符的 JSON 字符串，并将其解码为对象字段名。 */
   const readString = () => {
     const start = index++;
     while (index < source.length) {
@@ -28,7 +28,7 @@ function rejectDuplicateObjectKeys(source) {
     }
     return '';
   };
-
+  /** 递归越过对象、数组和标量，同时核对每个对象内部的字段唯一性。 */
   const readValue = () => {
     whitespace();
     if (source[index] === '{') {
@@ -68,15 +68,15 @@ function rejectDuplicateObjectKeys(source) {
   readValue();
 }
 
-
+/** 先拒绝重复对象键，再使用标准 JSON 解析器校验完整语法。 */
 function parseStrictJson(source) {
   rejectDuplicateObjectKeys(source);
   return JSON.parse(source);
 }
 
-
+/** 从注入的可信环境读取器或进程环境取得变量值，兼容带元数据的返回结构。 */
 async function environmentValue(getEnvironmentValue, name) {
-
+  /** 解包环境读取结果中的值，保留普通字符串结果。 */
   const get = async key => {
     const result = getEnvironmentValue ? await getEnvironmentValue(key) : process.env[key];
     return result && typeof result === 'object' && 'value' in result ? result.value : result;
@@ -84,7 +84,7 @@ async function environmentValue(getEnvironmentValue, name) {
   return get(name);
 }
 
-
+/** 展开配置字符串中的环境变量引用，缺少引用变量时立即报告错误。 */
 async function expandEnvironment(value, getEnvironmentValue) {
   if (typeof value !== 'string') throw new Error('Configuration path/value must be a string');
   const reference = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)|%([A-Za-z_][A-Za-z0-9_]*)%/g;
@@ -100,7 +100,7 @@ async function expandEnvironment(value, getEnvironmentValue) {
   return result;
 }
 
-
+/** 先展开环境引用，再相对于当前配置文件解析目标路径。 */
 async function resolveConfigPath(value, configPath, getEnvironmentValue) {
   const expanded = await expandEnvironment(value, getEnvironmentValue);
   const homePath = expanded === '~' ? os.homedir() : expanded.startsWith('~/') || expanded.startsWith('~\\')
@@ -109,7 +109,7 @@ async function resolveConfigPath(value, configPath, getEnvironmentValue) {
   return resolved;
 }
 
-
+/** 加载并严格校验服务配置及可选基础配置，解析服务地址、执行模式和操作凭据。 */
 export async function loadServiceConfig(configFile, {getEnvironmentValue, requireOperatorToken = true} = {}) {
   let configPath = await resolveConfigPath(configFile, path.join(process.cwd(), '_config'), getEnvironmentValue);
   let config = parseStrictJson(await fs.readFile(configPath, 'utf8'));
@@ -177,7 +177,7 @@ export async function loadServiceConfig(configFile, {getEnvironmentValue, requir
   return {config, configPath, serviceUrl: config.service_url, operatorToken: token || '', executionMode};
 }
 
-
+/** 为可信会话访问作用域签名，限定服务受众并设置五分钟有效期。 */
 export function signAccessScope(scope, secret, now = Date.now()) {
   const value = {
     host_id: scope.host_id, owner_id: scope.owner_id, session_id: scope.session_id,
@@ -189,9 +189,9 @@ export function signAccessScope(scope, secret, now = Date.now()) {
   return encoded + '.' + createHmac('sha256', secret).update(encoded).digest('hex');
 }
 
-
+/** 创建携带操作凭据与会话作用域签名的服务请求器，并规范化及校验返回结果。 */
 export function createServiceClient({serviceUrl, operatorToken}) {
-  return  async (route, args, signal, {scope = currentAccessScope()} = {}) => {
+  return /** 发送附有操作凭据及可信会话签名的 JSON 请求，检查服务错误并规范化返回数据。 */ async (route, args, signal, {scope = currentAccessScope()} = {}) => {
     const response = await fetch(serviceUrl + route, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + operatorToken,

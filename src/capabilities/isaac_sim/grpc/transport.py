@@ -23,8 +23,10 @@ TRANSIENT = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED,
              grpc.StatusCode.RESOURCE_EXHAUSTED}
 
 
+# 保留协议字段名与默认值转换为JSON，并将负零规范化以兼容宿主。
 def document(message):
     """Preserve protocol names and defaults; DSH JSON also requires positive zero."""
+    # 递归清理字典和数组，把浮点零统一为正零。
     def clean(value):
         if isinstance(value, dict):
             return {key: clean(item) for key, item in value.items()}
@@ -36,6 +38,7 @@ def document(message):
 
 
 class RemoteJobFailed(RuntimeError):
+    # 保留远程任务完整回执，并将失败状态、错误码和原因写入异常。
     def __init__(self, job):
         self.job = document(job)
         super().__init__(f"Isaac Sim job {job.job_id} {pb.JobState.Name(job.state)}: "
@@ -45,6 +48,7 @@ class RemoteJobFailed(RuntimeError):
 class A100Client:
     """A shared thread-safe channel; each independent scene owns its own request IDs."""
 
+    # 从服务配置建立带认证与可选TLS的gRPC连接，设置请求和任务超时。
     def __init__(self, config):
         settings = isaac_config(config)
         connection = settings.get('grpc', {})
@@ -66,25 +70,31 @@ class A100Client:
             self.channel = grpc.insecure_channel(self.endpoint, options=options)
         self.stub = SimulatorStub(self.channel)
 
+    # 关闭原生模拟器的gRPC连接。
     def close(self):
         self.channel.close()
 
+    # 带统一认证元数据和超时调用指定gRPC方法。
     def call(self, method, request=None, *, timeout=None):
         return getattr(self.stub, method)(request or Empty(), timeout=timeout or self.timeout,
                                          metadata=self.metadata)
 
+    # 把普通或功能请求转换为协议消息，并附上幂等请求标识提交。
     def submit(self, payload, request_id, *, feature=False):
         message = pb.FeatureRequest() if feature else pb.SubmitTaskRequest()
         ParseDict({**payload, 'request_id': request_id}, message)
         return self.call('InvokeFeature' if feature else 'SubmitTask', message)
 
+    # 按任务标识读取远程任务的最新状态。
     def get(self, job_id):
         return self.call('GetJob', pb.JobRequest(job_id=job_id))
 
+    # 向服务请求取消任务，由服务决定排队任务能否取消。
     def cancel(self, job_id):
         """The server alone decides whether a queued job can be cancelled."""
         return self.call('CancelJob', pb.JobRequest(job_id=job_id))
 
+    # 轮询任务直至终态、超时或停止，区分显式取消和仅停止本地观察。
     def wait(self, job, *, stop=None, on_status=lambda job: None, timeout=None):
         deadline = time.monotonic() + (self.job_timeout if timeout is None else timeout)
         while True:
@@ -126,10 +136,12 @@ class A100Client:
             finally:
                 stream.cancel()
 
+    # 计算文件摘要并分块上传，返回服务登记的不可变资产句柄。
     def upload(self, path, *, asset_id='', relative_path=None):
         path = Path(path)
         with path.open('rb') as stream:
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        # 按256KiB产生上传块，仅首块携带资产标识、相对路径及摘要。
         def chunks():
             with path.open('rb') as stream:
                 first = True
@@ -145,11 +157,13 @@ class A100Client:
             raise ValueError('Isaac Sim asset upload receipt does not match source bytes')
         return document(result)
 
+    # 在回执锁内下载任务清单指定的产物，支持校验偏移和断点续传。
     def download(self, job, directory, *, stop=None):
         """Download manifest identities with checked offsets, resumable files and receipts."""
         with receipt_lock(directory):
             return self._download(job, directory, stop=stop)
 
+    # 校验不可变产物清单，逐项验证身份、流偏移和摘要并保存下载回执。
     def _download(self, job, directory, *, stop=None):
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)

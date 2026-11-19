@@ -22,6 +22,7 @@ _persistent = ContextVar('benchforge_persistent_outputs', default=())
 _TEXT_SUFFIXES = {'.json', '.jsonl', '.md', '.txt', '.log', '.csv', '.yaml', '.yml'}
 
 
+# 只替换已知私有暂存目录的完整前缀，保留相似名称和普通资源引用。
 def _replace_prefix(value, source, destination):
     # A private stage is not a user-controlled file reference. Only translate
     # its exact directory prefix, including occurrences in diagnostic prose.
@@ -29,6 +30,7 @@ def _replace_prefix(value, source, destination):
         if value != source else destination
 
 
+# 将当前操作暂存路径映射为发布后的逻辑产物路径。
 def logical_path(value):
     path = Path(value)
     for output in _outputs():
@@ -39,6 +41,7 @@ def logical_path(value):
     return path
 
 
+# 将已登记逻辑产物路径映射回当前私有暂存目录。
 def physical_path(value):
     path = Path(value)
     for output in _outputs():
@@ -49,11 +52,13 @@ def physical_path(value):
     return path
 
 
+# 按嵌套优先级收集持久运行与当前操作的有效输出上下文。
 def _outputs():
     current = _current.get()
     return (*reversed(_persistent.get()), *((current,) if current else ()))
 
 
+# 递归转换结构中的已知暂存前缀，不推断或打开用户资源路径。
 def logical_value(value):
     """Translate only known staging prefixes; never infer or open resource paths."""
     if isinstance(value, dict):
@@ -68,6 +73,7 @@ def logical_value(value):
     return value
 
 
+# 递归把结构中的已登记逻辑路径转换为当前执行可用的私有路径。
 def physical_value(value):
     if isinstance(value, dict):
         return {key: physical_value(child) for key, child in value.items()}
@@ -79,11 +85,13 @@ def physical_value(value):
     return value
 
 
+# 取得当前操作绑定的工作区；无输出上下文时按标准目录结构推导。
 def operation_workspace(directory):
     output = _current.get()
     return output.workspace if output else Path(directory).parents[1]
 
 
+# 确认绝对路径确实位于本次操作的私有暂存树内，允许内部消费尚未发布的产物。
 def trusted_output_path(path):
     """Allow internal consumers to read this operation's own staged products."""
     candidate = Path(path)
@@ -93,6 +101,7 @@ def trusted_output_path(path):
 
 
 class OperationOutputs:
+    # 保存工作区、发布目录、暂存目录及已固定的目标目录描述符。
     def __init__(self, workspace, destination, directory, descriptor):
         self.workspace = Path(workspace)
         self.destination = Path(destination)
@@ -100,6 +109,7 @@ class OperationOutputs:
         self.descriptor = descriptor
         self.published = {}
 
+    # 遍历并原子发布普通产物文件，拒绝链接目录和非普通文件。
     def publish(self):
         """Publish regular files atomically while holding the destination root."""
         for current, folders, files in os.walk(self.directory, followlinks=False):
@@ -132,12 +142,14 @@ class OperationOutputs:
                 self.published[relative] = version
 
 
+# 将所有有效输出上下文的产物发布，使后续数据库记录中的逻辑路径可访问。
 def publish_current():
     """Make a plan/review artifact available before committing its logical path."""
     for output in _outputs():
         output.publish()
 
 
+# 将可恢复运行文件保存在私有目录，重用嵌套运行上下文并维持数据库的状态权威。
 @contextmanager
 def persistent_outputs(destination, config=None, *, kind='pipeline-runs'):
     """Keep resumable run bytes private; PostgreSQL remains state authority."""
@@ -185,6 +197,7 @@ def persistent_outputs(destination, config=None, *, kind='pipeline-runs'):
                 _persistent.reset(token)
 
 
+# 为有作用域的操作建立私有暂存区和固定发布根，结束时安全发布产物。
 @contextmanager
 def operation_outputs(workspace, operation, *, scoped):
     destination = Path(workspace) / 'operations' / operation

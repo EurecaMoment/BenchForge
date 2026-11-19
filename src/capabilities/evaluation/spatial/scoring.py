@@ -5,6 +5,7 @@ from capabilities.dataset_authoring.spatial.task_generators.graph import path_co
 from capabilities.dataset_authoring.spatial.environments import environment
 
 
+# 递归比较答案结构，数值使用有限值与绝对误差要求，布尔保持严格类型。
 def close(actual,expected,atol=.08):
     if isinstance(expected,bool):return type(actual) is bool and actual==expected
     if expected is None or isinstance(expected,str):return actual==expected
@@ -15,6 +16,7 @@ def close(actual,expected,atol=.08):
     return actual==expected
 
 
+# 解析预测并按路径、轨迹或结构化合同评分，保留解析失败原因。
 def score(authority,prediction):
     if isinstance(prediction,str):
         try:prediction=json.loads(prediction)

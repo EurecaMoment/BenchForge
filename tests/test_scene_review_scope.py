@@ -12,6 +12,7 @@ from test_scene_diagnostics import sample
 
 
 class SceneReviewScopeTests(unittest.TestCase):
+    # 验证物理检查失败后仍收集视觉缺陷，且该场景不能被当作成功导出。
     def test_physical_failure_still_collects_visual_defects_and_cannot_export(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -26,9 +27,11 @@ class SceneReviewScopeTests(unittest.TestCase):
             updates = []
 
             class Store:
+                # 将评审器的产物访问指向本测试的固定修订目录。
                 def directory(self, *_):
                     return directory
 
+                # 捕获评审器写回的状态和失败信息，供拒绝导出断言。
                 def update(self, *args, **kwargs):
                     updates.append(kwargs)
 
@@ -56,6 +59,7 @@ class SceneReviewScopeTests(unittest.TestCase):
             self.assertEqual(updates[-1]['state'], 'FAILED_FINAL')
             export.assert_not_called()
 
+    # 验证预检查失败保留真实失败原因，不凭空补造视觉缺陷。
     def test_failed_precheck_keeps_failure_without_inventing_six_visual_defects(self):
         with TemporaryDirectory() as temporary, \
                 patch('capabilities.scene_authoring.validation.acceptance._policy_for_mode', return_value={'enabled': True}), \

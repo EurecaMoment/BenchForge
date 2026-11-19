@@ -12,6 +12,7 @@ from capabilities.isaac_sim.resource_access import NativeResources
 from storage.operation_outputs import operation_workspace, persistent_outputs, logical_path
 
 
+# 仅在会话所有权、冻结请求及远程身份完全匹配后复用旧版任务回执。
 def _legacy_submission(workspace, key, payload, feature, client, owners, session):
     """Reuse a pre-ownership receipt only after its session has been verified."""
     identity = hashlib.sha256(key.encode()).hexdigest()
@@ -35,6 +36,7 @@ def _legacy_submission(workspace, key, payload, feature, client, owners, session
     return job, receipt
 
 
+# 提供原生目录、上传与任务操作入口，按会话验证资源及任务所有权并保留可恢复回执。
 def execute(args, directory, config):
     """Expose the actual catalog and messages, without deployment-specific plugins."""
     directory = Path(directory)

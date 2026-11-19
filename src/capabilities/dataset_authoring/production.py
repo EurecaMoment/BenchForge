@@ -40,6 +40,7 @@ PUBLIC_VIDEO_SUFFIXES = {'.avi', '.m4v', '.mkv', '.mov', '.mp4', '.webm'}
 PRIVATE_PATH_PARTS = {'answer', 'answers', 'authority', 'gold', 'oracle', 'private', 'sft'}
 
 
+# 提取已发布RGB-D标定读取器实际消费的公开资产引用。
 def public_asset_references(value):
     """References consumed by the existing published RGB-D calibration reader."""
     references = []
@@ -61,6 +62,7 @@ def public_asset_references(value):
     return references
 
 
+# 只验证显式声明的公开资产白名单，检查内容并阻止私有真值泄露。
 def validate_public_assets(files, private_source=None, cache=None):
     """Validate the explicit whitelist only; never discover additional files."""
     approved = set(files)
@@ -80,6 +82,7 @@ def validate_public_assets(files, private_source=None, cache=None):
             continue
         if stat.st_size > 2 * 1024 * 1024:
             raise ValueError('Public asset JSON exceeds the supported size')
+        # 递归检查公开JSON，发现私有答案或对象真值字段即拒绝。
         def no_private_fields(node):
             if isinstance(node, dict):
                 if PRIVATE_ASSET_FIELDS & {str(key).casefold() for key in node}:
@@ -110,6 +113,7 @@ def validate_public_assets(files, private_source=None, cache=None):
     return versions
 
 
+# 验证并复制样本声明的公开资产，保持相对依赖并检查版本一致性。
 def copy_public_assets(sample, root, roots, copied, checked=None):
     files = list(dict.fromkeys(Path(file).resolve() for file in sample.get('assets', [])))
     if not files:
@@ -133,6 +137,7 @@ def copy_public_assets(sample, root, roots, copied, checked=None):
     return references
 
 
+# 收集题目引用的包内资产，只接受assets目录下的相对路径并重新验证。
 def packaged_public_assets(questions, root):
     assets = set()
     checked = {}
@@ -150,6 +155,7 @@ def packaged_public_assets(questions, root):
     return sorted(assets)
 
 
+# 只接收可解码的公开观察媒体，拒绝任意源文件或私有来源。
 def validate_public_media(files, private_source=None):
     """Accept only decodable observations, never arbitrary source files."""
     private_source = Path(private_source).resolve() if private_source else None
@@ -189,6 +195,7 @@ def validate_public_media(files, private_source=None):
     return validated
 
 
+# 解析包内media目录中的题目引用并验证全部公开媒体。
 def packaged_public_media(questions, root):
     media_root = (root / 'media').resolve()
     files = set()
@@ -203,6 +210,7 @@ def packaged_public_media(questions, root):
     return validate_public_media(sorted(files))
 
 
+# 检查每条记录的固定数据分区，并统计各有效分区数量。
 def partition_counts(items):
     counts = Counter()
     for item in items:
@@ -214,6 +222,7 @@ def partition_counts(items):
 
 
 
+# 拒绝显式标记为演练或不具备生产资格的证据。
 def _require_production_evidence(value):
     # Old records may omit these flags. An explicit preparation/smoke marker
     # must be checked before binding discards record metadata or selects GT.
@@ -221,6 +230,7 @@ def _require_production_evidence(value):
         raise ValueError('Non-production evidence cannot enter a production pipeline; provide accepted production evidence')
 
 
+# 从已声明来源提取答案与准入事实，验证其生产资格和模板绑定。
 def bind_record(template, row, base):
     _require_production_evidence(row)
     source = row['provenance']
@@ -255,6 +265,7 @@ def bind_record(template, row, base):
             'question_spec': row.get('question_spec')}
 
 
+# 按模板数量分配并验证生产证据，构建分区数据、公开题目和私有答案。
 def produce(args, directory, config=None):
     preserve = args.get('preserve_source_splits', False)
     if type(preserve) is not bool:
@@ -416,6 +427,7 @@ def produce(args, directory, config=None):
     return {'dataset': str(root.resolve()), 'report': str((root/'quality_report.json').resolve()), **report}
 
 
+# 检查数量缺口、场景验收与答案合同，打包可发布数据及受控评测材料。
 def package(args, directory, config=None):
     root = Path(args['dataset']).resolve()
     report = read(root/'quality_report.json')

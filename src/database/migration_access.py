@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from database.schema import metadata
 
 
+# 仅在约束缺失时添加迁移代码指定的固定约束，兼容已有数据。
 def _constraint(connection, table, name, definition):
     present = connection.execute(text("SELECT 1 FROM pg_constraint WHERE conrelid=to_regclass(:table) AND conname=:name"),
                                  {"table": table, "name": name}).first()
@@ -13,6 +14,7 @@ def _constraint(connection, table, name, definition):
         connection.exec_driver_sql(f'ALTER TABLE "{table}" ADD CONSTRAINT "{name}" {definition} NOT VALID')
 
 
+# 升级工作区与会话身份字段、JSONB 类型及隔离所需索引和约束。
 def upgrade(connection):
     for name, column in (("runs", "workspace_id VARCHAR"), ("runs", "session_id VARCHAR"),
                          ("reviews", "session_id VARCHAR GENERATED ALWAYS AS (session) STORED"),

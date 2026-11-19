@@ -21,10 +21,12 @@ NEW_RUN = r.BENCH / 'work/production-rectified-20261116'
 CONTROL = r.AUDIT / 'production-control.json'
 
 
+# 返回当前UTC时间的ISO格式字符串，供迁移与操作审计记录使用。
 def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+# 首次改写前将既有文件复制到审计备份目录，已有备份保持不变。
 def keep(path):
     path = Path(path)
     if path.is_file():
@@ -34,11 +36,13 @@ def keep(path):
             shutil.copy2(path, target)
 
 
+# 先保留原文件备份，再通过示例公共写入函数保存新内容。
 def save(path, value):
     keep(path)
     r.write(path, value)
 
 
+# 使用SQLite备份接口冻结运行与阶段审查索引，避免直接复制活动数据库。
 def snapshot_indexes():
     for name in ('runs.sqlite', 'stage-reviews.sqlite'):
         source = r.ROOT / name
@@ -49,6 +53,7 @@ def snapshot_indexes():
                 original.backup(backup)
 
 
+# 从保留的原生场景、表面和相机记录重算各模板答案，并核对旧答案后生成显式测量依据。
 def native_answers(records):
     """Produce annotations from the transported native scene, not copied GT."""
     import importlib.util
@@ -137,6 +142,7 @@ def native_answers(records):
     return output, context
 
 
+# 依据重算结果更新题干、原始观察与标注附件说明及答案输出合同。
 def question(row, measured):
     original = measured['original']
     params = deepcopy(row['parameters'])
@@ -182,6 +188,7 @@ def question(row, measured):
     return params, spec
 
 
+# 备份旧材料后重建示例标注和证据绑定，重新执行场景验收并记录迁移完成标记。
 def migrate():
     _, store = r.setup()
     marker = r.AUDIT / 'collection-assets-rebuilt.json'
@@ -277,6 +284,7 @@ def migrate():
     print(json.dumps(r.read(marker), ensure_ascii=False), flush=True)
 
 
+# 为一次本地操作记录请求与数据库状态，保存结果或失败原因后返回操作身份。
 def recorded(tool, arguments, handler):
     from storage.operation_index import ensure_schema
     operation = uuid.uuid4().hex[:16]
@@ -300,6 +308,7 @@ def recorded(tool, arguments, handler):
         raise
 
 
+# 按冻结证据恢复场景原定分区，只修正导入记录而不重新划分既有样本。
 def repair_partitions():
     """Correct imported default scene partitions to the frozen dataset split."""
     _, store = r.setup()
@@ -335,6 +344,7 @@ def repair_partitions():
     print(json.dumps(r.read(path), ensure_ascii=False), flush=True)
 
 
+# 复用已保存控制记录，或用已验收场景生成生产计划并启动首阶段审查。
 def start():
     r.setup()
     if CONTROL.exists():
@@ -354,6 +364,7 @@ def start():
     from pipelines.benchmark.design.plan_versions import activate
     from pipelines.reviews.service import gate
 
+    # 通过生产规划器生成计划，绑定当前工作区，并登记首阶段审查。
     def create(directory):
         # Draft through the production planner, then bind to the live repository
         # workspace; the artifacts themselves intentionally stay under example/.
@@ -369,6 +380,7 @@ def start():
     print(json.dumps({'control': r.read(CONTROL), 'stage_review': result.get('stage_review')}, ensure_ascii=False), flush=True)
 
 
+# 读取阶段审查门禁；允许继续时运行下一段生产流程并保存紧凑进度。
 def advance():
     r.setup()
     control = r.read(CONTROL)
@@ -386,6 +398,7 @@ def advance():
     from pipelines.benchmark.execution.runner import run
     arguments = {'plan': control['plan'], 'run': control['run']}
 
+    # 为生产运行补齐工作区与会话身份，并调用统一流程执行器。
     def execute(directory):
         return run({**arguments, '_workspace': str(r.ROOT), '_dsh_context': {'session_id': r.SESSION}}, directory)
 
@@ -402,6 +415,7 @@ def advance():
     return compact
 
 
+# 在四十五分钟上限内推进生产流程，按审查期限等待并在终态或需人工介入时结束。
 def drive():
     deadline = time.monotonic() + 2700
     while time.monotonic() < deadline:

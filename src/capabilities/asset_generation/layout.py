@@ -12,11 +12,13 @@ from service_access.progress import record_progress
 from service_access.request_context import RunContext
 
 
+# 根据场景意图构建默认设计简报，优先采用显式提供的布局参考。
 def default_layout(intent):
     """New scenes begin with a visible design brief; explicit references take priority."""
     return {'mode':'generate','prompt':'Real interior architectural photograph, slightly elevated wide three-quarter perspective showing the complete room layout, major objects, useful aisles and credible support surfaces. Natural window illumination with soft indirect light, contact shadows, restrained highlights retaining texture. Distinct ceramic, metal, wood and fabric roughness; subtle wear and material grain, realistic scale, recognizable object shapes. Show the functional character of a room in real use. Photographic realism, not a floor plan, sketch, watercolor, text-labelled diagram, toy scene or plastic CGI. Scene brief: '+intent['description'][:5000]}
 
 
+# 检查布局设计声明的类型、参考方式及必要字段。
 def validate_layout(spec):
     if not isinstance(spec,dict) or set(spec)-{'mode','prompt','source_image','source_view','seed','design_task_id'}:
         raise ValueError('invalid layout guidance fields')
@@ -37,6 +39,7 @@ def validate_layout(spec):
     return spec
 
 
+# 生成或复用布局参考图，并把设计依据和状态写入本次工作目录。
 def prepare_layout(tools,intent,directory,stop,parent_directory=None,design_directory=None):
     spec=intent.get('layout')
     inherited=None
@@ -105,6 +108,7 @@ def prepare_layout(tools,intent,directory,stop,parent_directory=None,design_dire
     return directory/'layout_reference.png'
 
 
+# 从设计记录解析并验证对应的设计任务目录。
 def design_directory(store, layout):
     task_id = (layout or {}).get('design_task_id')
     if not task_id:
@@ -122,11 +126,13 @@ def design_directory(store, layout):
     return directory
 
 
+# 校验显式布局参考及其来源；省略参考时交由后续流程生成。
 def require_prior_reference(store, intent, parent_directory=None):
     """Validate an explicit reference; the pipeline generates omitted references."""
     design_directory(store, intent.get('layout'))
 
 
+# 验证设计请求并创建可恢复执行的布局设计任务。
 def start_design_request(store, value):
     if not isinstance(value, dict) or set(value) - {'request_key', 'name', 'description', 'layout', 'context'}:
         raise ValueError('layout request fields: request_key, name, description, optional layout')
@@ -137,12 +143,14 @@ def start_design_request(store, value):
     if 'source_view' in layout or (layout['mode'] != 'generate' and not layout.get('source_image')):
         raise ValueError('standalone edit/reference needs source_image; copy a prior PNG with evidence and workspace_id')
     intent = {'name': value['name'], 'description': value['description'], 'layout': layout}
+    # 宿主附加的运行身份单独交给存储层，不能混入布局意图或模型参数。
     context = RunContext.from_request(value.get('context'))
     kwargs = {'context': context} if context is not None else {}
     return {'run_id': store.submit(value['request_key'], [intent], 'layout', **kwargs), 'state': 'accepted',
             'workflow': 'layout', 'next_action': 'wait_then_inspect_design', 'gt_source': False}
 
 
+# 执行布局设计任务，生成参考材料并保存可供后续场景使用的回执。
 def execute_design(store, task, stop):
     directory = store.directory(task['id'], task['unit']['revision'])
     prepare_layout(GenerationTools(store.root, engine=store.repo.engine, task_id=task['id']), task['unit']['intent'], directory, stop)

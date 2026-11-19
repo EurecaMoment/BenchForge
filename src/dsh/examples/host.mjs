@@ -14,6 +14,7 @@ const imports = defineDomain({name: 'benchforge_examples', version: 1, tables: {
   workbenchVersion: z.literal(1).optional(),
 }))}});
 
+/** 在启用示例导入时装配资源与会话引导，并把存储域释放绑定到宿主生命周期。 */
 export async function apply(ctx, config) {
   if (!config.enabled || !config.sourceDirectory) return;
   const home = launchEnvironmentOf(ctx).get('DSH_HOME')?.value;
@@ -22,6 +23,7 @@ export async function apply(ctx, config) {
   ctx.effect(() => () => domain.close(), name);
   const result = await bootstrapExample({sourceDirectory: config.sourceDirectory, home,
     persistence: ctx.sessionPersistence, registry: ctx.workspaceRegistry, table: domain.table('imports'),
+    /** 根据导入事件生成官方冷快照，使示例立即具有可检索投影摘要。 */
     publishSummary: (header, events) => ctx.sessionProjectionCache.coldSnapshot(header, 0, events)});
   ctx.logger(name).info('Example %s: %s', result.status, result.sessionId);
 }

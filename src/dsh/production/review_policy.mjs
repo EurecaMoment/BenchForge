@@ -19,6 +19,7 @@ const reads = new Set(['read', 'read_image', 'read_file', 'list_directory', 'lis
 const writes = new Set(['write', 'edit', 'str_replace_editor']);
 const inspections = new Set(['guide', 'capabilities', 'status', 'catalog', 'assets', 'wait', 'download']);
 
+/** 判断写入是否仅影响允许修改的任务草稿，防止修改已冻结的复核与操作记录。 */
 function draftWrite(exec, workspace) {
   if (!writes.has(exec.name)) return false;
   const args = exec.arguments || {}, target = args.file_path || args.path;
@@ -30,6 +31,7 @@ function draftWrite(exec, workspace) {
   return !api.isAbsolute(relative) && /^(tasks|synthesis)[\\/]/.test(relative);
 }
 
+/** 在复核门禁有效时允许读取、草稿编辑及停止操作，返回其他推进操作的拒绝原因。 */
 export function reviewDenial(exec, review, workspace) {
   if (!review || !pending.has(review.state)) return;
   const args = exec.arguments || {};
@@ -51,8 +53,9 @@ export function reviewDenial(exec, review, workspace) {
   };
 }
 
+/** 沿父会话链读取实际生产负责人的复核状态，同时保留执行子会话自己的草稿归属。 */
 export function createReviewPolicy({readReview, agents, sessions} = {}) {
-  return async exec => {
+  return /** 从执行 Agent 沿父链确定生产复核负责人，依据最新门禁限制当前工具调用。 */ async exec => {
     let agent = exec.agent;
     if (!agent?.session?.header?.cwd) return;
     // Draft ownership follows the executing child; stage approval follows its
@@ -84,13 +87,14 @@ export function createReviewPolicy({readReview, agents, sessions} = {}) {
   };
 }
 
+/** 在异步工具执行边界安装复核策略，使用最新状态拦截暂停期间的生产推进。 */
 export function apply(ctx,config) {
   const environment=launchEnvironmentOf(ctx);
-  const reader=createStageReviewReader({...config,getEnvironmentValue:name=>environment.get(name)?.value});
+  const reader=createStageReviewReader({...config,/** 从可信宿主启动环境中读取复核服务配置引用。 */ getEnvironmentValue:name=>environment.get(name)?.value});
   const review=createReviewPolicy({readReview:reader.latest,agents:ctx.get('agents'),sessions:ctx.get('sessions')});
   // Tool guards are synchronous. Read at the async dispatch boundary, after
   // approval, so a paused review cannot be bypassed by a cached decision.
-  ctx.on('tools/execute',async(exec,next)=>{
+  ctx.on('tools/execute',/** 在原生工具执行前读取复核决定，取消优先并把拒绝原因作为宿主错误返回。 */ async(exec,next)=>{
     const denial=await review(exec);
     exec.signal.throwIfAborted();
     if(denial)throw new HarnessError(denial.reason,denial.info.code);

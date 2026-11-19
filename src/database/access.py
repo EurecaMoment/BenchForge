@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 import re
 
+# 校验持久身份的字符集和长度；label 用于指出无效身份的类别。
 def identifier(value, label="identity"):
     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", value):
         raise ValueError(f"Invalid {label}")
@@ -20,6 +21,7 @@ class AccessScope:
     policy_epoch: int
     legacy_namespace: str | None = None
 
+    # 检查宿主解析的各项身份及正整数代次，拒绝不完整或无效的访问作用域。
     def __post_init__(self):
         for field in ("host_id", "session_id", "workspace_id", "owner_id"):
             identifier(getattr(self, field), field)
@@ -28,11 +30,13 @@ class AccessScope:
         if any(type(value) is not int or value < 1 for value in (self.root_generation, self.policy_epoch)):
             raise ValueError("Invalid scope generation")
 
+    # 返回去重的当前工作区及兼容旧账本命名空间，保持查询顺序稳定。
     @property
     def ledger_namespaces(self):
         return tuple(dict.fromkeys([self.workspace_id, *([self.legacy_namespace] if self.legacy_namespace else [])]))
 
 
+# 确认查询连接没有管理、绕过行级隔离、建表或写表权限。
 def assert_reader_role(connection):
     """A query connection must not own tables, bypass RLS, or write them."""
     from sqlalchemy import text
@@ -52,6 +56,7 @@ def assert_reader_role(connection):
         raise PermissionError("Database query role must be a non-owner without write or administrative privileges")
 
 
+# 把经宿主确认的身份写入当前事务的 PostgreSQL 设置，供行级策略使用。
 def set_scope(connection, scope):
     from sqlalchemy import text
     if not isinstance(scope, AccessScope):
@@ -61,6 +66,7 @@ def set_scope(connection, scope):
                            {"name": "benchforge." + name, "value": str(getattr(scope, name) or "")})
 
 
+# 将作用域与已登记的活动工作区及会话逐项比对，拒绝过期或撤销的身份。
 def validate_scope(connection, scope):
     from sqlalchemy import select
     from database.schema import workspaces, workspace_sessions
@@ -76,6 +82,7 @@ def validate_scope(connection, scope):
     return row
 
 
+# 建立带超时和身份校验的只读事务；关闭事务时清除连接上的局部作用域。
 @contextmanager
 def read_transaction(engine, scope, *, enforce_role=True):
     """A transaction-local scope is rolled back before the connection is reused.

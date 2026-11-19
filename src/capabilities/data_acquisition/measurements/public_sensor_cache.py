@@ -6,18 +6,21 @@ from threading import RLock
 
 class _BoundedCache:
     """Small process-local LRU; callers supply real file-version keys, no hashes."""
+    # 建立带条目和可选字节上限的线程安全最近使用缓存。
     def __init__(self, entries, max_bytes=None):
         self.limit, self.max_bytes = entries, max_bytes
         self.values = OrderedDict()
         self.bytes = self.hits = self.misses = 0
         self.lock = RLock()
 
+    # 递归统计数组或数组组合的有效数据字节数。
     @staticmethod
     def _weight(value):
         if isinstance(value, (tuple, list)):
             return sum(_BoundedCache._weight(v) for v in value)
         return int(getattr(value, 'nbytes', 0))
 
+    # 读取缓存并更新使用顺序，同时记录命中或未命中次数。
     def get(self, key):
         with self.lock:
             if key not in self.values:
@@ -27,6 +30,7 @@ class _BoundedCache:
             self.values.move_to_end(key)
             return self.values[key][0]
 
+    # 保存结果并淘汰最久未用条目，单项超出内存上限时不缓存。
     def remember(self, key, value):
         weight = self._weight(value)
         with self.lock:
@@ -41,6 +45,7 @@ class _BoundedCache:
                 self.bytes -= removed
         return value
 
+    # 在锁内复用已有结果，或运行加载器并保存新结果。
     def load(self, key, loader):
         with self.lock:
             value = self.get(key)
@@ -48,6 +53,7 @@ class _BoundedCache:
                 return value
             return self.remember(key, loader())
 
+    # 返回缓存当前条目、字节数、限制和命中情况。
     def stats(self):
         with self.lock:
             return {'entries': len(self.values), 'bytes': self.bytes,
@@ -55,6 +61,7 @@ class _BoundedCache:
                     'max_entries': self.limit, 'max_bytes': self.max_bytes}
 
 
+# 使用已解析文件的路径、大小和纳秒修改时间标识公开输入版本。
 def _file_version(path):
     file = Path(path).resolve(strict=True)
     stat = file.stat()

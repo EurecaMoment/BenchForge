@@ -1,5 +1,6 @@
 // DSH owns the parent catalog and immutable session headers. Browser-supplied
 // session arrays never participate in this scope.
+/** 读取父会话的原生子 Agent 目录，并在提取后立即释放观察快照。 */
 export async function readChildCatalog(query, parentId, signal) {
   const observation = await query.observeSession(parentId, {signal});
   try {
@@ -11,9 +12,10 @@ export async function readChildCatalog(query, parentId, signal) {
   }
 }
 
+/** 创建有界的子会话读取器，优先观察活动或已验证会话并缓存其父子身份。 */
 export function sessionFamilyReader(ctx) {
   const verified = new Map();
-  return async (parentId, signal) => {
+  return /** 按父会话的原生子 Agent 目录选择有界观察集合，核验父子身份后返回活动摘要。 */ async (parentId, signal) => {
     const query = ctx.get('sessionQuery');
     if (!query) return [];
     let entries;
@@ -29,7 +31,7 @@ export function sessionFamilyReader(ctx) {
         active: Boolean(resident && cached?.header?.parentSession === parentId && cached.state === 'running')};
     }).sort((a, b) => Number(b.active) - Number(a.active) || Number(Boolean(b.resident)) - Number(Boolean(a.resident)) ||
       b.created - a.created || b.index - a.index).slice(0, 8);
-    return (await Promise.all(candidates.map(async ({entry, resident}) => {
+    return (await Promise.all(candidates.map(/** 观察候选子会话的真实状态并验证父会话归属，读取后释放快照。 */ async ({entry, resident}) => {
       signal?.throwIfAborted();
       let header = resident?.header || verified.get(entry.id)?.header;
       let state = resident ? 'unknown' : 'inactive';

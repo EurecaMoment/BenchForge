@@ -3,6 +3,7 @@
 from database.schema import asset_grants, pipeline_documents
 
 
+# 补齐资源来源、个人授权及文档隔离字段和相应约束。
 def upgrade(connection):
     connection.exec_driver_sql("ALTER TABLE asset_versions ADD COLUMN IF NOT EXISTS provenance JSONB NOT NULL DEFAULT '{}'::jsonb")
     connection.exec_driver_sql("ALTER TABLE asset_grants ADD COLUMN IF NOT EXISTS grantee_owner_id VARCHAR")

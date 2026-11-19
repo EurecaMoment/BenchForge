@@ -5,6 +5,7 @@ import re
 from urllib.parse import unquote
 
 
+# 验证原生资产句柄的显式结构，拒绝把模拟器或服务文件系统路径当作句柄。
 def validate_native_reference(value):
     """Validate a native handle, never a simulator or service filesystem path."""
     required = {'asset_id', 'relative_path', 'size', 'source_up_axis'}
@@ -32,6 +33,7 @@ def validate_native_reference(value):
     return value
 
 
+# 按导入时的向上轴转换返回声明的Z向上资产尺寸。
 def native_size_z_up(value):
     """Declared source dimensions after the native import's up-axis conversion."""
     validate_native_reference(value)
@@ -39,6 +41,7 @@ def native_size_z_up(value):
     return [x, z, y] if value['source_up_axis'] == 'Y' else [x, y, z]
 
 
+# 仅提取场景对象中显式原生句柄，避免把无关元数据误当导入请求。
 def native_references(program):
     """Return explicit object handles; unrelated metadata is not an import."""
     if not isinstance(program, dict) or not isinstance(program.get('objects'), list):

@@ -2,6 +2,7 @@
 import math
 
 
+# 将证据绑定到已验收的原生执行录像，按需检查真实交互和机器人运动采样。
 def validate_native_episode(record, receipt, *, required=False, interaction=False, robot_locomotion=False):
     identifier = (record.get('provenance') or {}).get('native_episode_id')
     if not required and not identifier:

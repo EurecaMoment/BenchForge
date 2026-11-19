@@ -1,3 +1,4 @@
+/** 组合工作台视图组件，注入共享状态推导、原生输入和产物读取能力。 */
 export function createWorkbenchComponent({React, helpers, components}) {
   const h = React.createElement;
   const {status, button, card, empty, json, sceneName, questionText, planValue, planMarkdown,
@@ -10,8 +11,10 @@ export function createWorkbenchComponent({React, helpers, components}) {
   const {TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress,
     StageProgress, PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneGallery, SceneVideo,
     SceneLibrary, PreviewDialog, ArtifactGallery, StageReviewPanel, PlanProduct, ReportProduct, Quality} = components;
+  /** 管理当前会话的五阶段浏览、场景选择、计划编辑与生产续接，保持查询和原生输入状态一致。 */
   function Workbench({t, sessionId, useResource, useSessions, useSession, useProjection, useInput, inputActions, canSubmit = false,
     stopExecution, requestWorkbench, useStore, actions, configureProduction}) {
+    /** 为当前组件绑定工作台请求器，复用查询与轮询状态钩子。 */
     const useRecord = (params, revision, interval, active) =>
       useWorkbenchRecord(requestWorkbench, params, revision, interval, active);
     const panelRef = React.useRef(null);
@@ -83,6 +86,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const planSceneLibrary=useRecord(workspacePath && route.stage==='S1' ? {view:'scene_library',workspace_path:workspacePath,session_id:sessionId,
       origin:'selected',page_size:24} : null,receiptsRevision,30000,visible);
     const reviewRecord = useRecord(workspacePath ? {view:'stage_review',workspace_path:workspacePath,session_id:sessionId} : null,revision,3000,visible);
+    /** 向当前复核提交操作或指令，携带复核身份并触发界面刷新。 */
     const reviewAction = async (action,instruction='') => {
       const reviewId = reviewRecord.value?.review_id;
       const value = await requestWorkbench({view: 'stage_review', workspace_path: workspacePath, session_id: sessionId},
@@ -96,6 +100,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const savedSceneSelection = sceneLibraryView.value?.selection;
     const currentSceneSelection = sceneChoice && (!savedSceneSelection || sceneChoice.version >= savedSceneSelection.version)
       ? sceneChoice : savedSceneSelection;
+    /** 以互斥方式保存当前场景选择版本；失败时恢复旧选择并显示错误。 */
     const chooseScenes = async (selected, allow_new_scenes) => {
       if (sceneSaveLock.current || selectionSubmitLock.current || !currentSceneSelection) return;
       sceneSaveLock.current = true; setSceneSaving(true); setSceneError('');
@@ -111,18 +116,18 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const sampleId = sample?.row_index;
     const currentSample = sample ? dataset.value?.items.find((row) => row.row_index === sampleId &&
       (row.item_id || row.id) === (sample.item_id || sample.id)) : null;
-    React.useEffect(() => { setSample(null); }, [route.dataset, route.page, route.size, route.template, route.split, route.q]);
-    React.useEffect(() => {setPreview((current) => current?.library ? current : null);}, [selectedRunId, sourceScene?.run_id]);
-    React.useEffect(() => {
+    React.useEffect(/** 切换数据集、分页或样本筛选后关闭旧题目，避免展示不属于当前列表的内容。 */ () => { setSample(null); }, [route.dataset, route.page, route.size, route.template, route.split, route.q]);
+    React.useEffect(/** 切换运行或来源场景时关闭旧产物预览，独立场景库预览可继续保留。 */ () => {setPreview((current) => current?.library ? current : null);}, [selectedRunId, sourceScene?.run_id]);
+    React.useEffect(/** 数据集更新导致总页数减少时，将当前页调整到仍然存在的最后一页。 */ () => {
       if (dataset.value && route.page > Math.max(1, dataset.value.pages)) update({page: Math.max(1, dataset.value.pages)});
     }, [dataset.value, route.page]);
-    React.useEffect(() => {
+    React.useEffect(/** 当前预览样本已不在最新数据中时关闭对话框，并提示样本已移除。 */ () => {
       if (sample && dataset.value && !currentSample) {setSample(null); setNotice(t('sampleRemoved'));}
     }, [dataset.value, sample, currentSample]);
-    React.useEffect(() => {
+    React.useEffect(/** 离开数据集阶段时关闭样本详情，保持预览与当前阶段一致。 */ () => {
       if (route.stage !== 'S4') setSample(null);
     }, [sampleId, route.stage]);
-    React.useEffect(() => {
+    React.useEffect(/** 摘要刷新后清除已消失的运行，并在当前数据集失效时选择首个可用数据集。 */ () => {
       if (!summary.value) return;
       const patch = {};
       if (route.run && !rows.some((row) => row.id === route.run)) patch.run = '';
@@ -141,10 +146,13 @@ export function createWorkbenchComponent({React, helpers, components}) {
       image_url: row.stage === 'S3' && row.kind === 'json' ? allStageFiles.find((image) => image.kind === 'image' &&
         image.task_id === row.task_id && image.revision === row.revision && image.file === row.file?.replace(/\.json$/, '.png'))?.url : undefined}));
     const activePipeline = sourceScene ? null : pipeline;
+    /** 根据显式运行选择或阶段上下文选定导航对应的流水线。 */
     const navigationPipeline = (id) => !route.run && !route.production
       ? pipelineForStage(id, pipelines) || (['S2', 'S3'].includes(id) ? null : activePipeline) : activePipeline;
+    /** 显式运行优先使用其来源场景，否则为当前阶段选择适用场景。 */
     const navigationScene = (id) => route.run || route.production ? sourceScene :
       navigationPipeline(id) ? null : sceneForStage(id, sceneJobs);
+    /** 将操作指令插入原生输入框并启用追加生产配置，提示用户在输入框中继续。 */
     const prepare = (text = '') => {
       if (typeof inputActions?.submit !== 'function') {setNotice(t('noSendInterface')); return;}
       if (typeof text === 'string' && text.trim()) {
@@ -156,6 +164,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       actions.requestChange();
       setNotice(t('continueInComposer'));
     };
+    /** 核验权限、输入空闲和待发送内容，避免重复提交或覆盖尚未发送的用户草稿。 */
     const submitRequest = (payload, setError) => {
       if (submitLock.current || payload.submitted || lastSubmitted.current === payload.text) return false;
       if (!canSubmit) {setError(t('permissionsPending')); return false;}
@@ -190,6 +199,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         return false;
       } finally {submitLock.current = false; setSending(false);}
     };
+    /** 在发送前保存并核验场景约束，协调复核指令和运行停止，防止并发发送。 */
     const submitWithScenes = async (payload, setError) => {
       if (selectionSubmitLock.current || submitLock.current || sceneSaveLock.current) return false;
       if (!canSubmit) {setError(t('permissionsPending')); return false;}
@@ -217,6 +227,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       } catch (error) {setError(t(readError) + ' ' + error.message); return false;}
       finally {selectionSubmitLock.current = false; setSending(false);}
     };
+    /** 保存当前会话计划修订；发生实际变化时清除旧运行定位并刷新产物。 */
     const savePlan=async(edit)=>{
       const value = await requestWorkbench({view: 'plan_edit', workspace_path: workspacePath, session_id: sessionId},
         {body: edit});
@@ -224,28 +235,37 @@ export function createWorkbenchComponent({React, helpers, components}) {
       if(value.state!=='unchanged'){update({run:'',production:''});setRevision((value)=>value+1);}
       return value;
     };
+    /** 先停止正在执行的会话，再提交针对已保存计划修订的准确应用指令。 */
     const applyPlanEdit=async(path,setError)=>{
       if(conversationRunning)await stopExecution();
       return submitWithScenes({text:planEditInstruction(path),
         inserted:false,reviewContinued:true},setError);
     };
+    /** 切换到用户选择的流水线运行。 */
     const openRun = (id) => update({run: id});
+    /** 切换数据集并重置样本筛选、分页与搜索草稿。 */
     const changeDataset = (id) => { update({dataset: id, template: '', split: '', q: '', page: 1}); setSearch(''); };
+    /** 切换到目标数据集并导航至数据集生产阶段。 */
     const openDataset = (id) => {changeDataset(id); update({stage: 'S4'});};
+    /** 将所选样本设为题目详情对话框内容。 */
     const openSample = (item) => setSample(item);
+    /** 展示查询失败提示和重新读取按钮。 */
     const readFailure = () => h('div', {className: 'bfw-empty'}, t('readFailed'), ' ', button(t('retry'), () => setRevision((value) => value + 1)));
+    /** 把运行列表转换为含状态、步骤、产物数与时间的可导航表格。 */
     const runTable = (items) => items.length ? table([t('workspace'), t('runs'), t('state'), t('steps'), t('artifacts'), t('updated')],
       items.map((item) => [item.workspace, button(displayRef(item.label), () => openRun(item.id), {title: item.label}), status(item.state, t), item.steps, item.artifact_total ?? '—', item.updated_at])) : empty(t('noRuns'));
     const conversationPlan = !route.run && summary.value?.plan?.selections?.some((row) => row.template_ids?.length)
       ? summary.value.plan : null;
     const plan = conversationPlan || run.value?.plan || (!selectedRunId ? summary.value?.plan : null);
     const collectionPlan = summary.value?.plan?.assessment?.scenes ? summary.value.plan : plan;
+    /** 从当前计划的题型契约中读取可显示的题型名称。 */
     const templateName=(id)=>plan?.template_contracts?.find(row=>row.id===id)?.title || '题型';
     const versionOptions = [['', t('chooseDataset')], ...datasets.map((row,index) =>
       [row.id,'数据集 '+(index+1)+' · '+(row.report?.accepted ?? '—')+' 题 · '+(row.updated_at || '').slice(0,10)])];
+    /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
     const listControls = (listing, query, label, onQuery, onPage, pageSize, onPageSize) => h('div', {className: 'bfw-list-controls'},
       h('div', {className: 'bfw-toolbar'},
-        h('input', {className: 'bfw-input', type: 'search', 'aria-label': label, placeholder: label, value: query, onChange: (e) => onQuery(e.target.value)}),
+        h('input', {className: 'bfw-input', type: 'search', 'aria-label': label, placeholder: label, value: query, /** 把列表搜索框当前值传给对应筛选操作。 */ onChange: (e) => onQuery(e.target.value)}),
         select(t('pageSize'), String(pageSize), (value) => onPageSize(Number(value)), [12, 24, 48].map((value) => [String(value), String(value)])),
         h('span', {className: 'bfw-muted'}, t('matches') + ': ' + listing.total)),
       h('div', {className: 'bfw-pagination'},
@@ -258,25 +278,27 @@ export function createWorkbenchComponent({React, helpers, components}) {
       h('div', {className: 'bfw-counts'}, h('span', null, t('runCount') + ': ' + (summary.value ? rows.length : '—')),
         h('span', null, t('datasetCount') + ': ' + (summary.value ? datasets.length : '—'))),
       listControls(runListing, route.runFilter, t('runFilter'),
-        (value) => update({runFilter: value, runListPage: 1}), (page) => update({runListPage: page}),
-        route.runListSize, (size) => update({runListSize: size, runListPage: 1})),
+        /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
+        (value) => update({runFilter: value, runListPage: 1}), /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */ (page) => update({runListPage: page}),
+        route.runListSize, /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */ (size) => update({runListSize: size, runListPage: 1})),
       summary.loading ? empty(t('loading')) : summary.error && !summary.value ? readFailure() :
         runListing.total ? runTable(runListing.items) : empty(rows.length ? t('noMatchingRuns') : t('noRuns')));
     const datasetDirectory = h('details', {'data-dataset-directory': true, open: !route.dataset},
       h('summary', null, t('directory')), h('small', {className: 'bfw-hint'}, t('datasetNote')),
       summary.loading ? empty(t('loading')) : summary.error && !summary.value ? readFailure() : datasets.length ? h(React.Fragment, null,
         listControls(versionListing, route.versionFilter, t('versionFilter'),
-          (value) => update({versionFilter: value, versionListPage: 1}), (page) => update({versionListPage: page}),
-          route.versionListSize, (size) => update({versionListSize: size, versionListPage: 1})),
+          /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */
+          (value) => update({versionFilter: value, versionListPage: 1}), /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */ (page) => update({versionListPage: page}),
+          route.versionListSize, /** 生成列表搜索、每页数量及前后页控制，并显示匹配总数。 */ (size) => update({versionListSize: size, versionListPage: 1})),
         versionListing.total ? table([t('workspace'), t('version'), t('generationAccepted'), t('state'), t('open')], versionListing.items.map((row) =>
           [row.workspace, h('span', {className: 'bfw-code bfw-version', title: row.version}, displayRef(row.version)), row.report?.accepted ?? '—',
             status(row.state, t), button(t('browse'), () => openDataset(row.id))])) : empty(t('noMatchingVersions'))) : empty(t('noDatasets')));
     const datasetBrowser = h('div', {'data-dataset-browser': true},
       h('small', {className: 'bfw-hint'}, t('publicNote')),
-      h('form', {className: 'bfw-toolbar', onSubmit: (e) => {e.preventDefault(); update({q: search, page: 1});}},
+      h('form', {className: 'bfw-toolbar', /** 阻止表单页面跳转，应用当前样本搜索词并回到第一页。 */ onSubmit: (e) => {e.preventDefault(); update({q: search, page: 1});}},
         select(t('template'), route.template, (id) => update({template: id, page: 1}), [['', t('all')], ...(data?.facets.templates || []).map((id) => [id,templateName(id)])]),
         select(t('split'), route.split, (id) => update({split: id, page: 1}), [['', t('all')], ...(data?.facets.splits || []).map((id) => [id, id])]),
-        h('input', {className: 'bfw-input', 'aria-label': t('search'), placeholder: t('search'), value: search, onChange: (e) => setSearch(e.target.value)}),
+        h('input', {className: 'bfw-input', 'aria-label': t('search'), placeholder: t('search'), value: search, /** 保存样本搜索输入草稿，等待用户提交筛选。 */ onChange: (e) => setSearch(e.target.value)}),
         h('button', {className: 'bfw-button', type: 'submit'}, t('apply'))),
       h('div', {className: 'bfw-toolbar'},
         select(t('pageSize'), String(route.size), (size) => update({size: Number(size), page: 1}), [24, 48, 96].map((size) => [String(size), String(size)])),
@@ -285,7 +307,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         !data?.items.length ? h('div', {className: 'bfw-empty'}, t('noItems'),
           (route.template || route.split || route.q) && button(t('clearFilters'), () => changeDataset(route.dataset))) :
           h('div', {className: 'bfw-items bfw-question-grid','data-question-grid':true}, data.items.map((item) => h('button', {type: 'button', className: 'bfw-item', key: item.row_index,
-            'data-sample-row': String(item.row_index),'aria-label':'查看题目 '+(item.row_index+1),onClick: () => openSample(item)},
+            'data-sample-row': String(item.row_index),'aria-label':'查看题目 '+(item.row_index+1),/** 打开当前样本的题目与公开观察预览。 */ onClick: () => openSample(item)},
             firstImage(item) ? h(PublicObservation, {src: firstImage(item), compact: true, label:'题目 '+(item.row_index+1),t}) :
               h('div',{className:'bfw-question-placeholder'},'文字题'),
             h('span', {className: 'bfw-muted'},'题目 '+(item.row_index+1)), h('p', {className: 'bfw-question-preview'}, item.question_presentation?.stem || questionText(item.question)),
@@ -294,7 +316,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         button(t('previous'), () => update({page: route.page - 1}), {disabled: route.page <= 1 || dataset.loading}),
         h('span', null, t('page') + ' ' + route.page + ' / ' + Math.max(1, data?.pages || 1)),
         button(t('nextPage'), () => update({page: route.page + 1}), {disabled: !data || route.page >= data.pages || dataset.loading})),
-      route.stage==='S4' && currentSample && h(QuestionDialog,{key:currentSample.row_index,item:currentSample,close:()=>setSample(null),t}));
+      route.stage==='S4' && currentSample && h(QuestionDialog,{key:currentSample.row_index,item:currentSample,/** 关闭当前样本或产物预览，清除对应选择状态。 */ close:()=>setSample(null),t}));
       const planReceipt = plan ? {id: conversationPlan || !selectedRunId
         ? summary.value?.plan_source?.operation_id || 'saved-plan' : selectedRunId,
         state: 'completed', label: t('persistedPlan')} : null;
@@ -303,6 +325,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       const filesError = sceneArtifacts.error || run.error;
       const productFiles = stageFiles.filter((row) => (row.url || row.data) && !(separatePlan &&
         (row.title === '评测计划' && row.stage === 'S1' || row.title === '评测配置' && row.stage === 'S4')));
+      /** 根据当前阶段关联的流水线、场景和后端生成事实计算导航状态。 */
       const navigationState = (id) => example?.stages?.[id] || stageState(id, navigationPipeline(id), progressSceneForStage(id, navigationScene(id), sceneJobs), progress.value?.operations,
         planReceipt, navigationScene(id)?.run_id === artifactScene ? sceneArtifacts.value?.items || [] :
           navigationPipeline(id)?.id === selectedRunId ? allStageFiles : [],
@@ -316,6 +339,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       const liveProgressScene = liveProgressStage.id === 'execution' ? null : navigationScene(liveProgressStage.id);
       const finalReport = productFiles.find((row) => row.file === 'release/collection_report.json') ||
         productFiles.find((row) => !row.file && row.stage === 'S5' && row.step_id);
+      /** 检查场景的可读名称是否匹配当前计划中登记的设计。 */
       const designMatch=row=>plan?.assessment?.scenes?.designs?.some(design=>sceneName(row.name).startsWith(design.name));
       const planScenes=[...(plan?.assessment?.scenes?.allow_new_scenes ? (sceneLibrary.value?.items || [])
         .filter(row=>row.origin_session===sessionId && row.available && designMatch(row)).map(row=>({...row,planCurrent:true})) : []),
@@ -329,12 +353,14 @@ export function createWorkbenchComponent({React, helpers, components}) {
           save: example ? undefined : savePlan, applyEdit: example ? undefined : applyPlanEdit,
           scenes:uniqueScenes,t}),
         h(TemplateCatalog, {catalog, catalogQuery, setCatalogQuery, catalogPage, setCatalogPage,
-          capability, setCapability, retry: () => setRevision((value) => value + 1), t}),
+          capability, setCapability, /** 增加读取修订标记，触发失败查询重试。 */ retry: () => setRevision((value) => value + 1), t}),
         runHistory);
       else if (!example && stage.id === 'S2' && (sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading)) product = h(SceneLibrary, {record: sceneLibraryView,
         selection: currentSceneSelection, saving: sceneSaving || sending, error: sceneError, choose: chooseScenes,
-        query: sceneQuery, search: (query) => {setSceneQuery(query); setScenePage(1);}, origin: sceneOrigin,
+        query: sceneQuery, /** 更新场景搜索词并返回场景列表第一页。 */ search: (query) => {setSceneQuery(query); setScenePage(1);}, origin: sceneOrigin,
+        /** 更新场景来源筛选并重置分页。 */
         filter: (origin) => {setSceneOrigin(origin); setScenePage(1);}, page: setScenePage,
+        /** 触发当前工作台查询重新读取最新快照。 */
         refresh: () => setRevision((value) => value + 1), preview: setPreview, t});
       else if (['S2', 'S3'].includes(stage.id)) product = h(React.Fragment, null,
         stage.id === 'S3' && h('small', {className: 'bfw-hint'}, t('annotationNote')),
@@ -383,6 +409,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       h('nav', {className: 'bfw-flow', 'aria-label': t('navigation')}, STAGES.map((step) => h('button', {
         className: 'bfw-stage', type: 'button', key: step.id, 'data-stage': step.id,
         'aria-current': stage.id === step.id ? 'step' : undefined,
+        /** 切换到用户选择的生产阶段，并清除上次操作提示。 */
         onClick: () => {update({stage: step.id}); setNotice('');}},
         h('span', {className: 'bfw-stage-index', 'aria-hidden': true}, step.id.slice(1).padStart(2, '0')),
         h('span', {className: 'bfw-stage-copy'}, h('strong', {title: t(step.key)}, t(step.key + 'Nav')),
@@ -391,7 +418,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       example ? h('div',{className:'bfw-hint','data-example-summary':true},h('strong',null,example.title),h('p',null,example.description)) : h(StageProgress, {stage: liveProgressStage, pipeline: liveProgressPipeline, scene: liveProgressScene, record: progress,
         activity:productionActivity, planReceipt, collectionPlan, artifacts: allStageFiles, conversationRunning,
         completedStages: Object.values(progressStates).filter((state) => state === 'completed').length, t}),
-      h(StageReviewPanel,{value:reviewRecord.value,t,change:() => prepare(''),act:async (action) => {
+      h(StageReviewPanel,{value:reviewRecord.value,t,/** 进入原生输入框中的追加需求编辑流程。 */ change:() => prepare(''),/** 处理复核暂停或继续操作；必要时停止执行，或为未被宿主接管的继续动作提交生产指令。 */ act:async (action) => {
         try {
           const result=await reviewAction(action);
           if (action === 'pause' && conversationRunning) await stopExecution();
@@ -405,7 +432,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
       notice && h('div', {className: 'bfw-notice', role: 'status'}, notice),
       [summary.error, run.error, dataset.error].filter(Boolean).map((error, i) => h('div', {className: 'bfw-error', role: 'alert', key: i}, error)),
       h('section', {id: 'bfw-content-' + sessionId, 'aria-label': t(stage.key)}, body),
-      preview && h(PreviewDialog, {key: preview.url || preview.title, item: preview, close: () => setPreview(null), t})));
+      preview && h(PreviewDialog, {key: preview.url || preview.title, item: preview, /** 关闭当前样本或产物预览，清除对应选择状态。 */ close: () => setPreview(null), t})));
   }
   return {Workbench};
 }

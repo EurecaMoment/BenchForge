@@ -10,6 +10,7 @@ from storage.workspace_jobs import WorkspaceJobs
 
 
 class Runtime(WorkspaceJobs):
+    # 直接处理概览与模板目录查询，其余请求交给工作区操作运行时。
     def call(self, tool, args):
         if tool == "catalog":
             section = args.get('section', 'overview')
@@ -22,6 +23,7 @@ class Runtime(WorkspaceJobs):
             return overview()
         return super().call(tool, args)
 
+    # 根据工具类型分派采集、建集、评测及模型调用，并把结果保存在本次操作目录。
     def execute(self, tool, args, directory):
         from server.operations import OPERATIONS
         if tool in OPERATIONS:

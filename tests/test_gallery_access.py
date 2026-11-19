@@ -14,12 +14,14 @@ from server import http_api
 
 
 class GalleryAccessTests(unittest.TestCase):
+    # 验证图像和图库 GET 路由与业务 POST 一样要求操作者凭据。
     def test_image_and_gallery_require_the_same_credential_as_post(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "unregistered.png").write_bytes(b"png")
             ready, holder = Event(), {}
 
+            # 创建随机本机端口的测试 HTTP 服务，并通知测试客户端服务已就绪。
             def server_factory(address, handler):
                 server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
                 holder["server"] = server

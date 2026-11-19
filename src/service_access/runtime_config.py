@@ -12,12 +12,14 @@ from service_access.service_config import (
 )
 
 
+# 通过数据库包统一解析共享数据库地址，避免调用方自行拼接连接。
 def resolve_database_url(harness=None, database_url=None):
     """Resolve the one shared database URL through the database package."""
     from database.config import resolve_database_url as resolve
     return resolve(harness, database_url)
 
 
+# 读取模型配置的场景角色，并投影成运行时使用的模型端点与凭据引用。
 def _resolve_model_settings(config):
     reference = config.get('models_config')
     if not reference:
@@ -35,6 +37,7 @@ def _resolve_model_settings(config):
             config.pop(target, None)
 
 
+# 加载并合并引用配置，解析路径、环境变量、模型及凭据而不改动进程环境。
 def load_service_config(path, *, required_tokens=('operator',)):
     """Resolve one configuration without mutating process-wide environment."""
     config = load_common_config(path, require_operator_token='operator' in required_tokens)
@@ -71,6 +74,7 @@ def load_service_config(path, *, required_tokens=('operator',)):
     return config
 
 
+# 只在服务可执行入口把已解析配置投影到兼容旧调用的环境变量。
 def apply_runtime_environment(config):
     """Install one service's legacy environment at its executable startup boundary."""
     mapping = {**_PATH_ENVIRONMENT, 'execution_mode': 'BENCHFORGE_EXECUTION_MODE',

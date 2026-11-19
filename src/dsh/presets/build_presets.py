@@ -12,6 +12,7 @@ else:
 yaml = base.yaml
 
 
+# 组合自有预设与宿主入口，关闭被替代的 SQLite 查询并按部署方式添加模型补丁。
 def build(standard, python, config_path, service_config, *, package_imports=False):
     entries = definition.build(standard, python, service_config, config_path=config_path,
                                package_imports=package_imports)
@@ -20,6 +21,7 @@ def build(standard, python, config_path, service_config, *, package_imports=Fals
             *([] if package_imports else base.model_patches(config_path))]
 
 
+# 解析构建路径与解释器设置，生成可移植或本机专用的预设 YAML。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     base.add_source_arguments(parser)

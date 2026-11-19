@@ -9,6 +9,7 @@ from server.operations import OPERATIONS
 from server.operation_config import load_operation_config
 
 
+# 解析生产评测工具命令与 JSON 输入，在工作区运行操作并输出结构化结果。
 def main():
     parser = argparse.ArgumentParser(description="BenchForge production and evaluation tools")
     parser.add_argument("tool", choices=["catalog", "status", "plan", "model_infer", "habitat", "libero", "carla", "evidence", "build", "evaluate", *OPERATIONS])

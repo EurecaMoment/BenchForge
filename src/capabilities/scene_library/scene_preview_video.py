@@ -12,6 +12,7 @@ import time
 from capabilities.scene_library.preview_manifest import PREVIEW_FILE, FORMAT_VERSION, preview_folder, cached_preview
 
 
+# 优先查找系统ffmpeg，必要时使用预览依赖自带编码器。
 def encoder_path():
     binary = shutil.which('ffmpeg')
     if binary:
@@ -23,6 +24,7 @@ def encoder_path():
         raise RuntimeError('Install the workbench preview runtime from requirements-preview.txt') from error
 
 
+# 只将已声明且验证通过的公开帧编码为持久预览，并保存可核验清单。
 def persist_preview(config, task_id, revision, frames):
     """Only declared, validated public frame paths reach the encoder; no browser request encodes."""
     if not frames or len(frames) > 40:
@@ -70,6 +72,7 @@ def persist_preview(config, task_id, revision, frames):
         lock.unlink(missing_ok=True)
 
 
+# 检查会话场景产物，为成功修订预先生成或复用预览视频。
 def prepare_scene(config, session, scene, run_ids=()):
     from service_access.scene_service import service_read
     from capabilities.scene_library.observations import stage_artifacts

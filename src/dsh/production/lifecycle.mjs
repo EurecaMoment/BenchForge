@@ -4,11 +4,13 @@ import {ProductionIncompleteError} from './errors.mjs';
 import {reviewSnapshot, reviewNotice, reviewChanges} from './review_snapshot.mjs';
 
 /** Conversation policy; all facts come from the projection and domain receipts. */
+/** 创建生产任务生命周期控制器，按会话协调复核、停止恢复、通知去重和宿主卸载。 */
 export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
   schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
   const timers=new Map(), queues=new Map(), reminders=new Map(), checks=new Map();
   const lifetime=new AbortController();
   let disposed=false;
+  /** 将同一会话的状态变更串行排队；等待与执行均响应取消，完成后删除队列占用。 */
   const serialized=(id,operation,signal=lifetime.signal)=>{
     const previous=queues.get(id)||Promise.resolve();
     const next=waitWithSignal(previous,signal).catch(_priorFailure=>{signal?.throwIfAborted();}).then(()=>{signal?.throwIfAborted();return operation();});
@@ -16,15 +18,18 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const settled=next.finally(()=>{if(queues.get(id)===next)queues.delete(id);});
     return waitWithSignal(settled,signal);
   };
+  /** 取得会话级检查信号，并与整个生命周期的取消信号合并。 */
   function checkSignal(id) {
     if(!checks.has(id))checks.set(id,{controller:new AbortController()});
     return AbortSignal.any([lifetime.signal,checks.get(id).controller.signal]);
   }
+  /** 将当前轮次的取消信号绑定到后台检查，避免停止后的旧任务继续投递消息。 */
   function bindTurn(agent,signal) {
     if(!signal || checks.get(agent.id)?.signal===signal)return;
     const prior=checks.get(agent.id);
     prior?.detach?.();
     const controller=prior&&!prior.controller.signal.aborted?prior.controller:new AbortController();
+    /** 停止该会话的检查和定时器，并持久化暂停状态供显式恢复使用。 */
     const abort=()=>{
       controller.abort(signal.reason);
       if(timers.has(agent.id))unschedule(timers.get(agent.id));
@@ -35,15 +40,19 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       }).catch(error=>{if(!disposed)onError(error);});
     };
     signal.addEventListener('abort',abort,{once:true});
-    checks.set(agent.id,{controller,signal,detach:()=>signal.removeEventListener('abort',abort)});
+    checks.set(agent.id,{controller,signal,/** 解除旧轮次的取消监听，避免重复处理后续停止事件。 */ detach:()=>signal.removeEventListener('abort',abort)});
     if(signal.aborted)abort();
   }
+  /** 读取该 Agent 会话当前的生产投影视图。 */
   const viewOf=agent=>projection.stateOf(agent.session).view;
+  /** 构造带稳定通知键和业务事实的原生提示消息。 */
   const notice=(kind,key,text,facts={})=>createMessage({source:{kind,noticeKey:key,form:'notice',summary:text,...facts},content:[{type:'text',text}]});
+  /** 检查下一轮或下一步收件箱是否已包含同一通知，避免重复投递。 */
   function pendingNotice(agent,key) {
     const pending=[...(agent.inbox?.nextTurn||[]),...(agent.inbox?.nextStep||[])];
     return pending.some(message=>message.source?.noticeKey===key);
   }
+  /** 按复核截止时间安排后台刷新；暂停、取消或卸载后不再设定定时器。 */
   function arm(id,record,minDelay=0) {
     if(timers.has(id))unschedule(timers.get(id));
     timers.delete(id);
@@ -54,6 +63,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     },Math.max(minDelay,record.review.deadline*1000-now()));
     timer?.unref?.();timers.set(id,timer);
   }
+  /** 在同会话队列内读取当前复核并更新持久化状态，只处理活动的父生产会话。 */
   async function observe(agent,signal=lifetime.signal) {
     if(disposed)return;
     signal=AbortSignal.any([lifetime.signal,signal]);
@@ -72,6 +82,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       if(['paused','needs_input','check_failed','superseded'].includes(current?.state) ||
         ['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state)) record.suspended=true;
       if(prior?.key===key&&prior.suspended&&view.state==='interrupted')record.suspended=true;
+      /** 忽略投影修订号来比较复核内容是否真正改变。 */
       const stable=value=>JSON.stringify(value && {...value,revision:0});
       if(stable(prior)===stable(record))return {...record,reviewReceipt:current};
       await table.put(agent.id,record);
@@ -80,6 +91,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       return {...record,reviewReceipt:current};
     },signal);
   }
+  /** 推进已登记复核并处理释放、暂停及输入要求，再按新状态决定是否通知或继续检查。 */
   async function refresh(id) {
     const signal=checkSignal(id);
     return serialized(id,async()=>{
@@ -133,6 +145,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       return true;
     },signal);
   }
+  /** 在 Agent 准入下一步时协调生产状态，并根据静默时长和阶段变化补充必要提醒。 */
   async function preStep({agent,signal},next) {
     bindTurn(agent,signal);
     const decision=await next();
@@ -165,6 +178,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     }
     return decision;
   }
+  /** 结束轮次前核对实际生产与复核状态，对可恢复的未完成工作安排有界续接。 */
   async function stopping({agent,turn,signal}) {
     signal?.throwIfAborted();
     const state=projection.stateOf(agent.session);
@@ -191,16 +205,19 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     agent.steer(notice('benchforge/production-continue',`${key}:recovery:${attempts+1}`,
       `本轮收尾检查：当前生产状态=${view.state}，尚不能据此宣告任务完成。${action}先简短说明当前进展；不能用空回复结束。若存在无法自行修复的阻塞，使用已有任务或阶段工具记录真实阻塞并解释，不能伪造验收。`,reviewNotice(review,view.review)));
   }
+  /** 在 Agent 恢复后重新安排未暂停复核的检查，不在会话组合阶段直接驱动工作。 */
   async function resume(agent) {
     const record=table.get(agent.id);
     // agent/created is composition time. Queue after creation, never drive it here.
     if(record?.review&&!record.suspended)arm(agent.id,record);
   }
+  /** 宿主启动后立即协调持久化的复核窗口，使过期记录获得一次及时检查。 */
   function start() {
     // Reconcile persisted/legacy windows immediately after host startup.
     for(const [id,record] of table.entries())arm(id,{...record,
       review:record.review && {...record.review,deadline:Math.min(record.review.deadline,now()/1000)}});
   }
+  /** 显式解除会话复核的暂停状态，并立即刷新对应后台状态。 */
   async function changed(id) {
     const ready=await serialized(id,async()=>{
       const record=table.get(id);
@@ -211,6 +228,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     return ready ? refresh(id) : false;
   }
   return {observe,preStep,stopping,resume,start,refresh:changed,
+    /** 取消全部生命周期任务、移除监听和定时器，并等待已排队操作结束。 */
     async dispose(){disposed=true;lifetime.abort(new DOMException('Production lifecycle unloaded','AbortError'));
       for(const check of checks.values()){check.detach?.();check.controller.abort(lifetime.signal.reason);}checks.clear();
       for(const timer of timers.values())unschedule(timer);timers.clear();await Promise.allSettled([...queues.values()]);},

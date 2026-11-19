@@ -11,6 +11,7 @@ from profile_migration import base
 Loader, Dumper = base.Loader, base.Dumper
 
 
+# 迁移合并生成预设，先创建带时间戳备份再原子替换既有 profile。
 def install(profile, preset):
     current = yaml.load(profile.read_text(encoding='utf-8'), Loader=Loader) or []
     generated = yaml.load(preset.read_text(encoding='utf-8'), Loader=Loader)
@@ -26,6 +27,7 @@ def install(profile, preset):
     return backup
 
 
+# 解析 profile 与预设文件位置，执行安装并报告备份路径。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--profile', required=True, type=Path)

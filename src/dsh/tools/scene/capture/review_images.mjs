@@ -1,7 +1,8 @@
 // Bring the actual reference and latest render together at the existing review.
 // These are production observations, not a separate model evaluator or score.
+/** 根据实际采集视图和可选参考图读取复核媒体，并转换为当前模型可用的图片块。 */
 export function createDeliveryVisuals({ api, images }) {
-  return async ({ task, agent, signal }) => {
+  return /** 读取当前任务实际采集视图及可选设计参考，只返回模型能够消费的复核图片。 */ async ({ task, agent, signal }) => {
     const hasReference = Boolean(task.unit.intent.layout);
     const count = Number.isInteger(task.result?.report?.frames) && task.result.report.frames > 0
       ? task.result.report.frames : 1;

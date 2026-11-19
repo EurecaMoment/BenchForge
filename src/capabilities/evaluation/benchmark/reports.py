@@ -41,6 +41,7 @@ _RESOURCE_FIELDS = frozenset({
 _PROVENANCE_FIELDS = frozenset({'provenance', 'source_provenance', 'history'})
 
 
+# 读取当前服务访问范围；独立导出的评分脚本不依赖服务运行时。
 def _access():
     # The exported score.py intentionally runs with standard Python alone.
     if not __package__:
@@ -49,6 +50,7 @@ def _access():
     return current_access()
 
 
+# 解析评测输入路径，在服务上下文中限制为可信产物或授权工作区文件。
 def _input_path(value, *, base=None):
     path = Path(value)
     if base is not None and not path.is_absolute():
@@ -62,6 +64,7 @@ def _input_path(value, *, base=None):
     return path.absolute()
 
 
+# 在访问范围和大小限制内读取输入字节，保留可信服务产物的直接读取路径。
 def _input_bytes(path, *, limit=_INPUT_LIMIT):
     path = _input_path(path)
     access = _access()
@@ -74,6 +77,7 @@ def _input_bytes(path, *, limit=_INPUT_LIMIT):
     return path.read_bytes()
 
 
+# 读取评测JSONL记录，有访问范围时使用受限文件读取。
 def _input_rows(path):
     if _access() is None:
         return rows(path)
@@ -81,6 +85,7 @@ def _input_rows(path):
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
+# 按授权范围复制评测输入，独立执行时拒绝符号链接源。
 def _copy_input(source, destination):
     source = _input_path(source)
     access = _access()
@@ -97,6 +102,7 @@ def _copy_input(source, destination):
         shutil.copyfile(source, destination)
 
 
+# 只枚举普通文件条目，不沿链接目录遍历复现包。
 def _bundle_files(root):
     """Enumerate only regular entries; never descend through a linked directory."""
     if root.is_symlink():
@@ -112,6 +118,7 @@ def _bundle_files(root):
             yield path
 
 
+# 持有已验证文件句柄写入压缩包，避免压缩时跟随符号链接。
 def _zip_tree(root, destination):
     """Hold file descriptors while archiving; ZipFile.write follows symlinks."""
     root = Path(root).absolute()
@@ -126,6 +133,7 @@ def _zip_tree(root, destination):
                 shutil.copyfileobj(source, output, 1024 * 1024)
 
 
+# 复制复现目录和明确声明的外部资源，重写可移植引用并保留来源字段。
 def _reproduce_bundle(bundle, copied):
     bundle = _input_path(bundle)
     if not bundle.is_dir():
@@ -140,6 +148,7 @@ def _reproduce_bundle(bundle, copied):
     external.mkdir(exist_ok=True)
     mapping = {}
 
+    # 递归重定位声明的本地资源路径，保留远程引用及原始来源元数据。
     def relocate(value, field='', descriptor=False):
         if field in _PROVENANCE_FIELDS:
             return value
@@ -187,14 +196,17 @@ def _reproduce_bundle(bundle, copied):
     })
 
 
+# 按题目、通用记录或评测标识的优先级读取统一字符串身份。
 def identity(row):
     return str(row.get('item_id',row.get('id',row.get('eval_id',''))))
 
 
+# 去除首尾空白、合并连续空白并忽略大小写，规范化文本答案。
 def normalized(value):
     return ' '.join(str(value).strip().casefold().split())
 
 
+# 把列表、JSON列表或常见分隔文字转换为序列答案。
 def sequence(value):
     if isinstance(value,list):return value
     if isinstance(value,str):
@@ -206,6 +218,7 @@ def sequence(value):
     return []
 
 
+# 按记录指定指标计算集合、顺序、数值或结构化答案分数，兼容单一答案封装。
 def metric(item,pred):
     gold=item['answer']
     name=item.get('metric_id','exact_match')
@@ -250,6 +263,7 @@ def metric(item,pred):
     raise ValueError(f'Unsupported deterministic metric {name}; provide an explicit metric plugin rather than silently using exact match')
 
 
+# 检查题目和预测唯一性及未知标识，计算逐题分数与各维汇总。
 def score_predictions(items,predictions,model='saved_predictions'):
     expected=unique([{**r,'id':identity(r)} for r in items])
     mapped=unique([{**r,'id':identity(r)} for r in predictions])
@@ -268,6 +282,7 @@ def score_predictions(items,predictions,model='saved_predictions'):
             'source':item.get('source',item.get('source_name',item.get('scene','unspecified'))),
             'capability_tags':item.get('capability_tags',item.get('capabilities',[])),
             'difficulty':item.get('difficulty_level','unspecified')})
+    # 汇总一组题目的平均分和缺失数量。
     def aggregate(values):return {'items':len(values),'score':sum(v['score'] for v in values)/len(values),
                                   'missing':sum(not v['present'] for v in values)}
     groups={}
@@ -283,6 +298,7 @@ def score_predictions(items,predictions,model='saved_predictions'):
                 'partial_credit':sum(0<r['score']<1 for r in scored)}}
 
 
+# 读取题目与保存的预测，输出逐题评分文件及指标摘要。
 def evaluate(args,directory,config):
     items=_input_rows(args['items'])
     result=score_predictions(items,_input_rows(args['predictions']),args.get('model','saved_predictions'))
@@ -291,6 +307,7 @@ def evaluate(args,directory,config):
     return {**result,'scores':str(directory/'score_items.jsonl'),'metrics':str(directory/'metrics.json')}
 
 
+# 从题目中仅提取模型可见题面、媒体、选项和答案类型。
 def public_row(row,media):
     result={'id':identity(row),'question':row['question'],'media':media}
     if row.get('options',row.get('choices')) is not None:result['choices']=row.get('options',row.get('choices'))
@@ -298,6 +315,7 @@ def public_row(row,media):
     return result
 
 
+# 复制并分离公开题目媒体与私有标准答案，生成独立评分和复现包。
 def package(args,directory,config):
     directory.mkdir(parents=True,exist_ok=True)
     root=directory/'benchmark'
@@ -343,6 +361,7 @@ When supplied, `reproduce/` contains the caller's reproduction bundle and copied
             'public':str(pub),'authority':str(private),'count':len(public)}
 
 
+# 只将白名单公开字段发送给配置模型，记录预测与失败供后续评分。
 def model_eval(args,directory,config):
     public=_input_rows(args['public_items'])
     # Construct allowlisted request rows even if caller accidentally passes audit items.
@@ -404,6 +423,7 @@ def model_eval(args,directory,config):
     return {'models':results,'status':'completed' if all(not r['failed'] for r in results) else 'incomplete'}
 
 
+# 仅使用公开选项运行首选项和随机选项基线，保存预测及分数。
 def baselines(args,directory,config):
     items=_input_rows(args['items']);rng=random.Random(args.get('seed',42))
     results=[]
@@ -423,6 +443,7 @@ def baselines(args,directory,config):
     return {'models':results,'evaluation_mode':'proxy','note':'Deterministic/random controls are not independent model respondents or empirical evidence of IRT validity.'}
 
 
+# 合并唯一的模型题目评分，生成总体及分层指标报告。
 def report(args,directory,config):
     paths=args['scores'] if isinstance(args['scores'],list) else [args['scores']]
     matrix=[r for path in paths for r in _input_rows(path)]

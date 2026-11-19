@@ -13,12 +13,15 @@ from pipelines.scene_production.service_failures import (
 
 
 class SceneLifecycle:
+    # 绑定场景工作区，供策略解析和生命周期操作使用。
     def __init__(self, root):
         self.root = Path(root)
 
+    # 提取提交程序及其回执的稳定身份，用于幂等任务比对。
     def submission_identity(self, submission):
         return submission_identity(submission)
 
+    # 按工作流及执行模式校验引用与显式程序要求，决定是否准入场景任务。
     def admit(self, intents, workflow, submitted_programs):
         scene_modes = (
             [intent.get("execution_mode") for intent in intents] if workflow == "scene" else []
@@ -63,10 +66,12 @@ class SceneLifecycle:
             if submission:
                 validate_scene_requirements(submission["program"])
 
+    # 在场景工作流完成前要求有效的生产验收回执。
     def require_success(self, directory, unit):
         if unit.get("workflow", "scene") == "scene":
             require_accepted(self.root, directory, unit.get("intent", {}).get("execution_mode"))
 
+    # 依据失败阶段、操作反馈和恢复模式构造下一次尝试，同时保留既有成功产物。
     def retry(self, task, feedback, capture_mode, directory_for):
         tid = task["id"]
         recovery_id = None

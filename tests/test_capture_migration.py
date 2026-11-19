@@ -21,6 +21,7 @@ from pipelines.scene_production.service import create_store
 
 
 class CaptureStoreTests(unittest.TestCase):
+    # 建立探索模式下的独立场景存储及临时目录，隔离采集迁移测试。
     def setUp(self):
         self.database_url = use_postgres(self)
         self.temporary = TemporaryDirectory()
@@ -29,17 +30,20 @@ class CaptureStoreTests(unittest.TestCase):
         self.env.start()
         self.store = create_store(self.root / 'artifacts', database_url=self.database_url)
 
+    # 释放数据库引擎、恢复执行环境并删除临时采集目录。
     def tearDown(self):
         self.store.repo.engine.dispose()
         self.env.stop()
         self.temporary.cleanup()
 
+    # 创建并推进一个待采集工作项，返回其编号以构造不同旧协议状态。
     def capture(self, key):
         run = self.store.submit(key, [{'name': key, 'execution_mode': 'exploration'}])
         task = self.store.snapshot(run)['tasks'][0]
         self.store.update(task['id'], state='READY', unit={**task['unit'], 'phase': 'capture'})
         return task['id']
 
+    # 验证迁移保留历史产物、只执行一次，并要求显式重试旧协议采集。
     def test_migration_preserves_artifacts_and_requires_explicit_retry_once(self):
         task = self.capture('legacy')
         directory = self.store.directory(task, 0)
@@ -70,12 +74,14 @@ class CaptureStoreTests(unittest.TestCase):
         self.assertFalse((self.store.directory(task, 1) / 'capture').exists())
         self.assertIsNotNone(self.store.claim_stage(task, 'after-migration'))
 
+    # 验证已使用当前原生协议的采集回执不被迁移误作废。
     def test_existing_native_receipt_is_not_retired(self):
         task = self.capture('native')
         write_json(self.store.directory(task, 0) / 'isaac_sim/attempt_0/capture.json', {'protocol': 'a100sim.v1.Simulator'})
         self.assertEqual(migrate_capture(self.store)['retired_tasks'], 0)
         self.assertEqual(self.store.snapshot(task.split('.')[0])['tasks'][0]['state'], 'READY')
 
+    # 验证不同采集任务可独立领取，而过期所有者不能发布产物。
     def test_capture_claims_are_independent_and_publication_rejects_stale_owner(self):
         first, second = self.capture('first'), self.capture('second')
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -96,6 +102,7 @@ class CaptureStoreTests(unittest.TestCase):
         self.assertTrue((self.store.directory(first, 0) / 'capture/report.json').exists())
         self.assertTrue(self.store.renew_stage(second, 'second-owner'))
 
+    # 验证恢复过程复用已知活动远端任务，避免重复提交采集。
     def test_recovery_does_not_duplicate_known_active_native_jobs(self):
         directory = self.root / 'revision'
         receipt = directory / 'isaac_sim/attempt_0/jobs/capture/receipt.json'
@@ -110,6 +117,7 @@ class CaptureStoreTests(unittest.TestCase):
 
 
 class ConfigurationMigrationTests(unittest.TestCase):
+    # 验证配置迁移保留完整模型端点、推理与上下文设置。
     def test_migration_preserves_full_model_settings(self):
         models = {'url': 'http://127.0.0.1:8000/v1', 'model': 'existing',
             'context_window': 1048576, 'max_tokens': 65536, 'reasoning_effort': 'max',
@@ -127,6 +135,7 @@ class ConfigurationMigrationTests(unittest.TestCase):
         self.assertEqual(result['server'], {'operator_token': 'retained'})
         self.assertEqual(migrate_configuration(result), result)
 
+    # 验证配置同步备份退役文件并复用已有凭据，避免无意轮换密码。
     def test_sync_backs_up_retired_config_and_keeps_credentials(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

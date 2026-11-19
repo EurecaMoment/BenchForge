@@ -11,6 +11,7 @@ PACKAGES = ("numpy", "numpy.libs", "PIL", "pillow.libs", "scipy", "scipy.libs",
             "trimesh", "networkx", "packaging", "typing_extensions")
 
 
+# 根据已固定的工作区和脚本描述符构造隔离执行命令；调用方需保持描述符打开。
 def python_command(workspace, script, *, workspace_fd, script_fd,
                    conversation_root, conversation_fd, argv=()):
     """Build a command from pinned workspace/script descriptors.
@@ -36,6 +37,7 @@ def python_command(workspace, script, *, workspace_fd, script_fd,
                "--proc", "/proc", "--dev", "/dev"]
     mounted = set()
 
+    # 去重添加存在路径的只读挂载，避免重复覆盖同一目标位置。
     def mount(source, destination=None):
         source = Path(source)
         if source.exists():

@@ -23,10 +23,12 @@ VISUAL_CHECKS = {'object_identity', 'realistic_scale', 'support_and_attachment',
                  'functional_layout', 'access_and_clearance', 'materials_and_lighting'}
 
 
+# 按显式执行模式或既有配置读取场景验收策略。
 def _policy_for_mode(root, execution_mode):
     return policy_for(root) if execution_mode is None else policy_for(root, execution_mode)
 
 
+# 要求审查引用真实采集视图且具有有效观察内容，不以文字长度替代证据。
 def captured_observation(row, frames):
     """A real view and useful text are required; verbosity is not evidence."""
     return (isinstance(row,dict) and isinstance(row.get('view'),str) and row['view'] in frames and
@@ -39,6 +41,7 @@ def captured_observation(row, frames):
 
 
 
+# 按启用的生产策略预检场景，阻断不满足准入条件的程序。
 def admit_program(root, program, *, allow_generated=False, execution_mode=None):
     policy = _policy_for_mode(root, execution_mode)
     if not policy:
@@ -49,6 +52,7 @@ def admit_program(root, program, *, allow_generated=False, execution_mode=None):
     return report
 
 
+# 综合真实采集、物理、几何和逐视图审查，生成生产场景验收结论。
 def capture_acceptance(root, program, report, evidence, review, capture, execution_mode=None):
     """Require actual native capture, physics, geometry and per-view life review."""
     policy = _policy_for_mode(root, execution_mode)
@@ -172,6 +176,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
     brief = admission.get('scene_brief')
     native_relation_checks=[]
     if brief:
+        # 仅根据当前关系的原生证据判断是否通过，避免无关缺陷污染逐关系反馈。
         def relation_passed(relation):
             """Evaluate only the native evidence for this relation.
 
@@ -281,6 +286,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             'on_failure':'retain all failed evidence; gather independent physical and visual issues, batch-preflight a complete repair candidate, then recapture within budget; never export or mark complete'}
 
 
+# 要求场景已有通过的生产验收，并检查简报和冻结证据版本仍然有效。
 def require_accepted(root, directory, execution_mode=None):
     policy = _policy_for_mode(root, execution_mode)
     if not policy:return

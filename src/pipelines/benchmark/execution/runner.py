@@ -33,6 +33,7 @@ SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture'
                   'benchforge.task_code': '/task-code'}
 
 
+# 按操作类型分派场景验收、采集验证、嵌套流水线及普通服务步骤。
 def execute_step(step, arguments, directory, environment, client):
     operation = step['uses']
     if operation == 'scene.acceptance' or operation in COLLECTION_OPERATIONS:
@@ -87,6 +88,7 @@ def execute_step(step, arguments, directory, environment, client):
     raise ValueError(f'Unknown pipeline operation: {operation}')
 
 
+# 在运行锁或私有持久输出上下文内推进一次执行，允许状态读取独立进行。
 def run(args, directory, config=None, client=service_call):
     """Advance one run under a lock; status readers need not acquire it."""
     run_root = Path(args['run']).resolve() if args.get('run') else Path(directory) / 'pipeline_run'
@@ -98,6 +100,7 @@ def run(args, directory, config=None, client=service_call):
         return _run_locked(args, directory, config, client)
 
 
+# 冻结并恢复运行计划，解析步骤绑定，执行未完成步骤并保存阶段和产物状态。
 def _run_locked(args, directory, config, client):
     plan_path = Path(args['plan']).resolve()
     plan = read(plan_path)
@@ -164,6 +167,7 @@ def _run_locked(args, directory, config, client):
                    '_assessment': plan.get('assessment'), '_plan_path': str(plan_path)}
     if execution_mode == 'production' and plan.get('assessment'):
         environment['_allocations'] = step_allocations(plan['steps'], plan['inputs']['selections'])
+    # 在推进前核对活动计划及待应用用户编辑，计划被替代或待更新时停止执行。
     def plan_guard():
         owner_plan = scope['plan'] if scope else str(plan_path)
         active=active_plan(args['_workspace'],session) if session else None
@@ -181,6 +185,7 @@ def _run_locked(args, directory, config, client):
                     raise ValueError('Run bindings must honor the active edited '+key)
     blocked=plan_guard()
     if blocked:return blocked
+    # 持久化需要等待的评审状态及下一步提示，并返回当前运行回执。
     def waiting(value):
         state.update(state=value['state'], stage_review=value,
                      next=value['next'])
@@ -194,6 +199,7 @@ def _run_locked(args, directory, config, client):
             initial = gate(args['_workspace'],session,'S1',plan.get('stage_review_key',str(plan_path)),str(plan_path))
             if not initial['can_continue']:
                 return waiting(initial)
+    # 检查完整生产阶段，核对交付数量并为真实阶段产物开启或恢复评审。
     def checkpoint():
         if not session:
             return None
@@ -327,11 +333,13 @@ def _run_locked(args, directory, config, client):
     return {'run': str(run_root.resolve()), 'outputs': {k: v['result'] for k, v in state['steps'].items()}, **state}
 
 
+# 补齐操作所属工作区身份后执行生产流水线。
 def pipeline_run(args, directory, config=None):
     # Core operations directory is workspace/operations/id.
     return run({**args, '_workspace': str(operation_workspace(directory))}, directory, config)
 
 
+# 从可信运行文档读取状态，缺少可信状态时拒绝仅凭目录推断运行。
 def status(args, directory=None, config=None):
     documents = RunDocuments(args['run'])
     state = documents.load('state.json')

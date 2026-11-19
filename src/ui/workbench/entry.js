@@ -46,6 +46,7 @@ const PLAN_FIELDS = {
   description: '具体说明', physical_assumptions: '物理假设与验证范围', revision_history: '设计修订依据', changes: '修改内容', type: '关系',
 };
 
+/** 组合工作台界面模块、共享辅助函数与原生宿主集成入口。 */
 function createClient(React, defineStore, ui) {
   const h = React.createElement;
   const primitives = createPrimitives({React, PLAN_FIELDS, PLAN_SECTIONS});
@@ -58,16 +59,18 @@ function createClient(React, defineStore, ui) {
   const composer = createComposerComponents({React, helpers, ui});
   const {Workbench} = createWorkbenchComponent({React, helpers, components});
 
+  /** 读取当前会话原生权限投影，将可否提交生产传给目标组件。 */
   function ProductionEnvironment({t, component: Component = Workbench, ...props}) {
     const permissions = props.useProjection('permissions');
     return h(Component, {...props, t, canSubmit: canStartProduction(permissions)});
   }
 
+  /** 挂载原生远程接口和资源提供器，注册会话存储、输入配置与工作台界面插槽。 */
   async function apply(ctx) {
     await ctx.remote.$mount(workbenchRemote);
     ctx.effect(() => ctx.locale.register(NS, dictionaries));
     const t = ctx.locale.bind(NS);
-    ctx.inject(['remote.benchforgeWorkbench', 'resources'], (workbenchCtx) => {
+    ctx.inject(['remote.benchforgeWorkbench', 'resources'], /** 在原生远程与资源服务可用后注册工作台资源、按会话隔离的存储及界面插槽。 */ (workbenchCtx) => {
       const requestWorkbench = createWorkbenchRequest(workbenchCtx.remote);
       workbenchCtx.effect(() => workbenchCtx.resources.register(createProductsResource(workbenchCtx.remote)),
         'benchforge-workbench: conversation products resource');
@@ -76,33 +79,37 @@ function createClient(React, defineStore, ui) {
       const production = createProductionInput({ctx: workbenchCtx, requestWorkbench,
         productionRequest: helpers.productionRequest, productionContext: helpers.productionContext, t});
       workbenchCtx.effect(() => workbenchCtx.inputTriggers.registerSource(production.source));
+      /** 为当前会话初始化浏览及需求状态，并绑定生产配置、停止和场景导航操作。 */
       const environment = (sessionId, actions) => {
         actions.initialize(helpers.initialState(sessionId), helpers.initialDemand(sessionId));
         return {
           requestWorkbench,
+          /** 将当前会话身份附到生产配置更新操作。 */
           configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
+          /** 调用当前原生会话的取消接口，失败时向界面报告原因。 */
           stopExecution: async () => {
             const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();
             if (!result.ok) throw new Error(result.error?.message || t('stopFailed'));
           },
+          /** 切换工作台到场景选择，并展开右侧面板。 */
           openScenes: () => {actions.openScenes(); sidebar.openTab(WORKBENCH_KIND);},
         };
       };
       workbenchCtx.effect(() => workbenchCtx.sidebarRightTabs.register({
-        id: WORKBENCH_TAB, kind: WORKBENCH_KIND, title: () => t('panel'), keepMounted: true,
+        id: WORKBENCH_TAB, kind: WORKBENCH_KIND, /** 按当前语言读取工作台标签页标题。 */ title: () => t('panel'), keepMounted: true,
       }));
-      workbenchCtx.slots.inject('sidebar.right.pane.tab', () => workbenchCtx.slots.register({
+      workbenchCtx.slots.inject('sidebar.right.pane.tab', /** 在插槽提供方作用域内注册对应工作台面板、输入设置或切换按钮，并随依赖卸载释放。 */ () => workbenchCtx.slots.register({
         name: 'sidebar.right.pane.tab', key: WORKBENCH_TAB, locale: NS, store, inject: environment,
-      }, function WorkbenchPanel(props) {
+      }, /** 仅为 BenchForge 预设会话渲染带权限环境的工作台面板。 */ function WorkbenchPanel(props) {
         const preset = props.useProjection('agentPreset');
         if (preset !== PRESET_ID) return null;
         return h(ProductionEnvironment, {...props, key: props.sessionId, t});
       }));
       for (const slot of ['conversation.composer.dock', 'conversation.input.dock']) {
-        workbenchCtx.slots.inject(slot, () => workbenchCtx.slots.register({
+        workbenchCtx.slots.inject(slot, /** 在插槽提供方作用域内注册对应工作台面板、输入设置或切换按钮，并随依赖卸载释放。 */ () => workbenchCtx.slots.register({
           name: slot, id: 'benchforge-production-settings', order: 10, locale: NS,
           store, inject: environment,
-        }, function WorkbenchComposer(props) {
+        }, /** 在适用的输入插槽显示生产设置，首页形态仅用于空白会话。 */ function WorkbenchComposer(props) {
           const preset = props.useProjection('agentPreset');
           const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
           const hero = slot === 'conversation.input.dock';
@@ -110,15 +117,16 @@ function createClient(React, defineStore, ui) {
           return h(ProductionEnvironment, {...props, key: props.sessionId, t, hero, component: composer.ProductionComposer});
         }));
       }
+      /** 根据右侧面板当前展开状态切换工作台的显示与隐藏。 */
       const toggle = () => {
         const active = sidebar.active();
         if (active?.kind === WORKBENCH_KIND && sidebar.isExpanded()) sidebar.hide(active.id);
         else sidebar.openTab(WORKBENCH_KIND);
       };
       for (const slot of ['conversation.session.header.utilities', 'conversation.hero.options']) {
-        workbenchCtx.slots.inject(slot, () => workbenchCtx.slots.register({
+        workbenchCtx.slots.inject(slot, /** 在插槽提供方作用域内注册对应工作台面板、输入设置或切换按钮，并随依赖卸载释放。 */ () => workbenchCtx.slots.register({
           name: slot, id: 'benchforge-workbench-toggle', order: 10, locale: NS,
-        }, function WorkbenchToggle({useProjection}) {
+        }, /** 仅在 BenchForge 会话显示具有可访问标签的工作台切换按钮。 */ function WorkbenchToggle({useProjection}) {
           const preset = useProjection('agentPreset');
           if (preset !== PRESET_ID) return null;
           return h('button', {
@@ -138,6 +146,7 @@ function createClient(React, defineStore, ui) {
   return {ProductionEnvironment, Workbench, dictionaries, apply, createWorkbenchRequest, ...publicHelpers, ...components};
 }
 
+/** 从宿主加载 React、存储和界面组件依赖，并导出工作台插件入口与共享展示能力。 */
 export default function createPlugin(require) {
   const React = require('react');
   const {defineStore} = require('@deepseek-ai/dsh-client-store');

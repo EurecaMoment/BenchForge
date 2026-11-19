@@ -2,13 +2,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {currentAccessScope} from '../../access/context.mjs';
 
+/** 检查候选路径是否位于指定工作区根目录内。 */
 const within = (root, file) => {
   const relative = path.relative(root, file);
   return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
+/** 识别文件不存在或路径中间项不是目录的预期查询失败。 */
 const missing = error => ['ENOENT', 'ENOTDIR'].includes(error.code);
 
 /** Repair a nonexistent workspace ancestor, never a filename or arbitrary path. */
+/** 将指向当前工作区的安全绝对文件引用转换为相对引用；拒绝上级跳转和真实路径越界。 */
 export async function workspaceReference(file, workspace, signal) {
   signal?.throwIfAborted();
   if (typeof file !== 'string' || !workspace || !path.isAbsolute(file) || !path.isAbsolute(workspace)) return;
@@ -44,6 +47,7 @@ export async function workspaceReference(file, workspace, signal) {
 }
 
 /** Bind relative image references to the session rather than retyping its root. */
+/** 只规范受支持读取工具的文件参数，保留其他参数和原生文件诊断行为。 */
 export async function resolveReadArguments(name, args, workspace, signal) {
   if (!['read_image', 'read'].includes(name) || !args || typeof args !== 'object') return args;
   const reference = await workspaceReference(args.file_path, workspace, signal);

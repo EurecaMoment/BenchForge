@@ -25,9 +25,11 @@ _PUBLIC_IMAGES = _BoundedCache(512, 128*1024*1024)
 _METRIC_FRAMES = _BoundedCache(32, 256*1024*1024)
 
 
+# 只解码白名单中的公开图像，按文件版本缓存不可变像素数组。
 def _public_image(path, version=None):
     """Only decode whitelisted public image files; never open native sources."""
     key = version or _file_version(path)
+    # 从公开图像复制像素数组，并设为只读以保护共享缓存。
     def load():
         with Image.open(key[0]) as image:
             array = np.asarray(image).copy()
@@ -36,9 +38,11 @@ def _public_image(path, version=None):
     return _PUBLIC_IMAGES.load(key, load)
 
 
+# 按深度与有效掩码版本缓存米制深度和有效像素。
 def _public_metric_frame(depth_path, valid_path, unit_scale):
     depth_key, valid_key = _file_version(depth_path), _file_version(valid_path)
     key = depth_key, valid_key, float(unit_scale)
+    # 解码公开深度并换算为米，同时冻结深度数组和有效掩码。
     def load():
         depth = np.asarray(_public_image(depth_path, depth_key), dtype=np.float64)*float(unit_scale)
         valid = _public_image(valid_path, valid_key) > 0
@@ -48,11 +52,13 @@ def _public_metric_frame(depth_path, valid_path, unit_scale):
     return _METRIC_FRAMES.load(key, load)
 
 
+# 汇总公开图像、米制帧及公开几何结果的缓存统计。
 def cache_status():
     return {'public_images': _PUBLIC_IMAGES.stats(), 'metric_frames': _METRIC_FRAMES.stats(),
             'public_geometry_results': PUBLIC_GEOMETRY_RESULTS.stats()}
 
 
+# 从公开对象引用中提取编号标签，缺少合法标签时拒绝测量。
 def _tag(value):
     match = re.match(r"([ABC]\d{2})", str(value))
     if not match:
@@ -60,6 +66,7 @@ def _tag(value):
     return match.group(1)
 
 
+# 验证公开三维点和正交局部轴，计算表面极值形成的中心与尺寸。
 def geometry_from_points(points, local_axes):
     points = np.asarray(points, dtype=np.float64)
     axes = np.asarray(local_axes, dtype=np.float64)
@@ -73,6 +80,7 @@ def geometry_from_points(points, local_axes):
             "basis": "published metric-depth surface extremes in declared local axes"}
 
 
+# 根据多个公开相机中的标记像素观测求交三角化，忽略重复或越界帧。
 def triangulate_public_marker(frames, observations):
     matrices, rhs = [], []
     used = set()
@@ -98,6 +106,7 @@ def triangulate_public_marker(frames, observations):
 
 
 class PublicReconstruction:
+    # 读取公开米制标定及局部轴，并建立本次重建的文件与几何缓存。
     def __init__(self, calibration_file):
         self.path = Path(calibration_file).resolve()
         self.base = self.path.parent
@@ -111,6 +120,7 @@ class PublicReconstruction:
         self.point_cache, self.geometry_cache, self.frame_cache = {}, {}, {}
         self.geometry_point_counts, self.asset_version_cache = {}, {}
 
+    # 解析标定包内的公开资产路径，拒绝缺失引用及目录越界。
     def _asset(self, value):
         if not value:
             raise PublicMeasurementError("A required public asset is missing")
@@ -120,6 +130,7 @@ class PublicReconstruction:
         path.relative_to(self.base)
         return path
 
+    # 融合对象掩码内的有效公开深度点，统一变换到参考相机坐标。
     def points(self, label):
         if label in self.point_cache: return self.point_cache[label]
         arrays = []
@@ -152,15 +163,18 @@ class PublicReconstruction:
         self.point_cache[label] = points
         return points
 
+    # 缓存公开资产的路径、大小和修改时间版本。
     def _public_asset_version(self, value):
         if value not in self.asset_version_cache:
             self.asset_version_cache[value] = _file_version(self._asset(value))
         return self.asset_version_cache[value]
 
+    # 根据公开点与声明局部轴重建几何，返回副本保护共享结果。
     def geometry(self,label):
         if label not in self.geometry_cache:
             if label not in self.axes: raise PublicMeasurementError("No public local axes for "+label)
             key = public_geometry_key(self.card, self.frames, self.axes[label], label, self._public_asset_version)
+            # 计算对象公开表面几何，并冻结结果及参与重建的点数。
             def reconstruct():
                 points = self.points(label)
                 return freeze_geometry(geometry_from_points(points,self.axes[label]),len(points))
@@ -172,11 +186,13 @@ class PublicReconstruction:
         return {"center": np.array(result.center,dtype=np.float64),
                 "size": np.array(result.size,dtype=np.float64), "basis": result.basis}
 
+    # 返回几何缓存中的点数，尚未重建时统计公开点云。
     def point_count(self,label):
         if label in self.geometry_point_counts:
             return self.geometry_point_counts[label]
         return len(self.points(label))
 
+    # 按问题模板从公开传感器重建结果计算预测，拒绝隐藏真值字段。
     def predict(self,query):
         if any(name in query for name in ("answer","private","objects_gt","object_GT","point_world","settled_center_m","size_xyz_m")):
             raise PublicMeasurementError("Hidden truth is not a public query input")
@@ -211,6 +227,7 @@ class PublicReconstruction:
         raise PublicMeasurementError("Unsupported frozen template "+template)
 
 
+# 仅从公开参数绑定构建测量查询，拒绝把裁判答案作为查询输入。
 def public_query(template, parameters, calibration_file, marker_observations=()):
     """Construct a query from public parameter bindings; never accept oracle fields."""
     query={"template_id":template}

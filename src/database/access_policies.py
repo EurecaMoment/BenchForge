@@ -4,10 +4,12 @@ from sqlalchemy import text
 from database.schema import metadata
 
 
+# 生成读取事务级身份设置的 SQL 表达式，并把空字符串视为缺失。
 def setting(name):
     return f"NULLIF(current_setting('benchforge.{name}', true), '')"
 
 
+# 为各业务表构造工作区、会话及资源授权的行级可见性条件。
 def policy_expressions():
     workspace, session, host = (setting(name) for name in ("workspace_id", "session_id", "host_id"))
     own = f"workspace_id = {workspace}"
@@ -39,6 +41,7 @@ def policy_expressions():
     return {name: expr if name == "workspaces" else f"({active}) AND ({expr})" for name, expr in expressions.items()}
 
 
+# 启用并强制行级隔离，保留服务所有者写入权限并限制公共读策略。
 def install_policies(connection):
     """Owner service retains writes; an independent reader gets scoped SELECT."""
     expressions = policy_expressions()
@@ -55,6 +58,7 @@ def install_policies(connection):
         connection.exec_driver_sql(f"CREATE POLICY benchforge_reader ON {table} FOR SELECT TO PUBLIC USING ({expressions.get(name, 'false')})")
 
 
+# 校验现有专用角色的权限，再授予受行级策略限制的读取能力。
 def grant_reader(connection, role):
     """Grant an existing isolated role; role creation/passwords stay deployment-owned."""
     from database.access import identifier

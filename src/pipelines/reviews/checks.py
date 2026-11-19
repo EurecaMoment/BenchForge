@@ -6,6 +6,7 @@ from pipelines.benchmark.execution.review_checks import check_artifact as benchm
 from pipelines.scene_production.review_checks import check_repair_artifact
 
 
+# 分派普通生产或场景修复产物检查，并确认自检期间文件字节没有变化。
 def check_artifact(workspace, session, row):
     if not row["key"].startswith("scene-repair:"):
         return benchmark_artifact(workspace, session, row)

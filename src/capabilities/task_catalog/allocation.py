@@ -3,6 +3,7 @@
 from collections import Counter
 
 
+# 将每组选定模板的总量均匀分配，并保证每个显式模板至少获得一条。
 def counts_for(selections):
     counts = Counter()
     for selection in selections:

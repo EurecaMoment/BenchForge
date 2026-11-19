@@ -2,6 +2,7 @@
 import numpy as np
 
 
+# 汇总网格的颜色、材质和纹理传输情况，区分实际外观证据与缺失信息。
 def inspect_mesh_appearance(mesh):
     materials = mesh.get('materials') or []
     slots = sorted({slot for material in materials for slot, path in material.get('textures', {}).items() if path})

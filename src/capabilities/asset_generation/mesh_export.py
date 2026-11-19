@@ -14,6 +14,7 @@ import numpy as np
 import trimesh
 
 
+# 将材质因子展开为有限浮点列表，必要时按255归一化；无效输入使用默认值。
 def _float_factor(value, default):
     try:
         values = np.asarray(value, dtype=np.float64).reshape(-1)
@@ -26,6 +27,7 @@ def _float_factor(value, default):
         return default
 
 
+# 将纹理输入规范化为可保存的图像对象。
 def _image(value):
     if value is None:
         return None
@@ -41,6 +43,7 @@ def _image(value):
     return None
 
 
+# 序列化网格材质参数并复制纹理图像，生成相对文件引用。
 def _material_record(material, texture_dir, material_index):
     """Serialize a trimesh PBR/Simple material and copy image payloads."""
     if material is None:
@@ -74,6 +77,7 @@ def _material_record(material, texture_dir, material_index):
     return record
 
 
+# 加载源网格，转换坐标系并导出几何、材质和可选GLB文件。
 def export_mesh(source, output, glb_output=None, source_frame='sam3d_camera'):
     source, output = Path(source), Path(output)
     scene = trimesh.load(source, force='scene', process=False)
@@ -170,6 +174,7 @@ def export_mesh(source, output, glb_output=None, source_frame='sam3d_camera'):
     return record
 
 
+# 解析网格转换命令行参数，执行导出并写入转换结果。
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--source', required=True); parser.add_argument('--output', required=True); parser.add_argument('--glb-output'); parser.add_argument('--source-frame', choices=['sam3d_camera', 'y_up', 'z_up'], default='sam3d_camera')
     args = parser.parse_args(); result = export_mesh(args.source, args.output, args.glb_output, args.source_frame)

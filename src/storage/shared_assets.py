@@ -18,6 +18,7 @@ from database.schema import assets, asset_versions, asset_grants, workspaces
 from database.transactions import lock_entity, insert_statement
 
 
+# 校验共享资源文件清单的路径、摘要、大小及唯一性，拒绝越界引用。
 def validate_manifest(manifest):
     if not isinstance(manifest, list) or not 1 <= len(manifest) <= 4096:
         raise ValueError("Asset manifest must contain 1..4096 files")
@@ -41,6 +42,7 @@ def validate_manifest(manifest):
     return sorted(files, key=lambda row: row["path"])
 
 
+# 仅保留受支持且长度有限的公开元数据，拒绝发布私有评测权威信息。
 def _metadata(value):
     allowed = {"description", "license", "source", "units", "coordinate_system", "classification", "name", "kind"}
     if not isinstance(value, dict) or set(value) - allowed:
@@ -52,6 +54,7 @@ def _metadata(value):
     return {**value, "classification": value.get("classification", "public_input")}
 
 
+# 构造未撤销、未过期且受众匹配的授权条件，可进一步要求允许派生。
 def _grant_filter(scope, *, derive=False):
     conditions = [asset_grants.c.revoked_at.is_(None),
                   or_(asset_grants.c.expires_at.is_(None), asset_grants.c.expires_at > func.now()),
@@ -62,11 +65,13 @@ def _grant_filter(scope, *, derive=False):
     return and_(*conditions)
 
 
+# 组合工作区自有资源与有效授权资源的可见性条件。
 def _visible(scope, *, derive=False):
     return or_(asset_versions.c.workspace_id == scope.workspace_id,
                asset_versions.c.asset_version_id.in_(select(asset_grants.c.asset_version_id).where(_grant_filter(scope, derive=derive))))
 
 
+# 查询当前作用域可见的指定资源版本，不可用时统一拒绝访问。
 def _version(connection, scope, version_id, *, derive=False):
     identifier(version_id, "asset version")
     row = connection.execute(select(asset_versions).where(
@@ -76,6 +81,7 @@ def _version(connection, scope, version_id, *, derive=False):
     return row
 
 
+# 递归核验资源依赖全部可见，去重并限制依赖闭包规模。
 def _closure(connection, scope, row, seen=None):
     seen = set() if seen is None else seen
     if row["asset_version_id"] in seen:
@@ -87,6 +93,7 @@ def _closure(connection, scope, row, seen=None):
         _closure(connection, scope, _version(connection, scope, dependency), seen)
 
 
+# 由可信服务发布已验证私有存储的不可变资源版本，记录依赖、来源及内容摘要。
 def publish_version(engine, scope, *, name, kind, manifest, storage_ref, metadata=None,
                     asset_id=None, derived_from_version_id=None, dependencies=(), provenance=None):
     """Trusted service only; storage_ref identifies already verified private storage."""
@@ -131,6 +138,7 @@ def publish_version(engine, scope, *, name, kind, manifest, storage_ref, metadat
         return {"asset_id": aid, "asset_version_id": vid, "version": number, "content_hash": digest}
 
 
+# 为唯一受众创建资源授权，校验派生权限、未来到期时间及个人所有者身份。
 def grant_version(engine, scope, version_id, *, grantee_workspace_id=None, grantee_owner_id=None, public=False,
                   allow_derive=False, expires_at=None):
     if type(public) is not bool or type(allow_derive) is not bool or sum((public, bool(grantee_workspace_id), bool(grantee_owner_id))) != 1:
@@ -176,6 +184,7 @@ def grant_version(engine, scope, version_id, *, grantee_workspace_id=None, grant
         return {"grant_id": result, "asset_version_id": version_id, "audience": audience}
 
 
+# 仅撤销本工作区拥有的授权，目标不可用时拒绝操作。
 def revoke_grant(engine, scope, grant_id):
     identifier(grant_id, "grant")
     with engine.begin() as connection:
@@ -186,10 +195,12 @@ def revoke_grant(engine, scope, grant_id):
             raise PermissionError("Asset grant is unavailable")
 
 
+# 提取可公开的资源身份、清单、依赖和元数据，隐藏私有存储位置。
 def _public(row):
     return {key: row[key] for key in ("asset_version_id", "asset_id", "version", "content_hash", "manifest", "dependencies", "metadata")}
 
 
+# 解析可见资源的最新版本，核验完整依赖后向可信服务返回私有存储信息。
 def resolve_asset_version(engine, scope, asset_id, *, enforce_role=False):
     """Trusted resolver; grants are checked before returning private storage metadata."""
     identifier(asset_id, "asset")
@@ -202,6 +213,7 @@ def resolve_asset_version(engine, scope, asset_id, *, enforce_role=False):
         return dict(row)
 
 
+# 对已识别的私有存储引用复核资源可见性及依赖，再返回版本记录。
 def resolve_storage_version(engine, scope, storage_ref):
     """Trusted resolver for a path already recognized as private asset storage."""
     with read_transaction(engine, scope, enforce_role=False) as connection:
@@ -213,6 +225,7 @@ def resolve_storage_version(engine, scope, storage_ref):
         return dict(row)
 
 
+# 在受作用域保护的只读事务中读取指定版本的公开信息并核验依赖。
 def read_version(engine, scope, version_id, *, enforce_role=True):
     with read_transaction(engine, scope, enforce_role=enforce_role) as connection:
         row = _version(connection, scope, version_id)
@@ -220,6 +233,7 @@ def read_version(engine, scope, version_id, *, enforce_role=True):
         return _public(row)
 
 
+# 按资源版本游标分页列出可见资源，并标记其依赖是否完整可用。
 def list_versions(engine, scope, *, limit=30, after=None, enforce_role=True):
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("Asset query limit must be 1..100")

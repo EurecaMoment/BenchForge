@@ -4,6 +4,7 @@ import math
 from capabilities.dataset_authoring.spatial.task_generators.geometry import result
 
 
+# 将场景图转为邻接表，可按通行宽度、开闭状态和避让节点过滤。
 def adjacency(graph, feasible=False, avoid=()):
     adj={n:[] for n in graph['nodes'] if n not in avoid}
     for e in graph['edges']:
@@ -14,6 +15,7 @@ def adjacency(graph, feasible=False, avoid=()):
     return adj
 
 
+# 在过滤后的图上搜索最低成本路径；目标不可达时返回两个空值。
 def shortest(graph,start=None,goal=None,feasible=True,avoid=()):
     start=start or graph['start'];goal=goal or graph['goal'];adj=adjacency(graph,feasible,avoid)
     if start not in adj or goal not in adj:return None,None
@@ -29,6 +31,7 @@ def shortest(graph,start=None,goal=None,feasible=True,avoid=()):
     return None,None
 
 
+# 校验整条路径均存在合法边并累加最低边成本，非法路径返回空。
 def path_cost(graph,path,feasible=True):
     if not isinstance(path,list) or not path:return None
     adj=adjacency(graph,feasible);total=0
@@ -39,6 +42,7 @@ def path_cost(graph,path,feasible=True):
     return total
 
 
+# 遍历指定起点可达的节点，可选择仅使用实际可通行边。
 def reachable(graph,start,feasible=False):
     adj=adjacency(graph,feasible);seen=set();todo=[start]
     while todo:
@@ -48,6 +52,7 @@ def reachable(graph,start,feasible=False):
     return sorted(seen)
 
 
+# 依据图结构、可通行条件和局部访问观察生成建图或路径规划任务。
 def task(scene,nid,op):
     g=scene['graph'];start,goal=g['start'],g['goal'];adj=adjacency(g);route,cost=shortest(g)
     edge_list=sorted([e['a'],e['b']] for e in g['edges'])
@@ -109,8 +114,10 @@ def task(scene,nid,op):
     return result(text,answer,kind,inputs=inputs,path_rule=rules if kind=='path' else None)
 
 
+# 通过深度优先遍历判断有向或无向图是否存在环。
 def has_cycle(g):
     adj=adjacency(g);visited=set();active=set()
+    # 维护访问集和递归栈检测回边，无向图跳过父节点边。
     def visit(node,parent=None):
         visited.add(node);active.add(node)
         for other,_ in adj[node]:

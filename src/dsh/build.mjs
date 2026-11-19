@@ -19,6 +19,7 @@ const packages = path.join(stage, 'packages');
 const workbench = path.join(packages, 'workbench');
 const protocolRoot = path.join(packages, 'protocol');
 const protocolTypes = './lib/types/index.d.ts';
+/** 以缩进 JSON 格式写出构建阶段的包元数据。 */
 const json = (file, value) => writeFile(file, JSON.stringify(value, null, 2));
 
 try {
@@ -83,8 +84,8 @@ const client = await build({
   ].join('\n')},
   footer: {js: '    return benchforgeClient.default(require);\n  },\n});'},
 });
-const stylesheet = client.outputFiles.find((file) => file.path.endsWith('.css'));
-const browserScript = client.outputFiles.find((file) => file.path.endsWith('.js'));
+const stylesheet = client.outputFiles.find(/** 按扩展名从构建内存输出中定位样式表或浏览器脚本，供后续生成客户端入口。 */ (file) => file.path.endsWith('.css'));
+const browserScript = client.outputFiles.find(/** 按扩展名从构建内存输出中定位样式表或浏览器脚本，供后续生成客户端入口。 */ (file) => file.path.endsWith('.js'));
 const styleMetadata = stylesheet
   ? '  meta: () => ({ stylesheets: { ' + clientName + ': { text: () => ' + JSON.stringify(stylesheet.text) + ' } } }),\n'
   : '';

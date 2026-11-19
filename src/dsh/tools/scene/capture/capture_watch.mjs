@@ -1,18 +1,22 @@
 import path from 'node:path';
 
+/** 把采集任务标识规范为所属运行标识，兼容任务级输入。 */
 export function captureRunId(value) {
   return typeof value==='string' ? (/^(sf_[A-Za-z0-9_-]+)\.scene\d+$/.exec(value)?.[1] || value) : value;
 }
 
+/** 按白名单摘取已定义字段，避免观察摘要暴露无关内部数据。 */
 function fields(value, names) {
   return Object.fromEntries(names.filter(name => value?.[name] !== undefined).map(name => [name, value[name]]));
 }
 
 // Keep diagnostics verbatim, including their object/view location. Narrative,
 // inventories and saved plans are read through explicit detail/evidence tools.
+/** 从嵌套诊断中提取可读问题，供精简观察结果引用。 */
 function diagnostics(value, source) {
   const rows = [], diagnosticKeys = new Set(['error','errors','issues','repair_suggestions']);
   const documents = new Set(['intent','scene_brief','program','submitted_program','scene_program']);
+  /** 递归遍历诊断对象和列表，将可读错误收集为摘要。 */
   function visit(value, location) {
     if (!value || typeof value !== 'object') return;
     if (Array.isArray(value)) {value.forEach((item, index) => visit(item, location + '[' + index + ']'));return;}
@@ -34,6 +38,7 @@ function diagnostics(value, source) {
   return rows;
 }
 
+/** 压缩运行和任务观察数据，保留状态、失败原因、质量与必要产物定位。 */
 export function compactCaptureObservation(value, {artifacts} = {}) {
   const summary = fields(value, ['run_id','state','terminal','changed','waited_seconds','next_poll_seconds','gallery_url','watch','detail_available']);
   if (summary.terminal === undefined && ['SUCCEEDED','FAILED_FINAL','CANCELED'].includes(value.state)) summary.terminal = true;

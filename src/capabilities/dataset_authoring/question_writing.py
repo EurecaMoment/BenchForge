@@ -21,6 +21,7 @@ INSTRUCTIONS = (
 )
 
 
+# 返回题目编写模式、必填字段、规则与示例，供编写和校验使用。
 def contract():
     return {'schema': SCHEMA, 'instructions': INSTRUCTIONS,
             'evidence_field': 'question_spec',
@@ -35,6 +36,7 @@ def contract():
             'validation_scope': 'writing structure and exact source bindings; human answerability requires real media review'}
 
 
+# 将结构化公开参数转换为适合题目展示的文字。
 def public_value(value):
     """Render structured public parameters without Python/JSON serialization."""
     if isinstance(value, dict):
@@ -46,6 +48,7 @@ def public_value(value):
     return str(value)
 
 
+# 验证题干、作答规则、媒体标签和原始参数绑定的一致性。
 def validate_spec(spec, parameters, media_count):
     if not isinstance(spec, dict):
         raise ValueError(f'Source evidence needs question_spec; read {NAMES["pipeline_catalog"]} section=plan_template, field question_authoring')
@@ -82,6 +85,7 @@ def validate_spec(spec, parameters, media_count):
             ('stem', 'context', 'conditions', 'options', 'response', 'media_labels')}}
 
 
+# 使用已经审查的公开参数与标记媒体构建内置题目表述。
 def builtin_spec(template, sample):
     """Built-in generators use already reviewed public parameters and marked media."""
     text = template['prompt_template'].format_map({key: public_value(value) for key, value in sample['parameters'].items()})
@@ -97,6 +101,7 @@ def builtin_spec(template, sample):
             'parameter_bindings': sample['parameters']}
 
 
+# 把题干、条件、选项和作答方式组合成完整题面。
 def question_text(presentation):
     parts = [presentation['stem']]
     for key, title in [('context', '已知条件'), ('conditions', '作答规则'), ('options', '选项')]:

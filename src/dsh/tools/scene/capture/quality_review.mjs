@@ -9,6 +9,7 @@ const observations = new Set(captureObservationNames);
 const captureTools = new Set([...submissions, ...observations]);
 
 // PTC stores settled inner calls separately from the outer run_code result.
+/** 把批量派发事件展开为普通工具调用与结果，统一后续采集复核处理。 */
 function captureEvents(events) {
   return events.flatMap(event => event.type === 'tool/ptc-dispatch' ? [
     {type:'tool/call',data:{name:event.data.name,callId:event.data.subCallId,arguments:JSON.stringify(event.data.arguments)}},
@@ -16,6 +17,7 @@ function captureEvents(events) {
   ] : [event]);
 }
 
+/** 检查当前轮次中的采集提交、回执和复核事件，找出尚需交付检查的最新任务。 */
 export function pendingCapture(events, turn) {
   events = captureEvents(events);
   const start = events.findLastIndex(e => e.type === 'turn/start' && e.data.turn === turn);
@@ -61,6 +63,7 @@ export function pendingCapture(events, turn) {
     && (submittedHere || revisited.has(latest.runId) || revisited.has(latest.taskId)) ? latest : undefined;
 }
 
+/** 判断当前 Agent 是否拥有实际生产工具；只读准备子会话不承担父会话的生产复核责任。 */
 export function productionReviewApplies(agent, tools = agent.ctx?.get('tools')) {
   if (agent.session.header?.origin !== 'subagent' || typeof tools?.get !== 'function') return true;
   return ['benchforge_capture', 'benchforge_refine', 'benchforge_run', 'benchforge_extend']
@@ -68,8 +71,9 @@ export function productionReviewApplies(agent, tools = agent.ctx?.get('tools')) 
     .some(name => tools.get(name, agent)?.name === name);
 }
 
+/** 创建采集交付复核器，核验终态与质量并向负责会话投递必要的诊断和图片。 */
 export function createDeliveryReview({ api, createMessage, visuals = async () => [], shouldReview = productionReviewApplies }) {
-  return async ({ agent, turn, signal }, deliver = message => agent.steer(message)) => {
+  return /** 检查当前负责 Agent 的未复核采集终态，读取质量证据与图片后投递准确的交付反馈。 */ async ({ agent, turn, signal }, deliver = message => agent.steer(message)) => {
     signal.throwIfAborted();
     // Read-only preparation does not transfer the parent's production duty.
     if (!shouldReview(agent)) return;
@@ -124,8 +128,9 @@ When the requested work is complete, or an external blocker requires stopping, w
 
 // Put new observations before the next model decision (including update_goal),
 // rather than waiting until the model has already announced completion.
+/** 在成功采集工具结果进入下一步前执行复核，防止未检查结果直接结束任务。 */
 export function createCaptureReviewStep(review) {
-  return async (input, next) => {
+  return /** 在官方准入允许进入后检查本步是否取得采集结果，并在下一步前完成必要复核。 */ async (input, next) => {
     const decision = await next();
     if (decision.kind !== 'enter') return decision;
     const events = captureEvents(input.agent.session.snapshotEvents());

@@ -29,6 +29,7 @@ const bindings = defineDomain({name: 'benchforge_access', version: 1, tables: {
 }});
 
 /** A Host service, deliberately not a Remote or a model tool. */
+/** 装配受管工作区、只读资源和会话授权服务，并把访问策略的注册与释放绑定到宿主及会话生命周期。 */
 export async function apply(ctx, config) {
   if (typeof ctx.sandboxPolicy.registerReadAccess !== 'function')
     throw new AccessError('BenchForge requires the native read-access policy extension', 'BENCHFORGE_ACCESS_UNAVAILABLE');
@@ -47,7 +48,7 @@ export async function apply(ctx, config) {
   const publishedRoots = [skillsRoot];
   try { publishedRoots.push(await publishResources(supportSource, store.resourceRoot, 'task-support', /\.(?:md|py|json)$/i)); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
-  const roots = [...await systemReadRoots(), ...await Promise.all(config.readOnlyRoots.map(async value => {
+  const roots = [...await systemReadRoots(), ...await Promise.all(config.readOnlyRoots.map(/** 解析显式只读根目录，拒绝盘符根目录、受管目录重叠及不符合来源标记的路径。 */ async value => {
     if (!path.isAbsolute(value)) throw new AccessError('Read-only resource roots must be absolute');
     const actual = await fs.realpath(value);
     if (actual === path.parse(actual).root || within(actual, store.workspaceRoot) || within(actual, store.resourceRoot))
@@ -63,17 +64,24 @@ export async function apply(ctx, config) {
     return actual;
   }))];
   const active = new WeakMap();
+  /** 根据预设身份或已有绑定判断会话是否受 BenchForge 工作区管理。 */
   const managed = session => session?.header.agentPreset === 'benchforge' ||
     Boolean(session?.header.id && domain.table('workspaces').get(session.header.id));
+  /** 同时检查已绑定会话和正在组合的预设，识别需要受管授权的 Agent。 */
   const managedAgent = agent => managed(agent?.session) ||
     agent?.ctx?.get?.('agentPresets')?.composedPreset(agent.ctx) === 'benchforge';
   const service = {
-    get: id => store.get(id), scope: session => store.scope(session),
+    /** 按会话标识读取受管工作区绑定。 */
+    get: id => store.get(id), /** 从已激活的会话工作区构造可信访问作用域。 */ scope: session => store.scope(session),
+    /** 为会话预留工作区，并记录可选的父会话归属。 */
     reserve: (id, parentId) => store.reserve(id, parentId),
+    /** 把父工作区中的已授权输入制作成供子会话读取的不可变快照。 */
     snapshotInput: (id, parentId, source) => store.snapshotInput(id, parentId, source),
+    /** 把子会话准备好的文件导出到父会话指定的草稿目录。 */
     exportPreparation: (id, parentId, destination) => store.exportPreparation(id, parentId, destination), skillsRoot,
     // Host administration only: callers must obtain the file manifest from
     // authorized database records or an explicit owner review, never tool args.
+    /** 核验已停止的源会话及其版本，再为显式选择的文件准备新会话迁移。 */
     prepareMigration: async ({sourceSessionId, newSessionId, sourceRevision, files}, signal) => {
       if (ctx.get('agents')?.get(sourceSessionId)?.status === 'running')
         throw new AccessError('Stop the source conversation before migrating its files');
@@ -87,6 +95,7 @@ export async function apply(ctx, config) {
           throw new AccessError('Source conversation identity or revision changed');
         if (sourceSessionId === newSessionId) throw new AccessError('Migration must create a new conversation');
         await store.reserve(newSessionId);
+        /** 迁移提交前重新核对源会话的目录、版本和运行状态，拒绝预览后发生的变化。 */
         const verifySource = async () => {
           const current = await query.observeSession(sourceSessionId, {signal, projectionMode: 'none'});
           try {
@@ -101,7 +110,7 @@ export async function apply(ctx, config) {
     },
   };
   ctx.provide('benchforgeAccess', service);
-  ctx.on('agent/create', async (request, next) => {
+  ctx.on('agent/create', /** 创建受管会话前预留独立工作区，并核对父会话与传入目录的绑定。 */ async (request, next) => {
     const options = request.options;
     const parentId = options.meta?.parentSession;
     const parentBound = parentId && domain.table('workspaces').get(parentId);
@@ -110,6 +119,7 @@ export async function apply(ctx, config) {
     request.options = {...options, meta: {...options.meta, agentPreset: options.meta?.agentPreset || 'benchforge', cwd: row.rootPath}};
     return next();
   });
+  /** 校验会话工作区绑定并安装新一代只读访问策略；随 Agent 释放授权。 */
   async function activate(agent) {
     if (!managedAgent(agent)) return;
     const row = await store.activate(agent.session.header);
@@ -124,7 +134,7 @@ export async function apply(ctx, config) {
     const workspace = await ctx.workspaceRegistry.create(row.rootPath, 'BenchForge');
     await workspace.attachSession(agent.id);
   }
-  ctx.on('agent/created', async ({agent}) => activate(agent));
+  ctx.on('agent/created', /** Agent 完成创建后激活其工作区及只读访问策略。 */ async ({agent}) => activate(agent));
   for (const agent of ctx.get('agents')?.list() || []) {
     // Existing unbound conversations remain readable in the UI; tools reject
     // their scope until an explicit migration has established a trusted root.
@@ -137,7 +147,7 @@ export async function apply(ctx, config) {
       ctx.logger(name).warn('Conversation %s requires workspace migration', agent.id);
     }
   }
-  ctx.on('tools/execute', async (exec, next) => {
+  ctx.on('tools/execute', /** 工具执行前核对授权代际，并在可信异步作用域内调用官方执行链。 */ async (exec, next) => {
     const session = exec.agent?.session;
     if (managedAgent(exec.agent)) {
       const row = store.get(session.header.id);
@@ -146,7 +156,7 @@ export async function apply(ctx, config) {
     }
     return next();
   }, {prepend: true});
-  ctx.on('working-directory/access', async (request, next) => {
+  ctx.on('working-directory/access', /** 除已获完整访问权限的会话外，限制受管会话只能访问自己的绑定工作目录。 */ async (request, next) => {
     if (!managedAgent(request.agent)) return next();
     const row = store.get(request.agent.id);
     if (ctx.sandboxPolicy.resolve({session: request.agent.session}).mode === 'danger-full-access') return next();

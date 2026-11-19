@@ -10,6 +10,7 @@ from database.engine import dispose_engines, engine_for
 from database.migrations import initialize_schema
 
 
+# 为测试创建独立 PostgreSQL schema，只使用专用测试地址，绝不复用部署凭据。
 def use_postgres(test):
     """Never use deployment credentials; each test gets an isolated schema."""
     url = os.environ.get('BENCHFORGE_TEST_POSTGRES_URL')
@@ -20,6 +21,7 @@ def use_postgres(test):
     with admin.begin() as connection:
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
     database_url = make_url(url).update_query_dict({'options': f'-c search_path={schema}'}).render_as_string(hide_password=False)
+    # 先释放测试连接池，再删除本测试独占的 schema 及其表。
     def drop():
         dispose_engines()
         with engine_for(url).begin() as connection:

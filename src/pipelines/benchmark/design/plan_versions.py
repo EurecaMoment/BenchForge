@@ -8,11 +8,13 @@ from capabilities.benchmark_design.assessment import assessment_with_current_sch
 from capabilities.benchmark_design.assessment import validate_assessment
 
 
+# 通过规范化 JSON 比较结构值，忽略字典键顺序差异。
 def _same(left,right):
     return json.dumps(left,ensure_ascii=False,sort_keys=True,separators=(',',':')) == json.dumps(
         right,ensure_ascii=False,sort_keys=True,separators=(',',':'))
 
 
+# 逐叶比较评估方案并记录前后值，拒绝会造成字段路径歧义的含点键名。
 def _leaf_changes(before,after,path=''):
     if isinstance(before,dict) and isinstance(after,dict):
         output=[]
@@ -42,6 +44,7 @@ def _leaf_changes(before,after,path=''):
     return []
 
 
+# 递归提取答案、权威、凭据等私有字段，供计划编辑一致性检查。
 def _private_projection(value,path=''):
     if isinstance(value,dict):
         output={}
@@ -60,10 +63,12 @@ def _private_projection(value,path=''):
     return {}
 
 
+# 去除结构化评估代码块，取得 Markdown 中的说明正文。
 def _narrative(markdown):
     return re.sub(r'^```assessment-yaml\s*\r?\n.*?^```\s*$', '', markdown or '', flags=re.M|re.S).strip()
 
 
+# 清理说明正文的常见 Markdown 标记并归一空白，供语义映射比较。
 def _plain_text(markdown):
     value=_narrative(markdown)
     value=re.sub(r'^\s*#{1,6}\s*', '', value, flags=re.M)
@@ -72,6 +77,7 @@ def _plain_text(markdown):
     return ' '.join(value.split())
 
 
+# 检查编辑后的说明变化是否都被显式解析记录覆盖。
 def _narrative_unmapped(old,new,resolutions):
     if _plain_text(old)==_plain_text(new):
         return False
@@ -95,6 +101,7 @@ def _narrative_unmapped(old,new,resolutions):
     return unmatched
 
 
+# 核对 Markdown 归一化结果的每个结构化变更均有用户文字依据，防止额外改写。
 def _check_normalization(saved,previous,args):
     assessment=args.get('assessment')
     if not isinstance(assessment,dict):
@@ -163,6 +170,7 @@ def _check_normalization(saved,previous,args):
     return rows,only_parameters,unmapped_narrative
 
 
+# 确认执行更新已经应用当前待处理用户编辑，并完整保留其 Markdown 及约束。
 def verify_application(active,args):
     if not active or not active['pending']:return
     if args.get('applies_edit')!=active['plan']:

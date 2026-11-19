@@ -5,6 +5,7 @@ from pathlib import PurePosixPath
 from storage.json_io import write_json as write_json
 
 
+# 解析可信根内的相对产物路径，拒绝路径穿越、链接及不符合格式的引用。
 def safe_path(root: Path, relative: str, must_exist: bool = False) -> Path:
     root = root.resolve()
     rel = PurePosixPath(relative)

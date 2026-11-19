@@ -18,11 +18,13 @@ from test_scene_diagnostics import sample, object_record
 
 
 class CapturePreflightTests(unittest.TestCase):
+    # 创建相互独立的临时工作区，供程序与适配器批量预检。
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
 
+    # 验证同一候选的适配器错误与通用契约错误都进入完整报告。
     def test_adapter_and_contract_errors_are_collected_from_the_same_candidate(self):
         program = sample()
         program['objects'] = [
@@ -46,6 +48,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertEqual(program, original)
         self.assertEqual(report['runtime_checks']['status'], 'not_evaluated')
 
+    # 验证原生资源绑定和别名检查采用本次部署设置。
     def test_native_binding_and_alias_check_use_deployment_settings(self):
         program = sample()
         program['objects'] = [object_record('cup', kind='mesh', asset_id='mug',
@@ -55,6 +58,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertEqual(capture_requirement_issues(
             program, self.root, {'asset_sources': {'mug': {'asset_id': 'native-cup'}}}), [])
 
+    # 验证编译器沿用同一批适配器约束，不放宽被预检拒绝的字段。
     def test_compiler_uses_the_same_adapter_batch_and_does_not_relax_it(self):
         program = sample()
         program['objects'][0]['appearance'] = {'ior': 1.5, 'specular': .5}
@@ -65,6 +69,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertEqual(caught.exception.issues, expected)
         self.assertEqual(len(expected), 4)
 
+    # 验证无效提交保存两类完整诊断，但不会创建队列任务。
     def test_submission_saves_adapter_and_contract_diagnostics_without_queueing(self):
         workspace = self.root / 'operator_workspaces' / 'test'
         workspace.mkdir(parents=True)
@@ -81,6 +86,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertEqual(json.loads(Path(report['program_snapshot_path']).read_text(encoding='utf-8')), program)
         self.assertFalse(list(self.root.glob('sf_*')))
 
+    # 验证 HTTP 摘要限制不截断持久报告或客户端收到的完整预检异常。
     def test_http_summary_does_not_truncate_the_saved_report_or_client_error(self):
         program = sample()
         program['objects'] = [object_record(f'item_{i}', support=f'absent_{i}') for i in range(80)]
@@ -98,6 +104,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertEqual(caught.exception.preflight, report)
         self.assertIn('absent_79', str(caught.exception))
 
+    # 验证非预检 HTTP 错误保留原状态和响应正文。
     def test_unrelated_http_error_keeps_its_status_and_body(self):
         body = b'upstream unavailable'
         with patch('service_access.scene_service.load_service_client_config', return_value={
@@ -109,6 +116,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 503)
         self.assertEqual(caught.exception.read(), body)
 
+    # 验证批量校验保留主原生资源身份及阶段要求。
     def test_main_native_identity_and_stage_requirements_survive_batch_validation(self):
         program = sample()
         design = {'id': 'design', 'name': 'Robot scene', 'summary': 'A recognizable robot on the floor',
@@ -132,6 +140,7 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertFalse(report['passed'])
         self.assertTrue(any('each hard requirement' in row['message'] for row in report['issues']))
 
+    # 验证异常计划角色不使预检崩溃，也不遮蔽其他对象的问题。
     def test_malformed_plan_roles_do_not_crash_or_hide_other_objects(self):
         program = sample()
         program['objects'][0]['size'] = [0, 1, 1]

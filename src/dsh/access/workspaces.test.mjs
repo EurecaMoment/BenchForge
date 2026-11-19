@@ -6,13 +6,15 @@ import test from 'node:test';
 import {WorkspaceBindings} from './workspaces.mjs';
 import {currentAccessScope, runWithAccessScope} from './context.mjs';
 
+/** 创建临时受管根目录和内存绑定表，提供激活真实测试会话的辅助入口。 */
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bf-access-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
-  const rows = new Map(), table = {get: key => rows.get(key), put: async (key, value) => rows.set(key, structuredClone(value))};
+  const rows = new Map(), table = {/** 按测试键读取内存记录或模拟服务。 */ get: key => rows.get(key), /** 保存测试记录的副本，模拟持久化写入并防止引用共享。 */ put: async (key, value) => rows.set(key, structuredClone(value))};
   const options = {table, hostId: 'host', ownerId: 'owner', workspaceRoot: path.join(root, 'workspaces'), resourceRoot: path.join(root, 'resources')};
   const store = new WorkspaceBindings(options);
   await store.initialize();
+  /** 预留并激活带可选父会话绑定的独立测试工作区。 */
   const create = async (id, parent) => {
     const binding = await store.reserve(id, parent);
     const session = {header: {id, cwd: binding.rootPath, ...(parent ? {parentSession: parent} : {})}};
@@ -22,7 +24,7 @@ async function fixture(t) {
   return {root, store, options, create};
 }
 
-test('concurrent allocation, restart and multi-turn scope keep one stable independent root', async t => {
+test('concurrent allocation, restart and multi-turn scope keep one stable independent root', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：concurrent allocation, restart and multi-turn scope keep one stable independent root。 */ async t => {
   const {store, options} = await fixture(t);
   const [first, duplicate] = await Promise.all([store.reserve('a'), store.reserve('a')]);
   assert.equal(first.workspaceId, duplicate.workspaceId);
@@ -39,7 +41,7 @@ test('concurrent allocation, restart and multi-turn scope keep one stable indepe
   await assert.rejects(resumed.activate({id: 'b', cwd: first.rootPath}), {code: 'BENCHFORGE_WORKSPACE_MIGRATION_REQUIRED'});
 });
 
-test('child receives immutable explicit inputs, never parent or sibling roots', async t => {
+test('child receives immutable explicit inputs, never parent or sibling roots', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：child receives immutable explicit inputs, never parent or sibling roots。 */ async t => {
   const {store, create} = await fixture(t), parent = await create('parent'), other = await create('other');
   const source = path.join(parent.binding.rootPath, 'tasks', 'plan.json');
   await fs.writeFile(source, '{"value":1}');
@@ -59,7 +61,7 @@ test('child receives immutable explicit inputs, never parent or sibling roots', 
   await assert.rejects(store.snapshotInput('child', 'parent', newFile));
 });
 
-test('preparation handoff is bounded to drafts and never replaces parent edits', async t => {
+test('preparation handoff is bounded to drafts and never replaces parent edits', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：preparation handoff is bounded to drafts and never replaces parent edits。 */ async t => {
   const {store, create} = await fixture(t), parent = await create('parent'), child = await create('child', 'parent');
   const output = path.join(child.binding.rootPath, 'tasks', 'preparation');
   const target = path.join(parent.binding.rootPath, 'tasks', 'handoff');
@@ -74,7 +76,7 @@ test('preparation handoff is bounded to drafts and never replaces parent edits',
   await assert.rejects(store.exportPreparation('child', 'parent', path.join(parent.binding.rootPath, 'outputs')), /draft/);
 });
 
-test('async scopes remain isolated across parallel tools and are absent afterwards', async () => {
+test('async scopes remain isolated across parallel tools and are absent afterwards', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：async scopes remain isolated across parallel tools and are absent afterwards。 */ async () => {
   assert.equal(currentAccessScope(), undefined);
   const results = await Promise.all(['a', 'b'].map(session_id => runWithAccessScope({session_id}, async () => {
     await new Promise(resolve => setTimeout(resolve, 5));
@@ -85,7 +87,7 @@ test('async scopes remain isolated across parallel tools and are absent afterwar
   assert.equal(currentAccessScope(), undefined);
 });
 
-test('separately instantiated plugin modules share the same Host call context', async () => {
+test('separately instantiated plugin modules share the same Host call context', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：separately instantiated plugin modules share the same Host call context。 */ async () => {
   const duplicate = await import('./context.mjs?independent-plugin-copy');
   await runWithAccessScope({session_id: 'shared-host'}, async () => {
     assert.equal(duplicate.currentAccessScope().session_id, 'shared-host');
@@ -97,7 +99,7 @@ test('separately instantiated plugin modules share the same Host call context', 
   assert.equal(duplicate.currentAccessScope(), undefined);
 });
 
-test('approved legacy migration copies drafts and grants evidence without changing source history', async t => {
+test('approved legacy migration copies drafts and grants evidence without changing source history', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：approved legacy migration copies drafts and grants evidence without changing source history。 */ async t => {
   const {store, root} = await fixture(t), legacy = path.join(root, 'legacy');
   await fs.mkdir(path.join(legacy, 'tasks'), {recursive: true});
   await fs.mkdir(path.join(legacy, 'operations', 'one'), {recursive: true});

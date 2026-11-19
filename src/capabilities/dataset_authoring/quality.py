@@ -1,6 +1,7 @@
 """Validate the public answer contract without calling a model."""
 
 
+# 检查选择题答案确实存在于公开选项的显式标识中。
 def validate_choice(template, answer, presentation):
     if template.get('output_kind') != 'choice':
         return

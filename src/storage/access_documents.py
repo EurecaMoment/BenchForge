@@ -20,6 +20,7 @@ def run_document_key(root):
     return hashlib.sha256(str(logical_path(Path(root).resolve())).encode()).hexdigest()
 
 
+# 校验运行编号与相对文档名，并补齐当前工作区和会话的复合身份。
 def _identity(scope, run_id, name):
     identifier(run_id, "pipeline run")
     if (not isinstance(name, str) or not name or len(name) > 240 or "\\" in name or ":" in name
@@ -28,14 +29,17 @@ def _identity(scope, run_id, name):
     return dict(workspace_id=scope.workspace_id, session_id=scope.session_id, run_id=run_id, name=name)
 
 
+# 按完整文档身份构造精确查询，避免不同运行或会话的同名文档混用。
 def _query(identity):
     return select(pipeline_documents).where(*(pipeline_documents.c[key] == value for key, value in identity.items()))
 
 
+# 只对外返回文档版本、正文及摘要，隐藏数据库内部身份字段。
 def _public(row):
     return {key: row[key] for key in ("revision", "document", "sha256")} if row else None
 
 
+# 将对象规范编码为有大小上限且禁止非有限数的 JSON，并计算内容摘要。
 def encode_document(document):
     if not isinstance(document, dict):
         raise ValueError("Pipeline document must be an object")
@@ -45,6 +49,7 @@ def encode_document(document):
     return json.loads(raw), hashlib.sha256(raw).hexdigest()
 
 
+# 在访问作用域内读取流水线文档；外部查询服务须启用独立读角色检查。
 def read_document(engine, scope, run_id, name, *, enforce_role=False):
     """Trusted pipeline read; external query services must enforce their reader role."""
     identity = _identity(scope, run_id, name)
@@ -52,6 +57,7 @@ def read_document(engine, scope, run_id, name, *, enforce_role=False):
         return _public(connection.execute(_query(identity)).mappings().first())
 
 
+# 以预期版本执行比较后写入；版本零只允许新建，冲突时拒绝覆盖。
 def write_document(engine, scope, run_id, name, document, *, expected_revision):
     """Compare-and-swap a service-authored document; zero creates, never overwrites."""
     if type(expected_revision) is not int or expected_revision < 0:

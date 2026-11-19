@@ -9,6 +9,7 @@ from storage.review_progress import check_reason
 from pipelines.reviews.checks import check_artifact
 
 
+# 驱动评审状态机，在每次需要时对实际产物执行有锁自检并按版本提交回执。
 def review(workspace, session, action="status", *, now=None, **options):
     clock = time.time() if now is None else now
     result = ledger.review(workspace, session, action, now=clock, **options)
@@ -38,5 +39,6 @@ def review(workspace, session, action="status", *, now=None, **options):
         return ledger.review(workspace, session, review_id=row["id"], now=clock)
 
 
+# 为指定生产阶段和真实产物开启或恢复统一评审门禁。
 def gate(workspace, session, stage, key, artifact):
     return review(workspace, session, "open", stage=stage, key=key, artifact=artifact)

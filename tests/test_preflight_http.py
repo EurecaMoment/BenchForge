@@ -16,6 +16,7 @@ from test_scene_diagnostics import sample, object_record
 
 
 class PreflightHTTPTests(unittest.TestCase):
+    # 验证 HTTP 诊断和提交均报告完整批量错误，失败候选不入队。
     def test_diagnostics_and_submission_report_all_failures_without_enqueueing(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -29,6 +30,7 @@ class PreflightHTTPTests(unittest.TestCase):
             store = SimpleNamespace(root=root, submit=Mock())
             ready, holder = Event(), {}
 
+            # 绑定随机本机端口的测试服务并通知客户端已就绪。
             def server_factory(_address, handler):
                 server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
                 holder['server'] = server
@@ -51,6 +53,7 @@ class PreflightHTTPTests(unittest.TestCase):
                 server = holder['server']
                 base = 'http://127.0.0.1:' + str(server.server_address[1])
 
+                # 向测试路由发送带可选授权的 JSON，覆盖认证与完整诊断响应。
                 def request(route, authorized=True):
                     headers = {'Content-Type': 'application/json'}
                     if authorized:
@@ -82,6 +85,7 @@ class PreflightHTTPTests(unittest.TestCase):
                     self.assertEqual(payload['preflight']['issues'], report['issues'])
                     self.assertNotEqual(payload['preflight']['report_path'], report['report_path'])
                     store.submit.assert_not_called()
+                    # 有效预览复用预检几何，仍保持原响应，不再构造生成器重复读取网格。
                     from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
                     source.write_text(json.dumps(sample()), encoding='utf-8')
                     with patch('capabilities.scene_authoring.validation.preflight.preview_scene_geometry',

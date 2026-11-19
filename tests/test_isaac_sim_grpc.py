@@ -20,6 +20,7 @@ from capabilities.isaac_sim.tool_api import execute
 from service_access.request_context import RunCancelled
 
 
+# 在独立进程创建客户端执行下载，并确保关闭连接，供跨进程回执测试。
 def download_in_process(config, serialized_job, directory):
     client = A100Client(config)
     try:
@@ -30,6 +31,7 @@ def download_in_process(config, serialized_job, directory):
 
 class Simulator(SimulatorServicer):
     """Wire-contract fixture; no renderer or physical evidence is simulated here."""
+    # 初始化线程安全的假仿真服务、任务和文件存储，以及故障注入开关。
     def __init__(self):
         self.lock = Lock()
         self.jobs, self.payloads, self.blobs = {}, {}, {}
@@ -37,9 +39,11 @@ class Simulator(SimulatorServicer):
         self.lose_reply, self.drop_download = False, False
         self.download_gates = {}
 
+    # 返回测试用的真实协议版本能力回执。
     def GetCapabilities(self, request, context):
         return pb.Capabilities(api_version='a100sim.v1', simulator_version='contract-test')
 
+    # 模拟按请求编号幂等提交，并可注入提交成功但响应丢失的情况。
     def SubmitTask(self, request, context):
         with self.lock:
             self.submissions += 1
@@ -56,11 +60,13 @@ class Simulator(SimulatorServicer):
                 context.abort(grpc.StatusCode.UNAVAILABLE, 'reply lost after admission')
             return self.jobs[identity]
 
+    # 按任务编号返回状态，未知任务按 gRPC 未找到错误终止。
     def GetJob(self, request, context):
         if request.job_id not in self.jobs:
             context.abort(grpc.StatusCode.NOT_FOUND, 'job missing')
         return self.jobs[request.job_id]
 
+    # 等待任务修订超过游标后发送更新，支持客户端取消观测。
     def WatchJob(self, request, context):
         while context.is_active():
             value = self.jobs[request.job_id]
@@ -69,6 +75,7 @@ class Simulator(SimulatorServicer):
                 return
             time.sleep(.005)
 
+    # 仅允许取消排队任务，记录取消次数并返回更新后的状态。
     def CancelJob(self, request, context):
         self.cancels += 1
         job = self.jobs[request.job_id]
@@ -77,6 +84,7 @@ class Simulator(SimulatorServicer):
         job.state, job.revision = pb.CANCELLED, job.revision + 1
         return job
 
+    # 按偏移量流式返回测试文件，可注入阻塞或中断以验证恢复行为。
     def DownloadArtifact(self, request, context):
         self.offsets.append(request.offset)
         if request.artifact_id in self.download_gates:
@@ -93,6 +101,7 @@ class Simulator(SimulatorServicer):
         if end < len(data):
             yield pb.DownloadChunk(offset=end, data=data[end:])
 
+    # 合并上传块并核验声明摘要，返回测试资源身份。
     def UploadAsset(self, requests, context):
         chunks = list(requests)
         data = b''.join(row.data for row in chunks)
@@ -104,6 +113,7 @@ class Simulator(SimulatorServicer):
 
 
 class GrpcContractTests(unittest.TestCase):
+    # 启动随机端口的本地 gRPC 服务、独立数据库及客户端，隔离远端任务契约测试。
     def setUp(self):
         self.database_url = use_postgres(self)
         self.temporary = TemporaryDirectory()
@@ -118,15 +128,18 @@ class GrpcContractTests(unittest.TestCase):
             'grpc': {'host': '127.0.0.1', 'port': port, 'timeout_seconds': 20}}}}
         self.client = A100Client(self.config)
 
+    # 关闭客户端与 gRPC 服务，等待线程池结束并删除临时文件。
     def tearDown(self):
         self.client.close()
         self.server.stop(0).wait()
         self.pool.shutdown()
         self.temporary.cleanup()
 
+    # 为同一场景建立共享回执目录的持久任务客户端。
     def requests(self):
         return DurableTasks(self.client, self.root / 'requests', 'scene-test')
 
+    # 验证客户端使用当前真实服务名称，退役方法不会被错误兼容。
     def test_actual_service_name_and_retired_method_rejection(self):
         self.assertEqual(self.client.call('GetCapabilities').api_version, 'a100sim.v1')
         old = self.client.channel.unary_unary('/benchforge.isaac.IsaacSim/JobStatus',
@@ -135,6 +148,7 @@ class GrpcContractTests(unittest.TestCase):
             old(Empty(), timeout=1)
         self.assertEqual(raised.exception.code(), grpc.StatusCode.UNIMPLEMENTED)
 
+    # 验证提交响应丢失及客户端重启后仍恢复原任务而非新建任务。
     def test_lost_submit_reply_and_restart_keep_the_original_job(self):
         self.simulator.lose_reply = True
         job = self.requests().submit('import', {'snapshot': {}})
@@ -146,6 +160,7 @@ class GrpcContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'request changed'):
             self.requests().submit('import', {'step': {'steps': 2}})
 
+    # 验证同身份并发请求只创建一次，其他场景不被该请求锁阻塞。
     def test_concurrent_same_identity_submits_once_and_other_scenes_do_not_block(self):
         with ThreadPoolExecutor(max_workers=4) as pool:
             jobs = list(pool.map(lambda _: self.requests().submit('same', {'snapshot': {}}), range(4)))
@@ -154,6 +169,7 @@ class GrpcContractTests(unittest.TestCase):
         other = DurableTasks(self.client, self.root / 'other', 'other-scene')
         self.assertNotEqual(other.submit('same', {'snapshot': {}}).job_id, jobs[0].job_id)
 
+    # 验证等待接口将远端终态失败报告为错误，不伪称成功。
     def test_wait_observes_terminal_failure_and_never_claims_success(self):
         job = self.requests().submit('failed', {'snapshot': {}})
         self.simulator.jobs[job.job_id].state = pb.INTERRUPTED
@@ -162,6 +178,7 @@ class GrpcContractTests(unittest.TestCase):
             self.client.wait(job, timeout=.5)
         self.assertEqual(raised.exception.job['state'], 'INTERRUPTED')
 
+    # 验证本地停止仅脱离等待，显式取消则遵从服务端任务状态限制。
     def test_shutdown_detaches_and_explicit_cancellation_obeys_server(self):
         job = self.requests().submit('queued', {'snapshot': {}})
         stop = Event()
@@ -180,12 +197,14 @@ class GrpcContractTests(unittest.TestCase):
         self.assertEqual(raised.exception.code(), grpc.StatusCode.FAILED_PRECONDITION)
         self.assertEqual(self.simulator.jobs[running.job_id].state, pb.RUNNING)
 
+    # 验证观测超时既不重新提交，也不擅自取消远端任务。
     def test_watch_budget_does_not_submit_or_cancel(self):
         job = self.requests().submit('waiting', {'snapshot': {}})
         with self.assertRaises(TimeoutError):
             self.client.wait(job, timeout=.03)
         self.assertEqual((self.simulator.submissions, self.simulator.cancels), (1, 0))
 
+    # 验证按清单断点续传，并保留不同目录下相同文件名的产物。
     def test_manifest_download_resumes_and_preserves_equal_basenames(self):
         self.simulator.blobs = {'first': b'abcdef', 'second': b'ghijkl'}
         job = pb.Job(job_id='download', state=pb.SUCCEEDED, artifacts=[
@@ -200,6 +219,7 @@ class GrpcContractTests(unittest.TestCase):
         self.assertEqual(len({row['source_path'] for row in files}), 2)
         self.assertEqual(files[0]['sha256'], hashlib.sha256(b'abcdef').hexdigest())
 
+    # 验证清单中的越界路径及恢复时变化的清单均被拒绝。
     def test_manifest_traversal_and_changed_manifest_are_rejected(self):
         job = pb.Job(job_id='bad', state=pb.SUCCEEDED, artifacts=[
             pb.Artifact(artifact_id='identity', name='../outside', size_bytes=1)])
@@ -212,6 +232,7 @@ class GrpcContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.requests().submit('..', {'snapshot': {}})
 
+    # 验证跨进程下载共用单一回执，同步不阻塞其他任务。
     def test_concurrent_download_processes_share_one_receipt_without_blocking_other_jobs(self):
         self.simulator.blobs = {'shared': b'abcdef', 'independent': b'ghijkl'}
         entered, release = Event(), Event()
@@ -235,6 +256,7 @@ class GrpcContractTests(unittest.TestCase):
         self.assertEqual(self.simulator.offsets, [0, 0])
         self.assertEqual(list(self.root.rglob('*.partial')), [])
 
+    # 验证原生操作下载回执包含其真实生产阶段身份。
     def test_native_operation_sets_stage_in_download_artifact_contract(self):
         self.simulator.blobs['dataset'] = b'collected data'
         for index, (operation, stage) in enumerate([
@@ -259,6 +281,7 @@ class GrpcContractTests(unittest.TestCase):
                 if stage is None:
                     self.assertNotIn('stage', artifact)
 
+    # 验证流式上传保持完整字节并核对源文件摘要。
     def test_streaming_upload_checks_source_digest(self):
         source = self.root / 'scene.usda'
         source.write_bytes(b'x' * (256 * 1024 + 7))
@@ -266,6 +289,7 @@ class GrpcContractTests(unittest.TestCase):
         self.assertEqual(result['sha256'], hashlib.sha256(source.read_bytes()).hexdigest())
         self.assertEqual(int(result['size_bytes']), source.stat().st_size)
 
+    # 验证工具在调用 RPC 前就限定远端任务的会话与端点归属。
     def test_tools_scope_native_jobs_to_session_and_endpoint_before_rpc(self):
         owner = {'session_id': 'session-owner', 'call_id': 'call-one'}
         request = {'action':'submit', 'request_id':'same-key', 'request':{'snapshot':{}}, '_dsh_context':owner}
@@ -284,6 +308,7 @@ class GrpcContractTests(unittest.TestCase):
                          self.root / 'operations' / 'status-owner', self.config)
         self.assertEqual(status['job']['job_id'], first['job']['job_id'])
 
+    # 验证旧提交在回执可核实后复用已有远端任务。
     def test_legacy_submit_reuses_verified_receipt_without_another_submission(self):
         from storage.native_jobs import NativeJobs
         key, payload = 'old-key', {'snapshot': {}}
@@ -299,6 +324,7 @@ class GrpcContractTests(unittest.TestCase):
             execute({**arguments, 'request': {'snapshot': {'size': 64}}},
                     self.root / 'operations/changed', self.config)
 
+    # 验证旧提交归属未能确认时拒绝新建重复任务。
     def test_unresolved_legacy_submission_does_not_create_another_job(self):
         key = 'lost-legacy-reply'
         folder = self.root / '.benchforge/isaac_sim' / hashlib.sha256(key.encode()).hexdigest()

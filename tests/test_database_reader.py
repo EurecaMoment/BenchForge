@@ -9,6 +9,7 @@ from database.reader import _same_database, provision_reader, reader_url
 
 
 class DatabaseReaderTests(unittest.TestCase):
+    # 验证托管部署生成独立且重复同步稳定的读角色凭据。
     def test_managed_projection_generates_stable_independent_credentials(self):
         credentials = {}
         settings = dict(deployment_config.DEPLOYMENT_DEFAULTS['database'])
@@ -23,6 +24,7 @@ class DatabaseReaderTests(unittest.TestCase):
         self.assertEqual((service.hostname, service.port, service.path), (query.hostname, query.port, query.path))
         self.assertNotIn('reader_database_url', first)
 
+    # 验证外部读连接环境配置被保留，不额外生成密码。
     def test_external_reader_environment_is_preserved_without_a_new_password(self):
         credentials = {}
         settings = {**deployment_config.DEPLOYMENT_DEFAULTS['database'],
@@ -33,6 +35,7 @@ class DatabaseReaderTests(unittest.TestCase):
         self.assertNotIn(deployment_config.READER_URL, environment)
         self.assertEqual(credentials, {})
 
+    # 验证自动生成读地址时保留原数据库及连接选项。
     def test_external_auto_reader_keeps_database_and_connection_options(self):
         settings = {**deployment_config.DEPLOYMENT_DEFAULTS['database'], 'url_env': 'SERVICE_URL'}
         _, environment = deployment_config._database_projection(settings, {
@@ -41,6 +44,7 @@ class DatabaseReaderTests(unittest.TestCase):
         self.assertEqual((parsed.hostname, parsed.port, parsed.path, parsed.query),
                          ('localhost', 5444, '/db', 'sslmode=require'))
 
+    # 验证读角色不能复用所有者身份，也不能指向另一数据库。
     def test_reader_cannot_reuse_owner_or_another_database(self):
         for query in ('postgresql://owner:secret@localhost/db',
                       'postgresql://reader:secret@localhost/other',
@@ -50,6 +54,7 @@ class DatabaseReaderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             reader_url({}, environ={})
 
+    # 验证缺少建角色能力时先失败，不留下部分角色修改。
     def test_missing_create_role_fails_before_any_role_mutation(self):
         connection = MagicMock()
         engine = MagicMock()

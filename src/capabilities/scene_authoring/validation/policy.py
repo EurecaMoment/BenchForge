@@ -10,6 +10,7 @@ EXECUTION_MODES = {"production", "exploration"}
 STRUCTURE = re.compile(r'^(?:floor|ceiling|wall(?:_|$)|ground|terrain|pavement|asphalt|roof|road(?:_|$)|bay_line|rug|carpet|window|door(?:_|$))', re.I)
 
 
+# 合并请求与环境的执行模式，拒绝冲突并验证生产或探索模式。
 def resolve_execution_mode(value=None):
     configured = environment_value("BENCHFORGE_EXECUTION_MODE")
     if value is not None and configured is not None and value != configured:
@@ -25,6 +26,7 @@ def resolve_execution_mode(value=None):
     return value
 
 
+# 读取场景策略，生产模式要求启用真实性约束并强制保存场景简报。
 def policy_for(root, execution_mode=None):
     mode = resolve_execution_mode(execution_mode)
     explicit = environment_value("BENCHFORGE_SCENE_POLICY")
@@ -43,6 +45,7 @@ def policy_for(root, execution_mode=None):
     return {}
 
 
+# 拒绝继续引用用户已排除的场景来源及其派生产物。
 def check_references(value, policy):
     if references_excluded_source(value, policy):
         raise ValueError(
@@ -50,6 +53,7 @@ def check_references(value, policy):
         )
 
 
+# 结合静态标记和尺寸判断是否为墙地等薄型结构，避免仅凭名称认可大型占位块。
 def structure(obj):
     # A name cannot turn a chair-sized cube into a floor or wall.
     size = obj.get('size', [])
@@ -58,6 +62,7 @@ def structure(obj):
             and max(size) >= 1)
 
 
+# 验证显式静态固定关系的目标、轴与相对面，拒绝非法自连接或动态固定。
 def attachment(obj, by_id):
     value = obj.get('metadata', {}).get('spatial_attachment')
     if value is None:return None
@@ -71,6 +76,7 @@ def attachment(obj, by_id):
     return value
 
 
+# 检查对象是否具有细分构造，区分真实建模结构与单一外包络占位体。
 def detailed_construction(obj):
     """A modeled table/fixture is distinct from a single envelope placeholder.
 

@@ -6,6 +6,7 @@ from storage.json_io import write_json
 from capabilities.evaluation.spatial.evaluation import read_rows
 
 
+# 对每个种子从相同初始检查点独立运行三组课程实验，并汇总对比结果。
 def experiment(args,directory,config=None):
     settings=json.loads(Path(args['config']).read_text(encoding='utf8'));root=Path(args.get('run',Path(directory)/'comparison'))
     results=[]

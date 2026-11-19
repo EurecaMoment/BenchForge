@@ -3,16 +3,18 @@ import path from 'node:path';
 import {ARTIFACT_PROJECTION} from './projection.mjs';
 import {ApiError, workspaceRoots} from '../../host/session_scope.mjs';
 
+/** 判断证据声明的目录是否落在已授权目录范围内。 */
 const contains = (directory, candidate) => {
   const relative = path.relative(directory, candidate);
   return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
 };
 
 /** Read the registered projection at DSH's live/prepared cut; never rescan session logs. */
+/** 创建原生会话族产物证据读取器，读取后释放各会话的观察快照。 */
 export function createArtifactEvidenceReader(query) {
-  return async (sessionId, related, signal) => {
+  return /** 读取当前会话及已验证子会话的原生产物投影，形成包含拥有者身份的证据集合。 */ async (sessionId, related, signal) => {
     const ids = [sessionId, ...related.map((row) => row.id)];
-    return Promise.all(ids.map(async (id) => {
+    return Promise.all(ids.map(/** 观察单个会话的产物事实并验证身份，完成读取后立即释放快照。 */ async (id) => {
       const observation = await query.observeSession(id, {signal});
       try {
         const view = observation.projections?.values[ARTIFACT_PROJECTION];
@@ -24,6 +26,7 @@ export function createArtifactEvidenceReader(query) {
 }
 
 /** Combine only proven production workspaces with the requested registered workspace. */
+/** 将当前工作区与原生产物证据声明的根目录交叉核验，只保留已注册且获授权的真实目录。 */
 export async function resolveArtifactRoots(config, registered, requestedPath, evidence) {
   const current = await workspaceRoots(config, registered, requestedPath);
   const authorized = [...registered, ...(config.workspacePaths || []).map((directory) => ({

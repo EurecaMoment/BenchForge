@@ -30,6 +30,7 @@ from storage.scene_jobs.workbench_queries import read_connection
 scene_intent = _scene_requests.scene_intent
 
 
+# 将领域异常映射为 HTTP 状态，区分缺失资源、拒绝访问、请求错误和内部故障。
 def request_error_status(method, exc):
     if isinstance(exc, FileNotFoundError) or (isinstance(exc, KeyError) and method == 'GET'):
         return 404
@@ -40,10 +41,12 @@ def request_error_status(method, exc):
     return 500
 
 
+# 把运行编号完整编码为安全的图库路由路径。
 def gallery_path(run_id):
     return '/gallery/' + quote(str(run_id), safe='')
 
 
+# 生成有长度上限的错误摘要，同时保留完整的场景领域诊断报告。
 def request_error_payload(exc, status):
     """Preserve complete domain diagnostics beside the bounded error summary."""
     from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError
@@ -57,6 +60,7 @@ def request_error_payload(exc, status):
     return payload
 
 
+# 将场景启动请求转给统一处理器，并注入当前设置对应的提交读取与参考检查。
 def start_scene_request(store,value,max_scenes=1000,*,settings=None):
     return _scene_requests.start_scene_request(
         store,
@@ -67,6 +71,7 @@ def start_scene_request(store,value,max_scenes=1000,*,settings=None):
     )
 
 
+# 规范资源生成参数并按请求键提交持久运行，返回接受回执。
 def start_generation_request(store,tool,value):
     from capabilities.asset_generation.generation_stage import validate_generation_request
     parameters=validate_generation_request(GenerationTools(store.root),tool,{k:v for k,v in value.items() if k not in {'request_key','context'}})
@@ -78,6 +83,7 @@ def start_generation_request(store,tool,value):
     return {'run_id':rid,'task_id':rid+'.scene0','state':'accepted','tool':tool}
 
 
+# 通过统一场景处理器读取并提交采集请求，使用当前服务的原生设置。
 def start_capture_request(store,value,*,settings=None):
     return _scene_requests.start_capture_request(
         store,
@@ -86,6 +92,7 @@ def start_capture_request(store,value,*,settings=None):
     )
 
 
+# 将场景修订请求交给统一处理器，并绑定提交读取与先前参考校验。
 def refine_scene_request(store,value,*,settings=None):
     return _scene_requests.refine_scene_request(
         store,
@@ -95,6 +102,7 @@ def refine_scene_request(store,value,*,settings=None):
     )
 
 
+# 将场景扩展请求交给统一处理器，复用当前设置和先前参考校验。
 def extend_scene_request(store,value,*,settings=None):
     return _scene_requests.extend_scene_request(
         store,
@@ -104,6 +112,7 @@ def extend_scene_request(store,value,*,settings=None):
     )
 
 
+# 加载服务配置、任务存储与调度器，注册经过身份校验的 HTTP 接口并管理服务生命周期。
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--config',required=True);args=parser.parse_args()
     faulthandler.enable()
@@ -121,6 +130,7 @@ def main():
     thread.start()
 
     class Handler(BaseHTTPRequestHandler):
+        # 映射异常并记录内部故障的请求身份，返回可诊断且受限的错误响应。
         def fail(self, exc):
             status = request_error_status(self.command, exc)
             if status == 500:
@@ -133,6 +143,7 @@ def main():
                 )
             self.reply(request_error_payload(exc, status), status)
 
+        # 序列化 JSON 响应，并将成功创建的运行绑定到当前已验证会话。
         def reply(self,value,status=200):
             if status < 300 and isinstance(value, dict) and value.get('run_id'):
                 from service_access.access_scope import current_access
@@ -141,8 +152,10 @@ def main():
                     from storage.access_identity import bind_run_scope
                     bind_run_scope(store.repo.engine, access.scope, value['run_id'])
             data=json.dumps(value,ensure_ascii=False,default=str).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+        # 发送带正确类型和长度的二进制响应。
         def binary(self,data,mime='application/zip'):
             self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+        # 校验操作者凭据后处理图像、图库和下载等读取路由。
         def do_GET(self):
             # Gallery and image routes share the operator authentication boundary.
             if not hmac.compare_digest(self.headers.get('Authorization', ''), 'Bearer ' + config['operator_token']):
@@ -168,6 +181,7 @@ def main():
                 else:self.reply({'name':'BenchForge','message':'Use /gallery/<run_id>'},404);return
                 self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
             except Exception as exc:self.fail(exc)
+        # 验证操作者凭据及可选宿主票据，在请求访问上下文内分派业务操作。
         def do_POST(self):
             if not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+config['operator_token']):self.reply({'error':'unauthorized'},401);return
             from service_access.access_scope import access_context, resolve_ticket
@@ -179,6 +193,7 @@ def main():
             except Exception as exc:
                 self.fail(exc)
 
+        # 按路由与请求大小限制解析 JSON，调用生产、工作台及资源操作并返回结果。
         def dispatch_post(self):
             if self.path == '/dataset':
                 self.reply({
@@ -251,6 +266,7 @@ def main():
                     submission=read_program_submission(store.root,value['scene_program_path'],
                                                        policy={},include_preflight=True)
                     validate_native_references(submission['program'],capture_settings)
+                    # 复用同一次静态检查的完整几何预览，保留既有对象路径和响应格式。
                     self.reply(submission['preflight']['geometry_preview'])
                 elif self.path == '/scene-preflight':
                     self.reply(inspect_capture_submission(

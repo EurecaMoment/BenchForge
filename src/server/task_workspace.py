@@ -17,6 +17,7 @@ from server.task_runtime import python_command
 from storage.confined_files import copy_output, open_directory, open_write
 
 
+# 通过固定目录描述符列举本次执行后的草稿元数据，不打开文件内容并限制扫描规模。
 def _artifacts(workspace_fd, workspace, started, call_id):
     """List draft metadata through the pinned directory without opening contents."""
     artifacts = []
@@ -41,12 +42,14 @@ def _artifacts(workspace_fd, workspace, started, call_id):
     return artifacts
 
 
+# 刷新并回卷可信输出流，再安全发布到固定工作区目录。
 def _publish(workspace_fd, name, stream):
     stream.flush()
     stream.seek(0)
     copy_output(workspace_fd, stream, name)
 
 
+# 校验代码及超时，在受控会话任务目录运行隔离 Python 并收集输出和草稿元数据。
 def run_task_code(artifact_root, workspace_id, code, timeout_seconds=60):
     if not isinstance(code, str) or not 1 <= len(code) <= 1024 * 1024:
         raise ValueError("code must be 1..1048576 characters")

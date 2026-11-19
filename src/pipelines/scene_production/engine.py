@@ -8,9 +8,11 @@ from capabilities.asset_generation.generation import ResourceWait
 from capabilities.asset_generation.asset_review import review_generated_asset
 from capabilities.scene_authoring.validation.policy import policy_for
 
+# 复用调度器对无需生成资源的采集任务快速移交判断。
 def _capture_handoff(unit):
     return _scheduler_capture_handoff(unit)
 
+# 按服务配置装配规划、采集、评审与资源工具，启动统一场景调度循环。
 def coordinate(store,stop,config=None):
     from functools import partial
     from capabilities.isaac_sim.capture_stage import execute_capture

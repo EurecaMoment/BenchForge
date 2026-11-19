@@ -28,10 +28,12 @@ from capabilities.scene_library.repair_context import GUIDANCE as REPAIR_GUIDANC
 
 
 
+# 按执行模式取得严格生产策略；探索模式返回空策略。
 def _strict_policy(root, execution_mode):
     policy = policy_for(root) if execution_mode is None else policy_for(root, execution_mode)
     return policy if execution_mode != 'exploration' else {}
 
+# 在程序副本上按 JSON 指针应用字段替换，支持追加列表项及完整文档替换。
 def apply_scene_replacements(proposal, edits):
     """Apply field edits to a copy; complete ScenePrograms can also be returned."""
     updated=deepcopy(proposal)
@@ -54,6 +56,7 @@ def apply_scene_replacements(proposal, edits):
         else:node[key]=value
     return updated
 
+# 结合用户意图、原程序和执行反馈构造修复提示，要求保留场景功能与必要约束。
 def scene_repair_prompt(raw, error, intent, base=None):
     prompt=('Revise this scene to satisfy the user request and the supplied execution feedback. '
             'Choose the necessary changes to layout, entities, assets, materials, lights, cameras and actions. '
@@ -68,6 +71,7 @@ def scene_repair_prompt(raw, error, intent, base=None):
     if base:prompt+='\nThis input is an extension delta; the server merges the existing base afterward. Use refine to change base objects.'
     return prompt
 
+# 恢复或编写场景程序，完成资源生成及预检，响应取消并推进任务到下一阶段。
 def plan_scene(store,task,stop):
     if stop.is_set():
         if getattr(stop, 'canceled', False):
@@ -82,6 +86,7 @@ def plan_scene(store,task,stop):
     if strict and not submission:raise ValueError('Unchecked scene planners are disabled; submit a complete SceneProgram')
     prompt='' if direct else 'You plan scenes for an embodied dataset. Realize the requested function with recognizable registered or generated assets, plausible scale, supports, access paths and functional layout. Never substitute cubes, primitives or composite proxies for real objects. Missing assets or execution evidence must cause an explicit failure. Produce a coherent scene for this frozen requirement. '+json.dumps(unit['intent'],ensure_ascii=False)+'\n'+SCENE_SCHEMA_DESCRIPTION
     tools=GenerationTools(store.root, engine=store.repo.engine, task_id=task['id'])
+    # 读取已登记网格的顶点和坐标系信息，供场景几何预览使用。
     @lru_cache(maxsize=8)
     def load_preview_mesh(asset_id):
         mesh=json.loads(tools.asset_path(asset_id,'mesh.json').read_text(encoding='utf8'))

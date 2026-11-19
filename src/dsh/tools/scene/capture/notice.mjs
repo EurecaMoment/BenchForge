@@ -1,6 +1,8 @@
 /** Bounded notifications; complete diagnostics remain in the evidence service. */
+/** 收集采集错误和任务诊断，形成去重的可读状态通知。 */
 export function captureNotice(observation = {}, error) {
   const issues = new Set();
+  /** 仅沿已知诊断字段递归收集非空问题文本，避免夹带整个内部对象。 */
   function collect(value) {
     if (!value || typeof value !== 'object') return;
     for (const [key, child] of Object.entries(value)) {

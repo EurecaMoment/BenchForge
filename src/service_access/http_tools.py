@@ -28,6 +28,7 @@ class ResourceWait(RuntimeError):
     """The configured provider has no capacity for the request yet."""
 
 
+# 将输入图像编码成模型可接受的数据 URL，不支持的图像格式先转为 RGB PNG。
 def _data_url(path):
     path = Path(path)
     mime = mimetypes.guess_type(path)[0]
@@ -37,12 +38,14 @@ def _data_url(path):
         return _png_data_url(image.convert('RGB'))
 
 
+# 把内存图像编码为 PNG 数据 URL，供多模态请求内联使用。
 def _png_data_url(image):
     buffer = BytesIO()
     image.save(buffer, format='PNG')
     return 'data:image/png;base64,' + base64.b64encode(buffer.getvalue()).decode('ascii')
 
 
+# 按比例扩展检测框并裁剪到图像尺寸内。
 def _pad_box(box, size, ratio):
     x0, y0, x1, y1 = box
     dx, dy = (x1 - x0) * ratio, (y1 - y0) * ratio
@@ -50,6 +53,7 @@ def _pad_box(box, size, ratio):
     return [max(0, x0 - dx), max(0, y0 - dy), min(width, x1 + dx), min(height, y1 + dy)]
 
 
+# 结合检测置信度、与提示框的交并比及中心包含关系计算候选优先级。
 def _box_rank(detection, prompt_box):
     left, top, right, bottom = detection['box_xyxy']
     x0, y0, x1, y1 = prompt_box
@@ -60,6 +64,7 @@ def _box_rank(detection, prompt_box):
 
 
 class ModelClient:
+    # 绑定提供方端点、模型、超时及请求默认值，并从指定环境变量读取凭据。
     def __init__(self, provider, settings):
         self.provider = provider
         self.url = settings['url'].rstrip('/')
@@ -73,6 +78,7 @@ class ModelClient:
                 raise ValueError(f'providers.{provider}.token_env references unset {token_env}')
             self.headers['Authorization'] = f'Bearer {token}'
 
+    # 发送同源模型请求；拒绝服务返回跨源地址并保留可诊断的错误信息。
     def _open(self, path, method, body=None, *, timeout=None):
         url = urljoin(self.url + '/', path)
         if urlsplit(url).netloc != urlsplit(self.url).netloc or urlsplit(url).scheme != urlsplit(self.url).scheme:
@@ -94,16 +100,19 @@ class ModelClient:
                 raise ResourceWait(message) from None
             raise RuntimeError(message) from None
 
+    # 调用模型接口并解析 JSON 响应，可单独覆盖此次请求超时。
     def _json(self, path, method='GET', body=None, *, timeout=None):
         with self._open(path, method, body, timeout=timeout) as response:
             return json.load(response)
 
+    # 先下载到临时文件，完成后替换目标，避免暴露未完成的模型产物。
     def _download(self, path, output):
         temporary = output.with_suffix(output.suffix + '.part')
         with self._open(path, 'GET') as response, temporary.open('wb') as stream:
             shutil.copyfileobj(response, stream)
         temporary.replace(output)
 
+    # 构造文生图或图像编辑请求，合并尺寸与采样参数并保存生成结果。
     def diffusion(self, request):
         size = self.defaults.get('size', '1024x1024')
         if 'width' in request or 'height' in request:
@@ -123,6 +132,7 @@ class ModelClient:
         output.write_bytes(base64.b64decode(result['data'][0]['b64_json']))
         return {'output': str(output)}
 
+    # 按文本及实例提示逐项分割图像，处理中响应取消并汇总掩码产物。
     def sam3(self, request, stop):
         output = Path(request['output_dir'])
         output.mkdir(parents=True, exist_ok=True)
@@ -165,6 +175,7 @@ class ModelClient:
                                  'score': detection['score'], 'box': detection['box_xyxy'], 'mask': filename, **details})
         return {'segments': segments}
 
+    # 发送单视图或带相机标定的深度请求，下载并整理深度与预览产物。
     def depth(self, request):
         payload = {**self.defaults, 'model': self.model, 'task': 'depth', 'process_res': request['input_size'],
                    'return_inline': False, 'include_arrays': False, 'image_url': _data_url(request['image'])}
@@ -190,6 +201,7 @@ class ModelClient:
                 'extrinsics_convention': result['extrinsics_convention'],
                 'intrinsics_coordinates': result['intrinsics_coordinates'], 'pose_conditioned': result['pose_conditioned']}
 
+    # 逐对象提交或恢复网格重建任务，保存远端回执以支持中断后继续。
     def trellis(self, request, work, stop):
         output = Path(request['output_dir'])
         output.mkdir(parents=True, exist_ok=True)
@@ -221,6 +233,7 @@ class ModelClient:
                            'source_frame': 'y_up', 'provider_job_id': job_id})
         return {'assets': assets}
 
+    # 轮询网格生成任务直到完成、失败或取消，下载结果并更新持久回执。
     def _collect_mesh(self, job_id, receipt, target, stop):
         route = f'objects/generations/{quote(job_id, safe="")}'
         while not stop.is_set():

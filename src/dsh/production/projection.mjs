@@ -14,16 +14,21 @@ export const ProductionView = z.object({
 const State = z.object({view:ProductionView, errorTool:z.string(), errorCallSeq:z.number(), notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
   lastResponse:z.object({seq:z.number(),visible:z.boolean()}),
   calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string(), seq:z.number()}))});
+/** 提取消息中的可见文本块，合并并去掉两端空白。 */
 const visible = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
+/** 尝试解析事件中的 JSON 文本，解析失败时返回空值供投影忽略。 */
 const parse = text => {try {return JSON.parse(text);} catch {return null;}};
 const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benchforge_depth','benchforge_trellis','benchforge_isaac_sim']);
+/** 合并生产视图变化，并用当前事件的序号与时间更新投影版本。 */
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
   key:PRODUCTION_PROJECTION, stateVersion:7, stateSchema:State,
+  /** 根据会话头建立空生产状态，初始化工具追踪、通知和阶段进度字段。 */
   init:header => ({calls:{},errorTool:'',errorCallSeq:0,notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
     error:'',review:null,completed:0,total:0,delivered:false}}),
+  /** 把原生轮次、工具和通知事件归约为生产状态；批量工具派发沿用标准调用与结果处理。 */
   apply(state,event) {
     if (event.type === 'tool/ptc-dispatch') {
       const data=event.data;
@@ -120,5 +125,5 @@ export const productionProjection = {
     if(activated && receipt.state==='planned') Object.assign(changes,{run:'',completed:0,total:receipt.total_steps || 4,delivered:false});
     return patch(next,event,changes);
   },
-  wire:{viewSchema:ProductionView,view:state=>state.view},
+  wire:{viewSchema:ProductionView,/** 返回供界面消费的生产投影视图。 */ view:state=>state.view},
 };

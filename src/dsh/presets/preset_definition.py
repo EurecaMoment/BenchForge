@@ -87,6 +87,7 @@ PARENT_OWNED_SYNTHESIS_TOOLS = [
 ]
 
 
+# 遍历已完成的插件树，解析本预设实际提供的规范合成工具名称。
 def configured_synthesis_tools(plugins):
     """Resolve our canonical tool names from the completed preset plugin tree."""
     available = set()
@@ -105,8 +106,10 @@ def configured_synthesis_tools(plugins):
     return available
 
 
+# 保留原委派深度，移除过时的内联子代理策略并改由作用域插件管理。
 def configure_synthesis_delegation(plugins):
     """Keep existing delegation depth and use a scoped plugin for child policy."""
+    # 递归定位 spawn 或 fork 子代理提供方，清理与当前作用域策略冲突的旧选项。
     def walk(rows):
         for row in rows:
             config = row.get('config')
@@ -132,6 +135,7 @@ def configure_synthesis_delegation(plugins):
 WORKBENCH_PLUGIN_ID = base.WORKBENCH_PLUGIN_ID
 
 
+# 组合预设身份、阶段契约、并行委派与界面使用说明，生成统一代理提示。
 def persona():
     display_name = base.PRESETS[base.BENCHFORGE_ID]['name']
     identity = (f'You are the {display_name} assistant.\n五阶段合同：{STAGE_SUMMARY}。S3 采集包含标注。\n')
@@ -144,6 +148,7 @@ def persona():
     return re.sub(r'\b(' + '|'.join(TOOL_NAMES) + r')\b', lambda match: TOOL_NAMES[match[0]], text)
 
 
+# 生成宿主工作台读取入口，同一服务覆盖新会话与已绑定会话。
 def workbench_entry(python, service_config, *, package_imports=False):
     """One host reader serves new and already-bound sessions; the client gates UI."""
     return {
@@ -156,6 +161,7 @@ def workbench_entry(python, service_config, *, package_imports=False):
         },
     }
 
+# 从工作台配置派生采集运行时声明，并可标记热更新修订。
 def capture_entry(workbench, *, package_imports=False, revision=None):
     options = workbench['config']
     return {
@@ -170,6 +176,7 @@ def capture_entry(workbench, *, package_imports=False, revision=None):
     }
 
 
+# 生成会话操作宿主入口，绑定 Python、服务配置和可选修订号。
 def session_operations_entry(*, python='python3', service_config=None, package_imports=False, revision=None):
     return {
         'id': base.SESSION_OPERATIONS_PLUGIN_ID,
@@ -182,6 +189,7 @@ def session_operations_entry(*, python='python3', service_config=None, package_i
     }
 
 
+# 生成使用统一服务配置的会话查询宿主声明。
 def session_query_entry(service_config, *, package_imports=False):
     return {
         'id': base.SESSION_QUERY_PLUGIN_ID,
@@ -191,6 +199,7 @@ def session_query_entry(service_config, *, package_imports=False):
     }
 
 
+# 生成按 DSH 主目录幂等导入随包示例的宿主入口。
 def examples_entry(*, package_imports=False):
     """A repository deployment imports its bundled example once per DSH home."""
     return {
@@ -207,6 +216,7 @@ def examples_entry(*, package_imports=False):
     }
 
 
+# 只向 BenchForge 预设贡献随包使用指南。
 def skills_entry(*, package_imports=False):
     """Contribute packaged usage guides only to the BenchForge preset."""
     return {
@@ -216,8 +226,10 @@ def skills_entry(*, package_imports=False):
     }
 
 
+# 生成管理可信工作区根、资源根及身份的宿主访问服务声明。
 def access_entry(*, package_imports=False):
     """Host authority owns roots and identities; the preset only consumes it."""
+    # 构造运行时解析 DSH 主目录子路径的表达式，缺失主目录时明确报错。
     def home_path(name):
         return base.JavaScript("process.getBuiltinModule('node:path').join("
             "process.env.DSH_HOME || (() => {throw new Error('DSH_HOME is required')})(), "
@@ -230,6 +242,7 @@ def access_entry(*, package_imports=False):
     }
 
 
+# 以官方标准预设为基础装配自有身份、工具、子代理策略及共享宿主入口。
 def build(standard, python, service_config, *, config_path=None,
           package_imports=False):
     preset = base.compose_standard(standard)

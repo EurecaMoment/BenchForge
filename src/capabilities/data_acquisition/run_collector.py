@@ -7,6 +7,7 @@ import subprocess
 from service_access.processes import terminate_process_tree
 
 
+# 使用配置的模拟器环境运行采集脚本，保留日志并导入其输出清单。
 def collect(tool, args, directory, config, workspace):
     cfg = config.get('collectors', {}).get(tool)
     if not cfg:

@@ -25,6 +25,7 @@ GUIDANCE = ('geometry_preview.json is program/source-geometry advice before simu
     'without Isaac or a model API. Do not modify the Harness to use it.')
 
 
+# 计算网格统一缩放后的真实尺寸、限制轴和尺寸填充率，保留坐标来源。
 def mesh_fit_preview(mesh, requested_size, mesh_transform=None):
     _,receipt=transform_mesh_geometry(mesh['vertices'],requested_size,mesh.get('coordinate_frame'),mesh_transform)
     extent=[receipt['oriented_bounds_before_scale'][1][i]-receipt['oriented_bounds_before_scale'][0][i] for i in range(3)]
@@ -41,15 +42,18 @@ def mesh_fit_preview(mesh, requested_size, mesh_transform=None):
         'semantic_upright':'not_inferred','source':'registered mesh vertices and declared transform'}
 
 
+# 将局部二维点按偏航旋转后平移到世界坐标。
 def _world_xy(xy,local,yaw):
     c=math.cos(math.radians(yaw));s=math.sin(math.radians(yaw))
     return [xy[0]+local[0]*c-local[1]*s,xy[1]+local[0]*s+local[1]*c]
 
 
+# 计算给定中心、尺寸和偏航矩形的四个世界坐标角点。
 def _corners(xy,size,yaw):
     return [_world_xy(xy,[x*size[0]/2,y*size[1]/2],yaw) for x,y in ((-1,-1),(1,-1),(1,1),(-1,1))]
 
 
+# 用保守有向矩形判断对象是否落在支撑面内，不据此断言接触或稳定。
 def _fits_face(obj,size,face):
     # Conservative oriented bounding rectangle, not mesh contact or stability.
     corners=_corners(obj['xy'],size,obj.get('yaw_deg',0))
@@ -57,6 +61,7 @@ def _fits_face(obj,size,face):
     return all(abs(p[0])<=face['size_xy_m'][0]/2+1e-8 and abs(p[1])<=face['size_xy_m'][1]/2+1e-8 for p in local)
 
 
+# 只读加载场景明确引用的网格，预览放置和支撑尺寸，未知信息保持未知。
 def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
     """Use a validated SceneProgram and read-only registry root or mesh loader.
 
@@ -65,6 +70,7 @@ def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
     """
     root=Path(assets_root).resolve() if assets_root is not None else None
     cache={};fits={};rows=[];by_id={};warnings=[]
+    # 按资产标识缓存所需网格几何，读取失败时保存可解释的预览错误。
     def load(asset_id):
         if asset_id not in cache:
             try:
@@ -182,11 +188,13 @@ def preview_scene_geometry(program, assets_root=None, mesh_loader=None):
         'guidance':GUIDANCE}
 
 
+# 压缩场景几何预览供提示使用，保留完整报告文件的位置。
 def compact_preview(preview, *, full_report='geometry_preview.json'):
     """Keep prompt size bounded; full preview remains available through evidence."""
     warned={warning['object_id'] for warning in preview['warnings']}
     useful=[row for row in preview['objects'] if row.get('mesh_fit') or row['object_id'] in warned or row.get('unavailable')]
     useful.sort(key=lambda row:row['object_id'] not in warned)
+    # 递归把浮点预览数值保留六位小数，减少响应体积。
     def rounded(value):
         if isinstance(value,float):return round(value,6)
         if isinstance(value,list):return [rounded(v) for v in value]
@@ -214,6 +222,7 @@ def compact_preview(preview, *, full_report='geometry_preview.json'):
         'truncated_objects':len(useful)-len(objects),'guidance':GUIDANCE}
 
 
+# 对初始边界执行保守粗筛，仅报告潜在重叠而不作为碰撞结论。
 def initial_bounds_overlaps(preview):
     """Conservative broad phase over initial geometry; never a collision verdict."""
     rows = sorted((row for row in preview['objects'] if row.get('initial_world_bounds_m')),
@@ -238,6 +247,7 @@ def initial_bounds_overlaps(preview):
         active.append(right)
 
 
+# 将局部边界按对象偏航和平移转换成世界轴对齐边界。
 def _initial_bounds(obj, center, lo, hi):
     corners = [_world_xy(obj['xy'], [x, y], obj.get('yaw_deg', 0))
                for x in (lo[0], hi[0]) for y in (lo[1], hi[1])]

@@ -8,6 +8,7 @@ _FILES = {"plan", "run", "input", "output", "dataset", "evidence", "items", "pub
           "predictions", "script", "directory", "workspace", "source_image", "source_mask",
           "source_mesh", "source_gaussian", "media", "assets", "checkpoint"}
 _CONFIG = {"config", "config_path", "service_config", "database_url", "operator_token", "python_command"}
+# 远端资产内部的文件名由资产合同校验，不属于本机会话文件路径。
 _RESOURCE_PATHS = {"relative_path"}
 
 

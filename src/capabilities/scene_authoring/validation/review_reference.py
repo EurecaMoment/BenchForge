@@ -9,6 +9,7 @@ GUIDANCE = '''空间审查先固定参照，再看全部实际图片：世界方
 修复建议先说明具体缺陷、支持它的全部实际图、参照及原生事实。可信度低或证据冲突时建议澄清参照/补观察，不建议移动已获支持的物体；能看清但真实不合生活用途的缺陷照常保留。确需调整位置时说明预期改善及需保护的支撑余量、碰撞、通行、操作空间和原始硬要求；执行前仍由原生预检验证，之后重新实拍验收。不得为迎合一条视觉意见反向制造悬空、过悬、穿插或姿态错误。'''
 
 
+# 根据最终原生中心解析声明坐标系，生成审查空间上下文而不回退到编写姿态。
 def review_spatial_context(brief, evidence, native_checks=()):
     """Resolve declared frames from final native centers; no authored-pose fallback."""
     context = {'schema': 'benchforge.review-spatial-context/v1',
@@ -27,6 +28,7 @@ def review_spatial_context(brief, evidence, native_checks=()):
         context['reference_scope'] = 'text-only reference; do not infer numerical axes from camera framing'
         return context
     up = _unit(_vector(reference['world_up'], 'world_up'), 'world_up')
+    # 读取具有米制单位依据的最终采集中心，缺失时明确报告不可用。
     def center(oid):
         entity = entities.get(oid, {})
         for key in ('current_center', 'final_center', 'settled_center'):

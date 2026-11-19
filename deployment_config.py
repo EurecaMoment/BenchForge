@@ -48,6 +48,7 @@ DEFAULT_POLICY = {
 API_NAMES = ('operator',)
 
 
+# 读取 JSON 对象配置；可选文件缺失时返回空对象，非对象正文时报错。
 def read_object(path, *, optional=False):
     if optional and not path.exists():
         return {}
@@ -57,6 +58,7 @@ def read_object(path, *, optional=False):
     return value
 
 
+# 只解析字面的环境赋值语句，不执行 shell；可兼容受支持的引号形式。
 def read_env(path, *, shell=False):
     """Read literal .env assignments without running a shell."""
     values = {}
@@ -83,6 +85,7 @@ def read_env(path, *, shell=False):
     return values
 
 
+# 通过同目录临时文件原子替换本地配置及含密钥投影，失败时清理临时文件。
 def write_text(path, value):
     """Replace local settings and secret-bearing projections atomically."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,10 +99,12 @@ def write_text(path, value):
         temporary.unlink(missing_ok=True)
 
 
+# 以保留中文且禁止非有限数的 JSON 格式原子写入配置。
 def write(path, value):
     write_text(path, json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n')
 
 
+# 跨平台串行配置同步，避免并发初始化选出不同凭据。
 @contextmanager
 def projection_lock(generated):
     """Keep two init/sync processes from selecting different credentials."""
@@ -125,6 +130,7 @@ def projection_lock(generated):
                 fcntl.flock(marker, fcntl.LOCK_UN)
 
 
+# 接受数字或纯数字文本并校验合法 TCP 端口范围。
 def port(value, field):
     if isinstance(value, str) and re.fullmatch(r'[0-9]+', value):
         value = int(value)
@@ -133,24 +139,28 @@ def port(value, field):
     return value
 
 
+# 校验 Docker Compose 项目名称，防止无效部署身份进入命令参数。
 def compose_name(value):
     if not isinstance(value, str) or not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', value):
         raise ValueError('database.project must be a valid Docker Compose project name')
     return value
 
 
+# 校验设置指定的是合法环境变量名。
 def env_name(value, field):
     if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', value):
         raise ValueError(f'{field} must name an environment variable')
     return value
 
 
+# 要求非空单行文本，拒绝换行和空字符进入配置投影。
 def text_value(value, field):
     if not isinstance(value, str) or not value or any(c in value for c in '\r\n\0'):
         raise ValueError(f'{field} must be a nonempty string without line breaks')
     return value
 
 
+# 展开路径变量并相对配置目录解析，跨宿主的显式 Windows 路径保持原值。
 def _file_path(value, directory, environment):
     expanded = expand_environment(value, environment)
     if os.name != 'nt' and PureWindowsPath(expanded).is_absolute():
@@ -160,24 +170,29 @@ def _file_path(value, directory, environment):
     return str((directory / path).resolve())
 
 
+# 批量解析配置对象中已设置的路径字段。
 def _resolve_paths(values, fields, directory, environment):
     for field in fields:
         if values.get(field):
             values[field] = _file_path(values[field], directory, environment)
 
 
+# 返回本安装生成的服务和客户端配置的规范路径映射。
 def local_service_configs(generated):
     return {path.resolve(): path for path in (generated / SERVER_CONFIG, generated / CLIENT_CONFIG)}
 
 
+# 未配置外部连接地址或其环境变量引用时启用托管数据库。
 def database_is_managed(database):
     return not (database.get('url') or database.get('url_env'))
 
 
+# 从上一次数据库投影恢复 Compose 项目名，供安全停止旧实例使用。
 def previous_database_project(saved):
     return saved.get('COMPOSE_PROJECT_NAME', 'benchforge') if saved else None
 
 
+# 提取允许的部署分区并要求每个分区均为 JSON 对象。
 def _sections(local):
     result = {}
     for name in SECTIONS:
@@ -188,6 +203,7 @@ def _sections(local):
     return result
 
 
+# 递归补齐缺失默认项，保留本地已显式设置的值。
 def _inherit_defaults(values, defaults):
     for key, value in defaults.items():
         if key not in values:
@@ -196,6 +212,7 @@ def _inherit_defaults(values, defaults):
             _inherit_defaults(values[key], value)
 
 
+# 加载模板与本地配置，迁移版本、应用显式覆盖并校验部署分区和提供方。
 def read_configuration(config, *, overrides=None):
     template = read_object(config / 'benchforge.example.json')
     path = config / 'benchforge.local.json'
@@ -230,12 +247,14 @@ def read_configuration(config, *, overrides=None):
     return registry, original, environment
 
 
+# 复用已有凭据；仅在缺失时生成指定随机强度的 URL 安全文本。
 def _secret(credentials, field, size):
     if not credentials.get(field):
         credentials[field] = secrets.token_urlsafe(size)
     return text_value(credentials[field], field)
 
 
+# 优先保留环境变量形式的令牌配置，否则复用或生成本地凭据并移除冲突字段。
 def _token(config, name, credentials):
     field = name + '_token_env'
     if config.get(field):
@@ -246,6 +265,7 @@ def _token(config, name, credentials):
         config[name + '_token'] = _secret(credentials, name + '_token', 32)
 
 
+# 生成客户端可连接的服务地址，把通配监听主机映射为本机回环地址。
 def _service_url(server):
     if server.get('service_url'):
         return text_value(server['service_url'], 'server.service_url')
@@ -257,6 +277,7 @@ def _service_url(server):
     return f"http://{host}:{server['port']}"
 
 
+# 解析托管或外部数据库配置，生成服务与独立读角色一致使用的环境投影。
 def _database_projection(database, environment, credentials):
     name = database.get('url_env')
     url = database.get('url')
@@ -317,6 +338,7 @@ def _database_projection(database, environment, credentials):
     return resolved, env
 
 
+# 在同步锁内校验配置、复用凭据并原子更新本地及运行投影，清理已退役设置。
 def sync_configuration(config, generated, server_path, state, *, overrides=None):
     path = config / 'benchforge.local.json'
     credentials_path = state / 'credentials.local.json'

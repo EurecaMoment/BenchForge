@@ -16,6 +16,7 @@ from service_access.access_scope import TrustedAccess, access_context
 
 
 class WorkspaceInputContractTests(unittest.TestCase):
+    # 建立不同会话、私有资源目录和可信身份，供输入路径统一语义测试。
     def setUp(self):
         directory = TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -28,12 +29,14 @@ class WorkspaceInputContractTests(unittest.TestCase):
                                     str(self.workspace))
         self.store = Mock(root=self.artifacts)
 
+        # 恢复资源快照的可写权限，便于清理测试目录。
         def writable_cleanup():
             for file in self.artifacts.rglob('*'):
                 if file.is_file():
                     file.chmod(0o600)
         self.addCleanup(writable_cleanup)
 
+    # 验证相对场景与 OBJ 来源按会话根解析，不受后端当前目录影响。
     @unittest.skipUnless(os.name == 'posix', 'Confined input reads require Linux descriptors')
     def test_relative_scene_and_obj_inputs_ignore_backend_cwd(self):
         task = self.workspace / 'tasks/prepare/work'
@@ -61,6 +64,7 @@ class WorkspaceInputContractTests(unittest.TestCase):
             self.assertEqual((imported.parent / 'texture.png').read_bytes(), b'texture')
             self.assertEqual(tools.source_path(imported), imported)
 
+    # 验证会话相对输入缺失时，不会退回后端目录寻找同名文件。
     def test_missing_relative_input_never_retries_backend_directory(self):
         (self.root / 'scene.json').write_text('{"wrong_source":true}')
         (self.root / 'mesh.obj').write_text('v 0 0 0')
@@ -71,6 +75,7 @@ class WorkspaceInputContractTests(unittest.TestCase):
                 with self.subTest(file=file), self.assertRaises(FileNotFoundError):
                     consumer(file)
 
+    # 验证其他会话的来源及生产场景路径均被拒绝。
     def test_cross_session_source_and_production_scene_paths_are_denied(self):
         with access_context(self.access):
             tools = GenerationTools(self.artifacts, engine=Mock())
@@ -94,6 +99,7 @@ class WorkspaceInputContractTests(unittest.TestCase):
                         with self.assertRaises(PermissionError):
                             tools.source_path(str(mesh))
 
+    # 验证工作区中的链接输入被拒绝后，不再回退为自有服务资源授权。
     @unittest.skipUnless(os.name == 'posix', 'Symbolic link regression requires Linux')
     def test_linked_workspace_input_does_not_fall_through_to_owned_artifact(self):
         source = self.artifacts / 'task-a/mesh.obj'

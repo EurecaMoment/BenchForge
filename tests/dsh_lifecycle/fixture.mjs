@@ -20,7 +20,9 @@ const request='请实际执行一次 BenchForge 评测数据集生产任务，�
 class Adapter extends LlmAdapter {
   calls=0;
   requests=new Map();
+  /** 返回生命周期测试所需的确定性模型身份。 */
   async resolveModel(provider,model){return {provider,id:model,name:model};}
+  /** 按测试模型和尝试次数生成工具调用或文本流，覆盖取消、复核和清理等原生生命周期路径。 */
   async *stream(options){
     this.calls++;
     const attempt=(this.requests.get(options.model)||0)+1;this.requests.set(options.model,attempt);
@@ -48,6 +50,7 @@ class Adapter extends LlmAdapter {
 export const name='benchforge-lifecycle-smoke';
 export const inject=['llm','agents','tools','subprocess','sessionQuery','sessionController','sessionProjections','sessionProjectionCache','benchforgeSessions','workspaceRegistry','sessionPersistence','storageDomain','appReady','appExit'];
 
+/** 装配生命周期烟雾测试的模型、服务、等待工具和可选示例资源。 */
 export async function apply(ctx){
   if(process.env.BENCHFORGE_SMOKE_EXAMPLES)
     await ctx.plugin(examples,{enabled:true,sourceDirectory:process.env.BENCHFORGE_SMOKE_EXAMPLES});
@@ -71,14 +74,16 @@ export async function apply(ctx){
   const active=new Set(),ready=path.join(process.cwd(),'backend-ready.json');
   const reviewCalls=new Map(),reviewEntered=new Map();
   ctx.tools.register(defineTool({name:'benchforge_fixture_reviewed',description:'Record an authorized fixture dispatch.',parameters:{},
-    output:{schema:{type:'object',properties:{},additionalProperties:true},render:()=>[]},
+    output:{schema:{type:'object',properties:{},additionalProperties:true},/** 测试等待工具不需要额外展示内容，返回空渲染块。 */ render:()=>[]},
+    /** 执行当前烟雾场景的受控等待或复核操作，并保留原生调用的取消信号。 */
     execute:(_args,exec)=>{reviewCalls.set(exec.agent.id,(reviewCalls.get(exec.agent.id)||0)+1);return {accepted:true};}}));
   ctx.on('tools/pre-execute',async(exec,next)=>{
     if(exec.name==='benchforge_fixture_reviewed')reviewEntered.get(exec.agent.id)?.resolve();
     return next();
   });
   ctx.tools.register(defineTool({name:'benchforge_fixture_wait',description:'Wait in the isolated fixture backend.',parameters:{},
-    output:{schema:{type:'object',properties:{},additionalProperties:true},render:()=>[]},
+    output:{schema:{type:'object',properties:{},additionalProperties:true},/** 测试等待工具不需要额外展示内容，返回空渲染块。 */ render:()=>[]},
+    /** 执行当前烟雾场景的受控等待或复核操作，并保留原生调用的取消信号。 */
     execute:(_args,exec)=>invoke(ctx.subprocess,process.env.BENCHFORGE_SMOKE_PYTHON||'python3',process.cwd(),'',
       'wait',{},exec.signal,{module:'backend',active,environment:{PYTHONPATH:import.meta.dirname,BENCHFORGE_SMOKE_READY:ready}})}));
   const exit=ctx.appExit;
@@ -87,15 +92,20 @@ export async function apply(ctx){
   }));
 }
 
+/** 驱动真实 Agent 的停止、复核、重载与资源读取场景，汇总生命周期烟雾验证结果。 */
 async function run(ctx,adapter,active,ready,reviewCalls,reviewEntered,reviewStates){
   const handles=[],result={};
+  /** 为指定测试模型创建原生 Agent，并登记句柄供最终释放。 */
   const create=async model=>{
     const handle=await ctx.agents.create({sessionId:'session-'+randomUUID(),
       agentOptions:{provider:'lifecycle-fixture',model},meta:{cwd:process.cwd()}});
     handles.push(handle);return handle.agent;
   };
+  /** 向指定 Agent 发送原生用户跟进消息以启动测试轮次。 */
   const send=(agent,text)=>agent.followup(createUserMessage({source:{kind:'user'},content:[{type:'text',text}]}));
+  /** 在有界超时内等待 Agent 原生空闲，防止烟雾测试无限挂起。 */
   const idle=agent=>waitWithSignal(agent.whenIdle(),AbortSignal.timeout(15000));
+  /** 读取最近一轮原生结束原因，判断取消或正常完成是否符合预期。 */
   const ending=agent=>agent.session.snapshotEvents().findLast(event=>event.type==='turn/end')?.data.reason;
   try{
     if(process.env.BENCHFORGE_SMOKE_EXAMPLES){
@@ -118,6 +128,7 @@ async function run(ctx,adapter,active,ready,reviewCalls,reviewEntered,reviewStat
       assert.equal(result.example.sidebarTitle,'样板 · SpatialForge');
       assert.equal(ctx.agents.get(example.header.id),undefined);
       const handler=createWorkbenchHandler({},()=>[{id:'fixture-example',path:example.header.cwd}]);
+      /** 通过真实工作台处理器读取示例会话资源，并先断言响应成功。 */
       const get=async parameters=>{
         const response=await handler(new Request('http://fixture/api/benchforge/workbench?'+new URLSearchParams({
           session_id:example.header.id,workspace_path:example.header.cwd,...parameters})));

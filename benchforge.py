@@ -14,10 +14,12 @@ import benchforge_app
 ROOT=Path(__file__).resolve().parent
 
 
+# 把路径等参数统一转为字符串后执行命令，非零退出码立即向外报告。
 def run(argv, **kwargs):
     return subprocess.run([str(x) for x in argv],check=True,**kwargs)
 
 
+# 安全读取预设声明，判断其工具是否引用本仓库生成的本地服务配置。
 def uses_local_service(preset):
     import yaml
     from dsh.check_config import service_config_paths
@@ -29,11 +31,13 @@ def uses_local_service(preset):
                for reference in service_config_paths(profile))
 
 
+# 从当前 Git 提交的依赖条目读取锁定的 DSH 修订，避免使用工作目录的偶然状态。
 def pinned_dsh_revision(lock):
     entry = subprocess.check_output(['git', 'ls-tree', 'HEAD', '--', lock['path']], cwd=ROOT, text=True)
     return entry.split()[2]
 
 
+# 处理安装和启动入口，核验运行环境及锁定依赖，生成预设并启动本地 Web 应用。
 def main():
     if sys.version_info < (3, 10):
         raise SystemExit('Python 3.10+ is required. Run this launcher with your installed Python 3.10+ interpreter.')

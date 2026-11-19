@@ -25,6 +25,7 @@ BDDL_BASE = os.environ.get("LIBERO_BDDL_ROOT") or get_libero_path("bddl_files")
 DATASET_BASE = os.environ.get("LIBERO_DATASET_ROOT") or get_libero_path("datasets")
 
 
+# 解析LIBERO任务套件、采集步数、图像尺寸及动作来源。
 def parse_args():
     parser = argparse.ArgumentParser(description="Collect LIBERO env RGB and GT from live offscreen envs.")
     parser.add_argument("--suite", default="libero_10")
@@ -37,6 +38,7 @@ def parse_args():
     return parser.parse_args()
 
 
+# 递归把NumPy数组和标量转成JSON兼容值。
 def to_serializable(value):
     if isinstance(value, np.ndarray):
         return value.tolist()
@@ -49,10 +51,12 @@ def to_serializable(value):
     return value
 
 
+# 筛选观察字典中形状为高、宽、三通道的RGB数组字段。
 def rgb_keys(obs):
     return [k for k, v in obs.items() if isinstance(v, np.ndarray) and v.ndim == 3 and v.shape[-1] == 3]
 
 
+# 按相机和帧编号保存观察图像，并返回各相机文件路径。
 def save_rgb_images(obs, out_dir, frame_idx):
     out_dir.mkdir(parents=True, exist_ok=True)
     paths = {}
@@ -64,10 +68,12 @@ def save_rgb_images(obs, out_dir, frame_idx):
     return paths
 
 
+# 按套件与任务名称定位官方演示HDF5文件。
 def demo_path_for_task(task, suite_name):
     return os.path.join(DATASET_BASE, suite_name, f"{task.name}_demo.hdf5")
 
 
+# 读取首条演示的动作片段和初始状态，缺失演示时直接报错。
 def load_demo_actions(task, suite_name, steps_per_task):
     demo_path = demo_path_for_task(task, suite_name)
     if not os.path.exists(demo_path):
@@ -81,6 +87,7 @@ def load_demo_actions(task, suite_name, steps_per_task):
     return demo_path, actions, init_states
 
 
+# 在离屏环境重放演示或零动作，保存RGB、观察和奖励后关闭环境。
 def collect_task(task_suite, task_id, output_dir, suite_name, steps_per_task, image_size, seed, action_source):
     task = task_suite.get_task(task_id)
     bddl_path = os.path.join(BDDL_BASE, task.problem_folder, task.bddl_file)
@@ -144,6 +151,7 @@ def collect_task(task_suite, task_id, output_dir, suite_name, steps_per_task, im
     return manifest
 
 
+# 选择任务套件并逐个采集任务，保存数据集汇总清单。
 def main():
     args = parse_args()
     benchmark_dict = benchmark.get_benchmark_dict()

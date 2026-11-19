@@ -4,9 +4,11 @@ import path from 'node:path';
 import {pythonHostDirectory, pythonHostEnvironment} from './python_environment.mjs';
 
 /** Host-owned backend calls; timers and browser reads use the same policy. */
+/** 创建通过受管 Python 子进程推进阶段复核的客户端，并统一持有取消与回收责任。 */
 export function createStageReviewClient(subprocess, config = {}) {
   const productionConfig = config.productionConfig ? path.resolve(config.productionConfig) : '';
   const lifetime = new AbortController(), active = new Set();
+  /** 在请求、超时及宿主寿命约束下查询复核状态，并确保子进程退出后才接受结果。 */
   async function advance(workspace, sessionId, reviewId, _now, callerSignal) {
     const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(config.reviewTimeoutMs ?? 15000), ...(callerSignal ? [callerSignal] : [])]);
     const env = pythonHostEnvironment({...config.environment, BENCHFORGE_MANAGED_SUBPROCESS:'1'});
@@ -36,7 +38,7 @@ export function createStageReviewClient(subprocess, config = {}) {
       signal.throwIfAborted();
     }
   }
-  return {advance, async dispose() {
+  return {advance, /** 取消阶段复核客户端并回收其仍在运行的全部子进程。 */ async dispose() {
     lifetime.abort(new DOMException('Stage review host unloaded', 'AbortError'));
     await releaseProcesses(active, config.cleanupTimeoutMs);
   }};

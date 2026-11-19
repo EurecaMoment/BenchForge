@@ -9,6 +9,7 @@ import {HarnessError} from '@deepseek-ai/dsh-llm';
 import {apply} from './tools.mjs';
 import {reviewDenial} from '../../production/review_policy.mjs';
 
+/** 建立本地测试服务和工具注册上下文，记录预检请求并允许控制响应状态及诊断。 */
 async function fixture(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'benchforge-preflight-'));
   const requests = [], tools = new Map();
@@ -35,14 +36,16 @@ async function fixture(t) {
     execution_mode:'production', artifacts:directory,
   }));
   const context = {
-    tools:{register:tool => tools.set(tool.name, tool)}, on(){},
+    tools:{/** 按名称收集插件注册的工具，供测试直接执行。 */ register:tool => tools.set(tool.name, tool)}, /** 提供测试事件订阅接口，当前用例不需要真实事件总线。 */ on(){},
     llm:{}, attachments:{}, benchforgeCapture:{continuation:{}},
+    /** 从测试上下文返回工具插件依赖的服务。 */
     get(name){return this[name];},
   };
   await apply(context, {serviceConfig:config});
   return {requests, state, tool:tools.get('benchforge_scene_preflight')};
 }
 
+/** 生成包含大量阻塞问题的场景诊断，验证完整问题列表及预览裁剪行为。 */
 function report() {
   const issues = Array.from({length:80}, (_, index) => ({
     id:'issue_' + index, code:'missing_support', path:'/objects/' + index + '/support',
@@ -56,7 +59,7 @@ function report() {
     geometry_preview:{objects:[]}, checked:[]};
 }
 
-test('preflight preserves every diagnostic and forwards mode through the registered tool', async t => {
+test('preflight preserves every diagnostic and forwards mode through the registered tool', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：preflight preserves every diagnostic and forwards mode through the registered tool。 */ async t => {
   const {requests, state, tool} = await fixture(t);
   state.reply = report();
   assert.equal(tool.isConcurrencySafe({scene_program_path:'/workspace/scene.json'}), true);
@@ -73,7 +76,7 @@ test('preflight preserves every diagnostic and forwards mode through the registe
     body:{scene_program_path:'/workspace/scene.json', execution_mode:'production'}}]);
 });
 
-test('HTTP rejection retains the full report instead of only the bounded detail', async t => {
+test('HTTP rejection retains the full report instead of only the bounded detail', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：HTTP rejection retains the full report instead of only the bounded detail。 */ async t => {
   const {state, tool} = await fixture(t);
   state.status = 400;
   state.reply = {code:'scene_preflight_failed', detail:'summary', preflight:report()};
@@ -87,7 +90,7 @@ test('HTTP rejection retains the full report instead of only the bounded detail'
   });
 });
 
-test('cancellation reaches the request without starting a capture', async t => {
+test('cancellation reaches the request without starting a capture', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：cancellation reaches the request without starting a capture。 */ async t => {
   const {requests, tool} = await fixture(t);
   const controller = new AbortController();
   controller.abort();
@@ -96,7 +99,7 @@ test('cancellation reaches the request without starting a capture', async t => {
   assert.deepEqual(requests, []);
 });
 
-test('pending user review permits static preflight while still blocking capture', () => {
+test('pending user review permits static preflight while still blocking capture', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：pending user review permits static preflight while still blocking capture。 */ () => {
   const waiting = {state:'waiting_user', stage:'S1'};
   assert.equal(reviewDenial({name:'benchforge_scene_preflight'}, waiting, '/workspace'), undefined);
   assert.ok(reviewDenial({name:'benchforge_capture'}, waiting, '/workspace'));

@@ -21,12 +21,14 @@ from service_access.http_tools import ResourceWait as ResourceWait
 from service_access.request_context import check_cancelled
 
 
+# 记录源文件的绝对路径、大小及纳秒修改时间，用于识别生成输入。
 def _file_record(path):
     path = Path(path).resolve()
     stat = path.stat()
     return {'path': str(path), 'bytes': stat.st_size, 'mtime_ns': stat.st_mtime_ns}
 
 
+# 判断路径是否位于给定根目录内；无法取得相对路径时返回否。
 def _inside(path, root):
     try:
         path.relative_to(root)
@@ -35,11 +37,13 @@ def _inside(path, root):
         return False
 
 
+# 读取环境指定的模型注册表；未配置或文件缺失时使用空配置。
 def _model_registry():
     reference = environment_value('BENCHFORGE_MODELS_CONFIG')
     return read_json(Path(reference)) if reference and Path(reference).is_file() else {}
 
 
+# 提取模型请求默认值，并将扩散模型的尺寸字符串转为宽高参数。
 def generation_defaults(name):
     defaults = model_settings(_model_registry(), name).get('request_defaults', {})
     if name == 'diffusion':
@@ -52,6 +56,7 @@ def generation_defaults(name):
 
 
 class GenerationTools:
+    # 建立生成产物目录，保存当前访问范围，并按需绑定生产任务。
     def __init__(self, artifact_root, *, engine=None, task_id=None):
         self.root = Path(artifact_root).resolve()
         self.assets = self.root / 'generated_assets'
@@ -61,6 +66,7 @@ class GenerationTools:
         if task_id is not None:
             self.bind_task(task_id)
 
+    # 用任务的访问身份和数据库连接绑定后续资产操作。
     def bind_task(self, task_id):
         from database.engine import engine_for
         from service_access.task_access import task_access
@@ -69,6 +75,7 @@ class GenerationTools:
         self.run_id = task_id.split('.')[0]
         return self
 
+    # 列出当前范围可用的资产及紧凑几何摘要，可按资产标识筛选。
     def catalog(self, asset_ids=None):
         if self.access is not None:
             from capabilities.asset_generation.shared_library import catalog
@@ -98,10 +105,12 @@ class GenerationTools:
             records.append(record)
         return records
 
+    # 校验注册资产标识并解析其文件，限制在授权资产目录内。
     def asset_path(self, asset_id, filename='asset.json'):
         from capabilities.asset_generation.asset_access import registered_asset_path
         return registered_asset_path(self.root, asset_id, filename, access=self.access, engine=self.engine)
 
+    # 解析会话文件或本会话拥有的生产产物；跨范围、链接及私有评测输入会被拒绝。
     def source_path(self, value):
         """Resolve session-relative inputs or explicitly owned service artifacts."""
         if self.access is not None:
@@ -153,6 +162,7 @@ class GenerationTools:
             raise ValueError('source must be a file inside the artifact root, task workspace or BENCHFORGE_IMPORT_ROOTS')
         return path
 
+    # 按生成工具的返回协议检查所需输出是否已经实际落盘。
     @staticmethod
     def _outputs_exist(name, request, result):
         if result.get('status') != 'ok':
@@ -169,6 +179,7 @@ class GenerationTools:
             paths = [Path(result[key]) for key in ('depth', 'visualization', 'archive')]
         return all(p.is_file() and p.stat().st_size > 0 for p in paths)
 
+    # 复用有效回执或调用指定模型，检查完整输出并响应取消请求。
     def execute(self, name, request, work, stop):
         work = Path(work).resolve()
         work.mkdir(parents=True, exist_ok=True)
@@ -210,6 +221,7 @@ class GenerationTools:
         check_cancelled(stop, name)
         return result
 
+    # 先验证网格依赖闭包，再在独立进程中转换网格和可移植GLB文件。
     def _convert(self, source, work, frame):
         from capabilities.asset_generation.shared_library import verify_reference_closure
         verify_reference_closure(source)
@@ -220,6 +232,7 @@ class GenerationTools:
             subprocess.run(command, check=True, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=120)
         return conversion, glb
 
+    # 转换并登记网格、纹理与可选高斯数据，保留输入来源和坐标系依据。
     def _publish(self, spec, work, source, frame, provenance, status, image=None, mask=None):
         conversion, glb = self._convert(source, work, frame)
         mesh = json.loads(conversion.read_text(encoding='utf-8'))
@@ -272,6 +285,7 @@ class GenerationTools:
         write_json(work / 'asset_ref.json', record)
         return record
 
+    # 验证已有网格及声明的向上轴，将其导入资产库并保留来源记录。
     def import_asset(self, source, spec, work, stop):
         """Register an existing GLB/glTF/OBJ/PLY/STL mesh without model inference."""
         from capabilities.asset_generation.mesh_input import validate_mesh_input
@@ -286,6 +300,7 @@ class GenerationTools:
             raise ValueError('source_up_axis must be Y or Z')
         return self._publish(spec, work, source, frame, {'tools': ['mesh_import'], 'input': _file_record(source), 'declared_up_axis': spec.get('source_up_axis', 'Z')}, 'imported')
 
+    # 按冻结请求复用资产、导入网格或执行图像分割与重建，最终发布带来源的资产。
     def generate_asset(self, spec, work, stop):
         """Text/image reconstruction, mesh import, or registered asset reuse.
 

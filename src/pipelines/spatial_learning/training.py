@@ -23,6 +23,7 @@ from storage.training_runs import emit
 from storage.training_runs import read_guidance
 
 
+# 在开发问题或交互环境上运行求解器，记录成功、解析及耗时指标。
 def development(solver,questions,truths,limit=None):
     rows=[]
     for question in questions[:limit] if limit else questions:
@@ -45,10 +46,12 @@ def development(solver,questions,truths,limit=None):
     return rows
 
 
+# 把数据集内相对图像引用解析为训练读取所需的绝对路径。
 def resolve_media(rows,dataset):
     return [{**row,'images':[str((dataset/p).resolve()) for p in row.get('images',[])]} for row in rows]
 
 
+# 只聚合自然条件下的成功记录，计算每项能力的平均得分。
 def capability_scores(rows):
     bins=defaultdict(list)
     for row in rows:
@@ -57,6 +60,7 @@ def capability_scores(rows):
     return {cap:sum(v)/len(v) for cap,v in bins.items()}
 
 
+# 按提示比例及建议难度选择训练样本，无匹配难度时退回同条件候选。
 def select_record(rows,recommendation,rng):
     assisted=rng.random()<recommendation['hint_fraction']
     condition='supplied_intermediate' if assisted else 'natural'
@@ -65,6 +69,7 @@ def select_record(rows,recommendation,rng):
     return rng.choice(eligible or rows)
 
 
+# 加载训练及开发分区，执行课程窗口、检查点选择和可恢复训练状态保存。
 def run(config,run_directory,solver=None):
     root=Path(run_directory);root.mkdir(parents=True,exist_ok=True);dataset=Path(config['dataset'])
     rng=random.Random(config.get('seed',11));condition=config.get('condition','C')
@@ -76,6 +81,7 @@ def run(config,run_directory,solver=None):
     dev=[q for q in dev if q['template_id'] in enabled];selection=[q for q in selection if q['template_id'] in enabled]
     if not by_template or not dev or not selection:raise ValueError('Training needs nonempty train, curriculum_dev and selection_dev in the selected task pool')
     # A fixed, stratified development sample is reused across windows and arms.
+    # 按能力和条件轮转抽取开发样本，保持分组覆盖并使用固定随机状态。
     def sample_dev(rows,limit):
         buckets=defaultdict(list)
         for row in rows:buckets[(row['capabilities'][0],row['condition'])].append(row)
@@ -90,6 +96,7 @@ def run(config,run_directory,solver=None):
     if config.get('resume'):
         resume=Path(config['resume']);solver.restore(resume)
         saved=json.loads((resume/'run-state.json').read_text(encoding='utf8'));state=saved['curriculum'];step=saved['step'];start_window=saved['next_window']
+        # 递归将 JSON 恢复的列表转为元组，供随机采样器状态恢复。
         def tuple_tree(value):return tuple(tuple_tree(v) for v in value) if isinstance(value,list) else value
         rng.setstate(tuple_tree(saved['sampler_state']))
         if saved['accepted_checkpoint']!=str(resume):solver.restore(saved['accepted_checkpoint'])
@@ -102,6 +109,7 @@ def run(config,run_directory,solver=None):
     accepted=Path(saved['accepted_checkpoint']) if config.get('resume') else root/'base'
     if not config.get('resume'):solver.save(accepted)
     write_json(root/'config.json',config)
+    # 保存课程、步数、随机状态及已接受检查点，支持从下一窗口继续。
     def save_state(path,next_window):
         write_json(path/'run-state.json',{'curriculum':state,'step':step,'next_window':next_window,'sampler_state':rng.getstate(),
             'accepted_checkpoint':str(accepted.resolve()),'reference_selection':reference,'reference_selection_score':reference_score})
@@ -159,6 +167,7 @@ def run(config,run_directory,solver=None):
     return {'run':str(root),'checkpoint':str(accepted),'steps':step,'state':str(root/'state.json'),'events':str(root/'events.jsonl'),'sealed_test_used':False}
 
 
+# 在管理环境下把训练交给独立用户服务持有，普通命令行则保持后台进程行为。
 def _start_training_process(command, *, cwd, log, env=None):
     """Keep background jobs outside a managed tool's cancellation scope.
 
@@ -190,6 +199,7 @@ def _start_training_process(command, *, cwd, log, env=None):
     return {'pid': process.pid, 'owner': 'detached-process'}
 
 
+# 处理训练启动或状态操作，创建后台作业并保存可恢复的进程回执。
 def train(args,directory,config=None):
     if args.get('action')=='start':
         run_dir=Path(args.get('run',Path(directory)/'training')).resolve();run_dir.mkdir(parents=True,exist_ok=True)

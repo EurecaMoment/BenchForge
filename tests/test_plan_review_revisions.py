@@ -19,6 +19,7 @@ from pipelines.reviews.service import review
 
 
 class PlanReviewRevisionTests(unittest.TestCase):
+    # 建立独立会话、可控时钟及评估计划夹具，供修订与评审身份测试。
     def setUp(self):
         self.database_url = use_postgres(self)
         temporary = tempfile.TemporaryDirectory()
@@ -47,12 +48,14 @@ class PlanReviewRevisionTests(unittest.TestCase):
                     'geometry_exceptions': [{'scene_design_id': 'room', 'scene_id': 'room',
                         'object_ids': ['sofa', 'sofa_arm'], 'reason': 'Simplified furniture only'}]}}}
 
+    # 复制计划参数并分配独立操作目录，以指定或默认会话保存计划。
     def save(self, args=None, session=None):
         self.index += 1
         return plan({**deepcopy(self.args if args is None else args),
                      '_dsh_context': {'session_id': session or self.session}},
                     self.root / 'operations' / str(self.index))
 
+    # 验证等价计划重复保存保留原评审时间窗，并展示最新产物。
     def test_repeated_saves_keep_the_original_window_and_publish_the_latest_artifact(self):
         first = self.save()
         self.clock += 30
@@ -67,6 +70,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(current(self.root, self.session)['plan'], saved['plan'])
         self.assertTrue(Path(first['plan']).is_file())
 
+    # 验证用户继续后进行场景修复，不重启已完成的评审轮次。
     def test_continue_then_scene_repairs_do_not_restart_checked_rounds(self):
         first = self.save()
         review(self.root, self.session, 'continue')
@@ -88,6 +92,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
             self.assertNotIn('action=wait', saved['next'])
             self.assertEqual(saved['review_revision']['changed_fields'], [])
 
+    # 验证评审等待已完成的计划重新保存后仍保持放行。
     def test_elapsed_window_remains_released_on_resave(self):
         first = self.save()
         for _ in range(3):
@@ -99,6 +104,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertTrue(saved['stage_review']['can_continue'])
         self.assertNotIn('action=wait', saved['next'])
 
+    # 验证描述修复保留等待进度，而实质契约变化开启新评审。
     def test_soft_description_repair_retains_waits_but_hard_contract_does_not(self):
         first = self.save()
         self.clock += 60
@@ -115,6 +121,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'preserve original hard requirements'):
             self.save(changed)
 
+    # 验证数量、评分等硬契约变化生成新评审，并列出变化字段。
     def test_contract_changes_require_a_new_review_and_report_changed_fields(self):
         cases = {
             'quantity': lambda args: args['assessment']['dataset'].update(target_items=5),
@@ -134,6 +141,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
                 self.assertEqual(saved['review_revision']['kind'], 'contract_change')
                 self.assertTrue(saved['review_revision']['changed_fields'])
 
+    # 验证重用同一请求文件位置不能掩盖其内容中的要求变化。
     def test_same_request_path_does_not_hide_a_requirement_change(self):
         request = self.root / 'tasks/room/request.json'
         write(request, self.args)
@@ -144,6 +152,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'preserve require_robot_locomotion'):
             self.save({'request_path': str(request)})
 
+    # 验证执行修复不能把必需机器人改成几何例外以绕过要求。
     def test_repair_cannot_turn_a_required_robot_into_a_geometry_exception(self):
         self.save()
         changed = deepcopy(self.args)
@@ -151,6 +160,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'cannot replace required native assets'):
             self.save(changed)
 
+    # 验证正常布局修复和显式新任务仍可保存，不被契约保护误拦截。
     def test_ordinary_layout_repairs_and_new_tasks_remain_available(self):
         self.save()
         changed = deepcopy(self.args)
@@ -160,6 +170,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         changed['assessment']['scenes']['designs'][0]['hard_requirements'] = ['A new geometry experiment']
         self.assertEqual(self.save(changed)['review_revision']['kind'], 'new_task')
 
+    # 验证显式新任务及新请求谱系不会复用旧任务的放行。
     def test_new_request_and_explicit_new_task_do_not_reuse_review(self):
         first = self.save()
         separate = self.save({**self.args, 'new_task': True})
@@ -171,6 +182,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(separate['review_revision']['kind'], 'new_task')
         self.assertNotEqual(separate['stage_review']['review_id'], first['stage_review']['review_id'])
 
+    # 验证修复计划保留用户暂停和待处理指令状态。
     def test_repairs_preserve_pause_and_pending_instruction(self):
         for action in ('pause', 'instruction'):
             with self.subTest(action=action):
@@ -187,6 +199,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
                     self.save({**self.args, 'new_task': True}, session)
                 self.assertEqual(current(self.root, session)['plan'], saved['plan'])
 
+    # 验证单独声称应用用户编辑不能为新要求继承旧审批。
     def test_unverified_applies_edit_does_not_grant_approval_for_new_requirements(self):
         first = self.save(); review(self.root, self.session, 'continue')
         changed = deepcopy(self.args)
@@ -196,6 +209,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(saved['review_revision']['kind'], 'contract_change')
         self.assertFalse(saved['stage_review']['can_continue'])
 
+    # 验证已核实的工作台编辑保持原评审及用户暂停状态。
     def test_verified_workbench_edit_keeps_its_original_review_and_pause(self):
         first = self.save()
         review(self.root, self.session, 'pause')
@@ -217,9 +231,11 @@ class PlanReviewRevisionTests(unittest.TestCase):
         self.assertEqual(read(saved['plan'])['assessment']['scenes']['designs'][0]['hard_requirements'],
                          changed['assessment']['scenes']['designs'][0]['hard_requirements'])
 
+    # 验证同会话并发保存原子化，冲突只产生明确忙碌错误。
     def test_repeated_plan_saves_are_atomic_per_conversation(self):
         self.save()
         args = {**self.args, '_dsh_context': {'session_id': self.session}}
+        # 并发保存同一会话计划，将预期锁竞争转成可检查的空结果。
         def save(index):
             try:
                 return plan(deepcopy(args), self.root / 'operations' / ('parallel-' + str(index)))
@@ -233,6 +249,7 @@ class PlanReviewRevisionTests(unittest.TestCase):
         with engine_for(self.database_url).connect() as db:
             self.assertEqual(db.execute(text('SELECT COUNT(*) FROM reviews WHERE session=:session'), {'session':self.session}).scalar_one(), 1)
 
+    # 验证计划锁只阻止同会话，不影响另一会话保存。
     def test_plan_save_lock_does_not_block_another_conversation(self):
         lock = self.root / 'plan-locks' / sha256(self.session.encode()).hexdigest()
         with exclusive_run(lock):

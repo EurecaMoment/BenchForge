@@ -2,6 +2,7 @@
 import math
 
 
+# 按列向量先X再Y再Z的约定构建三维欧拉旋转矩阵。
 def rotation_matrix(angles):
     x,y,z=map(math.radians,angles)
     cx,cy,cz=math.cos(x),math.cos(y),math.cos(z)
@@ -12,6 +13,7 @@ def rotation_matrix(angles):
             (-sy,cy*sx,cy*cx))
 
 
+# 计算旋转盒体、椭球或椭圆柱体的精确轴对齐边界。
 def part_bounds(part):
     """Exact AABB of a rotated box, ellipsoid or elliptical Z-cylinder."""
     rotation=rotation_matrix(part.get('rotation_deg_xyz',[0,0,0]))
@@ -29,6 +31,7 @@ def part_bounds(part):
             [part['offset'][i]+extents[i] for i in range(3)])
 
 
+# 提取盒体实际存在的水平顶面，倾斜到无水平面时返回空。
 def horizontal_box_top(part):
     """Return an actual horizontal top face; a tilted box may have none."""
     rotation=rotation_matrix(part.get('rotation_deg_xyz',[0,0,0]))

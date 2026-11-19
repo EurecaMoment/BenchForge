@@ -7,7 +7,9 @@ import {launchEnvironmentOf} from '@deepseek-ai/dsh-launch-environment';
 import {loadServiceConfig, createServiceClient} from '../tools/scene/service_client.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 
+/** 对可序列化身份或内容计算 SHA-256 摘要，生成稳定的宿主或索引标识。 */
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+/** 构造带会话查询错误码的服务异常。 */
 const failure = (message, code) => new SessionQueryError(message, 'SESSION_QUERY_' + code);
 
 /** Official exact-read/restore behavior with a PostgreSQL search read model. */
@@ -15,6 +17,7 @@ export default class PostgresSessionQuery extends SessionQueryEngine {
   static inject = ['sessions', 'sessionPersistence'];
   static Config = Schema.object({productionConfig: Schema.string().required()});
 
+  /** 建立数据库会话查询服务，持有宿主身份、索引版本和统一取消寿命。 */
   constructor(ctx, config) {
     super(ctx);
     this.owner = ctx;
@@ -24,11 +27,13 @@ export default class PostgresSessionQuery extends SessionQueryEngine {
     ctx.effect(() => () => this.lifetime.abort(), 'postgres-session-query');
     const environment = launchEnvironmentOf(ctx);
     this.hostId = digest(environment.get('DSH_HOME')?.value || path.resolve(config.productionConfig));
-    this.client = () => this.service ||= loadServiceConfig(config.productionConfig, {
+    this.client = /** 按需建立后端服务客户端；连接失败后清除缓存以允许后续重试。 */ () => this.service ||= loadServiceConfig(config.productionConfig, {
+      /** 从宿主启动时保存的环境快照解析服务配置引用。 */
       getEnvironmentValue: name => environment.get(name)?.value,
     }).then(createServiceClient).catch(error => { this.service = null; throw error; });
   }
 
+  /** 仅为版本变化的会话重建事件搜索文档，并记录实际索引的不可变观察版本。 */
   async synchronize(records, signal) {
     const service = await this.client(), versions = [];
     for (const record of records) {
@@ -50,6 +55,7 @@ export default class PostgresSessionQuery extends SessionQueryEngine {
     return digest(versions.sort(([a], [b]) => a.localeCompare(b)));
   }
 
+  /** 将索引协调和查询放入同一串行代际，限制查询时长并保留原生取消语义。 */
   async search(request, exec = {}, grouped) {
     const signal = AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(30000), ...(exec.signal ? [exec.signal] : [])]);
     // Keep reconcile + query as one generation. Callers can cancel even while queued.
@@ -63,6 +69,7 @@ export default class PostgresSessionQuery extends SessionQueryEngine {
     }
   }
 
+  /** 校验查询及筛选范围，同步授权会话的索引后读取一页搜索结果。 */
   async searchPage(request, signal, grouped) {
     signal.throwIfAborted();
     const query = typeof request.query === 'string' ? request.query.trim() : '', limit = request.limit ?? 30;
@@ -93,6 +100,8 @@ export default class PostgresSessionQuery extends SessionQueryEngine {
     };
   }
 
+  /** 执行按会话分组的搜索，复用统一索引与权限校验流程。 */
   searchSessions(request, exec) { return this.search(request, exec, true); }
+  /** 搜索具体会话事件，返回未按会话聚合的匹配项。 */
   searchEvents(request, exec) { return this.search(request, exec, false); }
 }

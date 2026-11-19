@@ -18,20 +18,25 @@ from pipelines.scene_production.service_failures import stage_failure
 class _StageStore:
     """Fence writes from a claimed stage by its persisted attempt owner."""
 
+    # 把本次阶段执行的存储访问绑定到租约所有者。
     def __init__(self, store, owner):
         self._store = store
         self._owner = owner
 
+    # 将未包装的存储方法透传给底层仓库。
     def __getattr__(self, name):
         return getattr(self._store, name)
 
+    # 为状态更新自动附加预期租约所有者，阻止过期执行者修改任务。
     def update(self, task_id, **fields):
         return self._store.update(task_id, expected_owner=self._owner, **fields)
 
+    # 在采集发布时强制校验本执行者的租约身份。
     def publish_capture(self, task_id, token, incoming):
         return self._store.publish_capture(task_id, token, incoming, expected_owner=self._owner)
 
 
+# 识别无需资源生成的程序准备和只采集评审任务，允许走独立并发通道。
 def capture_handoff(unit):
     """CPU-only preparation/completion should not queue behind asset generation."""
     if unit['phase'] == 'review':
@@ -48,6 +53,7 @@ def capture_handoff(unit):
     )
 
 
+# 按阶段资源及并发预算领取任务，维护租约并在停止时回收执行资源。
 def coordinate(
     store,
     stop,
@@ -65,11 +71,13 @@ def coordinate(
 ):
     """Run work only after durable single-owner stage acquisition."""
 
+    # 执行已领取阶段，持续续约并将取消或租约失效传播到规划、采集和评审。
     def execute(claimed_task, owner):
         stage_store = _StageStore(store, owner) if owner else store
         lease_stop = Event()
         lease_thread = None
         if owner and callable(getattr(store, 'renew_stage', None)):
+            # 定期续租；续租异常或所有权丢失时触发本阶段停止信号。
             def keep_lease():
                 while not lease_stop.wait(15):
                     try:
@@ -85,10 +93,12 @@ def coordinate(
         try:
             try:
                 class TaskSignal:
+                    # 初始化运行取消状态及最近一次数据库检查时间。
                     def __init__(self):
                         self.checked = 0
                         self.canceled = False
 
+                    # 合并服务停止、租约失效与运行取消状态，并限制数据库检查频率。
                     def is_set(self):
                         if time.monotonic() - self.checked > 3:
                             self.canceled = (

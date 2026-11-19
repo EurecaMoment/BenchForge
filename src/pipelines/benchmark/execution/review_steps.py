@@ -8,11 +8,13 @@ from pipelines.benchmark.execution.artifact_graph import binding_roots
 from capabilities.benchmark_design.stages import stage_of
 from storage.operation_outputs import physical_path, logical_value
 
+# 展开组合流水线的叶子产物，为每个生产阶段确定唯一评审所属运行。
 def review_scope(plan, run_root, plan_path):
     """One review owner for the leaf artifacts of a composed production run."""
     members = {stage: [] for stage in STAGES[1:]}
     recipes = None
 
+    # 递归展开嵌套配方与未被后续消费的步骤，将实际产物归入阶段成员。
     def expand(steps, root, prefix=''):
         nonlocal recipes
         consumed = set()
@@ -43,6 +45,7 @@ def review_scope(plan, run_root, plan_path):
     expand(plan['steps'], run_root)
     return {'run': str(run_root.resolve()), 'plan': str(plan_path), 'members': members, 'continued_stages': []}
 
+# 仅在该阶段所有计划成员均已有成功回执时返回产物集合。
 def completed_stage(scope, stage):
     """Receipts are retained, but a review needs every planned stage artifact."""
     members = scope['members'][stage]

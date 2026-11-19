@@ -34,19 +34,25 @@ const STEP_STAGES = {scene: 'S2', capture: 'S2', accepted_scenes:'S2', collectio
 const RECEIPT_STAGES = {'benchforge.scene-stage/v1': 'S2', 'benchforge.scene-diagnostics/v1': 'S2',
   'benchforge.collection-stage/v1': 'S3', 'benchforge.annotation-stage/v1': 'S3'};
 const OUTPUT_CONTAINERS = new Set(['result', 'artifact', 'outputs', 'watch']);
+/** 识别非空且非数组的普通对象形值。 */
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+/** 只接受非空字符串作为显式文件或标题引用。 */
 const text = (value) => typeof value === 'string' && value.trim() ? value : null;
+/** 按会话工作目录选择 Windows 或 POSIX 路径规则，支持跨平台历史事件。 */
 const filesystem = (cwd) => /^[A-Za-z]:[\\/]/.test(cwd) ? path.win32 : path.posix;
+/** 将事件中的文件引用按对应平台解析为绝对路径。 */
 const resolve = (cwd, file) => {
   const api = filesystem(cwd);
   return text(file) && (api.isAbsolute(file) || cwd) ? api.resolve(cwd || '/', file) : null;
 };
 
+/** 容错解析工具参数，只保留对象形 JSON 结果。 */
 function argumentsOf(raw) {
   try {const value = JSON.parse(raw); return object(value) ? value : null;}
   catch {return null;}
 }
 
+/** 识别确实写入或编辑文件的有效工具调用，排除读取与无效参数。 */
 function mutationFile(name, args) {
   if (name === 'write' && typeof args.content === 'string') return text(args.file_path);
   if (name === 'edit' && text(args.old_string) && typeof args.new_string === 'string' && args.old_string !== args.new_string &&
@@ -58,6 +64,7 @@ function mutationFile(name, args) {
   return valid ? text(args.path) : null;
 }
 
+/** 从工具结果文本块中提取首个可解析的对象回执。 */
 function receiptOf(message) {
   for (const block of message.content || []) {
     if (block.type !== 'text') continue;
@@ -67,9 +74,11 @@ function receiptOf(message) {
   return null;
 }
 
+/** 从约定的输出字段提取产物引用；输入路径和说明文字不作为生产证据。 */
 function fileReferences(receipt) {
   const files = [];
   // Only explicit output references count. Input paths and prose never establish production.
+  /** 按有限深度遍历已知回执结构，携带阶段和步骤上下文提取显式输出文件。 */
   const visit = (value, {stage = null, step = ''} = {}, depth = 0) => {
     if (depth > 5) return;
     if (Array.isArray(value)) { for (const child of value) visit(child, {stage, step}, depth + 1); return; }
@@ -109,6 +118,7 @@ function fileReferences(receipt) {
   return files;
 }
 
+/** 合并文件、工作区与采集运行证据，并用当前事件序号更新投影版本。 */
 function publish(state, {files = [], workspace, captureId}, seq) {
   let view = state.view;
   const nextFiles = [...view.files];
@@ -135,9 +145,11 @@ function publish(state, {files = [], workspace, captureId}, seq) {
 /** A framework-owned, replayable fold. Pending calls never enter the wire view. */
 export const artifactProjection = {
   key: ARTIFACT_PROJECTION, stateVersion: 7, stateSchema: State,
+  /** 根据会话头初始化产物投影和待匹配工具调用表。 */
   init: (header) => ({cwd: header.cwd || '', calls: {}, view: {
     revision: 0, workspaces: [], primaryWorkspace: null, files: [], captureIds: [],
   }}),
+  /** 归约交付、文件写入及业务回执事件，建立可追溯的原生会话产物事实。 */
   apply(state, event) {
     if (event.type === 'deliverables/presented') {
       const files = (event.data.files || []).filter((row) => object(row) && text(row.path)).map((row) => ({
@@ -178,5 +190,5 @@ export const artifactProjection = {
     const workspace = text(receipt.artifact_dir) || files.length || captureId ? resolve(state.cwd, call.workspace) : null;
     return publish(settled, {files, workspace, captureId}, event.seq);
   },
-  wire: {viewSchema: ArtifactView, view: (state) => state.view, summary: false},
+  wire: {viewSchema: ArtifactView, /** 返回工作台需要的产物公开投影视图。 */ view: (state) => state.view, summary: false},
 };

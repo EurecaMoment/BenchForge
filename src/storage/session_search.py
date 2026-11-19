@@ -8,6 +8,7 @@ from database.transactions import lock_entity
 from database.migrations import initialize_schema
 
 
+# 按宿主命名空间处理会话搜索索引的替换、删除或检索，并校验输入边界。
 def session_search(engine, action, value):
     host = value.get('host_id')
     if not isinstance(host, str) or not re.fullmatch(r'[a-f0-9]{64}', host):

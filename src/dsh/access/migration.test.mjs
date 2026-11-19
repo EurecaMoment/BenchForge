@@ -6,6 +6,7 @@ import test from 'node:test';
 import {createWorkspaceMigration} from './migration.mjs';
 import {WorkspaceBindings} from './workspaces.mjs';
 
+/** 创建旧工作区、原生产物投影和受管迁移服务，记录会话创建、通知及快照释放情况。 */
 async function fixture(t, {aliasedRoot = false} = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bf-migration-'));
   t.after(() => fs.rm(root, {recursive: true, force: true}));
@@ -23,7 +24,7 @@ async function fixture(t, {aliasedRoot = false} = {}) {
     source = alias;
   }
   const records = new Map();
-  const store = new WorkspaceBindings({table: {get: id => records.get(id), put: async (id, row) => records.set(id, structuredClone(row))},
+  const store = new WorkspaceBindings({table: {/** 按测试键读取内存记录或模拟服务。 */ get: id => records.get(id), /** 保存测试记录的副本，模拟持久化写入并防止引用共享。 */ put: async (id, row) => records.set(id, structuredClone(row))},
     hostId: 'host', ownerId: 'owner', workspaceRoot: path.join(root, 'workspaces'), resourceRoot: path.join(root, 'resources')});
   await store.initialize();
   const header = Object.freeze({id: sourceId, cwd: source, agentPreset: 'benchforge'});
@@ -35,30 +36,33 @@ async function fixture(t, {aliasedRoot = false} = {}) {
   ]};
   const agents = new Map(), created = [], notices = [];
   const migration = createWorkspaceMigration({
+    /** 返回可调版本的源会话快照，供测试模拟预览后变动。 */
     observe: async () => ({header, cursor: state.cursor, projections: {values: {benchforgeArtifacts: {files: state.files}}},
+      /** 累计观察快照释放次数，便于确认迁移读取不会泄漏资源。 */
       [Symbol.dispose]() {state.disposed++;}}),
+    /** 核对源工作区与会话参数，并提供本会话及外部会话的对照操作记录。 */
     readOperations: async (_root, sessionId) => {
       assert.equal(_root, await fs.realpath(source)); assert.equal(sessionId, sourceId);
       return [{session_id: sourceId, state: 'completed', artifact: path.join(source, 'operations/own')},
         {session_id: 'session-foreign', state: 'completed', artifact: path.join(source, 'operations/foreign')}];
     },
-    access: {prepareMigration: async ({sourceSessionId, newSessionId, sourceRevision, files}, signal) => {
+    access: {/** 为目标会话预留工作区，并委托真实工作区存储执行批准文件的迁移。 */ prepareMigration: async ({sourceSessionId, newSessionId, sourceRevision, files}, signal) => {
       assert.equal(sourceSessionId, sourceId);
       await store.reserve(newSessionId);
       return store.migrateFiles(newSessionId, header, sourceRevision, files, signal);
     }},
-    sessions: {create: async request => {
+    sessions: {/** 记录迁移创建请求，激活目标工作区并提供可记录通知的 Agent。 */ create: async request => {
       created.push(request);
       await store.activate({id: request.sessionId, cwd: request.cwd, agentPreset: request.agentPreset});
-      agents.set(request.sessionId, {inject: notice => notices.push(notice)});
+      agents.set(request.sessionId, {/** 收集迁移完成后注入新会话的通知。 */ inject: notice => notices.push(notice)});
       return {sessionId: request.sessionId};
     }},
-    agents, createMessage: value => value,
+    agents, /** 保留测试消息结构，便于断言实际投递内容。 */ createMessage: value => value,
   });
   return {sourceId, source, header, state, agents, migration, created, notices, store};
 }
 
-test('preview intersects formal files with PG ownership and drafts with native successful mutations', async t => {
+test('preview intersects formal files with PG ownership and drafts with native successful mutations', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：preview intersects formal files with PG ownership and drafts with native successful mutations。 */ async t => {
   const {migration, sourceId, state} = await fixture(t);
   const result = await migration.preview(sourceId);
   assert.deepEqual(result.candidates.map(row => [row.relativePath, row.kind]), [
@@ -69,7 +73,7 @@ test('preview intersects formal files with PG ownership and drafts with native s
   assert.equal(result.production_authority_transferred, false);
 });
 
-test('owner-selected migration uses native create, immutable evidence, writable drafts and logged origin', async t => {
+test('owner-selected migration uses native create, immutable evidence, writable drafts and logged origin', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：owner-selected migration uses native create, immutable evidence, writable drafts and logged origin。 */ async t => {
   const {migration, sourceId, source, header, created, notices, store} = await fixture(t);
   const preview = await migration.preview(sourceId);
   const result = await migration.migrate(sourceId, {source_revision: preview.source_revision,
@@ -90,7 +94,7 @@ test('owner-selected migration uses native create, immutable evidence, writable 
   if (process.platform !== 'win32') assert.equal((await fs.stat(evidence.path)).mode & 0o222, 0);
 });
 
-test('root aliases retain owned candidates without accepting linked task directories', async t => {
+test('root aliases retain owned candidates without accepting linked task directories', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：root aliases retain owned candidates without accepting linked task directories。 */ async t => {
   const {migration, sourceId, source, state} = await fixture(t, {aliasedRoot: true});
   await fs.symlink(path.join(source, 'operations/own'), path.join(source, 'tasks/linked'), 'junction');
   state.files.push({path: path.join(source, 'tasks/linked/result.json'), source: 'mutation'});
@@ -106,7 +110,7 @@ test('root aliases retain owned candidates without accepting linked task directo
   for (const file of result.files) assert.equal(typeof file.path, 'string');
 });
 
-test('stale native revision, changed files and forged manifests cannot migrate', async t => {
+test('stale native revision, changed files and forged manifests cannot migrate', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：stale native revision, changed files and forged manifests cannot migrate。 */ async t => {
   const {migration, sourceId, source, state, created} = await fixture(t);
   const preview = await migration.preview(sourceId);
   const selection = {source_revision: preview.source_revision, selected: preview.candidates.map(row => row.id)};
@@ -120,12 +124,12 @@ test('stale native revision, changed files and forged manifests cannot migrate',
   assert.equal(created.length, 0);
 });
 
-test('live source runs under native maintenance, running sources are rejected and empty selection starts clean', async t => {
+test('live source runs under native maintenance, running sources are rejected and empty selection starts clean', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：live source runs under native maintenance, running sources are rejected and empty selection starts clean。 */ async t => {
   const {migration, sourceId, agents} = await fixture(t);
   agents.set(sourceId, {status: 'running'});
   await assert.rejects(migration.preview(sourceId), /Stop the source conversation/);
   let maintained = false;
-  agents.set(sourceId, {status: 'idle', runMaintenance: async task => {
+  agents.set(sourceId, {status: 'idle', /** 记录维护作用域已被使用，并用独立取消信号执行迁移任务。 */ runMaintenance: async task => {
     maintained = true; return task(new AbortController().signal);
   }});
   const preview = await migration.preview(sourceId);
@@ -135,7 +139,7 @@ test('live source runs under native maintenance, running sources are rejected an
   assert.equal(result.migration_from.sessionId, sourceId);
 });
 
-test('failed copy removes staged files and cannot commit a partial migration', async t => {
+test('failed copy removes staged files and cannot commit a partial migration', /** 验证受管工作区、可信访问和会话归属在该用例中的具体边界，完成准备、调用和结果断言。用例：failed copy removes staged files and cannot commit a partial migration。 */ async t => {
   const {store, source, header} = await fixture(t);
   const target = await store.reserve('session-failed');
   await assert.rejects(store.migrateFiles(target.sessionId, header, {cursor: 10}, [

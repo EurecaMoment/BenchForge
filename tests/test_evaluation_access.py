@@ -19,6 +19,7 @@ from storage.artifacts import jsonl, read, rows, write
 
 
 class EvaluationAccessTests(unittest.TestCase):
+    # 建立独立评测数据、会话工作区和可信身份，供打包与模型评测访问边界测试。
     def setUp(self):
         self.temporary = TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -35,11 +36,13 @@ class EvaluationAccessTests(unittest.TestCase):
         self.config = {'models': {'fixture': {'url': 'http://127.0.0.1:9000/v1',
                                              'model': 'fixture'}}}
 
+    # 把夹具记录的媒体引用替换为给定路径并重新写入 JSONL。
     def media_items(self, path):
         items = rows(self.items)
         items[0]['media'] = [str(path)]
         jsonl(self.items, items)
 
+    # 验证来源说明中的文本路径只作为数据保存，不被解释成待读取文件。
     def test_package_keeps_provenance_strings_inert(self):
         secret = self.root / 'private.txt'
         secret.write_text('private-credential-value', encoding='utf-8')
@@ -56,6 +59,7 @@ class EvaluationAccessTests(unittest.TestCase):
             self.assertFalse(any(b'private-credential-value' in archive.read(name)
                                  for name in archive.namelist()))
 
+    # 验证可信命令行打包复制显式资源，并维持公开输入和私有答案的分离。
     def test_unscoped_package_copies_declared_resources_and_keeps_public_private_split(self):
         image = self.workspace / 'camera.png'
         image.write_bytes(b'public-image')
@@ -85,12 +89,14 @@ class EvaluationAccessTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(read(self.root / 'metrics.json')['overall']['score'], 1)
 
+    # 验证有会话作用域时拒绝工作区外的主评测输入。
     def test_scoped_primary_input_outside_workspace_is_rejected(self):
         outside = self.root / 'outside.jsonl'
         jsonl(outside, rows(self.items))
         with access_context(self.access), self.assertRaises(PermissionError):
             reports.model_eval({'public_items': str(outside)}, self.output, self.config)
 
+    # 验证外部媒体在任何模型网络请求前被拒绝。
     def test_scoped_external_media_rejected_before_network(self):
         secret = self.root / 'private.png'
         secret.write_bytes(b'private')
@@ -102,6 +108,7 @@ class EvaluationAccessTests(unittest.TestCase):
             reports.model_eval({'public_items': str(self.items)}, self.output, self.config)
         network.assert_not_called()
 
+    # 验证打包清单拒绝符号链接文件及目录，防止引入外部资源。
     def test_bundle_rejects_linked_files_and_directories(self):
         secret = self.root / 'private.png'
         secret.write_bytes(b'private')
@@ -116,6 +123,7 @@ class EvaluationAccessTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 reports._reproduce_bundle(bundle, self.output / bundle.name)
 
+    # 验证 ZIP 归档过程不会跟随符号链接。
     def test_zip_rejects_symlinks(self):
         link = self.workspace / 'linked'
         try:
@@ -125,6 +133,7 @@ class EvaluationAccessTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             reports._zip_tree(self.workspace, self.output / 'archive.zip')
 
+    # 验证即使清单显式声明，也不能打包当前会话无权访问的外部资源。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative reads require Linux')
     def test_scoped_package_rejects_declared_external_resource(self):
         secret = self.root / 'private.png'
@@ -136,6 +145,7 @@ class EvaluationAccessTests(unittest.TestCase):
             reports.package({'items': str(self.items), 'bundle': str(bundle)}, self.output, {})
         self.assertFalse((self.output / 'benchmark-complete.zip').exists())
 
+    # 验证模型评测可正常读取当前工作区内的相对媒体。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative reads require Linux')
     def test_scoped_model_eval_reads_in_workspace_media(self):
         image = self.workspace / 'camera.png'
@@ -152,6 +162,7 @@ class EvaluationAccessTests(unittest.TestCase):
                          'data:image/png;base64,' + base64.b64encode(b'public-image').decode())
         self.assertEqual(result['status'], 'completed')
 
+    # 验证工作区内的媒体符号链接同样被受限打包拒绝。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative reads require Linux')
     def test_scoped_package_rejects_media_symlink(self):
         target = self.workspace / 'camera.png'
@@ -162,6 +173,7 @@ class EvaluationAccessTests(unittest.TestCase):
         with access_context(self.access), self.assertRaises(PermissionError):
             reports.package({'items': str(self.items)}, self.output, {})
 
+    # 验证包内合法资源引用被规范为可复现的内部相对位置。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative reads require Linux')
     def test_scoped_package_normalizes_internal_references(self):
         bundle = self.workspace / 'bundle'
@@ -174,6 +186,7 @@ class EvaluationAccessTests(unittest.TestCase):
         record = read(self.output / 'benchmark/reproduce/manifest.json')
         self.assertEqual(record, {'media': ['camera.png'], 'image_path': 'camera.png'})
 
+    # 验证路径检查后媒体被替换为外部链接，也不能读出外部字节。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative reads require Linux')
     def test_media_replacement_after_path_validation_cannot_escape(self):
         from service_access.access_scope import workspace_path
@@ -182,6 +195,7 @@ class EvaluationAccessTests(unittest.TestCase):
         secret = self.root / 'secret.png'
         secret.write_bytes(b'private')
 
+        # 在合法路径校验后立刻替换媒体为外部链接，模拟检查与使用之间的竞争。
         def replace_after_validation(value, **kwargs):
             path = workspace_path(value, **kwargs)
             if path == image:
@@ -194,6 +208,7 @@ class EvaluationAccessTests(unittest.TestCase):
                 self.assertRaises(OSError):
             reports._input_bytes(image)
 
+    # 验证 ZIP 枚举后文件被替换为链接，归档仍拒绝外部字节。
     @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative reads require Linux')
     def test_zip_does_not_follow_a_file_replaced_after_enumeration(self):
         image = self.workspace / 'camera.png'
@@ -201,6 +216,7 @@ class EvaluationAccessTests(unittest.TestCase):
         secret = self.root / 'secret.png'
         secret.write_bytes(b'private')
 
+        # 在归档枚举时把合法图像替换成外部链接，模拟竞态输入。
         def replaced_files(_root):
             image.unlink()
             image.symlink_to(secret)

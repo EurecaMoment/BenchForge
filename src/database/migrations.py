@@ -19,6 +19,7 @@ _initialization_lock = RLock()
 SCHEMA_VERSION = 6
 
 
+# 在锁保护下初始化或升级数据库结构，并阻止较旧程序连接更新的结构版本。
 def initialize_schema(engine=None):
     engine = engine or engine_for()
     with _initialization_lock:

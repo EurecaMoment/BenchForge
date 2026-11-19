@@ -23,21 +23,25 @@ ROOT = Path(__file__).resolve().parents[3]
 Loader, Dumper = base.Loader, base.Dumper
 
 
+# 按当前公开资源重建预设，并迁移合并到既有 profile。
 def update_profile(profile, python, mode_config, service_config, revision, *, sources):
     generated = build(sources, str(python), mode_config, service_config)
     return migrate_profile(profile, generated, revision)
 
 
+# 读取用户服务的主进程与活动状态，用于热更新前后核对。
 def service_state(service):
     return dict(line.split("=", 1) for line in subprocess.check_output(
         ["systemctl", "--user", "show", service, "-p", "MainPID", "-p", "ActiveState"], text=True).splitlines())
 
 
+# 同时快照 DSH 与后端服务状态，供更新过程监控。
 def monitored_services(dsh_service):
     return {name: service_state(name) for name in (dsh_service, "benchforge.service")}
 
 
 class DshRpc:
+    # 从显式或当前服务启动链接完成管理员认证，建立持有会话 cookie 的 RPC 客户端。
     def __init__(self, url, service, pid):
         auth_url = os.environ.get("DSH_ADMIN_URL")
         if not auth_url:
@@ -51,6 +55,7 @@ class DshRpc:
         self.opener = build_opener(ProxyHandler({}), HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.opener.open(auth_url, timeout=15).read()
 
+    # 发送带唯一 RPC 身份的客户端请求，解析结果并拒绝失败回执。
     def call(self, method, args):
         body = {"type": "client-request", "rpcId": str(uuid.uuid4()), "method": method, "payload": {"args": args}}
         request = Request(self.url + "/api/" + method, data=json.dumps(body).encode(),
@@ -62,6 +67,7 @@ class DshRpc:
         return result["value"]
 
 
+# 保留原文件权限，通过同目录临时文件原子更新 profile。
 def atomic_write(path, content):
     temporary = path.with_name(path.name + ".benchforge-new")
     temporary.write_bytes(content)
@@ -69,6 +75,7 @@ def atomic_write(path, content):
     temporary.replace(path)
 
 
+# 备份并热更新现有预设与宿主声明，通过 RPC 重载并核对服务进程状态。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     base.add_source_arguments(parser)

@@ -6,6 +6,7 @@ from urllib.error import HTTPError
 from service_access.scene_service import service_read
 from service_access.scene_service import session_runs
 
+# 在给定字节上限内读取JSON，超限时拒绝继续解析。
 def bounded_json(path, limit=2 * 1024 * 1024):
     with Path(path).open('rb') as handle:
         data = handle.read(limit + 1)
@@ -14,6 +15,7 @@ def bounded_json(path, limit=2 * 1024 * 1024):
     return json.loads(data)
 
 
+# 按冻结场景程序识别并归并重试版本，不依赖运行名称猜测。
 def saved_scene_identity(config, task):
     """Group retries by the frozen scene program, without guessing from run names."""
     if not config.get('artifacts') or not re.fullmatch(r'sf_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', task.get('id', '')):
@@ -37,6 +39,7 @@ def saved_scene_identity(config, task):
     return identity
 
 
+# 只允许已经产出的场景图像和面向操作者的标注摘要进入预览。
 def preview_kind(name):
     """Only produced scene imagery and operator-visible annotation summaries."""
     if name == 'preview/scene.mp4':
@@ -52,6 +55,7 @@ def preview_kind(name):
     return None
 
 
+# 为视图或阶段报告提取公开预览字段，排除私有答案和完整对象真值。
 def public_preview(name, value):
     if re.fullmatch(r'capture/view_\d+\.json', name):
         return {**{key: value[key] for key in ('frame_id', 'image_size', 'camera', 'depth_kind', 'depth_unit') if key in value},
@@ -65,6 +69,7 @@ def public_preview(name, value):
     return {key: value[key] for key in fields if key in value}
 
 
+# 读取可选服务证据，未找到时返回空结果，其他错误继续上报。
 def optional_evidence(config, arguments):
     try:
         return service_read(config, '/evidence', arguments)
@@ -76,6 +81,7 @@ def optional_evidence(config, arguments):
         return {}
 
 
+# 验证场景属于当前会话后列出或读取允许公开的阶段产物。
 def stage_artifacts(config, session, scene, task_id=None, revision=None, file=None, run_ids=(), sessions=()):
     # A caller-supplied run ID never grants cross-session access to scene artifacts.
     # run_ids are extracted server-side from the resolved workspace pipeline state.

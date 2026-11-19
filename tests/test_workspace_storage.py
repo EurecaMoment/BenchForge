@@ -16,15 +16,18 @@ from storage.native_jobs import NativeJobs
 
 
 class WorkspaceStorageTests(unittest.TestCase):
+    # 创建独立 PostgreSQL schema 与规范临时工作区，隔离存储并发测试。
     def setUp(self):
         self.database_url = use_postgres(self)
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
 
+    # 验证并发分区声明只产生一个不可变结果，其他分区请求失败。
     def test_concurrent_partition_claims_publish_one_immutable_split(self):
         barrier = Barrier(8)
 
+        # 同步多个竞争者后声明不同分区，将预期冲突作为空结果返回。
         def claim(index):
             barrier.wait()
             try:
@@ -37,6 +40,7 @@ class WorkspaceStorageTests(unittest.TestCase):
         self.assertEqual(len({x for x in results if x}), 1)
         self.assertEqual(results.count(None), 4)
 
+    # 验证操作索引先按会话过滤再分页，避免其他会话挤占结果限额。
     def test_index_filters_session_before_limit(self):
         with engine_for(self.database_url).begin() as db:
             for i in range(10):
@@ -49,6 +53,7 @@ class WorkspaceStorageTests(unittest.TestCase):
         self.assertEqual(len(query_operations(self.root, sessions=["b"], limit=2)), 2)
         self.assertEqual(query_operations(self.root), [])
 
+    # 验证旧原生任务回执恢复同时匹配会话和服务端点。
     def test_old_native_job_recovery_requires_matching_session_and_endpoint(self):
         operation = self.root / "operations" / "old"
         operation.mkdir(parents=True)

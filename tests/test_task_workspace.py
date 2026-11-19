@@ -13,6 +13,7 @@ from database.access import AccessScope
 
 
 class TaskWorkspaceTests(unittest.TestCase):
+    # 验证隔离命令分别挂载会话只读输入与任务可写输出命名空间。
     def test_command_preserves_conversation_input_and_task_output_namespaces(self):
         from server.task_runtime import python_command
 
@@ -31,6 +32,7 @@ class TaskWorkspaceTests(unittest.TestCase):
                 python_command(root.parent / 'other', root.parent / 'other/code.py',
                                workspace_fd=10, script_fd=11, conversation_root=root, conversation_fd=12)
 
+    # 验证从用户安装位置启动执行器时不泄漏服务环境变量。
     @unittest.skipUnless(os.name == 'posix', 'Task-code execution requires Linux descriptors')
     def test_user_installed_runner_does_not_leak_service_environment(self):
         with TemporaryDirectory() as temporary:
@@ -65,6 +67,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertEqual(args[0][args[0].index('--ro-bind-fd') + 2], str(root))
             self.assertIn('/run/benchforge-task.py', args[0])
 
+    # 验证标准输出、错误和回执的链接不能改写外部目标。
     @unittest.skipUnless(os.name == 'posix', 'Task-code execution requires Linux descriptors')
     def test_output_and_receipt_symlinks_never_touch_external_targets(self):
         with TemporaryDirectory() as temporary:
@@ -75,6 +78,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             victim.write_text('service-secret')
             access = TrustedAccess(AccessScope('host', 'session', 'workspace', 'owner', 1, 1), str(workspace))
 
+            # 在模拟执行时为各输出创建外部链接，复现任务产物替换竞争。
             def execute(command, **kwargs):
                 task = workspace / 'tasks/sample/work'
                 script = next(task.glob('code_*.py'))
@@ -92,6 +96,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             task = Path(result['workspace_path'])
             self.assertFalse((task / (result['call_id'] + '.receipt.json')).is_symlink())
 
+    # 验证运行中替换任务目录不会重定向挂载或产物发布。
     @unittest.skipUnless(os.name == 'posix', 'Task-code execution requires Linux descriptors')
     def test_directory_replacement_does_not_redirect_output_or_mount(self):
         with TemporaryDirectory() as temporary:
@@ -102,6 +107,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             outside.mkdir()
             access = TrustedAccess(AccessScope('host', 'session', 'workspace', 'owner', 1, 1), str(workspace))
 
+            # 将任务目录改名并用外部链接替代，模拟执行期间的目录替换。
             def execute(command, **kwargs):
                 task = workspace / 'tasks/sample/work'
                 original = task.with_name('original')
@@ -120,6 +126,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertEqual(result['stdout'], 'pinned output')
             self.assertTrue((workspace / 'tasks/sample/original' / (result['call_id'] + '.receipt.json')).is_file())
 
+    # 验证真实隔离运行仍能导入 NumPy，同时拒绝读取服务私有文件。
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bwrap'), 'Live bubblewrap requires Linux runner')
     def test_real_runtime_keeps_numpy_and_denies_service_files(self):
         try:
@@ -142,6 +149,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertEqual(result['stdout'].strip(), '6')
             self.assertTrue(any(row['file'] == 'array.npy' for row in result['artifacts']))
 
+    # 验证真实运行可读取本会话输入，返回路径可供后续自有工具复用。
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bwrap'), 'Live bubblewrap requires Linux runner')
     def test_real_runtime_reads_conversation_inputs_and_returns_reusable_paths(self):
         from capabilities.asset_generation.generation import GenerationTools
@@ -184,11 +192,13 @@ class TaskWorkspaceTests(unittest.TestCase):
                 if file.is_file():
                     file.chmod(0o600)
 
+    # 验证任务代码执行必须具备宿主已验证身份。
     def test_task_code_requires_host_identity(self):
         with patch('server.task_workspace.shutil.which', return_value='/usr/bin/bwrap'):
             with self.assertRaises(PermissionError):
                 run_task_code('/tmp', 'sample', 'print(1)')
 
+    # 验证缺少隔离执行器时，在写入脚本或启动任务前失败。
     def test_missing_runner_fails_before_writing_or_starting_task(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

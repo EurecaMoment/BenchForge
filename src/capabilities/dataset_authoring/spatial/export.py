@@ -6,6 +6,7 @@ from capabilities.dataset_authoring.spatial.generation import PARTITIONS
 from storage.json_io import write_json
 
 
+# 将各固定分区的题目、图片及私有评分记录导出为Parquet文件。
 def export(args,directory,config=None):
     import pyarrow as pa
     import pyarrow.parquet as pq

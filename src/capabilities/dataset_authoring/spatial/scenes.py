@@ -6,16 +6,19 @@ COLORS={'red':'#c94842','blue':'#356bb1','green':'#438763','orange':'#d88a30','p
 SHAPES=['rectangle','ellipse','triangle','pentagon','hexagon','cross','ring','arrow']
 
 
+# 按给定角度旋转二维向量，返回旋转后的坐标。
 def rotate(p, degrees):
     a=math.radians(degrees);c,s=math.cos(a),math.sin(a)
     return [c*p[0]-s*p[1],s*p[0]+c*p[1]]
 
 
+# 由对象中心位置和尺寸计算二维轴对齐边界框。
 def bbox(o):
     x,y=o['position'];w,h=o['size']
     return [x-w/2,y-h/2,x+w/2,y+h/2]
 
 
+# 按模板、种子和难度构造对象、运动、变换及交互剧本的私有场景。
 def create_scene(template, seed, difficulty=1, group=None):
     rng=random.Random(seed);profile=template['scene_profile'];family=template['scene_family']
     count=min(8,4+difficulty+rng.randrange(2))
@@ -200,6 +203,7 @@ def create_scene(template, seed, difficulty=1, group=None):
                    'budget':18+2*difficulty,'failure':profile if 'failure' in profile else None}}
 
 
+# 把私有米制合成几何渲染为公开观察图，按需选择帧或隐藏标识。
 def render(scene, path, frame=None, hide_labels=False):
     """Metric synthetic diagram. Geometry is private; pixels are the observation."""
     from PIL import Image
