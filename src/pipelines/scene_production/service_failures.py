@@ -78,8 +78,8 @@ def verify_capture_service_recovery(task, directory):
     """从保存程序重新发现服务，仅在实时核对通过后允许恢复原采集。"""
     unit = task['unit']
     frozen_path = directory / 'isaac_sim' / f"attempt_{unit.get('capture_generation', 0)}" / 'capture.json'
-    frozen = json.loads(frozen_path.read_text()) if frozen_path.is_file() else {}
+    frozen = json.loads(frozen_path.read_text(encoding='utf-8')) if frozen_path.is_file() else {}
     settings = current_capture_settings(frozen.get('settings'))
-    program = json.loads((directory / 'program.json').read_text())
+    program = json.loads((directory / 'program.json').read_text(encoding='utf-8'))
     require_live_service(program, settings, unit.get('intent', {}).get('capture_options'))
     return bool(frozen and frozen.get('settings') != settings)

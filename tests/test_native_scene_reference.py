@@ -40,6 +40,9 @@ class NativeReferenceTests(unittest.TestCase):
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
+        # 归属与静态合同测试不连接宿主仿真器；实时协议由服务合同测试单独覆盖。
+        self.enterContext(patch('capabilities.isaac_sim.capture_contract.inspect_live_capture_service',
+                                return_value=[]))
         self.settings = {'grpc': {'host': '127.0.0.1', 'port': 50051}}
         self.access = TrustedAccess(AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1),
                                     str(self.root))
@@ -170,7 +173,7 @@ class NativeReferenceTests(unittest.TestCase):
         source = self.root / 'scene.json'
         source.write_text(json.dumps(program))
         with (access_context(self.access), patch('capabilities.isaac_sim.resource_access.NativeResources') as owner,
-              patch('capabilities.asset_generation.generation.GenerationTools.asset_path') as generated):
+              patch('capabilities.asset_generation.asset_access.registered_asset_path') as generated):
             result = read_capture_submission(self.root / 'private', 'scene.json',
                                              settings=self.settings, execution_mode='exploration')
             self.assertEqual(result['program'], program)

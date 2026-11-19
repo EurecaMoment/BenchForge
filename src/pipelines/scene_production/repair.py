@@ -65,7 +65,7 @@ def resume_service_wait(record, config, post):
                 return True
         else:
             path = Path(record.get('service_program_path') or record['program_path'])
-            program = json.loads(path.read_text())
+            program = json.loads(path.read_text(encoding='utf-8'))
             settings = current_capture_settings(isaac_config(config))
             require_live_service(program, settings)
     except (OSError, ValueError) as error:
@@ -85,7 +85,7 @@ def author_completion(prompt, directory, images, max_tokens=14000):
     from service_access.openai_client import model_request_headers
     directory.mkdir(parents=True, exist_ok=True)
     saved = directory / 'response.json'
-    if saved.is_file():return _json_text(json.loads(saved.read_text())['content'])
+    if saved.is_file():return _json_text(json.loads(saved.read_text(encoding='utf-8'))['content'])
     content=[{'type':'text','text':prompt}]
     for file in images:
         content.append({'type':'image_url','image_url':{'url':'data:image/png;base64,'+base64.b64encode(file.read_bytes()).decode()}})
@@ -134,7 +134,7 @@ def repair_baseline(row, folder, attempt=0, feedback=None):
     previous=folder/('attempt_'+str(attempt-1))/'program.json'
     program_path=context/'program.json' if feedback and (context/'program.json').is_file() else previous if attempt and previous.is_file() else source/'program.json'
     brief_path=context/'scene_brief.json'
-    frozen=json.loads(brief_path.read_text()) if brief_path.is_file() else {}
+    frozen=json.loads(brief_path.read_text(encoding='utf-8')) if brief_path.is_file() else {}
     return program_path,context,frozen
 
 
@@ -145,18 +145,18 @@ def revise(config, row, folder, attempt=0, feedback=None):
     from capabilities.scene_authoring.contracts.scene_design import validate_scene_brief
     source = Path(row['source_directory'])
     program_path,context,frozen=repair_baseline(row,folder,attempt,feedback)
-    program = json.loads(program_path.read_text())
+    program = json.loads(program_path.read_text(encoding='utf-8'))
     work = folder / ('attempt_' + str(attempt));work.mkdir(parents=True, exist_ok=True)
     baseline_file = folder / 'original_requirements.json'
     if not baseline_file.exists():
         frozen_file=source/'scene_brief.json'
-        frozen=json.loads(frozen_file.read_text()) if frozen_file.is_file() else {}
+        frozen=json.loads(frozen_file.read_text(encoding='utf-8')) if frozen_file.is_file() else {}
         requirements=list(dict.fromkeys([*frozen.get('hard_requirements',[]),
             '保留本场景原有的真实用途、主要家具或工具及整体风格，使用真实可辨识的资产。',
             '修复悬空、倾倒、支撑和穿插错误，保证合理比例、取用空间、通行空间和物体使用关系。',
             '不得将场景降级为方块替代物；不能通过改写摘要免除原始要求，所有变更保留依据。']))
         save(baseline_file, {'source_task': row['id'], 'source_name': row['name'], 'requirements': requirements})
-    original = json.loads(baseline_file.read_text())
+    original = json.loads(baseline_file.read_text(encoding='utf-8'))
     protected=list(dict.fromkeys([*original['requirements'],*frozen.get('hard_requirements',[])]))
     images = sorted((context / 'capture').glob('view_*.png'))
     if len(images) > 4:images = [images[i * (len(images) - 1) // 3] for i in range(4)]
@@ -207,9 +207,9 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
             prior_history=deepcopy(frozen.get('revision_history',[]))
             previous_plan=folder/('attempt_'+str(attempt-1))/'scene-plan.json'
             if attempt and not prior_history:
-                if previous_plan.is_file():prior_history=json.loads(previous_plan.read_text())['assessment']['scenes']['designs'][0].get('revision_history',[])
+                if previous_plan.is_file():prior_history=json.loads(previous_plan.read_text(encoding='utf-8'))['assessment']['scenes']['designs'][0].get('revision_history',[])
             if not prior_history and (source/'scene_brief.json').is_file():
-                prior_history=json.loads((source/'scene_brief.json').read_text()).get('revision_history',[])
+                prior_history=json.loads((source/'scene_brief.json').read_text(encoding='utf-8')).get('revision_history',[])
             next_revision=(prior_history[-1].get('revision',0)+1) if prior_history else 1
             brief['revision_history'] = [*prior_history, {'revision': next_revision, 'changes': result.get('changes', []),
                                           'evidence_directory': str(context), 'evidence_refs': result.get('evidence_refs', []),
@@ -256,7 +256,7 @@ def main():
     config['_workspace'] = str(workspace);config['_session'] = args.session
     root.mkdir(parents=True, exist_ok=True)
     targets_file = root / 'targets.json'
-    if targets_file.exists():targets = json.loads(targets_file.read_text())
+    if targets_file.exists():targets = json.loads(targets_file.read_text(encoding='utf-8'))
     else:
         if not args.ids:
             parser.error('--ids is required for a new scene repair batch')
@@ -271,11 +271,11 @@ def main():
         def plan_one(row):
             folder = root / row['id']
             existing = folder / 'status.json'
-            if existing.is_file() and json.loads(existing.read_text()).get('state') in {'planned','capturing','accepted','needs_repair','waiting_service'}:return
+            if existing.is_file() and json.loads(existing.read_text(encoding='utf-8')).get('state') in {'planned','capturing','accepted','needs_repair','waiting_service'}:return
             try:revise(config, row, folder)
             except Exception as error:
                 # A slow author request must not overwrite a newer saved plan.
-                current=json.loads(existing.read_text()) if existing.is_file() else {}
+                current=json.loads(existing.read_text(encoding='utf-8')) if existing.is_file() else {}
                 if current.get('state') not in {'planned','capturing','accepted','needs_repair','waiting_service'}:
                     if is_service_failure(error):
                         current.update(source_id=row['id'], name=row['name'], attempt=0,
@@ -304,7 +304,7 @@ def main():
             if not future.done():continue
             try:future.result()
             except Exception as error:
-                status_file=root/source_id/'status.json';record=json.loads(status_file.read_text())
+                status_file=root/source_id/'status.json';record=json.loads(status_file.read_text(encoding='utf-8'))
                 if record.get('state')=='needs_repair':
                     if is_service_failure(error):
                         wait_for_service(record, error, 'needs_repair')
@@ -314,13 +314,13 @@ def main():
             repairing.pop(source_id)
         completed = 0
         outstanding=[row for row in targets if (root/row['id']/'status.json').is_file()
-                     and json.loads((root/row['id']/'status.json').read_text()).get('state')=='capturing']
+                     and json.loads((root/row['id']/'status.json').read_text(encoding='utf-8')).get('state')=='capturing']
         # Always finish existing captures before admitting another project.
         ordered=outstanding+[row for row in targets if row not in outstanding]
         for row in ordered:
             folder = root / row['id'];status_file = folder / 'status.json'
             if not status_file.is_file():continue
-            record = json.loads(status_file.read_text())
+            record = json.loads(status_file.read_text(encoding='utf-8'))
             if record['state'] in {'accepted', 'failed_final', 'planning_failed'}:
                 completed += 1;continue
             if record['state'] == 'needs_repair' and is_service_failure(record.get('failure') or {}):
@@ -390,13 +390,13 @@ def main():
                         key='scene-repair:' + row['id'], artifact=str(directory/'scene_acceptance.json'))
                     save(status_file, record)
                     repaired_file = workspace / 'scene-library/repairs.json'
-                    repaired = json.loads(repaired_file.read_text()) if repaired_file.is_file() else {}
+                    repaired = json.loads(repaired_file.read_text(encoding='utf-8')) if repaired_file.is_file() else {}
                     for original_id in [row['id'], *row.get('superseded_sources', [])]:
                         repaired[original_id] = {'task_id':task['id'], 'name':record['name'], 'evidence':str(directory),
                                                 'accepted_at':time.time(), 'original_retained':True}
                     save(repaired_file, repaired)
                 else:
-                    failure = json.loads((directory/'scene_acceptance.json').read_text()) if (directory/'scene_acceptance.json').is_file() else task.get('failure')
+                    failure = json.loads((directory/'scene_acceptance.json').read_text(encoding='utf-8')) if (directory/'scene_acceptance.json').is_file() else task.get('failure')
                     transport_only=(isinstance(failure,dict) and failure.get('stage')=='capture_transport')
                     execution_failure=task.get('failure') or {}
                     if is_service_failure(execution_failure):
@@ -406,7 +406,7 @@ def main():
                     review_transport=(task.get('unit',{}).get('phase')=='review' and execution_failure.get('error') in {'TimeoutError','URLError','ConnectionError','OSError','RemoteDisconnected','ConnectionResetError','ConnectionAbortedError'})
                     if review_transport:failure=execution_failure
                     record.update(state='needs_transport_recovery' if transport_only else 'needs_review_recovery' if review_transport else 'needs_repair', failure={'directory':str(directory),'issues':failure,
-                        'visual_review':json.loads((directory/'scene_review.json').read_text()) if (directory/'scene_review.json').is_file() else {}})
+                        'visual_review':json.loads((directory/'scene_review.json').read_text(encoding='utf-8')) if (directory/'scene_review.json').is_file() else {}})
                     save(status_file, record)
             if record['state'] == 'needs_repair':
                 if record['attempt'] >= 2:
