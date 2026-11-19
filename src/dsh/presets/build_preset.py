@@ -122,8 +122,13 @@ def model_patches(config_path):
         provider['apiKeyEnv'] = model['token_env']
     if model.get('compat'):
         provider['compat'] = model['compat']
-    if 'retries' in model:
-        provider['retryPolicy'] = {'mode': 'normal', 'maxRetries': model['retries']}
+    provider['retryPolicy'] = {
+        'mode': 'normal',
+        'maxRetries': model.get('retries', 2),
+        'retryableCodes': [
+            'EMPTY_RESPONSE', 'MALFORMED_RESPONSE', 'RATE_LIMIT', 'SERVER', 'TIMEOUT', 'TRANSPORT',
+        ],
+    }
     selection = {'provider': 'benchforge-models', 'model': model['model']}
     if model.get('reasoning_effort'):
         selection['reasoningEffort'] = model['reasoning_effort']
