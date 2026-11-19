@@ -1,6 +1,6 @@
 # 工具参数与调用示例
 
-本文件说明 `benchforge_isaac_sim` 的使用合同。所有调用都带当前会话的 `workspace`；下例的尖括号占位符必须替换成当前上下文或工具真实返回值。
+本文件说明 `benchforge_isaac_sim` 的使用合同。Host 自动绑定当前会话的工作区与访问身份，模型无需填写 `workspace` 或认证 token；下例的尖括号占位符仅替换为工具真实返回值。
 
 ## 动作
 
@@ -23,19 +23,19 @@
 ## 能力与产品入口
 
 ```json
-{"workspace":"<当前工作区>","action":"guide"}
+{"action":"guide"}
 ```
 
 下面读取的是能力名。如果在线列表没有它，选择任务所需的实际能力，不能臆造名称：
 
 ```json
-{"workspace":"<当前工作区>","action":"guide","operation":"extension.asset.import"}
+{"action":"guide","operation":"extension.asset.import"}
 ```
 
 产品目录先通过 `catalog` 获取；`feature_id` 是该目录的真实 ID：
 
 ```json
-{"workspace":"<当前工作区>","action":"guide","feature_id":"<目录返回的功能ID>"}
+{"action":"guide","feature_id":"<目录返回的功能ID>"}
 ```
 
 `guide` 的默认 `result.live.operations` 是摘要；选中 `operation` 后才包含对应能力的完整 `details.parameter_schema`。选中 `feature_id` 后，`result.live.features` 包含完整功能。细节不在摘要中不等于功能缺失。
@@ -45,14 +45,13 @@
 先在当前工作区准备真实 USD 文件，并核对服务支持下述导入操作。
 
 ```json
-{"workspace":"<当前工作区>","action":"upload","source_path":"tasks/example/work/scene.usda"}
+{"action":"upload","source_path":"tasks/example/work/scene.usda"}
 ```
 
 使用上传返回的 `asset.asset_id` / `asset.relative_path`：
 
 ```json
 {
-  "workspace":"<当前工作区>",
   "action":"submit",
   "request_id":"<为本次导入保存的稳定身份>",
   "request":{
@@ -70,7 +69,7 @@
 `submit.request` 只选择一个原生任务字段。例如原生 `snapshot` 任务用 `{"snapshot":{}}`；扩展任务用上述 `extension` 结构。具体任务及字段均以在线合同为准。
 
 ```json
-{"workspace":"<当前工作区>","action":"wait","job_id":"<job.job_id>","timeout_seconds":30}
+{"action":"wait","job_id":"<job.job_id>","timeout_seconds":30}
 ```
 
 只有成功导入后，才使用其 `job.result` 中真实返回的场景 `session_id` 进行后续操作。不同操作的结果形状可能不同，不猜嵌套路径。
@@ -78,7 +77,7 @@
 产生图像或导出文件的作业成功后下载：
 
 ```json
-{"workspace":"<当前工作区>","action":"download","job_id":"<成功采集或导出作业的job_id>"}
+{"action":"download","job_id":"<成功采集或导出作业的job_id>"}
 ```
 
 下载只能访问该作业清单中的产物。后续读取和展示使用返回的 `source_path` 与 `artifacts`，不要拼接远端文件系统路径。`operation_id` 是一次 BenchForge 工具调用，`job_id` 是原生作业，`session_id` 是仿真场景；三者不能互换。
@@ -87,7 +86,6 @@
 
 ```json
 {
-  "workspace":"<当前工作区>",
   "action":"invoke",
   "feature_id":"<目录返回的功能ID>",
   "request_id":"<为这组参数保存的稳定身份>",

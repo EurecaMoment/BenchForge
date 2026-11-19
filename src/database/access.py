@@ -4,9 +4,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 import re
 
-from sqlalchemy import text
-
-
 def identifier(value, label="identity"):
     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", value):
         raise ValueError(f"Invalid {label}")
@@ -38,6 +35,7 @@ class AccessScope:
 
 def assert_reader_role(connection):
     """A query connection must not own tables, bypass RLS, or write them."""
+    from sqlalchemy import text
     unsafe = connection.execute(text("""
         SELECT r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication
         OR has_schema_privilege(current_user,current_schema(),'CREATE')
@@ -55,6 +53,7 @@ def assert_reader_role(connection):
 
 
 def set_scope(connection, scope):
+    from sqlalchemy import text
     if not isinstance(scope, AccessScope):
         raise TypeError("A Host-resolved AccessScope is required")
     for name in ("host_id", "session_id", "workspace_id", "owner_id", "root_generation", "policy_epoch", "legacy_namespace"):

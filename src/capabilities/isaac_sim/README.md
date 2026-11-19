@@ -17,10 +17,10 @@ BenchForge capture daemon, device lock, callback endpoint or local Kit runtime i
 | `mesh_materials.py`, `usd_materials.py` | Untextured PBR factors, face materials and USD literals |
 | `native_geometry.py` | Measured bounds and enabled colliders from the simulator's USD export |
 | `scene_requirements.py` | Adapter capability validation before queue admission |
+| `capture_contract.py` | Compare actual import/edit request fields with live operation schemas before upload |
 | `capture_stage.py` | Import, simulate, inspect, capture and publish |
 | `evidence.py` | Native artifact and annotation conversion |
 | `recovery.py` | Explicit resume or new-attempt policy |
-| `capture_requests/` | SceneProgram request validation |
 
 Set `providers.IsaacSim4A100.grpc` in `config/benchforge.local.json`, then
 run `python benchforge_app.py sync` and the usual backend/DSH launch scripts.
@@ -28,6 +28,12 @@ Configuration version 4 migrates once to version 5, preserving model settings
 and backing up retired settings. On first backend start, the old queue is
 backed up and unfinished old-protocol captures require an explicit retry.
 That retry creates a new scene revision and leaves previous capture paths intact.
+
+The unused local Kit collector (`data_acquisition/collectors/isaac.py`) and legacy
+`capture_requests/` recorder helpers have been removed. Repository references and
+the maintained deployment launchers used neither path. External scripts that
+previously imported those paths must use the public gRPC capture entry points;
+historical implementations remain recoverable from Git.
 
 Start with `benchforge_isaac_sim({"action":"guide"})`; use
 `{"action":"guide","operation":"extension.asset.import"}` to read one operation's

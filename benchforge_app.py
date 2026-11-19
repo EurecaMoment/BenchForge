@@ -123,7 +123,7 @@ def _database_command(project, stop):
         # Compose expands its required service environment even for down. The
         # running containers and volumes do not use this interpolation value.
         environment.setdefault('POSTGRES_PASSWORD', 'unused-for-container-stop')
-    command = ['docker', 'compose', '-p', name, '-f', str(SOURCE / 'server/deploy/compose.yml')]
+    command = ['docker', 'compose', '-p', name, '-f', str(ROOT / 'config/compose.yml')]
     command += ['down'] if stop else ['up', '-d', '--wait']
     subprocess.run(command, env=environment, check=True)
 

@@ -4,7 +4,7 @@ from collections import Counter
 from collections import defaultdict
 from pathlib import Path
 from capabilities.evaluation.spatial.scoring import score
-from capabilities.dataset_authoring.spatial.generation import write_json
+from storage.json_io import write_json
 from capabilities.dataset_authoring.spatial.environments import environment
 
 

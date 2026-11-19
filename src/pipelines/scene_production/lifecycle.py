@@ -7,6 +7,9 @@ from capabilities.scene_authoring.program_submission import submission_identity
 from capabilities.scene_authoring.validation.acceptance import admit_program, require_accepted
 from capabilities.scene_authoring.validation.policy import policy_for, check_references
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
+from pipelines.scene_production.service_failures import (
+    is_service_failure, verify_capture_service_recovery,
+)
 
 
 class SceneLifecycle:
@@ -67,6 +70,13 @@ class SceneLifecycle:
     def retry(self, task, feedback, capture_mode, directory_for):
         tid = task["id"]
         recovery_id = None
+        service_recovery = is_service_failure(task.get('failure') or {})
+        settings_changed = False
+        if service_recovery:
+            if task['unit']['phase'] != 'capture' or feedback is not None:
+                raise ValueError('Resolve the service contract and recheck the saved capture; scene repair feedback cannot fix this failure')
+            settings_changed = verify_capture_service_recovery(
+                task, directory_for(tid, task['unit']['revision']))
         if policy_for(self.root) and task["unit"].get("workflow", "scene") == "scene":
             from capabilities.scene_authoring.contracts.scene_design import capture_retry_directory
             from capabilities.scene_authoring.contracts.scene_design import review_retry_directory
@@ -75,7 +85,7 @@ class SceneLifecycle:
             capture_failure = (
                 task["unit"]["phase"] == "capture"
                 and (task.get("failure") or {}).get("stage")
-                in {"capture_transport", "capture_execution"}
+                in {"capture_transport", "capture_execution", "capture_service_contract"}
                 and feedback is None
             )
             review_failure = (
@@ -128,7 +138,7 @@ class SceneLifecycle:
         if capture_mode != "auto" and not (
             phase == "capture"
             and (task.get("failure") or {}).get("stage")
-            in {"capture_transport", "capture_execution"}
+            in {"capture_transport", "capture_execution", "capture_service_contract"}
         ):
             raise ValueError("capture_mode applies only to capture execution/transport failures")
         if recovery_id:
@@ -142,13 +152,14 @@ class SceneLifecycle:
         if phase == "capture" and (task.get("failure") or {}).get("stage") in {
             "capture_transport",
             "capture_execution",
+            "capture_service_contract",
         }:
             from capabilities.isaac_sim.recovery import prepare_retry
 
             unit = prepare_retry(
                 directory_for(tid, unit["revision"]),
                 unit,
-                capture_mode,
+                'restart' if settings_changed else capture_mode,
                 retired_protocol=(task.get("failure") or {}).get("code")
                 == "CAPTURE_PROTOCOL_MIGRATED",
             )

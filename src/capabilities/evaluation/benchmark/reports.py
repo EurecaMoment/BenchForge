@@ -321,7 +321,7 @@ def package(args,directory,config):
     jsonl(pub/'items.jsonl',public);jsonl(private/'items.jsonl',gold)
     shutil.copyfile(Path(__file__),root/'score.py')
     source = Path(__file__).resolve().parents[3]
-    for module in (source/'storage/artifacts.py', source/'service_access/processes.py'):
+    for module in (source/'storage/artifacts.py', source/'storage/json_io.py', source/'service_access/processes.py'):
         shutil.copyfile(module, root/module.name)
     if args.get('bundle'):
         _reproduce_bundle(args['bundle'],root/'reproduce')

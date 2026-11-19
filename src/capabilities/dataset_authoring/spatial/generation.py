@@ -5,6 +5,7 @@ from collections import Counter
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+from storage.json_io import write_json
 from capabilities.task_catalog.spatial import templates
 from capabilities.dataset_authoring.spatial.scenes import create_scene
 from capabilities.dataset_authoring.spatial.scenes import render
@@ -18,10 +19,6 @@ from capabilities.dataset_authoring.spatial.environments import demonstration
 from capabilities.dataset_authoring.spatial.conditions import apply_condition
 
 PARTITIONS=('train','curriculum_dev','selection_dev','sealed_test')
-
-
-def write_json(path,value):
-    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(value,ensure_ascii=False,indent=2),encoding='utf8')
 
 
 def build_task(scene,template):

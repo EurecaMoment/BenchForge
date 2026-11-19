@@ -1,12 +1,11 @@
 """Pipeline authority lives in PostgreSQL; task files are readable projections."""
 
 from pathlib import Path
-import hashlib
 from database.engine import engine_for
 from service_access.access_scope import current_access
-from storage.access_documents import read_document, write_document
+from storage.access_documents import read_document, run_document_key, write_document
 from storage.artifacts import read, write
-from storage.operation_outputs import logical_path, logical_value, physical_value
+from storage.operation_outputs import logical_value, physical_value
 
 
 class RunDocuments:
@@ -14,7 +13,7 @@ class RunDocuments:
         self.root = Path(root).resolve()
         self.access = current_access()
         self.engine = engine_for() if self.access else None
-        self.key = hashlib.sha256(str(logical_path(self.root)).encode()).hexdigest()
+        self.key = run_document_key(self.root)
         self.revisions = {}
 
     def load(self, name, default=None):

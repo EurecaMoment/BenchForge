@@ -19,6 +19,61 @@ from pipelines.scene_production.preflight import inspect_capture_program
 from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, REPAIR_GUIDANCE
 from service_access.configuration import isaac_config
 from service_access.scene_service import ScenePreflightRejected
+from pipelines.scene_production.service_failures import (
+    SERVICE_OWNER, current_capture_settings, failure_issues, is_service_failure,
+    require_live_service, stage_failure,
+)
+
+
+def require_repair_service(report, program, directory):
+    """服务预检阻断时保存原候选并退出，不让模型通过修改几何规避服务问题。"""
+    if not is_service_failure(report):
+        return
+    from capabilities.isaac_sim.scene_requirements import UnsupportedScene
+    path = directory / 'service_blocked_program.json'
+    save(path, program)
+    error = UnsupportedScene('Resolve the configured service before scene repair',
+                             issues=failure_issues(report))
+    error.service_program_path = str(path)
+    raise error
+
+
+def wait_for_service(record, failure, resume_state):
+    """单独保存服务等待状态及恢复位置，保留场景修复次数和原有反馈。"""
+    previous = record.get('failure')
+    record.update(state='waiting_service', service_resume_state=resume_state,
+                  service_previous_failure=previous,
+                  failure=deepcopy(failure) if isinstance(failure, dict)
+                  else stage_failure(failure, 'capture'),
+                  repair_owner=SERVICE_OWNER, retry_unchanged=False)
+    if getattr(failure, 'service_program_path', None):
+        record['service_program_path'] = failure.service_program_path
+    return record
+
+
+def resume_service_wait(record, config, post):
+    """先实时核对原场景或由服务重查原任务，通过后再恢复保存的处理位置。"""
+    target = record['service_resume_state']
+    try:
+        if target == 'capturing':
+            task = post('/inspect', {'run_id': record['run_id']})['tasks'][0]
+            if task['state'] == 'FAILED_FINAL':
+                post('/retry', {'task_id': record['task_id']})
+            elif task['state'] == 'CANCELED':
+                record['state'] = 'failed_final'
+                return True
+        else:
+            path = Path(record.get('service_program_path') or record['program_path'])
+            program = json.loads(path.read_text())
+            settings = current_capture_settings(isaac_config(config))
+            require_live_service(program, settings)
+    except (OSError, ValueError) as error:
+        record['service_recovery_error'] = stage_failure(error, 'capture')
+        return False
+    record.update(state=target, failure=record.pop('service_previous_failure', None))
+    for key in ('service_resume_state', 'repair_owner', 'retry_unchanged', 'service_recovery_error'):
+        record.pop(key, None)
+    return True
 
 
 def author_completion(prompt, directory, images, max_tokens=14000):
@@ -102,6 +157,7 @@ def revise(config, row, folder, attempt=0, feedback=None):
     diagnostic = inspect_capture_program(config['artifacts'], program,
         settings=isaac_config(config), execution_mode=config.get('execution_mode'))
     save(work / 'baseline_preflight.json', diagnostic)
+    require_repair_service(diagnostic, program, work)
     visible_diagnostic = {key: value for key, value in diagnostic.items()
                           if key not in {'geometry_preview', 'checked'}}
     prompt = '''你是场景制作与空间布局修复者。使用所附实际场景图片、原始完整程序、物理/几何反馈，修复真实场景中不合生活常识或物理逻辑的关系，同时保留用途、主要物体和风格。不要泛泛而谈，不准改服务或降低验收标准。
@@ -164,6 +220,7 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
                 settings=isaac_config(config), execution_mode=config.get('execution_mode'),
                 allow_generated=False)
             save(work / ('candidate_preflight_' + str(trial) + '.json'), admission)
+            require_repair_service(admission, candidate, work)
             if not admission['passed']:
                 raise ScenePreflightError(admission)
             save(work / 'program.json', candidate)
@@ -174,7 +231,10 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
                 key='scene-repair:' + row['id'] + ':' + str(attempt), artifact=str(plan_file))
             save(folder / 'status.json', record)
             return record
-        except (ValueError, KeyError, OSError, TypeError) as error:last_error = str(error)
+        except (ValueError, KeyError, OSError, TypeError) as error:
+            if is_service_failure(error):
+                raise
+            last_error = str(error)
     raise ValueError('Candidate still fails authoring admission: ' + str(last_error))
 
 
@@ -203,13 +263,18 @@ def main():
         def plan_one(row):
             folder = root / row['id']
             existing = folder / 'status.json'
-            if existing.is_file() and json.loads(existing.read_text()).get('state') in {'planned','capturing','accepted','needs_repair'}:return
+            if existing.is_file() and json.loads(existing.read_text()).get('state') in {'planned','capturing','accepted','needs_repair','waiting_service'}:return
             try:revise(config, row, folder)
             except Exception as error:
                 # A slow author request must not overwrite a newer saved plan.
                 current=json.loads(existing.read_text()) if existing.is_file() else {}
-                if current.get('state') not in {'planned','capturing','accepted','needs_repair'}:
-                    save(existing, {'state': 'planning_failed', 'source_id': row['id'], 'error': str(error), 'updated_at': time.time()})
+                if current.get('state') not in {'planned','capturing','accepted','needs_repair','waiting_service'}:
+                    if is_service_failure(error):
+                        current.update(source_id=row['id'], name=row['name'], attempt=0,
+                                       pending_repair_attempt=0, updated_at=time.time())
+                        save(existing, wait_for_service(current, error, 'needs_repair'))
+                    else:
+                        save(existing, {'state': 'planning_failed', 'source_id': row['id'], 'error': str(error), 'updated_at': time.time()})
         with ThreadPoolExecutor(max_workers=3) as pool:
             for done in as_completed([pool.submit(plan_one, row) for row in targets]):done.result()
         print(json.dumps({'action': 'plan', 'targets': len(targets)}), flush=True)
@@ -232,7 +297,11 @@ def main():
             except Exception as error:
                 status_file=root/source_id/'status.json';record=json.loads(status_file.read_text())
                 if record.get('state')=='needs_repair':
-                    record.update(state='failed_final',repair_error=str(error));save(status_file,record)
+                    if is_service_failure(error):
+                        wait_for_service(record, error, 'needs_repair')
+                    else:
+                        record.update(state='failed_final',repair_error=str(error))
+                    save(status_file,record)
             repairing.pop(source_id)
         completed = 0
         outstanding=[row for row in targets if (root/row['id']/'status.json').is_file()
@@ -245,6 +314,12 @@ def main():
             record = json.loads(status_file.read_text())
             if record['state'] in {'accepted', 'failed_final', 'planning_failed'}:
                 completed += 1;continue
+            if record['state'] == 'needs_repair' and is_service_failure(record.get('failure') or {}):
+                wait_for_service(record, record['failure'], 'capturing' if record.get('task_id') else 'planned')
+            if record['state'] == 'waiting_service':
+                resume_service_wait(record, config, post)
+                save(status_file, record)
+                continue
             if record['state']=='needs_review_recovery':
                 try:
                     existing=post('/inspect',{'run_id':record['run_id']})['tasks'][0]
@@ -278,7 +353,10 @@ def main():
                     record['submission_transport_error']=str(error);save(status_file,record)
                     break
                 except Exception as error:
-                    record.update(state='needs_repair', failure={'issues':[str(error)]})
+                    if is_service_failure(error):
+                        wait_for_service(record, error, 'planned')
+                    else:
+                        record.update(state='needs_repair', failure={'issues':[str(error)]})
                     save(status_file, record)
             if record['state'] == 'capturing':
                 # One outstanding capture at a time: this loop owns this repair queue.
@@ -312,6 +390,10 @@ def main():
                     failure = json.loads((directory/'scene_acceptance.json').read_text()) if (directory/'scene_acceptance.json').is_file() else task.get('failure')
                     transport_only=(isinstance(failure,dict) and failure.get('stage')=='capture_transport')
                     execution_failure=task.get('failure') or {}
+                    if is_service_failure(execution_failure):
+                        wait_for_service(record, execution_failure, 'capturing')
+                        save(status_file, record)
+                        continue
                     review_transport=(task.get('unit',{}).get('phase')=='review' and execution_failure.get('error') in {'TimeoutError','URLError','ConnectionError','OSError','RemoteDisconnected','ConnectionResetError','ConnectionAbortedError'})
                     if review_transport:failure=execution_failure
                     record.update(state='needs_transport_recovery' if transport_only else 'needs_review_recovery' if review_transport else 'needs_repair', failure={'directory':str(directory),'issues':failure,
@@ -321,7 +403,9 @@ def main():
                 if record['attempt'] >= 2:
                     record['state']='failed_final';save(status_file,record);continue
                 if row['id'] not in repairing:
-                    repairing[row['id']]=repair_pool.submit(revise,config,row,folder,record['attempt']+1,record['failure'])
+                    repair_attempt=record.get('pending_repair_attempt', record['attempt']+1)
+                    record['pending_repair_attempt']=repair_attempt;save(status_file,record)
+                    repairing[row['id']]=repair_pool.submit(revise,config,row,folder,repair_attempt,record['failure'])
         if completed == len(targets):
             save(root/'progress.json', {'state':'finished','targets':len(targets),'updated_at':time.time()})
             break

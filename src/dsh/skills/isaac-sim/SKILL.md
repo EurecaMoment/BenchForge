@@ -11,12 +11,12 @@ description: 通过 BenchForge 已配置的 Isaac Sim 服务查询能力、导�
 
 ## 先发现，再调用
 
-1. 调用 `benchforge_isaac_sim({"workspace":"<当前会话工作区>","action":"guide"})`。`guide` 返回生命周期说明、在线操作摘要与产品域计数，不要求读取整套目录。
+1. 调用 `benchforge_isaac_sim({"action":"guide"})`。`guide` 返回生命周期说明、在线操作摘要与产品域计数，不要求读取整套目录。
 2. 按任务选择操作，再用 `action="guide", operation="<完整能力名>"` 获取其完整范围与参数；按产品功能调用时用 `feature_id` 取得完整功能描述。需要原始列表时用 `capabilities` 或 `catalog`。
 3. 以实时返回的 `availability`、`support`、`reason`、`scope` 和 schema 为准。`AVAILABLE` 说明当前可路由/就绪；`PARTIAL` 和 `UNVERIFIED` 需核对范围；`UNAVAILABLE` 与 `UNSUPPORTED` 不能当作可用承诺。仅有 `{"type":"object"}` 的 schema 没有说明字段，不能据此推导支持或拒绝某字段。
 4. 在当前会话工作区保存输入文件，按已公开的合同提交。批量检查所需参数和能力，一次修正已知输入问题；不要为绕过质量失败而删掉用户要求。
 
-`workspace` 始终使用当前会话绑定的工作区。原样保留返回的 `source_path`、`asset_id`、`relative_path`、`job_id` 和 `session_id`，不要凭记忆重写路径或标识。
+工作区与访问身份由 Host 自动绑定，模型无需传 `workspace` 或认证 token。原样保留返回的 `source_path`、`asset_id`、`relative_path`、`job_id` 和 `session_id`，不要凭记忆重写路径或标识。
 
 SceneProgram 可以直接使用本会话上传的原生资产：对象设为 `kind="native"`，`native_asset` 填入上传返回的 `asset_id`、`relative_path`，以及来源资产的 `size`、`source_up_axis`，按需声明 `fix_base`。不要修改源码中的原生目录、部署配置或服务器全局资产目录。目录中的 `configured` 仅说明有绑定，不代表资源存在、渲染成功或机器人能运动；`unconfigured` 不能当作可直接使用。普通 `mesh_import` 接受 GLB/glTF/OBJ/PLY/STL 静态网格，不能通过转换 USD 来保证关节语义。保留机器人原生表示后，仍须用仿真器实际回执验证关节、控制和采集能力。
 

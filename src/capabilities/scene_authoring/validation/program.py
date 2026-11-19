@@ -220,7 +220,7 @@ def _validate_scene_extensions(p, checks):
     if not isinstance(assets, list):
         assets = []
     asset_ids = set()
-    asset_kinds = {'builtin', 'usd', 'mesh', 'generated', 'diffusion', 'sam3d', 'procedural', 'imported', 'native', 'unknown'} | set(ASSETS)
+    asset_kinds = {'builtin', 'usd', 'mesh', 'generated', 'diffusion', 'trellis', 'sam3d', 'procedural', 'imported', 'native', 'unknown'} | set(ASSETS)
     for index, asset in assets_records:
         with checks.at(f'/assets/{index}'):
             require(isinstance(asset, dict), 'invalid asset record')

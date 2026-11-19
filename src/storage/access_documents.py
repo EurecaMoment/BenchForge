@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from sqlalchemy import func, select
 from database.access import identifier, read_transaction, validate_scope
@@ -12,6 +12,12 @@ from database.transactions import lock_entity
 
 class DocumentConflict(RuntimeError):
     """Another writer changed this document; reload before applying an update."""
+
+
+def run_document_key(root):
+    """用发布后的绝对运行路径生成文档键，执行器与只读查询共享同一身份规则。"""
+    from storage.operation_outputs import logical_path
+    return hashlib.sha256(str(logical_path(Path(root).resolve())).encode()).hexdigest()
 
 
 def _identity(scope, run_id, name):

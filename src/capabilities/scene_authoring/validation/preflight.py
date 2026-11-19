@@ -235,6 +235,11 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
             if not resolved_path.is_relative_to(resolved_assets_root):
                 raise ValueError('asset path escapes registry')
             try:
+                from service_access.access_scope import current_access
+                access = current_access()
+                if access is not None:
+                    from capabilities.asset_generation.asset_access import registered_asset_path
+                    path = registered_asset_path(root, asset_id, 'mesh.json', access=access)
                 value = json.loads(path.read_text(encoding='utf-8'))
                 if not isinstance(value, dict):
                     raise ValueError('mesh record must be an object')

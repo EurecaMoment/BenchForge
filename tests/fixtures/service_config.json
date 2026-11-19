@@ -1,0 +1,54 @@
+[
+  {
+    "name": "explicit-host",
+    "files": {"client.json": {"execution_mode": "exploration", "service_host": "localhost", "port": 4831}},
+    "environment": {},
+    "expected": {"service_url": "http://localhost:4831", "operator_token": "", "execution_mode": "exploration"}
+  },
+  {
+    "name": "environment-address",
+    "files": {"client.json": {"execution_mode": "exploration", "service_url": "http://unused:3841"}},
+    "environment": {"BENCHFORGE_SERVICE_URL": "https://${BF_TEST_HOST}:443/base///", "BF_TEST_HOST": "example.test", "BENCHFORGE_OPERATOR_TOKEN": "fixture-secret"},
+    "expected": {"service_url": "https://example.test:443/base", "operator_token": "fixture-secret", "execution_mode": "exploration"}
+  },
+  {
+    "name": "reference-and-paths",
+    "files": {
+      "client.json": {"service_config": "settings/server.json", "operator_token_env": "BF_TEST_TOKEN"},
+      "settings/server.json": {"execution_mode": "exploration", "port": 4832, "artifacts": "../artifacts", "task_root": "../tasks", "harness": "../harness"}
+    },
+    "environment": {"BF_TEST_TOKEN": "fixture-ref-token"},
+    "expected": {"service_url": "http://127.0.0.1:4832", "operator_token": "fixture-ref-token", "execution_mode": "exploration"},
+    "paths": {"artifacts": "artifacts", "task_root": "tasks", "harness": "harness"}
+  },
+  {
+    "name": "ipv6-host",
+    "files": {"client.json": {"execution_mode": "exploration", "service_host": "::1", "port": 4833}},
+    "environment": {},
+    "expected": {"service_url": "http://[::1]:4833", "operator_token": "", "execution_mode": "exploration"}
+  },
+  {
+    "name": "conflicting-reference",
+    "files": {"client.json": {"service_config": "server.json", "port": 4834}, "server.json": {"execution_mode": "exploration", "port": 4835}},
+    "environment": {},
+    "error": "conflicts with referenced service configuration"
+  },
+  {
+    "name": "missing-environment",
+    "files": {"client.json": {"execution_mode": "exploration", "service_url": "http://${BF_MISSING_HOST}:3841"}},
+    "environment": {},
+    "error": "unset environment variable"
+  },
+  {
+    "name": "non-http-service",
+    "files": {"client.json": {"execution_mode": "exploration", "service_url": "file:///private/server"}},
+    "environment": {},
+    "error": "absolute HTTP or HTTPS URL"
+  },
+  {
+    "name": "fractional-port",
+    "files": {"client.json": {"execution_mode": "exploration", "port": 3841.5}},
+    "environment": {},
+    "error": "port must be"
+  }
+]

@@ -65,3 +65,18 @@ class AccessScopeTests(unittest.TestCase):
             self.assertEqual(request['plan'], 'tasks/plan.json')
             with self.assertRaises(PermissionError):
                 resolve_arguments({'plan': '../outside.json'}, self.root)
+
+    def test_asset_member_name_is_not_resolved_as_a_workspace_file(self):
+        """上传来源绑定本地工作区，资产内部路径和句柄必须原样传递。"""
+        request = {'action': 'upload', 'asset_id': 'owned-asset',
+                   'relative_path': 'meshes/rotor.stl',
+                   'source_path': 'tasks/drone_villa/work/drone/rotor.stl'}
+        for access in (self.access, None):
+            with self.subTest(scoped=access is not None), access_context(access):
+                resolved = resolve_arguments(request, self.root)
+                self.assertEqual(resolved['source_path'], str(self.root / request['source_path']))
+                self.assertEqual(resolved['relative_path'], 'meshes/rotor.stl')
+                self.assertEqual(resolved['asset_id'], 'owned-asset')
+        self.assertEqual(request['source_path'], 'tasks/drone_villa/work/drone/rotor.stl')
+        with access_context(self.access), self.assertRaises(PermissionError):
+            resolve_arguments({**request, 'source_path': '../another-session/rotor.stl'}, self.root)

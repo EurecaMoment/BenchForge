@@ -33,6 +33,13 @@ def usage(capabilities, catalog, *, operation=None, feature_id=None):
             'needs a new request_id. wait never resubmits; cancellation needs service confirmation.',
             'Session identifiers belong to the operation family that created them. Do not reuse an '
             'identifier across unrelated scene/robot/world backends without an explicit service contract.',
+            'In this conversation, host ownership policy also applies: classic global-world operations '
+            'are unavailable through the scoped tool. Use a published retained-session operation; '
+            'adding a session_id to an unrelated global feature does not create an isolated route. '
+            'Asset-only import_robot/convert_asset features do not require a world.',
+            'Refresh discovery after a service change. A sessions.* feature can invoke its published '
+            'task_field; PARTIAL alone does not mean the route is absent. Preserve any extended. '
+            'prefix shown in the live capability name and use a session created in that family.',
             'Keep task code and uploads in this conversation workspace. Use returned source_path, '
             'asset_id, relative_path and job_id verbatim. Stage and quality reviews still apply.',
             'To reuse a USD asset in SceneProgram, upload the workspace file and use kind=native '

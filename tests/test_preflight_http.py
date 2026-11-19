@@ -82,6 +82,14 @@ class PreflightHTTPTests(unittest.TestCase):
                     self.assertEqual(payload['preflight']['issues'], report['issues'])
                     self.assertNotEqual(payload['preflight']['report_path'], report['report_path'])
                     store.submit.assert_not_called()
+                    from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
+                    source.write_text(json.dumps(sample()), encoding='utf-8')
+                    with patch('capabilities.scene_authoring.validation.preflight.preview_scene_geometry',
+                               wraps=preview_scene_geometry) as geometry:
+                        with urlopen(request('/preview'), timeout=10) as response:
+                            preview = json.load(response)
+                    self.assertEqual(geometry.call_count, 1)
+                    self.assertEqual(preview, preview_scene_geometry(sample()))
                 finally:
                     server.shutdown()
                     future.result(timeout=10)

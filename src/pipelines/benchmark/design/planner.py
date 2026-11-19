@@ -29,21 +29,21 @@ from storage.operation_outputs import operation_workspace, logical_path, publish
 
 
 def plan(args, directory, config=None):
+    args, authoring_sources = resolve_request(args, operation_workspace(directory))
     session = args.get('_dsh_context', {}).get('session_id')
     if not session or args.get('validate_only'):
-        return _plan(args, directory, config)
+        return _plan(args, directory, config, authoring_sources)
     # Serialize only saves in this conversation, including activation and gate
     # publication. Parallel conversations and read-only validation remain free.
     lock = operation_workspace(directory) / 'plan-locks' / sha256(session.encode()).hexdigest()
     try:
         with exclusive_run(lock):
-            return _plan(args, directory, config)
+            return _plan(args, directory, config, authoring_sources)
     except RunBusyError as error:
         raise ValueError('Another plan revision is being saved in this conversation. Retry after it finishes.') from error
 
 
-def _plan(args, directory, config=None):
-    args, authoring_sources = resolve_request(args, operation_workspace(directory))
+def _plan(args, directory, config, authoring_sources):
     if type(args.get('new_task', False)) is not bool:
         raise ValueError('new_task must be a boolean')
     catalog = {t['id']: t for t in all_templates()}

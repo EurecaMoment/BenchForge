@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+from storage.json_io import write_json as publish_json
 import re
 import time
 
@@ -55,11 +56,9 @@ def read_json(path, fallback):
 
 
 def write_json(path, value):
-    pending = path.with_suffix('.pending.json')
-    if pending.is_symlink() or path.is_symlink():
+    if path.is_symlink():
         raise LibraryError('Invalid library file', 403)
-    pending.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding='utf-8')
-    pending.replace(path)
+    publish_json(path, value)
 
 
 @contextmanager

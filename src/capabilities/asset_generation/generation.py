@@ -99,16 +99,8 @@ class GenerationTools:
         return records
 
     def asset_path(self, asset_id, filename='asset.json'):
-        if not isinstance(asset_id, str) or not re.fullmatch(r'asset_[a-f0-9]{16}', asset_id):
-            raise ValueError('invalid registered asset ID')
-        if self.access is not None:
-            from capabilities.asset_generation.shared_library import asset_file
-            return asset_file(self.root, self.access, asset_id, filename, engine=self.engine)
-        root = self.assets / asset_id
-        path = (root / filename).resolve()
-        if not _inside(path, root) or not path.is_file():
-            raise ValueError('registered asset file is unavailable')
-        return path
+        from capabilities.asset_generation.asset_access import registered_asset_path
+        return registered_asset_path(self.root, asset_id, filename, access=self.access, engine=self.engine)
 
     def source_path(self, value):
         """Resolve session-relative inputs or explicitly owned service artifacts."""

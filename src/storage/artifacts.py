@@ -6,73 +6,27 @@ coordinate changes to several files and external services.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
-import stat
 import subprocess
 import sys
-import uuid
 
 if __package__:
     from service_access.processes import terminate_process_tree
+    from storage.json_io import atomic_text as atomic_text, write_json, write_jsonl
 else:
     from processes import terminate_process_tree
+    from json_io import atomic_text as atomic_text, write_json, write_jsonl
 
 
 def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
-@contextmanager
-def atomic_text(path):
-    """Publish a complete UTF-8 file, preserving the old file on write failure."""
-    destination = Path(path)
-    if __package__:
-        from service_access.access_scope import current_access
-        access = current_access()
-        if access is not None:
-            from storage.operation_outputs import trusted_output_path
-            candidate = destination if destination.is_absolute() else Path(access.root_path) / destination
-            if candidate.is_relative_to(Path(access.root_path)) and not trusted_output_path(destination):
-                import io
-                from storage.confined_files import open_write
-                with open_write(access.root_path, destination) as binary:
-                    text = io.TextIOWrapper(binary, encoding='utf-8', newline='\n')
-                    try:
-                        yield text
-                        text.flush()
-                    finally:
-                        text.detach()
-                return
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-            if destination.exists():
-                os.chmod(temporary, stat.S_IMODE(destination.stat().st_mode))
-            yield stream
-        os.replace(temporary, destination)
-    finally:
-        temporary.unlink(missing_ok=True)
-
-
-def write_json(path, value):
-    with atomic_text(path) as stream:
-        json.dump(value, stream, ensure_ascii=False, indent=2)
-
-
 def read_jsonl(path):
     with Path(path).open(encoding="utf-8-sig") as stream:
         return [json.loads(line) for line in stream if line.strip()]
-
-
-def write_jsonl(path, values):
-    with atomic_text(path) as stream:
-        for value in values:
-            stream.write(json.dumps(value, ensure_ascii=False) + "\n")
 
 
 read = read_json

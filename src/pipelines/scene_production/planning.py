@@ -139,7 +139,7 @@ def plan_scene(store,task,stop):
     layout_instruction=''
     if layout_image:
         images.append(layout_image)
-        layout_instruction='\nThe LAST attached image is a design/layout reference (not a captured simulator frame). Use its composition and object relationships as design guidance, but derive metric dimensions, supports and executable geometry explicitly. Existing base objects remain immutable for extend; image editing does not override this. Preserve provenance and never use diffusion pixels or predicted geometry as native GT. Missing objects may use kind=generated with a detailed product prompt, reusing the existing diffusion→SAM3→SAM3D asset route; do not replace complex objects with simplistic cubes merely to match the picture.'
+        layout_instruction='\nThe LAST attached image is a design/layout reference (not a captured simulator frame). Use its composition and object relationships as design guidance, but derive metric dimensions, supports and executable geometry explicitly. Existing base objects remain immutable for extend; image editing does not override this. Preserve provenance and never use diffusion pixels or predicted geometry as native GT. Missing objects may use kind=generated with a detailed product prompt, reusing the existing diffusion→SAM3→TRELLIS asset route; do not replace complex objects with simplistic cubes merely to match the picture.'
         prompt+=layout_instruction
         if repair_context is not None:
             repair_context['attachment_manifest'].append({'attachment_index':len(images),'role':'design_reference_only','path':str(layout_image)})

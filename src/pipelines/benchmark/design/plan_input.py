@@ -9,6 +9,7 @@ FIELDS = {
     'steps', 'inputs', 'evidence', 'seed', 'split', 'service_config',
     'applies_edit', 'user_markdown', 'markdown_resolution', 'new_task',
 }
+CONTROL_FIELDS = {'validate_only'}
 
 
 def _document(source, workspace, field):
@@ -35,16 +36,22 @@ def resolve_request(args, workspace):
     sources = {}
     if 'request_path' in request:
         value, sources['request_path'] = _document(request.pop('request_path'), workspace, 'request_path')
-        unknown = set(value) - FIELDS
+        unknown = set(value) - FIELDS - CONTROL_FIELDS
         if unknown:
             raise ValueError('request_path contains unsupported fields: ' + ', '.join(sorted(unknown)))
         inline = set(request) & FIELDS
         if inline:
             raise ValueError('Use request_path or inline plan fields, not both: ' + ', '.join(sorted(inline)))
-        request.update(value)
+        for key in CONTROL_FIELDS:
+            if key in value and type(value[key]) is not bool:
+                raise ValueError(key + ' must be a boolean')
+        request = {**value, **request}
     if 'assessment_path' in request:
         if 'assessment' in request:
             raise ValueError('Use assessment_path or assessment, not both')
         request['assessment'], sources['assessment_path'] = _document(
             request.pop('assessment_path'), workspace, 'assessment_path')
+    for key in CONTROL_FIELDS:
+        if key in request and type(request[key]) is not bool:
+            raise ValueError(key + ' must be a boolean')
     return request, sources

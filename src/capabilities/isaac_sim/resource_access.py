@@ -5,6 +5,8 @@ from database.engine import engine_for
 from service_access.access_scope import current_access
 from storage.access_documents import read_document, write_document, DocumentConflict
 
+_ASSET_FEATURES = frozenset({'assets.import_robot', 'assets.convert_glb', 'robot_types.robot_assets'})
+
 
 class NativeResources:
     def __init__(self, endpoint):
@@ -75,7 +77,8 @@ class NativeResources:
                     raise PermissionError('Native source must use an uploaded asset handle')
         visit(arguments)
         creates = operation.endswith(('asset.import', 'sessions.asset.import', 'world.create', 'scene.create'))
-        if not found_session and not creates and operation != 'asset operation':
+        asset_operation = operation == 'asset operation' or (feature and operation in _ASSET_FEATURES)
+        if not found_session and not creates and not asset_operation:
             raise PermissionError('Native operation requires an owned retained session')
 
     def observe(self, job):

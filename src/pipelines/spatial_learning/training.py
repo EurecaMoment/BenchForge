@@ -15,7 +15,7 @@ from pathlib import Path
 from pipelines.spatial_learning.curriculum import allocate
 from pipelines.spatial_learning.curriculum import update_state
 from capabilities.evaluation.spatial.evaluation import read_rows
-from capabilities.dataset_authoring.spatial.generation import write_json
+from storage.json_io import write_json
 from capabilities.training.solver import TransformersSolver
 from capabilities.evaluation.spatial.scoring import score
 from capabilities.dataset_authoring.spatial.environments import environment

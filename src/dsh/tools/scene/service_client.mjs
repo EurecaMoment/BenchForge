@@ -1,10 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import {createHmac} from 'node:crypto';
 import {currentAccessScope} from '../../access/context.mjs';
 import {HarnessError} from '@deepseek-ai/dsh-llm';
 
 export class ScenePreflightRejected extends HarnessError {
+
   constructor(response, status) {
     super(JSON.stringify(response), 'scene_preflight_failed');
     this.status = status;
@@ -12,9 +14,12 @@ export class ScenePreflightRejected extends HarnessError {
   }
 }
 
+
 function rejectDuplicateObjectKeys(source) {
   let index = 0;
+
   const whitespace = () => { while (/\s/.test(source[index] || '') && index < source.length) index += 1; };
+
   const readString = () => {
     const start = index++;
     while (index < source.length) {
@@ -23,6 +28,7 @@ function rejectDuplicateObjectKeys(source) {
     }
     return '';
   };
+
   const readValue = () => {
     whitespace();
     if (source[index] === '{') {
@@ -62,18 +68,22 @@ function rejectDuplicateObjectKeys(source) {
   readValue();
 }
 
+
 function parseStrictJson(source) {
   rejectDuplicateObjectKeys(source);
   return JSON.parse(source);
 }
 
+
 async function environmentValue(getEnvironmentValue, name) {
+
   const get = async key => {
     const result = getEnvironmentValue ? await getEnvironmentValue(key) : process.env[key];
     return result && typeof result === 'object' && 'value' in result ? result.value : result;
   };
   return get(name);
 }
+
 
 async function expandEnvironment(value, getEnvironmentValue) {
   if (typeof value !== 'string') throw new Error('Configuration path/value must be a string');
@@ -83,21 +93,25 @@ async function expandEnvironment(value, getEnvironmentValue) {
   for (const match of matches) {
     const name = match[1] || match[2] || match[3];
     const replacement = await environmentValue(getEnvironmentValue, name);
-    if (replacement === undefined || replacement === null || replacement === '')
+    if (replacement === undefined || replacement === null)
       throw new Error(`Configuration references unset environment variable ${name}`);
     result = result.replace(match[0], String(replacement));
   }
   return result;
 }
 
+
 async function resolveConfigPath(value, configPath, getEnvironmentValue) {
   const expanded = await expandEnvironment(value, getEnvironmentValue);
-  const resolved = path.resolve(path.dirname(configPath), expanded);
+  const homePath = expanded === '~' ? os.homedir() : expanded.startsWith('~/') || expanded.startsWith('~\\')
+    ? path.join(os.homedir(), expanded.slice(2)) : expanded;
+  const resolved = path.resolve(path.dirname(configPath), homePath);
   return resolved;
 }
 
+
 export async function loadServiceConfig(configFile, {getEnvironmentValue, requireOperatorToken = true} = {}) {
-  let configPath = path.resolve(await expandEnvironment(configFile, getEnvironmentValue));
+  let configPath = await resolveConfigPath(configFile, path.join(process.cwd(), '_config'), getEnvironmentValue);
   let config = parseStrictJson(await fs.readFile(configPath, 'utf8'));
   if (!config || typeof config !== 'object' || Array.isArray(config))
     throw new Error('BenchForge service configuration must be a JSON object');
@@ -126,23 +140,28 @@ export async function loadServiceConfig(configFile, {getEnvironmentValue, requir
 
   const pathFields = [
     ['artifacts', 'BENCHFORGE_ARTIFACTS'],
+    ['harness', 'BENCHFORGE_HARNESS'],
+    ['models_config', 'BENCHFORGE_MODELS_CONFIG'],
     ['task_root', 'BENCHFORGE_TASK_ROOT'],
+    ['scene_policy_path', 'BENCHFORGE_SCENE_POLICY'],
   ];
   for (const [field, envName] of pathFields) {
     const override = await environmentValue(getEnvironmentValue, envName);
-    const value = override || config[field];
-    if (value) config[field] = await resolveConfigPath(String(value), configPath, getEnvironmentValue);
+    const value = override ?? config[field];
+    if (value !== undefined && value !== null)
+      config[field] = await resolveConfigPath(String(value), configPath, getEnvironmentValue);
   }
 
   const urlOverride = await environmentValue(getEnvironmentValue, 'BENCHFORGE_SERVICE_URL');
   const urlValue = urlOverride || config.service_url;
   if (urlValue) {
-    config.service_url = (await expandEnvironment(String(urlValue), getEnvironmentValue)).replace(/\/$/, '');
+    config.service_url = (await expandEnvironment(String(urlValue), getEnvironmentValue)).replace(/\/+$/, '');
   } else {
     const port = Number(config.port ?? 3841);
-    if (!Number.isInteger(port) || port < 1 || port > 65535)
+    if (typeof config.port === 'boolean' || !Number.isInteger(port) || port < 1 || port > 65535)
       throw new Error('port must be between 1 and 65535');
-    const host = await expandEnvironment(String(config.service_host || '127.0.0.1'), getEnvironmentValue);
+    let host = await expandEnvironment(String(config.service_host || '127.0.0.1'), getEnvironmentValue);
+    if (host.includes(':') && !host.startsWith('[')) host = `[${host}]`;
     config.service_url = `http://${host}:${port}`;
   }
 
@@ -150,13 +169,14 @@ export async function loadServiceConfig(configFile, {getEnvironmentValue, requir
   const configuredToken = await environmentValue(getEnvironmentValue, envName);
   const token = config.operator_token_env ? configuredToken : config.operator_token || configuredToken;
   if (requireOperatorToken && !token) throw new Error(`Configure operator_token or set ${envName}`);
-  config.operator_token = token;
+  config.operator_token = token || '';
 
   const service = new URL(config.service_url);
   if (!['http:', 'https:'].includes(service.protocol))
     throw new Error('service_url must be an absolute HTTP or HTTPS URL');
-  return {config, configPath, serviceUrl: config.service_url, operatorToken: token, executionMode};
+  return {config, configPath, serviceUrl: config.service_url, operatorToken: token || '', executionMode};
 }
+
 
 export function signAccessScope(scope, secret, now = Date.now()) {
   const value = {
@@ -169,8 +189,9 @@ export function signAccessScope(scope, secret, now = Date.now()) {
   return encoded + '.' + createHmac('sha256', secret).update(encoded).digest('hex');
 }
 
+
 export function createServiceClient({serviceUrl, operatorToken}) {
-  return async (route, args, signal, {scope = currentAccessScope()} = {}) => {
+  return  async (route, args, signal, {scope = currentAccessScope()} = {}) => {
     const response = await fetch(serviceUrl + route, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + operatorToken,

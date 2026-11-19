@@ -8,6 +8,40 @@ from service_access.access_scope import TrustedAccess, access_context
 
 
 class NativeResourceAccessTests(TestCase):
+    def test_uploaded_asset_features_do_not_require_a_retained_world(self):
+        """资产导入及转换与原生提交遵循同一授权规则，不要求先创建世界。"""
+        access = TrustedAccess(AccessScope('host', 'session', 'workspace', 'owner', 1, 1), '/tmp/workspace')
+        cases = {'assets.import_robot': 'import_robot', 'assets.convert_glb': 'convert_asset',
+                 'robot_types.robot_assets': 'import_robot'}
+        with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'):
+            resources = NativeResources('127.0.0.1:50051')
+            for feature, task in cases.items():
+                request = {'asset_id': 'mine', 'relative_path': 'robot.urdf'}
+                with self.subTest(feature=feature), patch.object(resources, 'require') as require:
+                    resources.check({'feature_id': feature, 'arguments': request}, feature=True)
+                    require.assert_called_once_with('asset', 'mine')
+                    require.reset_mock()
+                    resources.check({task: request})
+                    require.assert_called_once_with('asset', 'mine')
+
+    def test_asset_features_cannot_bypass_ownership_or_service_path_checks(self):
+        """放行资产处理不能赋予其他会话的资产、世界或服务器文件权限。"""
+        access = TrustedAccess(AccessScope('host', 'session', 'workspace', 'owner', 1, 1), '/tmp/workspace')
+        with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'):
+            resources = NativeResources('127.0.0.1:50051')
+            requests = ({'asset_id': 'other'}, {'source_path': '/private/robot.urdf'},
+                        {'source': '/private/robot.urdf'}, {'session_id': 'other'})
+            for feature in ('assets.import_robot', 'assets.convert_glb', 'robot_types.robot_assets'):
+                for request in requests:
+                    with (self.subTest(feature=feature, request=request),
+                          patch.object(resources, 'owns', return_value=False),
+                          self.assertRaises(PermissionError)):
+                        resources.check({'feature_id': feature, 'arguments': request}, feature=True)
+            with self.assertRaises(PermissionError):
+                resources.check({'feature_id': 'scene.capture', 'arguments': {}}, feature=True)
+            with self.assertRaises(PermissionError):
+                resources.check({'extension': {'operation': 'assets.import_robot', 'arguments': {}}})
+
     def test_other_world_is_denied_and_owned_session_is_allowed(self):
         access = TrustedAccess(AccessScope('host','session','workspace','owner',1,1), '/tmp/workspace')
         with access_context(access), patch('capabilities.isaac_sim.resource_access.engine_for'), \

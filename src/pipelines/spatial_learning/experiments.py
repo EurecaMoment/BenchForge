@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from pipelines.spatial_learning.training import run
-from capabilities.dataset_authoring.spatial.generation import write_json
+from storage.json_io import write_json
 from capabilities.evaluation.spatial.evaluation import read_rows
 
 

@@ -54,12 +54,11 @@ def read_program_document(artifact_root, source_path):
         json.dumps(program,allow_nan=False)  # Also rejects exponent overflow such as 1e999.
     except (UnicodeError,ValueError,RecursionError) as exc:raise ValueError('invalid SceneProgram JSON: '+str(exc)[:300]) from exc
     if access is not None:
-        from capabilities.asset_generation.generation import GenerationTools
-        assets = GenerationTools(artifact_root)
+        from capabilities.asset_generation.asset_access import registered_asset_path
         def authorize_assets(value):
             if isinstance(value, dict):
                 if isinstance(value.get('asset_id'), str) and value['asset_id'].startswith('asset_'):
-                    assets.asset_path(value['asset_id'])
+                    registered_asset_path(artifact_root, value['asset_id'], access=access)
                 for key, child in value.items():
                     if key != 'native_asset':
                         authorize_assets(child)
@@ -96,14 +95,14 @@ def inspect_program_submission(artifact_root, source_path, *, execution_mode=Non
 
 
 def read_program_submission(artifact_root, source_path, *, execution_mode=None, policy=None,
-                            inspector=None):
+                            inspector=None, include_preflight=False):
     from capabilities.scene_authoring.validation.preflight import inspect_program, ScenePreflightError
     submission = read_program_document(artifact_root, source_path)
     report = (inspector or inspect_program)(
         artifact_root, submission['program'], execution_mode=execution_mode, policy=policy)
     if not report['passed']:
         raise ScenePreflightError(save_preflight_report(artifact_root, submission, report))
-    return submission
+    return {**submission, 'preflight': report} if include_preflight else submission
 
 
 def handoff_receipt(submission,program,revision):

@@ -12,6 +12,7 @@ from capabilities.asset_generation.generation import GenerationTools
 from capabilities.asset_generation.generation import ResourceWait
 from service_access.request_context import RunCancelled
 from storage.scene_jobs.store import uid
+from pipelines.scene_production.service_failures import stage_failure
 
 
 class _StageStore:
@@ -236,9 +237,7 @@ def coordinate(
                     stage_store.update(
                         claimed_task['id'],
                         state='FAILED_FINAL',
-                        failure={'error': type(exc).__name__, 'detail': str(exc)[:1000],
-                                 **({'stage': 'capture_execution', 'native_receipts_retained': True}
-                                    if claimed_task['unit'].get('phase') == 'capture' else {})},
+                        failure=stage_failure(exc, claimed_task['unit'].get('phase')),
                     )
         finally:
             lease_stop.set()

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from storage.artifacts import read_jsonl as read_rows
 from capabilities.dataset_authoring.spatial.generation import PARTITIONS
-from capabilities.dataset_authoring.spatial.generation import write_json
+from storage.json_io import write_json
 
 
 def export(args,directory,config=None):

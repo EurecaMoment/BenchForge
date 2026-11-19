@@ -9,6 +9,7 @@ from capabilities.asset_generation.generation import GenerationTools
 from capabilities.asset_generation.generation import generation_defaults
 from capabilities.asset_generation.generation import _file_record
 from service_access.progress import record_progress
+from service_access.request_context import RunContext
 
 
 def default_layout(intent):
@@ -127,7 +128,7 @@ def require_prior_reference(store, intent, parent_directory=None):
 
 
 def start_design_request(store, value):
-    if not isinstance(value, dict) or set(value) - {'request_key', 'name', 'description', 'layout'}:
+    if not isinstance(value, dict) or set(value) - {'request_key', 'name', 'description', 'layout', 'context'}:
         raise ValueError('layout request fields: request_key, name, description, optional layout')
     for key, limit in (('request_key', 200), ('name', 200), ('description', 12000)):
         if not isinstance(value.get(key), str) or not 1 <= len(value[key]) <= limit:
@@ -136,7 +137,9 @@ def start_design_request(store, value):
     if 'source_view' in layout or (layout['mode'] != 'generate' and not layout.get('source_image')):
         raise ValueError('standalone edit/reference needs source_image; copy a prior PNG with evidence and workspace_id')
     intent = {'name': value['name'], 'description': value['description'], 'layout': layout}
-    return {'run_id': store.submit(value['request_key'], [intent], 'layout'), 'state': 'accepted',
+    context = RunContext.from_request(value.get('context'))
+    kwargs = {'context': context} if context is not None else {}
+    return {'run_id': store.submit(value['request_key'], [intent], 'layout', **kwargs), 'state': 'accepted',
             'workflow': 'layout', 'next_action': 'wait_then_inspect_design', 'gt_source': False}
 
 

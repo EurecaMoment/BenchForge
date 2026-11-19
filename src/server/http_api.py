@@ -247,13 +247,11 @@ def main():
                 elif self.path=='/capture':
                     self.reply(start_capture_request(store,value,settings=capture_settings))
                 elif self.path=='/preview':
-                    from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
                     from capabilities.isaac_sim.scene_requirements import validate_native_references
-                    program=read_program_submission(store.root,value['scene_program_path'],policy={})['program']
-                    validate_native_references(program,capture_settings)
-                    def mesh(asset_id):
-                        return json.loads(GenerationTools(store.root).asset_path(asset_id,'mesh.json').read_text())
-                    self.reply(preview_scene_geometry(program,mesh_loader=mesh))
+                    submission=read_program_submission(store.root,value['scene_program_path'],
+                                                       policy={},include_preflight=True)
+                    validate_native_references(submission['program'],capture_settings)
+                    self.reply(submission['preflight']['geometry_preview'])
                 elif self.path == '/scene-preflight':
                     self.reply(inspect_capture_submission(
                         store.root, value['scene_program_path'], execution_mode=value.get('execution_mode'),

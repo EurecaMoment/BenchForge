@@ -131,7 +131,7 @@ export const schemas = {
   "pipeline_plan": {
     "request_path": {
       "type": "string",
-      "description": "JSON request file relative to workspace or absolute. Preferred for large plans and edits: save once, submit its path. File cannot be combined with inline plan fields; host session context is preserved."
+      "description": "JSON request file relative to workspace or absolute. Preferred for large plans and edits: save once, submit its path. File cannot be combined with inline plan fields. validate_only may be stored in the file; an explicit tool argument overrides it. Host session context is preserved."
     },
     "assessment_path": {
       "type": "string",
@@ -139,7 +139,7 @@ export const schemas = {
     },
     "validate_only": {
       "type": "boolean",
-      "description": "Check the saved plan without saving a production plan or opening S1. Returns all correction issues; edit only those fields in the same file, then submit with false."
+      "description": "Check the saved plan without saving a production plan or opening S1. May be stored in request_path; an explicit tool argument takes precedence. Returns all correction issues; edit only those fields in the same file, then submit with false."
     },
     "new_task": {
       "type": "boolean",

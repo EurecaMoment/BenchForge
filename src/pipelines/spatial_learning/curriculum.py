@@ -6,7 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from capabilities.task_catalog.spatial import graph
 from capabilities.task_catalog.spatial import templates
-from capabilities.dataset_authoring.spatial.generation import write_json
+from storage.json_io import write_json
 
 DEFAULTS={'promotion_success':.9,'joint_success':.8,'parse_rate':.99,'retention_drop':.03,
           'promotion_windows':2,'min_scenes':20,'min_samples':100,'coverage_floor':.1,'retention_fraction':.25,

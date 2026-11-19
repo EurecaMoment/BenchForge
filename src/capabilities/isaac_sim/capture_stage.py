@@ -7,14 +7,17 @@ import shutil
 import uuid
 
 from capabilities.capture.capture_scope import capture_scope
-from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
+from capabilities.isaac_sim.authoring import compile_scene
 from capabilities.isaac_sim.evidence import measured_entities, physics_summary, resolve_artifact, save_frame
 from capabilities.isaac_sim.native_geometry import exported_entities
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
+from capabilities.isaac_sim.capture_contract import (
+    capture_capabilities, capture_service_client, native_edit_arguments, native_import_arguments, require_capture_service,
+)
 from capabilities.scene_authoring.catalog.native_reference import native_references
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
-from capabilities.isaac_sim.grpc.transport import A100Client, document
+from capabilities.isaac_sim.grpc.transport import document
 from service_access.configuration import isaac_config
 from service_access.progress import record_progress
 from service_access.request_context import check_cancelled
@@ -55,20 +58,12 @@ def _inspect(requests, identity):
 def _native_imports(requests, identity, compiled):
     for index, item in enumerate(compiled['imports']):
         obj = item['object']
-        binding = item['source']
-        _, imported = requests.extension(f'asset-{index}', 'asset.import', {
-            'session_id': identity, 'path': item['path'],
-            'source': {key: binding[key] for key in ('asset_id', 'relative_path')},
-            'fix_base': binding.get('fix_base', not obj['dynamic']),
-            'mass_kg': obj['mass_kg'], 'physics': obj.get('physics', {}),
-            'source_up_axis': item['catalog'].get('source_up_axis', 'Z')})
+        _, imported = requests.extension(f'asset-{index}', 'asset.import',
+                                         native_import_arguments(item, identity))
         # Admission checks either a configured source or an owned upload handle.
         scale = [obj['size'][i] / item['catalog']['size'][i] for i in range(3)]
-        changes = [{'op': 'transform', 'path': item['path'], 'translation': item['center'],
-                    'rotation_deg': [0, 0, obj.get('yaw_deg', 0)], 'scale': scale},
-                   {'op': 'set', 'path': item['path'], 'attribute': 'a100sim:semanticLabel',
-                    'type': 'string', 'value': obj['label']}]
-        requests.extension(f'asset-pose-{index}', 'scene.edit', {'session_id': identity, 'changes': changes})
+        requests.extension(f'asset-pose-{index}', 'scene.edit',
+            native_edit_arguments(obj, item['path'], identity, center=item['center'], scale=scale))
         compiled['entities'][obj['id']]['articulation_roots'] = imported.get('articulation_roots', [])
 
 
@@ -113,22 +108,14 @@ def execute_capture(store, task, stop, *, config, client=None):
         source = attempt / 'scene.usda'
         source.write_text(compiled['usd'], encoding='utf-8')
         own_client = client is None
-        client = client or A100Client(config)
+        client = client or capture_service_client(config)
         requests = DurableTasks(client, attempt / 'jobs', token, stop=stop,
             on_status=lambda job: record_progress(directory, 'isaac_sim_capture',
                 job_id=job.job_id, operation=job.operation, remote_state=document(job)['state'],
                 receipt=str(attempt / 'jobs')))
         try:
-            capability = document(client.call('GetCapabilities'))
-            required = {'extension.asset.import', 'extension.physics.step',
-                        'extension.scene.inspect', 'extension.scene.capture', 'extension.world.observe'}
-            if compiled['imports'] or scope['scene_export_requested']:
-                required.add('extension.scene.export')
-            if compiled['imports']:
-                required.add('extension.scene.edit')
-            available = {item['name'] for item in capability['capabilities'] if item['availability'] == 'AVAILABLE'}
-            if missing := required - available:
-                raise UnsupportedScene('Isaac Sim service lacks required operations: ' + ', '.join(sorted(missing)))
+            capability = capture_capabilities(client)
+            require_capture_service(capability, compiled, scope)
             source_ref = _asset(client, source, attempt)
             _, imported = requests.extension('import', 'asset.import', {'source': source_ref, 'path': '/World/Scene'})
             identity = imported['session_id']
