@@ -71,7 +71,17 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     if(!view.active || agent.session.header?.origin==='subagent')return;
     return serialized(agent.id,async()=>{
       const prior=table.get(agent.id);
-      const current=view.review ? await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal) : null;
+      let current=null;
+      if(view.review) {
+        try {
+          current=await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal);
+        } catch(error) {
+          signal.throwIfAborted();
+          if(error.code!=='BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE' && error.name!=='TimeoutError')throw error;
+          // 观察失败不覆盖审核记录，工具准入仍独立核对后端。
+          return {reviewUnavailable:true};
+        }
+      }
       signal?.throwIfAborted();
       const review=reviewSnapshot(current,view.review) || view.review;
       const key=review ? `${agent.id}:${review.review_id}` : '';
@@ -153,6 +163,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     if(decision.kind!=='enter')return decision;
     const view=viewOf(agent);
     const observed=await observe(agent,signal);
+    if(observed?.reviewUnavailable)return decision;
     if(view.active&&view.workflowTurn===view.turn&&agent.status==='running') {
       const previous=reminders.get(agent.id);
       const silent=now()-view.lastTextAt>=60000;
@@ -184,9 +195,18 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const state=projection.stateOf(agent.session);
     let view=state.view;
     if(!view.active||view.workflowTurn!==view.turn)return;
-    await observe(agent,signal);
-    const review=view.review?await waitWithSignal(readReview(view.workspace,agent.id,view.review.review_id,now(),signal),signal):null;
+    const observed=await observe(agent,signal);
     signal?.throwIfAborted();
+    if(observed?.reviewUnavailable) {
+      const key=`${agent.id}:${turn}:review-unavailable`;
+      const last=reminders.get(agent.id);
+      if(last?.unavailable!==key && !state.notices.includes(key)) {
+        reminders.set(agent.id,{...last,unavailable:key});
+        agent.steer(notice('benchforge/production-continue',key,'阶段审核服务暂时无法读取。报告已保存的进展和阻塞；恢复后读取原审核，再继续依赖该审核的生产。'));
+      }
+      return;
+    }
+    const review=observed?.reviewReceipt;
     view={...view,...reviewChanges(view,reviewNotice(review,view.review))};
     const waiting=review&&['waiting_user','paused','needs_input','check_failed'].includes(review.state);
     const blocked=['needs_input','needs_evidence','needs_plan_revision','blocked','failed','paused'].includes(view.state);

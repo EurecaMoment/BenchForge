@@ -4,6 +4,18 @@ import {setImmediate as nextTick} from 'node:timers/promises';
 import {createStageReviewReader} from './reviews.mjs';
 import {createReviewPolicy} from './review_policy.mjs';
 
+test('a refused review connection recovers and a newly paused review still blocks production',async()=>{
+  let calls=0;
+  const reader=createStageReviewReader({service:async()=>{
+    if(++calls===1)throw new TypeError('fetch failed',{cause:Object.assign(new Error(),{code:'ECONNREFUSED'})});
+    return {review_id:3,state:'paused',stage:'S2'};
+  }});
+  const policy=createReviewPolicy({readReview:reader.latest});
+  const denial=await policy({name:'bash',agent:{id:'s',session:{header:{cwd:'/workspace'}}}});
+  assert.equal(calls,2);
+  assert.equal(denial.info.code,'STAGE_REVIEW_PENDING');
+});
+
 test('each dispatch sees committed backend state, without caching prior approval',/** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：each dispatch sees committed backend state, without caching prior approval。 */ async()=>{
   const requests=[];let state='continued';
   const reader=createStageReviewReader({/** 提供用例控制的服务响应，覆盖正常返回、超时和取消等读取边界。 */ service:async(route,args)=>{

@@ -1,4 +1,5 @@
 import Schema from '@deepseek-ai/schemastery';
+import {setTimeout as delay} from 'node:timers/promises';
 import {HarnessError} from '@deepseek-ai/dsh-error';
 import {createServiceClient, loadServiceConfig} from '../tools/scene/service_client.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
@@ -21,9 +22,19 @@ export function createStageReviewReader({productionConfig, reviewReadTimeoutMs=1
       if (!client) client=service ? Promise.resolve(service) : loadServiceConfig(productionConfig, {getEnvironmentValue})
         .then(createServiceClient).catch(error=>{client=undefined;throw error;});
       const request=await waitWithSignal(client,signal);
-      const value=await waitWithSignal(request('/stage-review/read', {
-        workspace, session:sessionId, ...(reviewId===undefined?{}:{review_id:reviewId}),
-      },signal),signal);
+      const args={workspace, session:sessionId, ...(reviewId===undefined?{}:{review_id:reviewId})};
+      let value;
+      for (let backoff=200;;backoff=Math.min(1500,backoff*2)) {
+        try {
+          value=await waitWithSignal(request('/stage-review/read',args,signal),signal);
+          break;
+        } catch (error) {
+          signal.throwIfAborted();
+          if (!['ECONNREFUSED','ECONNRESET','UND_ERR_SOCKET'].includes(error.cause?.code ?? error.code)
+              && ![502,503,504].includes(error.status)) throw error;
+          await delay(backoff,undefined,{signal});
+        }
+      }
       signal.throwIfAborted();
       if (value?.state==='none') return null;
       if (!value || typeof value.state!=='string' || !Number.isInteger(value.review_id))
@@ -31,7 +42,7 @@ export function createStageReviewReader({productionConfig, reviewReadTimeoutMs=1
       return value;
     } catch(error) {
       signal.throwIfAborted();
-      throw new HarnessError('The stage review could not be read from PostgreSQL. Production remains stopped until the backend is available.',
+      throw new HarnessError('The BenchForge backend could not return the current stage review.',
         'BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE',{cause:error});
     }
   }

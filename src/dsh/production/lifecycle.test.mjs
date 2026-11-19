@@ -36,7 +36,10 @@ function harness() {
     /** 恢复测试 Agent 的驻留状态，并累计宿主恢复次数。 */
     restoreAgent:async()=>{restored++;live=true;return agent;},
     /** 根据可控时钟返回复核等待或已到期状态。 */
-    readReview:async()=>({...review,state:review.state==='waiting_user'&&clock>=400000?'elapsed':review.state}),
+    readReview:async()=>{
+      if(review instanceof Error)throw review;
+      return {...review,state:review.state==='waiting_user'&&clock>=400000?'elapsed':review.state};
+    },
     /** 保留测试消息结构，便于断言实际投递内容。 */
     createMessage:value=>value,/** 返回夹具当前毫秒时钟，避免测试依赖真实时间。 */ now:()=>clock,/** 记录待执行定时任务和延迟，供测试按需触发。 */ schedule:(fn,ms)=>{timers.push({fn,ms});return timers.length;},/** 测试调度器的移除接口由用例显式控制，无需真实计时器。 */ unschedule:()=>{}});
   /** 按标准工具调用与结果事件写入业务回执，驱动真实生产投影。 */
@@ -63,6 +66,23 @@ function harness() {
     /** 将 Agent 标为非驻留，模拟宿主重载后需要恢复会话。 */
     cold:()=>live=false,/** 返回 Agent 恢复次数，供断言后台协调是否重复恢复。 */ restores:()=>restored};
 }
+
+test('review outages preserve the turn and review record, then recover on the next step',async()=>{
+  const h=harness(),runtime=h.create();
+  h.plan();
+  await h.preStep(runtime);
+  const before=h.records.get(h.agent.id);
+  h.setReview(Object.assign(new Error('backend unavailable'),{code:'BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE'}));
+  assert.equal((await h.preStep(runtime)).kind,'enter');
+  await runtime.stopping({agent:h.agent,turn:1});
+  await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.filter(message=>message.source?.noticeKey?.endsWith(':review-unavailable')).length,1);
+  assert.equal(h.records.get(h.agent.id),before);
+  h.setReview({review_id:1,state:'paused',stage:'S1',deadline:500});
+  await h.preStep(runtime);
+  assert.equal(h.records.get(h.agent.id).review.state,'paused');
+  await runtime.dispose();
+});
 
 test('restored production notices adopt migrated review IDs without rewriting session events', /** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：restored production notices adopt migrated review IDs without rewriting session events。 */ async () => {
   const h = harness(), runtime = h.create();
