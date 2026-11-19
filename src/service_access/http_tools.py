@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import time
 from urllib.error import HTTPError
+from urllib.error import URLError
 from urllib.parse import quote
 from urllib.parse import urljoin
 from urllib.parse import urlsplit
@@ -99,6 +100,10 @@ class ModelClient:
             if exc.code in (429, 503):
                 raise ResourceWait(message) from None
             raise RuntimeError(message) from None
+        except URLError as exc:
+            if isinstance(exc.reason, TimeoutError):
+                raise exc.reason from exc
+            raise
 
     # 调用模型接口并解析 JSON 响应，可单独覆盖此次请求超时。
     def _json(self, path, method='GET', body=None, *, timeout=None):
@@ -214,6 +219,8 @@ class ModelClient:
             target = output / filename
             saved = json.loads(receipt.read_text(encoding='utf-8')) if receipt.is_file() else {}
             job_id = saved.get('id')
+            if not job_id and saved.get('state') == 'submission_unknown':
+                raise RuntimeError(saved['detail'])
             if not job_id or saved.get('state') in {'failed', 'cancelled'}:
                 with Image.open(item['image']) as image, Image.open(item['mask']) as mask:
                     if image.size != mask.size:
@@ -224,7 +231,13 @@ class ModelClient:
                 payload = {**self.defaults, 'model': self.model, 'image': _png_data_url(reference),
                            'mask': _png_data_url(selection), 'seed': item['seed'], 'wait': False,
                            'timeout_seconds': self.timeout, 'response_format': 'url'}
-                job_id = self._json('objects/generations', 'POST', payload, timeout=30)['id']
+                try:
+                    job_id = self._json('objects/generations', 'POST', payload)['id']
+                except TimeoutError as exc:
+                    detail = (f'FastTrellis2 submission timed out for {object_id} before a job ID was received. '
+                              'Acceptance is unknown. Reconcile the provider job before resubmitting.')
+                    write_json(receipt, {'state': 'submission_unknown', 'detail': detail})
+                    raise RuntimeError(detail) from exc
                 write_json(receipt, {'id': job_id})
                 saved = {}
             if saved.get('state') != 'completed' or not target.is_file():
@@ -236,8 +249,19 @@ class ModelClient:
     # 轮询网格生成任务直到完成、失败或取消，下载结果并更新持久回执。
     def _collect_mesh(self, job_id, receipt, target, stop):
         route = f'objects/generations/{quote(job_id, safe="")}'
+        # 状态查询可以安全重试，给连续失联单独计时，正常运行的任务不消耗这段预算。
+        deadline = time.monotonic() + self.timeout
         while not stop.is_set():
-            job = self._json(route, timeout=30)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(f'FastTrellis2 status unavailable for job {job_id} after '
+                                   f'{self.timeout}s. Its receipt is retained for resuming.')
+            try:
+                job = self._json(route, timeout=min(120, remaining))
+            except TimeoutError:
+                time.sleep(min(2, max(0, deadline - time.monotonic())))
+                continue
+            deadline = time.monotonic() + self.timeout
             state = job['status']
             if state == 'completed':
                 file_id = quote(job['data'][0]['file_id'], safe='')
