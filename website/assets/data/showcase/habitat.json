@@ -1,0 +1,380 @@
+{
+  "dataset": "habitat",
+  "suite": "SpatialHome-Nav",
+  "source": "Habitat",
+  "examples": [
+    {
+      "id": "apartment_1_HAB_C05_Q01_LARGEST_STEP_0000",
+      "capability_en": "Trajectory segment comparison",
+      "question_type": "multi_view_choice",
+      "question_type_en": "Multi-view choice",
+      "difficulty": "hard",
+      "question_original": "比较 T1→T2、T2→T3、T3→T4，哪一步在俯视图上最长？",
+      "question_en": "Compare T1→T2, T2→T3, and T3→T4. Which segment is longest in the top-down view?",
+      "choices_original": [
+        "A. T3→T4",
+        "B. T1→T2",
+        "C. T2→T3"
+      ],
+      "choices_en": [
+        "A. T3→T4",
+        "B. T1→T2",
+        "C. T2→T3"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. T2→T3",
+      "answer_display_en": "C. T2→T3",
+      "images": [
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q01_LARGEST_STEP_0000_1.webp",
+          "label": "Trajectory and observation overlay",
+          "width": 918,
+          "height": 446,
+          "source_relative_path": "assets/overlays/apartment_1_HAB_C05_Q01_LARGEST_STEP_0000.jpg"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q01_LARGEST_STEP_0000_2.webp",
+          "label": "Observation frame T1",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00081.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q01_LARGEST_STEP_0000_3.webp",
+          "label": "Observation frame T2",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00082.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q01_LARGEST_STEP_0000_4.webp",
+          "label": "Observation frame T3",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00083.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q01_LARGEST_STEP_0000_5.webp",
+          "label": "Observation frame T4",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00084.png"
+        }
+      ],
+      "selection_note_en": "Compares successive camera-motion segments against a labeled top-down path; the winning segment is visibly separated in length.",
+      "provenance": {
+        "dataset": "habitat",
+        "record_id": "apartment_1_HAB_C05_Q01_LARGEST_STEP_0000",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "HAB_C05",
+      "capability": "相机平面轨迹"
+    },
+    {
+      "id": "apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036",
+      "capability_en": "Trajectory distance ordering",
+      "question_type": "ordered_list",
+      "question_type_en": "Ordered list",
+      "difficulty": "hard",
+      "question_original": "以后续采集点到 T1 的平面距离为准，给出由近到远的顺序。",
+      "question_en": "Using planar distance from T1 to the later capture points, order them from nearest to farthest.",
+      "choices_original": [
+        "A. 时刻 T2",
+        "B. 时刻 T4",
+        "C. 时刻 T3"
+      ],
+      "choices_en": [
+        "A. Time step T2",
+        "B. Time step T4",
+        "C. Time step T3"
+      ],
+      "answer_raw": "[\"A\",\"C\",\"B\"]",
+      "answer_display_original": "A. 时刻 T2 → C. 时刻 T3 → B. 时刻 T4",
+      "answer_display_en": "A. Time step T2 → C. Time step T3 → B. Time step T4",
+      "images": [
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036_1.webp",
+          "label": "Trajectory and observation overlay",
+          "width": 918,
+          "height": 446,
+          "source_relative_path": "assets/overlays/apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036.jpg"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036_2.webp",
+          "label": "Observation frame T1",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00124.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036_3.webp",
+          "label": "Observation frame T2",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00125.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036_4.webp",
+          "label": "Observation frame T3",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00126.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036_5.webp",
+          "label": "Observation frame T4",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00127.png"
+        }
+      ],
+      "selection_note_en": "Ranks later camera positions from a labeled, north-oriented trajectory with distinct distances from T1.",
+      "provenance": {
+        "dataset": "habitat",
+        "record_id": "apartment_1_HAB_C08_Q03_DISTANCE_FROM_START_ORDER_0036",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "HAB_C08",
+      "capability": "采集顺序与多视角一致性"
+    },
+    {
+      "id": "apartment_1_HAB_C05_Q02_NET_DIRECTION_0005",
+      "capability_en": "Net camera displacement",
+      "question_type": "single_choice",
+      "question_type_en": "Single choice",
+      "difficulty": "medium",
+      "question_original": "从起点 T1 到终点 T4，总体位移更接近哪个方向？",
+      "question_en": "From T1 to T4, in which direction is the net displacement primarily oriented?",
+      "choices_original": [
+        "A. 朝北",
+        "B. 朝东",
+        "C. 朝西",
+        "D. 朝南"
+      ],
+      "choices_en": [
+        "A. North",
+        "B. East",
+        "C. West",
+        "D. South"
+      ],
+      "answer_raw": "A",
+      "answer_display_original": "A. 朝北",
+      "answer_display_en": "A. North",
+      "images": [
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q02_NET_DIRECTION_0005_1.webp",
+          "label": "Trajectory and observation overlay",
+          "width": 918,
+          "height": 446,
+          "source_relative_path": "assets/overlays/apartment_1_HAB_C05_Q02_NET_DIRECTION_0005.jpg"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q02_NET_DIRECTION_0005_2.webp",
+          "label": "Observation frame T1",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00209.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q02_NET_DIRECTION_0005_3.webp",
+          "label": "Observation frame T2",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00210.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q02_NET_DIRECTION_0005_4.webp",
+          "label": "Observation frame T3",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00211.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q02_NET_DIRECTION_0005_5.webp",
+          "label": "Observation frame T4",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00212.png"
+        }
+      ],
+      "selection_note_en": "Reads the start-to-end displacement from the top-down path and its north arrow.",
+      "provenance": {
+        "dataset": "habitat",
+        "record_id": "apartment_1_HAB_C05_Q02_NET_DIRECTION_0005",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "HAB_C05",
+      "capability": "相机平面轨迹"
+    },
+    {
+      "id": "apartment_1_HAB_C06_Q01_HEADING_CHANGE_0003",
+      "capability_en": "Camera heading change",
+      "question_type": "multi_view_choice",
+      "question_type_en": "Multi-view choice",
+      "difficulty": "medium",
+      "question_original": "只看俯视图里的箭头，选择最合适的转向描述。",
+      "question_en": "Based only on the arrows in the top-down view, choose the most suitable description of the turn.",
+      "choices_original": [
+        "A. 俯视图中顺时针转动",
+        "B. 接近反向转动",
+        "C. 俯视图中逆时针转动",
+        "D. 基本保持原方向"
+      ],
+      "choices_en": [
+        "A. Clockwise turn in the top-down view",
+        "B. Almost a reversal of direction",
+        "C. Counterclockwise turn in the top-down view",
+        "D. Orientation remains nearly unchanged"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. 接近反向转动",
+      "answer_display_en": "B. Almost a reversal of direction",
+      "images": [
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C06_Q01_HEADING_CHANGE_0003_1.webp",
+          "label": "Trajectory and observation overlay",
+          "width": 918,
+          "height": 229,
+          "source_relative_path": "assets/overlays/apartment_1_HAB_C06_Q01_HEADING_CHANGE_0003.jpg"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C06_Q01_HEADING_CHANGE_0003_2.webp",
+          "label": "Observation frame T1",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00227.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C06_Q01_HEADING_CHANGE_0003_3.webp",
+          "label": "Observation frame T2",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00228.png"
+        }
+      ],
+      "selection_note_en": "Compares two explicitly drawn camera-heading arrows at T1 and T2.",
+      "provenance": {
+        "dataset": "habitat",
+        "record_id": "apartment_1_HAB_C06_Q01_HEADING_CHANGE_0003",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "HAB_C06",
+      "capability": "相机朝向变化"
+    },
+    {
+      "id": "apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012",
+      "capability_en": "Trajectory return proximity",
+      "question_type": "multi_view_choice",
+      "question_type_en": "Multi-view choice",
+      "difficulty": "hard",
+      "question_original": "后面哪个采集点最像回到 T1 附近？",
+      "question_en": "Which later capture point comes closest to T1?",
+      "choices_original": [
+        "A. 时刻 T4",
+        "B. 时刻 T3",
+        "C. 时刻 T2"
+      ],
+      "choices_en": [
+        "A. Time step T4",
+        "B. Time step T3",
+        "C. Time step T2"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 时刻 T2",
+      "answer_display_en": "C. Time step T2",
+      "images": [
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012_1.webp",
+          "label": "Trajectory and observation overlay",
+          "width": 918,
+          "height": 446,
+          "source_relative_path": "assets/overlays/apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012.jpg"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012_2.webp",
+          "label": "Observation frame T1",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00345.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012_3.webp",
+          "label": "Observation frame T2",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00346.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012_4.webp",
+          "label": "Observation frame T3",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00347.png"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012_5.webp",
+          "label": "Observation frame T4",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00348.png"
+        }
+      ],
+      "selection_note_en": "Finds the later camera position nearest T1 using the same labeled top-down path.",
+      "provenance": {
+        "dataset": "habitat",
+        "record_id": "apartment_1_HAB_C05_Q03_CLOSEST_REVISIT_0012",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "HAB_C05",
+      "capability": "相机平面轨迹"
+    },
+    {
+      "id": "apartment_1_HAB_C06_Q02_CARDINAL_HEADING_0011",
+      "capability_en": "Cardinal camera heading",
+      "question_type": "single_choice",
+      "question_type_en": "Single choice",
+      "difficulty": "simple",
+      "question_original": "根据右侧俯视图，T1 的相机主要朝哪个方向？",
+      "question_en": "Which cardinal direction is the camera at T1 primarily facing?",
+      "choices_original": [
+        "A. 朝东",
+        "B. 朝南",
+        "C. 朝北",
+        "D. 朝西"
+      ],
+      "choices_en": [
+        "A. East",
+        "B. South",
+        "C. North",
+        "D. West"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. 朝南",
+      "answer_display_en": "B. South",
+      "images": [
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C06_Q02_CARDINAL_HEADING_0011_1.webp",
+          "label": "Trajectory and observation overlay",
+          "width": 686,
+          "height": 229,
+          "source_relative_path": "assets/overlays/apartment_1_HAB_C06_Q02_CARDINAL_HEADING_0011.jpg"
+        },
+        {
+          "src": "assets/images/showcase/habitat/apartment_1_HAB_C06_Q02_CARDINAL_HEADING_0011_2.webp",
+          "label": "Observation frame T1",
+          "width": 640,
+          "height": 480,
+          "source_relative_path": "assets/base_images/apartment_1_00142.png"
+        }
+      ],
+      "selection_note_en": "Reads the T1 heading arrow against the north indicator shown in the trajectory panel.",
+      "provenance": {
+        "dataset": "habitat",
+        "record_id": "apartment_1_HAB_C06_Q02_CARDINAL_HEADING_0011",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      },
+      "capability_id": "HAB_C06",
+      "capability": "相机朝向变化"
+    }
+  ]
+}

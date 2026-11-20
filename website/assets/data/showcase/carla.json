@@ -1,0 +1,124 @@
+{
+  "dataset": "carla",
+  "suite": "SpatialDrive",
+  "source": "CARLA",
+  "examples": [
+    {
+      "id": "Town10HD_Opt_front_00003_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_003_005763",
+      "capability": "图像平面空间关系",
+      "capability_en": "Image-plane spatial relation",
+      "capability_id": "O3_image_plane_spatial_relation",
+      "question_type": "ordered_list",
+      "question_type_en": "Ordered list",
+      "difficulty": "medium",
+      "question_original": "观察标注图，A、B、C 在画面里的横向顺序是什么？",
+      "question_en": "In the annotated image, what is the left-to-right order of A, B, and C?",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C"
+      ],
+      "answer_raw": "[\"B\",\"A\",\"C\"]",
+      "answer_display_original": "从左到右（按标注框中心）：标注对象 B → 标注对象 A → 标注对象 C",
+      "answer_display_en": "Left to right by marked-box center: object B → object A → object C",
+      "images": [
+        {
+          "src": "assets/images/showcase/carla/Town10HD_Opt_front_00003_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_003_005763.webp",
+          "label": "Annotated RGB observation",
+          "width": 640,
+          "height": 360,
+          "source_relative_path": "assets/Town10HD_Opt_front_00003_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_003_005763/Town10HD_Opt_front_00003_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_003_005763_overlay.jpg"
+        }
+      ],
+      "selection_note_en": "Orders the centers of the visible marked boxes from left to right.",
+      "provenance": {
+        "dataset": "carla",
+        "record_id": "Town10HD_Opt_front_00003_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_003_005763",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "Town10HD_Opt_side_right_00033_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_004_002756",
+      "capability": "图像平面空间关系",
+      "capability_en": "Image-plane spatial relation",
+      "capability_id": "O3_image_plane_spatial_relation",
+      "question_type": "ordered_list",
+      "question_type_en": "Ordered list",
+      "difficulty": "medium",
+      "question_original": "将这些候选标注目标按从左到右排列。",
+      "question_en": "Order the marked targets from left to right.",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C"
+      ],
+      "answer_raw": "[\"B\",\"A\",\"C\"]",
+      "answer_display_original": "从左到右（按标注框中心）：标注对象 B → 标注对象 A → 标注对象 C",
+      "answer_display_en": "Left to right by marked-box center: object B → object A → object C",
+      "images": [
+        {
+          "src": "assets/images/showcase/carla/Town10HD_Opt_side_right_00033_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_004_002756.webp",
+          "label": "Annotated RGB observation",
+          "width": 640,
+          "height": 360,
+          "source_relative_path": "assets/Town10HD_Opt_side_right_00033_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_004_002756/Town10HD_Opt_side_right_00033_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_004_002756_overlay.jpg"
+        }
+      ],
+      "selection_note_en": "Orders the centers of the visible marked boxes from left to right.",
+      "provenance": {
+        "dataset": "carla",
+        "record_id": "Town10HD_Opt_side_right_00033_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_004_002756",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "Town01_Opt_side_right_00029_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_001_000061",
+      "capability": "图像平面空间关系",
+      "capability_en": "Image-plane spatial relation",
+      "capability_id": "O3_image_plane_spatial_relation",
+      "question_type": "ordered_list",
+      "question_type_en": "Ordered list",
+      "difficulty": "medium",
+      "question_original": "观察标注图，A、B、C 在画面里的横向顺序是什么？",
+      "question_en": "In the annotated image, what is the left-to-right order of A, B, and C?",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C"
+      ],
+      "choices_en": [
+        "A. Marked object A",
+        "B. Marked object B",
+        "C. Marked object C"
+      ],
+      "answer_raw": "[\"B\",\"C\",\"A\"]",
+      "answer_display_original": "从左到右（按标注框中心）：标注对象 B → 标注对象 C → 标注对象 A",
+      "answer_display_en": "Left to right by marked-box center: object B → object C → object A",
+      "images": [
+        {
+          "src": "assets/images/showcase/carla/Town01_Opt_side_right_00029_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_001_000061.webp",
+          "label": "Annotated RGB observation",
+          "width": 640,
+          "height": 360,
+          "source_relative_path": "assets/Town01_Opt_side_right_00029_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_001_000061/Town01_Opt_side_right_00029_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_001_000061_overlay.jpg"
+        }
+      ],
+      "selection_note_en": "Orders the centers of the visible marked boxes from left to right.",
+      "provenance": {
+        "dataset": "carla",
+        "record_id": "Town01_Opt_side_right_00029_CARLA_GT_O3_IMAGE_PLANE_SPATIAL_001_000061",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    }
+  ]
+}

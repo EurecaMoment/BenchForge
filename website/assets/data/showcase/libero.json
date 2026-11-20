@@ -1,0 +1,249 @@
+{
+  "dataset": "libero",
+  "suite": "SpatialArm",
+  "source": "LIBERO",
+  "examples": [
+    {
+      "id": "LIBERO-OBJ-000048",
+      "capability": "双视角一致性与相机识别",
+      "capability_id": "LC9_MULTI_VIEW_CONSISTENCY",
+      "capability_en": "Multi-view consistency",
+      "question_type": "multi_view_choice",
+      "question_type_en": "Multi-view choice",
+      "difficulty": "simple",
+      "question_original": "从两个相机画面中选出手眼相机视角。",
+      "question_en": "Select the eye-in-hand camera view from the two camera images.",
+      "choices_original": [
+        "A. 面板 A",
+        "B. 面板 B"
+      ],
+      "choices_en": [
+        "A. Panel A",
+        "B. Panel B"
+      ],
+      "answer_raw": "B",
+      "answer_display_original": "B. 面板 B",
+      "answer_display_en": "B. Panel B",
+      "images": [
+        {
+          "src": "assets/images/showcase/libero/01-libero-obj-000048.webp",
+          "label": "Camera panels A and B",
+          "width": 548,
+          "height": 310,
+          "source_relative_path": "assets/libero_goal_open_the_middle_drawer_of_the_cabinet_seed3_step0001_003225/LIBERO-OBJ-000048_overlay.png"
+        }
+      ],
+      "selection_note_en": "The two synchronized camera panels make the wrist-camera view distinguishable from the scene camera.",
+      "provenance": {
+        "dataset": "libero",
+        "record_id": "LIBERO-OBJ-000048",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "LIBERO-OBJ-000030",
+      "capability": "时序轨迹与状态变化",
+      "capability_id": "LC7_TEMPORAL_TRAJECTORY",
+      "capability_en": "Temporal trajectory",
+      "question_type": "temporal_choice",
+      "question_type_en": "Temporal choice",
+      "difficulty": "medium",
+      "question_original": "观察轨迹标识，末端从开始到结束的主要方向是什么？",
+      "question_en": "From the trajectory visualization, what is the end effector’s primary direction of motion from start to end?",
+      "choices_original": [
+        "A. 向下",
+        "B. 向后",
+        "C. 向右",
+        "D. 向左",
+        "E. 向上",
+        "F. 动作幅度很小",
+        "G. 向前"
+      ],
+      "choices_en": [
+        "A. Down",
+        "B. Backward",
+        "C. To the right",
+        "D. To the left",
+        "E. Up",
+        "F. Movement is minimal",
+        "G. Forward"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 向右",
+      "answer_display_en": "C. To the right",
+      "images": [
+        {
+          "src": "assets/images/showcase/libero/02-libero-obj-000030.webp",
+          "label": "Start, goal, and end-effector path",
+          "width": 868,
+          "height": 274,
+          "source_relative_path": "assets/libero_90_KITCHEN_SCENE4_put_the_black_bowl_on_top_of_the_cabinet_seed0_step0007_001127/LIBERO-OBJ-000030_overlay.png"
+        }
+      ],
+      "selection_note_en": "The sample shows start and goal observations together with the end-effector path, grounding the direction question in visible trajectory evidence.",
+      "provenance": {
+        "dataset": "libero",
+        "record_id": "LIBERO-OBJ-000030",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "LIBERO-OBJ-000008",
+      "capability": "距离与接近关系",
+      "capability_id": "LC4_DISTANCE_PROXIMITY",
+      "capability_en": "Distance and proximity",
+      "question_type": "marked_object_choice",
+      "question_type_en": "Marked-object choice",
+      "difficulty": "medium",
+      "question_original": "以 A 为参照，哪个标注物体最靠近它？",
+      "question_en": "Taking A as the reference, which labeled object is closest to it?",
+      "choices_original": [
+        "B. 标注物体 B",
+        "C. 标注物体 C",
+        "D. 标注物体 D"
+      ],
+      "choices_en": [
+        "B. Labeled object B",
+        "C. Labeled object C",
+        "D. Labeled object D"
+      ],
+      "answer_raw": "C",
+      "answer_display_original": "C. 标注物体 C",
+      "answer_display_en": "C. Labeled object C",
+      "images": [
+        {
+          "src": "assets/images/showcase/libero/03-libero-obj-000008.webp",
+          "label": "RGB observation and labeled positions",
+          "width": 756,
+          "height": 354,
+          "source_relative_path": "assets/libero_goal_put_the_wine_bottle_on_the_rack_seed0_step0003_003491/LIBERO-OBJ-000008_overlay.png"
+        }
+      ],
+      "selection_note_en": "The labeled points are visible on a common position panel; object C is the closest marked candidate to A.",
+      "provenance": {
+        "dataset": "libero",
+        "record_id": "LIBERO-OBJ-000008",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "LIBERO-OBJ-000005",
+      "capability": "排序与区域定位",
+      "capability_id": "LC5_ORDER_AND_REGION",
+      "capability_en": "Spatial order and regions",
+      "question_type": "ordered_list",
+      "question_type_en": "Ordered list",
+      "difficulty": "hard",
+      "question_original": "请从标注图中判断 A、B、C、D 的从右到左排序。",
+      "question_en": "From the labeled diagram, order A, B, C, and D from right to left.",
+      "choices_original": [
+        "A. 标注物体 A",
+        "B. 标注物体 B",
+        "C. 标注物体 C",
+        "D. 标注物体 D"
+      ],
+      "choices_en": [
+        "A. Labeled object A",
+        "B. Labeled object B",
+        "C. Labeled object C",
+        "D. Labeled object D"
+      ],
+      "answer_raw": "[\"A\",\"D\",\"B\",\"C\"]",
+      "answer_display_original": "A. 标注物体 A → D. 标注物体 D → B. 标注物体 B → C. 标注物体 C",
+      "answer_display_en": "A. Labeled object A → D. Labeled object D → B. Labeled object B → C. Labeled object C",
+      "images": [
+        {
+          "src": "assets/images/showcase/libero/04-libero-obj-000005.webp",
+          "label": "RGB observation and labeled positions",
+          "width": 756,
+          "height": 354,
+          "source_relative_path": "assets/libero_90_KITCHEN_SCENE2_put_the_black_bowl_at_the_front_on_the_plate_seed1_step0001_000745/LIBERO-OBJ-000005_overlay.png"
+        }
+      ],
+      "selection_note_en": "All four labels and their horizontal positions are visible, so the requested right-to-left ordering can be read from the image.",
+      "provenance": {
+        "dataset": "libero",
+        "record_id": "LIBERO-OBJ-000005",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "LIBERO-OBJ-000224",
+      "capability": "数量区间与集合判断",
+      "capability_id": "LC2_COUNT_AND_SET",
+      "capability_en": "Object sets and task targets",
+      "question_type": "multi_choice",
+      "question_type_en": "Multiple choice",
+      "difficulty": "hard",
+      "question_original": "根据任务指令，需要重点操作哪些候选物体？可多选。\n任务指令：pick up the tomato sauce and put it in the basket",
+      "question_en": "Which candidate objects are relevant to the task instruction? Select all that apply.\nTask instruction: pick up the tomato sauce and put it in the basket",
+      "choices_original": [
+        "A. alphabet soup",
+        "B. tomato sauce",
+        "C. basket",
+        "D. butter"
+      ],
+      "choices_en": [
+        "A. alphabet soup",
+        "B. tomato sauce",
+        "C. basket",
+        "D. butter"
+      ],
+      "answer_raw": "[\"B\",\"C\"]",
+      "answer_display_original": "B. tomato sauce + C. basket",
+      "answer_display_en": "B. tomato sauce + C. basket",
+      "images": [
+        {
+          "src": "assets/images/showcase/libero/05-libero-obj-000224.webp",
+          "label": "RGB observation and task instruction",
+          "width": 772,
+          "height": 310,
+          "source_relative_path": "assets/libero_90_LIVING_ROOM_SCENE2_pick_up_the_tomato_sauce_and_put_it_in_the_basket_seed0_step0001_002049/LIBERO-OBJ-000224_overlay.png"
+        }
+      ],
+      "selection_note_en": "The task instruction and candidate names are both present in the artifact; the correct source and destination objects are named in the instruction.",
+      "provenance": {
+        "dataset": "libero",
+        "record_id": "LIBERO-OBJ-000224",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    },
+    {
+      "id": "LIBERO-OBJ-000603",
+      "capability": "可见对象清单与类别辨认",
+      "capability_id": "LC1_OBJECT_INVENTORY",
+      "capability_en": "Object inventory",
+      "question_type": "yes_no",
+      "question_type_en": "Yes / no",
+      "difficulty": "simple",
+      "question_original": "根据场景标识，plate 是否在场景中？",
+      "question_en": "According to the scene view, is a plate present?",
+      "choices_original": [
+        "A. 是",
+        "B. 否"
+      ],
+      "choices_en": [
+        "A. Yes",
+        "B. No"
+      ],
+      "answer_raw": "A",
+      "answer_display_original": "A. 是",
+      "answer_display_en": "A. Yes",
+      "images": [
+        {
+          "src": "assets/images/showcase/libero/06-libero-obj-000603.webp",
+          "label": "Scene observation",
+          "width": 256,
+          "height": 256,
+          "source_relative_path": "assets/libero_90_KITCHEN_SCENE1_open_the_top_drawer_of_the_cabinet_and_put_the_bowl_in_it_seed2_step0005_000597/LIBERO-OBJ-000603_overlay.png"
+        }
+      ],
+      "selection_note_en": "The plate is directly visible in the scene observation, so the yes/no answer does not depend on simulator-only state.",
+      "provenance": {
+        "dataset": "libero",
+        "record_id": "LIBERO-OBJ-000603",
+        "source_jsonl": "data/test-00000-of-00001.jsonl"
+      }
+    }
+  ]
+}
