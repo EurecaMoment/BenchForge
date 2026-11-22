@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 import json
 from threading import Event
+from urllib.error import HTTPError
 
 from capabilities.scene_authoring.validation.acceptance import capture_acceptance
 from pipelines.scene_production.review import review_scene
@@ -58,6 +59,24 @@ class SceneReviewScopeTests(unittest.TestCase):
             self.assertFalse(saved['passed'])
             self.assertEqual(updates[-1]['state'], 'FAILED_FINAL')
             export.assert_not_called()
+
+            baseline={'ref':{'task_id':'sf_old.scene0','revision':0,'token':'old'},'round':2,
+                      'images':[root/'old'/'view_0.png'],'receipt':{}}
+            with patch('pipelines.scene_production.review._strict_policy', return_value={'enabled':True}), \
+                    patch('pipelines.scene_production.review.capture_acceptance', return_value=rejection), \
+                    patch('pipelines.scene_production.review.load_baseline', return_value=baseline), \
+                    patch('pipelines.scene_production.review.audit_scene',return_value={}), \
+                    patch('pipelines.scene_production.review.completion',side_effect=[
+                        HTTPError('http://model',413,'payload too large',{},None),
+                        {'acceptable':False,'issues':['candidate still fails']}]) as bounded:
+                review_scene(store,task,Event())
+            first,retry=bounded.call_args_list
+            self.assertEqual(first.args[2],[capture/'view_0.png',*baseline['images']])
+            self.assertEqual(retry.args[2],[capture/'view_0.png'])
+            self.assertNotIn('repair_comparison',retry.args[0])
+            result=updates[-1]['failure']['scene_review']
+            self.assertEqual(result['repair_progress']['decision'],'uncompared')
+            self.assertFalse(result['passed'])
 
     # 验证预检查失败保留真实失败原因，不凭空补造视觉缺陷。
     def test_failed_precheck_keeps_failure_without_inventing_six_visual_defects(self):

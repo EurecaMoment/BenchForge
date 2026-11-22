@@ -23,7 +23,12 @@ export function captureNotice(observation = {}, error) {
     issue_count:all.length,
     diagnostics_truncated:all.length > 12 || all.some(value => value.length > 600),
     before_repair:'Read the full detail result, combine all independent native/visual issues, and batch-preflight one complete candidate. This notice is only a summary.',
-    tasks:(observation.tasks || []).map(task=>({id:task.id,state:task.state,records:task.records})),
+    tasks:(observation.tasks || []).map(task=>{
+      const progress=task.failure?.scene_review?.repair_progress;
+      const summary=progress && {decision:progress.decision,round:progress.round,baseline:progress.baseline,
+        candidate:progress.candidate,next_base:progress.next_base};
+      return {id:task.id,state:task.state,records:task.records,...(summary && {repair_progress:summary})};
+    }),
     detail:{tool:'benchforge_scene_status',run_id:observation.run_id,detail:true},
   };
 }

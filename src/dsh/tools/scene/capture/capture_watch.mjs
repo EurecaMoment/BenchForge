@@ -56,7 +56,7 @@ export function compactCaptureObservation(value, {artifacts} = {}) {
     // result. Keep failure identity and actions, project its known review
     // wrapper, and retain every diagnostic below. Full evidence stays on disk.
     if (task.failure?.scene_review) row.failure = {...task.failure,
-      scene_review:fields(task.failure.scene_review,['passed','acceptable','assessed','status','issues','errors','repair_suggestions','publication_status'])};
+      scene_review:fields(task.failure.scene_review,['passed','acceptable','assessed','status','issues','errors','repair_suggestions','publication_status','repair_progress'])};
     if (task.progress) {
       row.progress = fields(task.progress, ['stage','phase','state','status','percent','percentage','progress_percent',
         'completed','total','current','frames_done','frames_total','objects_done','objects_total','updated_ns',

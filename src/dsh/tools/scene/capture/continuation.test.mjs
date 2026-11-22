@@ -123,6 +123,17 @@ test('host reload restores an unfinished wait; consumed notices do not replay',/
   assert.equal(restored.sent.length,0);assert.equal(restored.requests.length,0);await restored.dispose();
 });
 
+test('failed repair notification identifies the preserved baseline across runs',async()=>{
+  const observation=failure();
+  const base={task_id:'sf_previous.scene0',revision:2,token:'a'};
+  observation.tasks[0].failure.scene_review.repair_progress={decision:'rollback',round:4,
+    next_base:base,baseline:base,candidate:{task_id:'sf_scene.scene0',revision:0,token:'b'},findings:[]};
+  const h=harness({read:async()=>observation});
+  h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();
+  assert.match(h.sent[0].content[0].text,/"next_base":\{"task_id":"sf_previous.scene0","revision":2/);
+  await h.dispose();
+});
+
 test('a notice lost before log commit is redelivered after restart',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a notice lost before log commit is redelivered after restart。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();await h.dispose();
   const next=harness({data:h.data,events:h.events});next.runtime.restore();await next.runtime.settled();

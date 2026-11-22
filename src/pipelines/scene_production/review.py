@@ -1,4 +1,5 @@
 import json
+from urllib.error import HTTPError
 from storage.files import write_json
 from service_access.openai_client import completion
 from capabilities.dataset_authoring.scene_capture.products import produce
@@ -14,6 +15,7 @@ from capabilities.scene_authoring.contracts.requirements import scene_requiremen
 
 
 from pipelines.scene_production.planning import _strict_policy
+from pipelines.scene_production.repair_progress import capture_ref, comparison_prompt, load_baseline, repair_decision
 
 # 检查采集报告、真实证据与场景质量，保存验收回执或修复反馈并响应取消。
 def review_scene(store,task,stop,*,capture_only=False):
@@ -30,6 +32,7 @@ def review_scene(store,task,stop,*,capture_only=False):
     strict_policy = _strict_policy(store.root, execution_mode)
     physical_precheck=capture_acceptance(store.root,program,report,evidence,{},capture,execution_mode) if strict_policy else {}
     physical_issues=physical_precheck.get('physical_issues',[])
+    repair_base=load_baseline(store,task,physical_precheck)
     spatial_context=None
     if report['status']=='captured' and any(capture.glob('view_*.png')):
         prompt='检查实际 Isaac 视图和执行证据是否满足原始场景需求：'+json.dumps(unit['intent'],ensure_ascii=False)+'''。
@@ -127,10 +130,23 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
         layout_reference=directory/'layout_reference.png'
         if layout_reference.is_file():
             review_images.append(layout_reference)
-            prompt+='\n最后一张是扩散设计参考，其余是实际 Isaac 视图。额外返回 design_alignment:{status:"aligned"|"partial"|"diverged",issues:[string]}，比较功能分区、主要物体、材质、采光和氛围；参考仅用于设计比较，不是仿真成品、GT 或像素匹配目标。'
-        review=completion(prompt,directory/'model_calls'/'scene_review',review_images,
-                          10000 if strict_policy.get('require_scene_brief') else 5000,
-                          bounded_review=bool(strict_policy),stop=stop,context=unit.get('run_context'))
+            prompt+=f'\n第 {len(review_images)} 张是扩散设计参考。额外返回 design_alignment:{{status:"aligned"|"partial"|"diverged",issues:[string]}}，比较功能分区、主要物体、材质、采光和氛围；参考仅用于设计比较，不是仿真成品、GT 或像素匹配目标。'
+        def assess(prompt_text, images):
+            """沿用当前评审的模型预算、取消信号及恢复记录。"""
+            return completion(prompt_text,directory/'model_calls'/'scene_review',images,
+                              10000 if strict_policy.get('require_scene_brief') else 5000,
+                              bounded_review=bool(strict_policy),stop=stop,context=unit.get('run_context'))
+
+        if repair_base and repair_base.get('images'):
+            try:
+                review=assess(prompt+comparison_prompt(repair_base,physical_precheck),review_images+repair_base['images'])
+            except HTTPError as error:
+                if error.code not in (400,413,422):
+                    raise
+                # 部分模型服务按图片数或上下文长度拒绝请求，此时仍须验收当前场景。
+                review=assess(prompt,review_images)
+        else:
+            review=assess(prompt,review_images)
     else: review={'acceptable':False,'issues':physical_issues or report.get('errors',[]),
                  'repair_suggestions':['Repair the actual support, attachment or layout issue in a new complete program and capture again.'],
                  'visual_review_skipped':True,
@@ -177,6 +193,10 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
     acceptance_passed = acceptance.get('passed') is not False
     passed=review.get('acceptable') is True and review['physical_stable'] and review['renderable'] and interaction_passed is not False and acceptance_passed
     review['passed']=passed
+    if repair_base:
+        candidate=capture_ref(task['id'],unit['revision'],acceptance.get('capture_token'))
+        review['repair_progress']=repair_decision(repair_base,candidate,acceptance,review,
+            {frame['frame_id']+'.png' for frame in views})
     review['publication_status']='pilot_candidate' if passed else 'exploration_requires_improvement'
     review['execution_mode']=execution_mode or 'exploration'
     review['evaluation_status']='not_evaluated' if not acceptance.get('enforced') else ('passed' if acceptance.get('passed') else 'failed')
