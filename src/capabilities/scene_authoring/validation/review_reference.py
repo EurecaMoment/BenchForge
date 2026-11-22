@@ -4,6 +4,37 @@ from capabilities.scene_authoring.contracts.scene_design import _review_referenc
 from capabilities.scene_authoring.contracts.scene_design import _review_reference_dot as _dot
 from capabilities.scene_authoring.contracts.scene_design import _review_reference_unit as _unit
 
+FACING_GUIDANCE = (
+    '\n仅对 visual_relations 中 type=facing 的单向关系，在相应 relation_checks 条目增加 '
+    'front_cue（从该条 view 看见的源物体功能正面或可推定正面的结构）以及 '
+    'front_to_target（toward、away、unclear 三选一）。结合已有机位判断：例如靠背到座垫前沿是就坐者面向，'
+    '说明目标相对这个朝向在哪里；需要时可在 observation 引用另一个实拍机位。'
+    '仅中心连线、yaw、物体名称或预期用途均不足以证明。背向填 away，无法辨认或证据冲突填 unclear，'
+    '两者均 passed=false；仅按简报要求检查源到目标，不自行要求目标回望或严格同轴。'
+)
+
+
+# 对显式朝向关系核对源对象的可见线索，忽略没有逐对象分割记录的机位元数据。
+def facing_observation_issue(relation, row, capture_frames):
+    pair = f"{relation['source']} -> {relation['target']}"
+    direction = row.get('front_to_target')
+    if direction == 'away':
+        return f'{pair}: the observed functional front faces away from the target'
+    cue = row.get('front_cue')
+    if direction != 'toward' or not isinstance(cue, str) or not cue.strip():
+        return f'{pair}: facing needs a visible functional-front cue and its direction toward the target'
+    for frame in capture_frames:
+        if (not isinstance(frame, dict) or not isinstance(frame.get('frame_id'), str) or
+                row.get('view') != frame['frame_id'] + '.png'):
+            continue
+        objects = frame.get('objects')
+        if isinstance(objects, list) and not any(
+                isinstance(obj, dict) and obj.get('object_id') == relation['source'] for obj in objects):
+            return f'{pair}: the captured view cited for the functional front does not show the source object'
+        return None
+    return f'{pair}: cite a captured scene camera view for the functional front'
+
+
 GUIDANCE = '''空间审查先固定参照，再看全部实际图片：世界方向、相机画面方向、使用者朝向和桌面前沿是不同定义。桌面“前沿/前区”通常指靠使用者的一侧；“在使用者前方”指其面朝方向，必须按保存的 front 定义区分。不得把画面上方当北/后、下方当前，或相机换位后改写同一关系。下面的局部坐标投影来自本次原生最终中心，只证明方向和位置关系，不能单独证明物体身份、可操作性、接触或生活合格；这些仍须逐图核实。方向定义缺失或坐标与视觉解释冲突时先明确引用哪个参照和哪张实际图，建议澄清摘要或改善观察，不能从低可信画面感觉直接给出移位修复。
 支撑按整个采集集合判断：一张图遮挡不等于全体图无法确认。主图或任何单张无需同时呈现全部场景要求，除非原始需求明确指定该机位必须包含该对象。窗户和采光来源在其对应实际机位查证；相机朝向另一侧而窗户处于画外，不能据此断言窗缺失或要求移动窗户。采光效果仍按实际图中的光照判断，光源身份须由对应视图支持。对同一物体检查其他已附机位；原生支撑回执通过且另一实际图清楚显示底座落在台面时，单视角的不可见只作观察限制，不得同时报告支撑缺失。所有机位均无法确认必要接触、或实图明确悬空/穿插时仍须失败，真实图与原生回执冲突须保留冲突并调查。不能以 declared support 或 stable=true 独自宣称图片合格。issues、life_review、brief_alignment 对同一事实须一致，并给出具体图片名和观察；已在某图确认的接触不能又在全局称完全未验证。
 修复建议先说明具体缺陷、支持它的全部实际图、参照及原生事实。可信度低或证据冲突时建议澄清参照/补观察，不建议移动已获支持的物体；能看清但真实不合生活用途的缺陷照常保留。确需调整位置时说明预期改善及需保护的支撑余量、碰撞、通行、操作空间和原始硬要求；执行前仍由原生预检验证，之后重新实拍验收。不得为迎合一条视觉意见反向制造悬空、过悬、穿插或姿态错误。'''

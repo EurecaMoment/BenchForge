@@ -1,10 +1,8 @@
 """Scene capture as an ordinary leased backend stage using native A100 jobs."""
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
-import uuid
 
 from capabilities.capture.capture_scope import capture_scope
 from capabilities.isaac_sim.authoring import compile_scene
@@ -14,6 +12,8 @@ from capabilities.isaac_sim.scene_requirements import validate_scene_requirement
 from capabilities.isaac_sim.capture_contract import (
     capture_capabilities, capture_service_client, native_edit_arguments, native_import_arguments, require_capture_service,
 )
+from capabilities.isaac_sim.asset_bundle import stage_texture_dependencies, upload_asset_bundle
+from capabilities.isaac_sim.appearance_evidence import appearance_evidence, observe_render_sources
 from capabilities.scene_authoring.catalog.native_reference import native_references
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
@@ -22,23 +22,6 @@ from service_access.configuration import isaac_config
 from service_access.progress import record_progress
 from service_access.request_context import check_cancelled
 from storage.files import write_json
-
-
-# 按摘要冻结场景上传输入，复用已验证上传回执或登记新的不可变资产。
-def _asset(client, source, directory):
-    receipt = directory / 'asset.json'
-    with source.open('rb') as stream:
-        digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-    if receipt.exists():
-        value = json.loads(receipt.read_text())
-        if value['sha256'] != digest:
-            raise ValueError('Frozen scene asset changed after upload')
-        return {key: value[key] for key in ('asset_id', 'relative_path')}
-    # Upload has no deduplication RPC. A lost upload reply may leave an unused
-    # immutable file; only a verified receipt becomes part of a submitted job.
-    value = client.upload(source, asset_id='benchforge-' + uuid.uuid4().hex)
-    write_json(receipt, value)
-    return {key: value[key] for key in ('asset_id', 'relative_path')}
 
 
 # 分页读取原生场景节点，限制总量并拒绝不前进的游标。
@@ -112,6 +95,8 @@ def execute_capture(store, task, stop, *, config, client=None):
         compiled = _compile_for_task(store, task, program, settings)
         source = attempt / 'scene.usda'
         source.write_text(compiled['usd'], encoding='utf-8')
+        texture_files = stage_texture_dependencies(
+            compiled.get('texture_dependencies', []), attempt)
         own_client = client is None
         client = client or capture_service_client(config)
         requests = DurableTasks(client, attempt / 'jobs', token, stop=stop,
@@ -121,7 +106,7 @@ def execute_capture(store, task, stop, *, config, client=None):
         try:
             capability = capture_capabilities(client)
             require_capture_service(capability, compiled, scope)
-            source_ref = _asset(client, source, attempt)
+            source_ref = upload_asset_bundle(client, source, attempt, texture_files)
             _, imported = requests.extension('import', 'asset.import', {'source': source_ref, 'path': '/World/Scene'})
             identity = imported['session_id']
             write_json(attempt / 'session.json', {'session_id': identity, 'capture_token': token})
@@ -138,6 +123,7 @@ def execute_capture(store, task, stop, *, config, client=None):
             incoming = attempt / 'capture'
             incoming.mkdir(exist_ok=True)
             frames, native_jobs = [], [physics_job.job_id]
+            rendered_sources = {}
             entities = measured_entities(compiled, prims)
             native = {key: value for key, value in compiled['entities'].items() if not value.get('geometry_parts')}
             if native:
@@ -164,6 +150,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                         raise ValueError('Isaac Sim returned a different camera')
                     frames.append(save_frame(frame, files, index, program, incoming,
                         physics_tick=observed.get('physics_tick'), dt=observed.get('dt', dt)))
+                    observe_render_sources(rendered_sources, frame)
                 native_jobs.append(job.job_id)
             if scope['scene_export_requested']:
                 job, exported = requests.extension('export', 'scene.export', {'session_id': identity, 'format': 'usdz'})
@@ -179,7 +166,8 @@ def execute_capture(store, task, stop, *, config, client=None):
                 'origin': 'isaac_native', 'token': token, 'protocol': 'a100sim.v1.Simulator',
                 'session_id': identity, 'job_ids': native_jobs, 'physics': physics,
                 'entities': entities, 'frames': frames, 'render_settings': render, 'capture_scope': scope,
-                'asset_dependencies': [], 'material_dependencies': [],
+                **appearance_evidence(compiled, json.loads((attempt / 'asset.json').read_text()),
+                                      prims, rendered_sources),
                 'realism': {'mass_and_contact_properties': 'uncalibrated synthetic priors',
                             'sim2real_gap': 'not measured'},
                 'interaction': {'validated': False, 'reason': 'no executable interaction requested', 'action_results': []}}

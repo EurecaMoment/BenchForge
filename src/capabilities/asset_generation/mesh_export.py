@@ -44,25 +44,35 @@ def _image(value):
 
 
 # 序列化网格材质参数并复制纹理图像，生成相对文件引用。
-def _material_record(material, texture_dir, material_index):
+def _material_record(material, texture_dir, material_index, *, gltf):
     """Serialize a trimesh PBR/Simple material and copy image payloads."""
+    default_metallic, default_roughness = (1., 1.) if gltf else (0., .55)
     if material is None:
-        return {'name': f'material_{material_index}', 'base_color_factor': [1., 1., 1., 1.], 'metallic_factor': 0., 'roughness_factor': .55, 'double_sided': True, 'textures': {}}
+        return {'name': f'material_{material_index}', 'base_color_factor': [1., 1., 1., 1.],
+                'metallic_factor': default_metallic, 'roughness_factor': default_roughness,
+                'double_sided': not gltf, 'textures': {}, **({'alpha_mode': 'OPAQUE'} if gltf else {})}
     name = str(getattr(material, 'name', None) or f'material_{material_index}')
     source_type = type(material).__name__
     # OBJ/MTL uses SimpleMaterial.image, not PBRMaterial.baseColorTexture.
     # Trimesh preserves its diffuse image/factor and approximates Ns as roughness.
     if isinstance(material, trimesh.visual.material.SimpleMaterial):
         material = material.to_pbr()
+    metallic = getattr(material, 'metallicFactor', None)
+    roughness = getattr(material, 'roughnessFactor', None)
     record = {
         'name': name,
         'source_material_type': source_type,
         'base_color_factor': _float_factor(getattr(material, 'baseColorFactor', None), [1., 1., 1., 1.]),
-        'metallic_factor': float(getattr(material, 'metallicFactor', 0.) or 0.),
-        'roughness_factor': float(getattr(material, 'roughnessFactor', .55) if getattr(material, 'roughnessFactor', None) is not None else .55),
-        'double_sided': bool(getattr(material, 'doubleSided', True)),
+        'metallic_factor': default_metallic if metallic is None else float(metallic),
+        'roughness_factor': default_roughness if roughness is None else float(roughness),
+        'double_sided': bool(getattr(material, 'doubleSided', not gltf)),
         'textures': {},
     }
+    if gltf:
+        record['alpha_mode'] = getattr(material, 'alphaMode', None) or 'OPAQUE'
+        if record['alpha_mode'] == 'MASK':
+            cutoff = getattr(material, 'alphaCutoff', None)
+            record['alpha_cutoff'] = .5 if cutoff is None else float(cutoff)
     slots = {'base_color': 'baseColorTexture', 'normal': 'normalTexture', 'metallic_roughness': 'metallicRoughnessTexture', 'occlusion': 'occlusionTexture', 'emissive': 'emissiveTexture'}
     for slot, attribute in slots.items():
         image = _image(getattr(material, attribute, None))
@@ -122,7 +132,8 @@ def export_mesh(source, output, glb_output=None, source_frame='sam3d_camera'):
         if not source_uv_present:
             uv = np.zeros((len(mesh.vertices), 2), dtype=np.float64)
         material_index = len(materials)
-        materials.append(_material_record(getattr(source_visual, 'material', None), texture_dir, material_index))
+        materials.append(_material_record(getattr(source_visual, 'material', None), texture_dir,
+                                          material_index, gltf=source.suffix.lower() in {'.glb', '.gltf'}))
         materials[-1]['source_uv_present'] = bool(source_uv_present)
         if materials[-1]['textures'] and not source_uv_present:
             raise ValueError(f'geometry {name!r} has texture images but no valid source UVs; refusing fabricated texture coordinates')

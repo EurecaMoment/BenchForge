@@ -16,7 +16,7 @@ versions = Table(
 )
 _initialized = WeakSet()
 _initialization_lock = RLock()
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 # 在锁保护下初始化或升级数据库结构，并阻止较旧程序连接更新的结构版本。
@@ -53,6 +53,10 @@ def initialize_schema(engine=None):
             if current < 6:
                 from database.migration_documents import upgrade
                 upgrade(connection)
+            if current < 7:
+                # 一个项目目录可有多个会话；保留工作区和会话的联合外键。
+                connection.exec_driver_sql("ALTER TABLE workspace_sessions "
+                                           "DROP CONSTRAINT IF EXISTS workspace_sessions_workspace_id_key")
             from time import time
             for version in range(current + 1, SCHEMA_VERSION + 1):
                 connection.execute(versions.insert().values(version=version, applied_at=int(time())))

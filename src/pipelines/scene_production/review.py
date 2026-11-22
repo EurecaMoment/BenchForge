@@ -8,6 +8,7 @@ from capabilities.scene_authoring.geometry.preview import compact_preview
 from capabilities.scene_authoring.validation.acceptance import capture_acceptance
 from capabilities.scene_authoring.validation.review_reference import review_spatial_context
 from capabilities.scene_authoring.validation.review_reference import GUIDANCE as REFERENCE_GUIDANCE
+from capabilities.scene_authoring.validation.review_reference import FACING_GUIDANCE
 from capabilities.scene_authoring.contracts.requirements import scene_requirements
 
 
@@ -58,6 +59,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                 write_json(directory/'scene_spatial_context.json',spatial_context)
                 prompt+='\n明确参照和本次原生方向/支撑事实（不能代替实际逐图生活检查）：'+json.dumps(spatial_context,ensure_ascii=False)
                 context['visual_relations']=[{'index':i,**r} for i,r in enumerate(brief['relations']) if r['type'] not in {'supported_by','mounted_to'}]
+                if any(r['type'] == 'facing' for r in context['visual_relations']):
+                    prompt += FACING_GUIDANCE
                 prompt += '\n必须对照的场景标题、摘要、角色及空间关系：' + json.dumps(context, ensure_ascii=False)
                 prompt += ('\n额外返回 brief_alignment:{passed:boolean,hard_requirements_preserved:boolean,observations:[{view:"view_0.png",observation:"实际可见依据"}],'
                            'unresolved:[string],proposed_summary_revision:{reason:string,summary:string,changes:[string]}}。'

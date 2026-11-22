@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 from unittest.mock import patch
 from pipelines.scene_production.service import create_store
@@ -9,19 +10,34 @@ import unittest
 from tests.database_fixtures import use_postgres
 
 import numpy as np
+from PIL import Image
 import trimesh
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 from capabilities.asset_generation.mesh_export import export_mesh
+from capabilities.isaac_sim.asset_bundle import stage_texture_dependencies, upload_asset_bundle
 from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
 from capabilities.isaac_sim.native_geometry import exported_entities
-from test_isaac_sim_evidence import scene_program
+
+
+# 构造固定双视角场景，避免通过其他测试模块间接加载 gRPC 运行时。
+def scene_program():
+    return {'schema': 'benchforge.scene/v1', 'scene_id': 'pbr_contract',
+        'title': 'PBR contract', 'assumptions': ['Synthetic test geometry'],
+        'objects': [
+            {'id': 'floor', 'label': 'floor', 'kind': 'box', 'size': [4, 4, .1],
+             'xy': [0, 0], 'base_z': -.1, 'support': 'ground', 'dynamic': False, 'mass_kg': 0,
+             'color': [.4, .4, .4]},
+            {'id': 'cube', 'label': 'PBR mesh', 'kind': 'box', 'size': [.2, .2, .2],
+             'xy': [0, 0], 'base_z': 1, 'support': 'ground', 'dynamic': True, 'mass_kg': 1,
+             'color': [.8, .1, .1]}],
+        'cameras': [{'id': 'a', 'position': [2, -2, 2], 'target': [0, 0, .1]},
+                    {'id': 'b', 'position': [-2, -2, 2], 'target': [0, 0, .1]}]}
 
 
 class AssetCaptureContractTests(unittest.TestCase):
-    # 建立独立数据库、临时资源目录和固定网格身份，供导出与采集契约验证。
+    # 建立临时资源目录和固定网格身份，供导出与采集契约验证。
     def setUp(self):
-        self.database_url = use_postgres(self)
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -56,15 +72,92 @@ class AssetCaptureContractTests(unittest.TestCase):
         self.assertEqual(colors.GetInterpolation(), "faceVarying")
         self.assertEqual(len(colors.Get()), len(record["faces"]) * 3)
 
-    # 验证包含纹理的网格不能在缺少必要数据时被静默按纯色处理。
-    def test_texture_data_cannot_be_silently_dropped(self):
+    def test_textured_glb_compiles_to_a100_omnipbr_and_preserves_registry(self):
+        mesh = trimesh.creation.icosphere(subdivisions=1)
+        mesh.visual = trimesh.visual.texture.TextureVisuals(
+            uv=mesh.vertices[:, :2] * 0.5 + 0.5,
+            material=trimesh.visual.material.PBRMaterial(
+                baseColorTexture=Image.new("RGB", (2, 2), (120, 90, 30)),
+                metallicRoughnessTexture=Image.new("RGB", (2, 2), (255, 64, 128)),
+                roughnessFactor=0.5,
+                metallicFactor=0.5,
+            ),
+        )
+        source = self.root / "textured.glb"
+        mesh.export(source)
+        record = export_mesh(source, self.asset / "mesh.json", self.asset / "source.glb")
+        textures = record["materials"][0]["textures"]
+        self.assertEqual(set(textures), {"base_color", "metallic_roughness"})
+        paths = ["mesh.json", "source.glb", *textures.values()]
+        registered = {path: (self.asset / path).read_bytes() for path in paths}
+        program = scene_program()
+        program["objects"][1].update(kind="mesh", asset_id=self.identity)
+        compiled = compile_scene(program, self.root, {})
+        self.assertEqual(len(compiled["texture_dependencies"]), 2)
+        self.assertIn('string info:mdl:sourceAsset:subIdentifier = "OmniPBR"', compiled["usd"])
+        self.assertIn('texCoord2f[] primvars:st', compiled["usd"])
+        self.assertIn('bool inputs:enable_ORM_texture = true', compiled["usd"])
+        self.assertIn('float inputs:RoughnessMultiplier = 0.5', compiled["usd"])
+        self.assertIn('float inputs:metallic_constant = 1.0', compiled["usd"])
+
+        stage = Usd.Stage.CreateInMemory()
+        self.assertTrue(stage.GetRootLayer().ImportFromString(compiled["usd"]))
+        mesh_prim = stage.GetPrimAtPath("/World/Objects/cube/Part0")
+        primvar = UsdGeom.PrimvarsAPI(mesh_prim).GetPrimvar("st")
+        self.assertEqual(primvar.GetInterpolation(), "vertex")
+        shader = UsdShade.Shader(stage.GetPrimAtPath("/World/Materials/cube_Part0/Surface"))
+        self.assertEqual(shader.GetPrim().GetAttribute(
+            "info:mdl:sourceAsset:subIdentifier").Get(), "OmniPBR")
+
+        package = self.root / "attempt"
+        package.mkdir()
+        scene = package / "scene.usda"
+        scene.write_text(compiled["usd"], encoding="utf-8")
+        dependencies = stage_texture_dependencies(compiled["texture_dependencies"], package)
+
+        class RecordingClient:
+            def __init__(self):
+                self.uploads = []
+
+            def upload(self, path, *, asset_id, relative_path):
+                with path.open("rb") as stream:
+                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                result = {"asset_id": asset_id, "relative_path": relative_path,
+                          "size_bytes": str(path.stat().st_size), "sha256": digest}
+                self.uploads.append(result)
+                return result
+
+        client = RecordingClient()
+        asset = upload_asset_bundle(client, scene, package, dependencies)
+        self.assertEqual(asset["relative_path"], "scene.usda")
+        self.assertEqual(len(client.uploads), 3)
+        self.assertEqual(len({upload["asset_id"] for upload in client.uploads}), 1)
+        self.assertEqual({upload["relative_path"] for upload in client.uploads},
+                         {"scene.usda", *(item["relative_path"] for item in dependencies)})
+        metallic = next(item["path"] for item in dependencies
+                        if "metallic_roughness" in item["relative_path"])
+        with Image.open(metallic) as image:
+            self.assertEqual(image.getpixel((0, 0))[2], 64)
+        self.assertEqual(registered, {path: (self.asset / path).read_bytes() for path in paths})
+
+    def test_unmapped_emissive_factor_fails_before_capture(self):
         record = {
             "vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            "faces": [[0, 1, 2]],
+            "faces": [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
             "coordinate_frame": "z_up",
-            "materials": [{"textures": {"base_color": "texture.png"}}],
+            "materials": [{"emissive_factor": [0.2, 0, 0], "textures": {}}],
         }
-        with self.assertRaises(UnsupportedScene):
+        with self.assertRaisesRegex(UnsupportedScene, "emissive_factor"):
+            self.compile(record)
+
+    def test_nonopaque_base_color_factor_fails_before_capture(self):
+        record = {
+            "vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            "faces": [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]],
+            "coordinate_frame": "z_up",
+            "materials": [{"base_color_factor": [1, 1, 1, 0.5], "textures": {}}],
+        }
+        with self.assertRaisesRegex(UnsupportedScene, "base-color opacity"):
             self.compile(record)
 
     # 验证无纹理 GLB 的颜色因子在导出和编译链路只应用一次。
@@ -130,7 +223,7 @@ class AssetCaptureContractTests(unittest.TestCase):
 
     # 验证当前适配器不支持的场景动作在入队前就被拒绝。
     def test_unsupported_scene_actions_are_rejected_before_queueing(self):
-        store = create_store(self.root, database_url=self.database_url)
+        store = create_store(self.root, database_url=use_postgres(self))
         self.addCleanup(store.repo.engine.dispose)
         with patch.dict(os.environ, {"BENCHFORGE_EXECUTION_MODE": "exploration"}):
             with self.assertRaisesRegex(ValueError, "native session"):

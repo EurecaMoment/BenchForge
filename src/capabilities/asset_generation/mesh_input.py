@@ -13,5 +13,5 @@ def validate_mesh_input(source):
     if suffix not in MESH_SUFFIXES:
         raise ValueError(
             'mesh_import accepts GLB, glTF, OBJ, PLY and STL static meshes. '
-            'USD and robot assets must use benchforge_isaac_sim upload/native import '
+            'Upload a USD root layer through benchforge_isaac_sim for native import. Convert non-USD robots with their joints first. Use this USD layer '
             'and a SceneProgram native_asset handle; mesh conversion does not preserve articulation.')

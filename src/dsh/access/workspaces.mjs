@@ -97,11 +97,13 @@ export class WorkspaceBindings {
     return copy(row);
   }
   /** 为新会话建立独立目录与保留状态；重入时核对父会话归属并复用已有绑定。 */
-  async reserve(sessionId, parentSessionId) {
+  async reserve(sessionId, parentSessionId, project) {
     return this.serial(sessionId, async () => {
       const prior = this.table.get(sessionId);
       if (prior) {
         if (prior.parentSessionId !== parentSessionId) throw new AccessError('Session parent binding changed');
+        if (project && (!prior.registeredProject || prior.rootPath !== project.path))
+          throw new AccessError('Session project binding changed');
         await this.verifyRoot(prior);
         return copy(prior);
       }
@@ -109,12 +111,21 @@ export class WorkspaceBindings {
         const parent = this.get(parentSessionId);
         if (parent.state !== 'active') throw new AccessError('Parent workspace is not active');
       }
-      const workspaceId = randomUUID(), rootPath = path.join(this.workspaceRoot, workspaceId);
-      await fs.mkdir(rootPath, {mode: 0o700});
-      await Promise.all(['tasks', 'inputs', 'outputs'].map(name => fs.mkdir(path.join(rootPath, name))));
+      // 侧栏移除后重新登记同一路径会分配新 ID，已持久化的数据库项目身份仍须复用。
+      const previousProject = project && [...this.table.entries()].find(([, row]) => row.registeredProject &&
+        row.hostId === this.hostId && row.ownerId === this.ownerId && row.rootPath === project.path)?.[1];
+      const workspaceId = project ? (previousProject?.workspaceId ?? project.id) : randomUUID();
+      const rootPath = project ? project.path : path.join(this.workspaceRoot, workspaceId);
       const row = {hostId: this.hostId, ownerId: this.ownerId, sessionId, workspaceId, rootPath,
         state: 'reserved', policyEpoch: 1, rootGeneration: 1, createdAt: Date.now(), grants: [],
+        ...(project ? {registeredProject: true} : {}),
         ...(parentSessionId ? {parentSessionId} : {})};
+      if (project) {
+        await this.verifyRoot(row);
+      } else {
+        await fs.mkdir(rootPath, {mode: 0o700});
+        await Promise.all(['tasks', 'inputs', 'outputs'].map(name => fs.mkdir(path.join(rootPath, name))));
+      }
       await this.table.put(sessionId, row);
       return copy(row);
     });
@@ -124,8 +135,12 @@ export class WorkspaceBindings {
     let actual;
     try { actual = await fs.realpath(row.rootPath); }
     catch { throw new AccessError('Managed workspace is missing; restore it explicitly.', 'BENCHFORGE_WORKSPACE_UNAVAILABLE'); }
-    if (actual !== row.rootPath || !within(this.workspaceRoot, actual) ||
-        actual === this.workspaceRoot || !(await fs.stat(actual)).isDirectory())
+    if (actual !== row.rootPath || !(await fs.stat(actual)).isDirectory())
+      throw new AccessError('Managed workspace identity changed');
+    if (row.registeredProject) {
+      if (row.parentSessionId || [this.workspaceRoot, this.resourceRoot].some(root => within(root, actual) || within(actual, root)))
+        throw new AccessError('Selected project overlaps a managed session or resource directory');
+    } else if (actual !== path.join(this.workspaceRoot, row.workspaceId) || !within(this.workspaceRoot, actual) || actual === this.workspaceRoot)
       throw new AccessError('Managed workspace identity changed');
     return actual;
   }
@@ -164,9 +179,12 @@ export class WorkspaceBindings {
   async exportPreparation(childId, parentId, destination) {
     const child = this.get(childId), parent = this.get(parentId);
     if (child.parentSessionId !== parentId || child.state !== 'active') throw new AccessError('Unknown preparation child');
+    await Promise.all([this.verifyRoot(child), this.verifyRoot(parent)]);
     const target = await fs.realpath(destination), source = path.join(child.rootPath, 'tasks', 'preparation');
-    if (!/^(tasks|synthesis)[\\/]/.test(path.relative(parent.rootPath, target)))
+    if (target !== destination || !/^(tasks|synthesis)[\\/]/.test(path.relative(parent.rootPath, target)))
       throw new AccessError('Handoff destination must be a parent draft directory');
+    if (await fs.realpath(source) !== source)
+      throw new AccessError('Preparation source no longer matches its managed draft directory');
     const files = [];
     let total = 0;
     for (const entry of await fs.readdir(source, {withFileTypes: true})) {

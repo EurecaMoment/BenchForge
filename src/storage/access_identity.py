@@ -53,8 +53,18 @@ def register_session_workspace(engine, *, host_id, session_id, owner_id, root_pa
             parent = connection.execute(_query(host_id, parent_session_id)).mappings().first()
             if not parent or parent["owner_id"] != owner_id or parent["state"] != "active":
                 raise PermissionError("Parent session is not authorized")
-        connection.execute(workspaces.insert().values(workspace_id=stable_id, host_id=host_id,
-            owner_id=owner_id, root_path=canonical, legacy_namespace=legacy_namespace))
+        # 两个会话可同时首次选中同一项目，由宿主和规范路径串行登记目录。
+        lock_entity(connection, "workspace-root", host_id, canonical)
+        existing = connection.execute(select(workspaces).where(workspaces.c.host_id == host_id,
+            workspaces.c.root_path == canonical).with_for_update()).mappings().first()
+        if existing:
+            if (workspace_id != existing["workspace_id"] or owner_id != existing["owner_id"]
+                    or existing["state"] != "active"
+                    or legacy_namespace not in (None, existing["legacy_namespace"])):
+                raise PermissionError("Project workspace identity does not match its registered directory")
+        else:
+            connection.execute(workspaces.insert().values(workspace_id=stable_id, host_id=host_id,
+                owner_id=owner_id, root_path=canonical, legacy_namespace=legacy_namespace))
         connection.execute(workspace_sessions.insert().values(host_id=host_id, session_id=session_id,
             workspace_id=stable_id, parent_session_id=parent_session_id))
         return _scope(connection.execute(_query(host_id, session_id)).mappings().one())
@@ -131,11 +141,11 @@ def workspace_namespace(engine, root_path, *, host_id=None, session_id=None):
         rows = connection.execute(query).mappings().all()
     if not rows:
         return legacy_workspace_id(root_path)
-    matches = [row["workspace_id"] for row in rows
+    matches = {row["workspace_id"] for row in rows
                if (host_id is None or row["host_id"] == identifier(host_id, "host"))
-               and (session_id is None or row["session_id"] == identifier(session_id, "session"))]
+               and (session_id is None or row["session_id"] == identifier(session_id, "session"))}
     if not matches:
         raise PermissionError("Workspace is not registered to this session")
     if len(matches) > 1:
         raise PermissionError("Workspace path has multiple Host identities; supply an explicit scope")
-    return matches[0]
+    return next(iter(matches))

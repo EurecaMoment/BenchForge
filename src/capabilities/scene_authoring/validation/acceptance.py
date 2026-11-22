@@ -18,6 +18,7 @@ from capabilities.scene_authoring.validation.policy import check_references
 from capabilities.scene_authoring.validation.policy import policy_for, structure, attachment
 from capabilities.scene_authoring.validation.preflight import inspect_program
 from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, format_issue
+from capabilities.scene_authoring.validation.review_reference import facing_observation_issue
 
 VISUAL_CHECKS = {'object_identity', 'realistic_scale', 'support_and_attachment',
                  'functional_layout', 'access_and_clearance', 'materials_and_lighting'}
@@ -242,6 +243,13 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
                     {row.get('index') for row in relevant} != expected_indices or
                     any(row.get('passed') is not True or not captured_observation(row,frames) for row in relevant)):
                 issues.append('Scene brief needs complete captured evidence for ' + key)
+            if key == 'relation_checks':
+                for row in relevant:
+                    relation = brief['relations'][row['index']]
+                    if relation['type'] == 'facing':
+                        issue = facing_observation_issue(relation, row, evidence.get('frames', []))
+                        if issue:
+                            issues.append(issue)
     expected_status='matches_declared_geometry' if style=='simplified_geometry' else 'visually_plausible'
     if not visual_pending and (review.get('acceptable') is not True or review.get('visual_realism', {}).get('status') != expected_status):
         issues.append('Captured views failed appearance/semantic acceptance')

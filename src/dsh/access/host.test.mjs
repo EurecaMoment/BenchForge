@@ -18,11 +18,11 @@ async function host(t) {
     storageDomain: {/** 提供按表隔离的内存存储域，供宿主插件测试持久化访问绑定。 */ open: async () => ({/** 按表名复用内存记录集，模拟存储域中的独立表。 */ table(name) {
       if (!tables.has(name)) {
         const rows = new Map();
-        tables.set(name, {/** 按测试键读取内存记录或模拟服务。 */ get: key => rows.get(key), /** 保存测试记录的副本，模拟持久化写入并防止引用共享。 */ put: async (key, value) => rows.set(key, structuredClone(value))});
+        tables.set(name, {entries: () => rows.entries(), /** 按测试键读取内存记录或模拟服务。 */ get: key => rows.get(key), /** 保存测试记录的副本，模拟持久化写入并防止引用共享。 */ put: async (key, value) => rows.set(key, structuredClone(value))});
       }
       return tables.get(name);
     }, /** 模拟资源关闭，并在用例配置了计数器时记录释放次数。 */ close: async () => {}})},
-    workspaceRegistry: {/** 创建测试会话或工作区适配器；会话路径覆盖时沿原生创建钩子与激活钩子执行。 */ create: async () => ({/** 记录工作区与会话的绑定操作。 */ attachSession: async () => {}})},
+    workspaceRegistry: {list: () => []},
     sandboxPolicy: {
       /** 返回当前会话的测试权限模式和已登记只读策略。 */
       resolve: ({session}) => ({mode: 'workspace-write', readAccess: policies.get(session)}),
@@ -39,8 +39,8 @@ async function host(t) {
   await apply(ctx, {workspaceRoot: path.join(folder, 'workspaces'), resourceRoot: path.join(folder, 'resources'),
     ownerId: 'owner', readOnlyRoots: [], skillsSource: path.dirname(skill)});
   /** 创建测试会话或工作区适配器；会话路径覆盖时沿原生创建钩子与激活钩子执行。 */
-  const create = async (id, parentSession) => {
-    const options = {sessionId: id, meta: {agentPreset: 'benchforge', cwd: folder, ...(parentSession ? {parentSession} : {})}};
+  const create = async (id, parentSession, cwd = folder) => {
+    const options = {sessionId: id, meta: {agentPreset: 'benchforge', cwd, ...(parentSession ? {parentSession} : {})}};
     const request = {options};
     const prepared = await hooks.get('agent/create')(request, async () => request.options);
     const disposers = [], agent = {id, session: {header: {id, ...prepared.meta}}, ctx: {/** 执行并保存 Agent 资源释放器，供测试确认授权会随会话释放。 */ effect: factory => disposers.push(factory())}};
@@ -56,6 +56,8 @@ test('native creation assigns isolated roots and all tools receive trusted scope
   const a = await create('a'), b = await create('b', 'a');
   assert.notEqual(a.prepared.meta.cwd, folder);
   assert.notEqual(a.prepared.meta.cwd, b.prepared.meta.cwd);
+  assert.deepEqual(ctx.benchforgeAccess.rootsFor(['a']).map(row => row.path), [a.prepared.meta.cwd]);
+  assert.deepEqual(ctx.benchforgeAccess.rootsFor(['b']).map(row => row.path), [b.prepared.meta.cwd]);
   const observed = await hooks.get('tools/execute')({agent: b.agent, arguments: {session_id: 'a'}}, async () => currentAccessScope());
   assert.equal(observed.session_id, 'b');
   assert.equal(observed.parent_session_id, 'a');
@@ -73,4 +75,29 @@ test('execution generations can advance without changing durable database policy
   await hooks.get('agent/created')({agent});
   assert.ok(policies.get(agent.session).epoch > revoked);
   assert.equal(ctx.benchforgeAccess.scope(agent.session).policy_epoch, 1);
+});
+
+test('a registered project is shared by top-level sessions and not inherited by children', async t => {
+  const {ctx, create, policies, folder} = await host(t);
+  const directory = path.join(folder, 'project');
+  await fs.mkdir(directory);
+  const project = {id: 'registered-project', path: await fs.realpath(directory), title: 'My project'};
+  ctx.workspaceRegistry.list = () => [project];
+  const [first, second] = await Promise.all([create('one', undefined, project.path), create('two', undefined, project.path)]);
+  for (const entry of [first, second]) {
+    assert.equal(entry.agent.session.header.cwd, project.path);
+    const scope = ctx.benchforgeAccess.scope(entry.agent.session);
+    assert.equal(scope.root_path, project.path);
+    assert.equal(scope.workspace_id, project.id);
+    assert.ok(policies.get(entry.agent.session).roots.includes(project.path));
+  }
+  assert.deepEqual(ctx.benchforgeAccess.rootsFor(['one', 'two']).map(entry => entry.path), [project.path]);
+  const child = await create('child', 'one', project.path);
+  assert.notEqual(child.prepared.meta.cwd, project.path);
+  assert.ok(!policies.get(child.agent.session).roots.includes(project.path));
+  const unselected = await create('another', undefined, folder);
+  assert.notEqual(unselected.prepared.meta.cwd, folder);
+  ctx.workspaceRegistry.list = () => [{...project, id: 'rejoined-sidebar-group'}];
+  const again = await create('three', undefined, project.path);
+  assert.equal(ctx.benchforgeAccess.scope(again.agent.session).workspace_id, project.id);
 });

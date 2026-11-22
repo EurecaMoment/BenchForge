@@ -5,13 +5,13 @@ import json
 from pathlib import Path, PurePosixPath
 import shlex
 import shutil
-import struct
 from urllib.parse import unquote, urlsplit
 import uuid
 
 from database.engine import engine_for
 from database.access import validate_scope
 from service_access.task_access import task_access as task_access
+from storage.gltf import gltf_document
 from storage.shared_assets import (publish_version, grant_version, list_versions,
                                    resolve_asset_version, resolve_storage_version)
 
@@ -34,20 +34,6 @@ def _file(root, relative):
     return candidate
 
 
-# 读取glTF文档或校验GLB头后提取JSON块。
-def _gltf_document(path):
-    if path.suffix.lower() == ".gltf":
-        return json.loads(path.read_text(encoding="utf-8"))
-    with path.open("rb") as source:
-        header = source.read(20)
-        if len(header) != 20:
-            raise ValueError("Truncated GLB")
-        magic, version, length, chunk_length, chunk_type = struct.unpack("<5I", header)
-        if magic != 0x46546C67 or version != 2 or length != path.stat().st_size or chunk_type != 0x4E4F534A or chunk_length > min(length - 20, 32 * 1024 * 1024):
-            raise ValueError("Invalid GLB header")
-        return json.loads(source.read(chunk_length).decode("utf-8"))
-
-
 # 提取glTF、OBJ和MTL中的外部文件引用，供依赖闭包验证。
 def _references(file):
     refs = []
@@ -63,7 +49,7 @@ def _references(file):
             elif isinstance(value, list):
                 for child in value:
                     visit(child)
-        visit(_gltf_document(file))
+        visit(gltf_document(file))
     elif file.suffix.lower() in {".obj", ".mtl"}:
         for line in file.read_text(encoding="utf-8").splitlines():
             fields = shlex.split(line, comments=True)

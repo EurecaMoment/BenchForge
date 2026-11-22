@@ -179,6 +179,13 @@ class GenerationTools:
             paths = [Path(result[key]) for key in ('depth', 'visualization', 'archive')]
         return all(p.is_file() and p.stat().st_size > 0 for p in paths)
 
+    @staticmethod
+    def _is_metric_depth(result):
+        depth_type = result.get('depth_type')
+        units = result.get('units')
+        return (depth_type in {'estimated_metric_depth', 'metric_depth', 'metric_depth_estimate'} and
+                isinstance(units, str) and units.strip().casefold() in {'m', 'meter', 'meters'})
+
     # 复用有效回执或调用指定模型，检查完整输出并响应取消请求。
     def execute(self, name, request, work, stop):
         work = Path(work).resolve()
@@ -198,7 +205,8 @@ class GenerationTools:
                 raise ValueError('generation request changed; create a new revision to preserve previous evidence')
             if response.exists():
                 result = json.loads(response.read_text(encoding='utf-8'))
-                if self._outputs_exist(name, request, result):
+                if (self._outputs_exist(name, request, result) and
+                        (name != 'depth' or self._is_metric_depth(result))):
                     return result
         provider = MODEL_PROVIDERS[name]
         settings = model_settings(_model_registry(), name)
@@ -217,6 +225,10 @@ class GenerationTools:
         result.update(status='ok', provider=provider, model=client.model)
         if not self._outputs_exist(name, request, result):
             raise ValueError(f'{provider} returned incomplete output')
+        if name == 'depth' and not self._is_metric_depth(result):
+            raise ValueError(
+                'FastDA3 must return estimated_metric_depth with units=m, meter or meters; '
+                'relative or unitless depth is rejected.')
         write_json(response, result)
         check_cancelled(stop, name)
         return result

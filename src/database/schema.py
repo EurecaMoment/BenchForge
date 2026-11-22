@@ -28,7 +28,7 @@ workspace_sessions = Table(
     "workspace_sessions", metadata,
     Column("host_id", String, primary_key=True),
     Column("session_id", String, primary_key=True),
-    Column("workspace_id", String, nullable=False, unique=True),
+    Column("workspace_id", String, nullable=False),
     Column("parent_session_id", String),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     ForeignKeyConstraint(["workspace_id", "host_id"], ["workspaces.workspace_id", "workspaces.host_id"],

@@ -1,6 +1,7 @@
 """Real PostgreSQL authorization and migration checks; opt-in disposable schemas."""
 
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import unittest
 import uuid
@@ -52,6 +53,43 @@ class AccessPostgresTests(unittest.TestCase):
             bind_run_scope(self.engine, b, "run-session-a")
         with self.assertRaises(PermissionError):
             query_records(self.engine, a, "runs")  # owner connections are not reader credentials
+
+    # 两个会话同时首次使用一个已选项目，检查身份复用、会话隔离以及旧版本约束升级。
+    def test_shared_project_registration(self):
+        from database.engine import dispose_engines
+        from database.migrations import versions
+        from database.schema import workspace_sessions
+        project = self.root / "shared"
+        project.mkdir()
+        with self.engine.begin() as connection:
+            connection.exec_driver_sql("ALTER TABLE workspace_sessions ADD UNIQUE (workspace_id)")
+            connection.execute(versions.delete().where(versions.c.version == 7))
+        dispose_engines()
+        self.engine = engine_for(self.url)
+
+        def register(session):
+            return register_session_workspace(self.engine, host_id="host", session_id=session,
+                workspace_id="selected-project", owner_id="owner", root_path=project)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first, second = pool.map(register, ["first", "second"])
+        self.assertEqual(first, register("first"))
+        self.assertEqual(first.workspace_id, second.workspace_id)
+        self.assertEqual(workspace_namespace(self.engine, project), first.workspace_id)
+        with self.engine.begin() as connection:
+            ids = connection.execute(select(workspace_sessions.c.session_id).where(
+                workspace_sessions.c.workspace_id == first.workspace_id)).scalars().all()
+            self.assertCountEqual(ids, ["first", "second"])
+            for scope in (first, second):
+                connection.execute(runs.insert().values(id="run-" + scope.session_id, state="PENDING",
+                    plan={}, workspace_id=scope.workspace_id, session_id=scope.session_id))
+        self.assertEqual([i["id"] for i in query_records(self.engine, first, "runs", enforce_role=False)["items"]],
+                         ["run-first"])
+        with self.assertRaises(PermissionError):
+            bind_run_scope(self.engine, second, "run-first")
+        with self.assertRaises(PermissionError):
+            register_session_workspace(self.engine, host_id="host", session_id="third",
+                owner_id="other", workspace_id=first.workspace_id, root_path=project)
 
     # 验证撤销使旧作用域失效，连接池复用不保留上一事务身份。
     def test_revoke_invalidates_old_scope_and_pool_state_is_transaction_local(self):

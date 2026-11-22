@@ -9,6 +9,7 @@ import {AccessError, WorkspaceBindings, within} from './workspaces.mjs';
 import {runWithAccessScope} from './context.mjs';
 import {systemReadRoots} from './runtime.mjs';
 import {publishResources} from './resources.mjs';
+import {lookupWorkspaceRoots, retireSessionRegistrations} from './workspace_registry.mjs';
 
 export const name = 'benchforge-access';
 export const inject = ['storageDomain', 'workspaceRegistry', 'sandboxPolicy'];
@@ -18,9 +19,10 @@ export const Config = Schema.object({
   skillsSource: Schema.string(), supportSource: Schema.string(),
 });
 const bindings = defineDomain({name: 'benchforge_access', version: 1, tables: {
-  identity: domainTable(z.object({hostId: z.string()})),
+  identity: domainTable(z.object({hostId: z.string(), sessionRegistrationsRetired: z.boolean().optional()})),
   workspaces: domainTable(z.object({hostId: z.string(), ownerId: z.string(), sessionId: z.string(),
-    workspaceId: z.string(), rootPath: z.string(), parentSessionId: z.string().optional(),
+    workspaceId: z.string(), rootPath: z.string(), registeredProject: z.literal(true).optional(),
+    parentSessionId: z.string().optional(), artifactRootId: z.string().optional(),
     state: z.enum(['reserved', 'active']), policyEpoch: z.number().int().positive(),
     rootGeneration: z.number().int().positive(), createdAt: z.number(),
     migrationFrom: z.object({sessionId: z.string(), revision: z.string(), copiedAt: z.number()}).optional(),
@@ -41,6 +43,10 @@ export async function apply(ctx, config) {
   const store = new WorkspaceBindings({table: domain.table('workspaces'), ...host,
     ownerId: config.ownerId, workspaceRoot: config.workspaceRoot, resourceRoot: config.resourceRoot});
   await store.initialize();
+  if (!host.sessionRegistrationsRetired) {
+    await retireSessionRegistrations(store, ctx.workspaceRegistry);
+    await table.put('host', {...host, sessionRegistrationsRetired: true});
+  }
   const packageDirectory = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
   const skillsRoot = await publishResources(config.skillsSource || path.join(packageDirectory, 'skills'),
     store.resourceRoot, 'skills', /\.md$/i);
@@ -71,6 +77,8 @@ export async function apply(ctx, config) {
   const managedAgent = agent => managed(agent?.session) ||
     agent?.ctx?.get?.('agentPresets')?.composedPreset(agent.ctx) === 'benchforge';
   const service = {
+    /** 按可信会话绑定查询工作台与采集可用的文件根目录。 */
+    rootsFor: (sessionIds, configuredPaths) => lookupWorkspaceRoots(store, ctx.workspaceRegistry, sessionIds, configuredPaths),
     /** 按会话标识读取受管工作区绑定。 */
     get: id => store.get(id), /** 从已激活的会话工作区构造可信访问作用域。 */ scope: session => store.scope(session),
     /** 为会话预留工作区，并记录可选的父会话归属。 */
@@ -115,7 +123,9 @@ export async function apply(ctx, config) {
     const parentId = options.meta?.parentSession;
     const parentBound = parentId && domain.table('workspaces').get(parentId);
     if (options.meta?.agentPreset !== 'benchforge' && !parentBound) return next();
-    const row = await store.reserve(options.sessionId, options.meta?.parentSession);
+    // 原生控制器已把选中的工作区解析为真实目录；只复用注册表内匹配的顶层项目。
+    const project = !parentId && ctx.workspaceRegistry.list().find(entry => entry.path === options.meta?.cwd);
+    const row = await store.reserve(options.sessionId, parentId, project || undefined);
     request.options = {...options, meta: {...options.meta, agentPreset: options.meta?.agentPreset || 'benchforge', cwd: row.rootPath}};
     return next();
   });
@@ -131,8 +141,6 @@ export async function apply(ctx, config) {
     });
     active.set(agent.session, row.policyEpoch);
     agent.ctx.effect(() => () => { active.delete(agent.session); dispose(); }, name);
-    const workspace = await ctx.workspaceRegistry.create(row.rootPath, 'BenchForge');
-    await workspace.attachSession(agent.id);
   }
   ctx.on('agent/created', /** Agent 完成创建后激活其工作区及只读访问策略。 */ async ({agent}) => activate(agent));
   for (const agent of ctx.get('agents')?.list() || []) {

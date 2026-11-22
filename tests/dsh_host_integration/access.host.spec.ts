@@ -1,5 +1,5 @@
 /** Keyless Host integration: real controllers, AgentLoop, filesystem and bwrap. */
-import {mkdtemp, readFile, realpath, rm, symlink, writeFile} from 'node:fs/promises'
+import {mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile} from 'node:fs/promises'
 import {homedir} from 'node:os'
 import {join} from 'node:path'
 import {randomUUID} from 'node:crypto'
@@ -92,6 +92,38 @@ async function boot(existingRoot?: string) {
 }
 
 describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host services', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：BenchForge with native DSH Host services。 */ () => {
+  it('uses the selected project for both sidebar membership and production files', async () => {
+    const {ctx, root, controller, call} = await boot()
+    const project = join(root, 'production-project')
+    await mkdir(project)
+    const workspace = await ctx.workspaceRegistry.create(project, 'Production')
+    const createInWorkspace = async () => {
+      const {sessionId} = await controller.create({sessionId: randomUUID() as never, agentPreset: 'benchforge', workspaceId: workspace.id})
+      const agent = ctx.agents.get(sessionId)
+      if (!agent) throw new Error('Selected-workspace session was not published')
+      return agent
+    }
+    const first = await createInWorkspace()
+    const second = await createInWorkspace()
+    expect(workspace.sessionIds).toEqual(expect.arrayContaining([first.id, second.id]))
+    const firstRoot = ctx.benchforgeAccess.scope(first.session).root_path
+    const secondRoot = ctx.benchforgeAccess.scope(second.session).root_path
+    expect(firstRoot).toBe(project)
+    expect(secondRoot).toBe(project)
+    expect(first.session.header.cwd).toBe(project)
+    expect(ctx.benchforgeAccess.scope(first.session).workspace_id).toBe(workspace.id)
+    const secret = join(root, 'outside.txt')
+    await writeFile(secret, 'OUTSIDE_PROJECT')
+    const read = await call(first, 'read', {file_path: secret})
+    expect(read.isError, text(read)).toBe(true)
+    const result = await call(first, 'bash', {description: 'Check execution and write access inside the selected project',
+      command: 'test ! -e ' + quote(secret) + ' && printf own > owned.txt'})
+    expect(result.isError, text(result)).toBe(false)
+    const shared = await call(second, 'read', {file_path: 'owned.txt'})
+    expect(shared.isError, text(shared)).toBe(false)
+    expect(text(shared)).toContain('own')
+  })
+
   it('creates isolated native sessions and enforces files, bash, skills and trusted tool scope', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：creates isolated native sessions and enforces files, bash, skills and trusted tool scope。 */ async () => {
     const {ctx, root, controller, create, call} = await boot()
     const [a, b] = await Promise.all([create(), create()])
@@ -99,7 +131,10 @@ describe.skipIf(process.platform !== 'linux')('BenchForge with native DSH Host s
     expect(aRoot).not.toBe(root)
     expect(aRoot).not.toBe(bRoot)
     expect(a.session.header.agentPreset).toBe('benchforge')
-    expect(ctx.workspaceRegistry.list().some(row => row.path === aRoot)).toBe(true)
+    expect(ctx.workspaceRegistry.list().some(row => row.path === aRoot || row.path === bRoot)).toBe(false)
+    const artifactRoots = ctx.benchforgeAccess.rootsFor([a.id]).map((entry: {path: string}) => entry.path)
+    expect(artifactRoots).toContain(aRoot)
+    expect(artifactRoots).not.toContain(bRoot)
     expect(ctx.benchforgeAccess.scope(a.session).session_id).toBe(a.id)
     expect((await controller.resolveAgent(a.id)).agent).toBe(a)
     const observation = await ctx.sessionQuery.observeSession(a.id)

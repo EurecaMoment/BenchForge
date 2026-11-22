@@ -38,7 +38,7 @@ export function createCaptureAssociations({ctx, roots}) {
     const additions = nativeCaptureAssociations(events);
     if (!additions.length) return;
     const cwd = await fs.realpath(agent.session.header.cwd);
-    const candidates = await Promise.all(roots(cwd).map(root => fs.realpath(root)));
+    const candidates = await Promise.all(roots(cwd, agent.id).map(root => fs.realpath(root)));
     const root = candidates.filter(root => inside(root, cwd)).sort((a, b) => b.length - a.length)[0];
     if (!root) return;
     const directory = path.join(root, '.benchforge', 'capture-associations');

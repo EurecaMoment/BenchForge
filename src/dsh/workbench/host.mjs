@@ -315,9 +315,10 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       ? await family(parentScope.session_id, request.signal) : [];
     const evidence = readEvidence && parentScope.session_id && !parentScope.history
       ? await readEvidence(parentScope.session_id, related, request.signal) : [];
+    const available = registered([parentScope.session_id, ...related.map(row => row.id)]);
     const roots = evidence.length
-      ? await resolveArtifactRoots(limits, registered(), url.searchParams.get('workspace_path') || '', evidence)
-      : await workspaceRoots(limits, registered(), url.searchParams.get('workspace_path') || '');
+      ? await resolveArtifactRoots(limits, available, url.searchParams.get('workspace_path') || '', evidence)
+      : await workspaceRoots(limits, available, url.searchParams.get('workspace_path') || '');
     const sessions = related.map((row) => row.id);
     const scope = scopeOf(url, sessions), scoped = {...limits, _sessionIds: sessions, _family: related};
     const example = await exampleWorkbench({roots, scope, url, request});
@@ -478,7 +479,8 @@ export async function apply(ctx, config) {
   const {associations} = ctx.benchforgeCapture;
   const readEvidence = createArtifactEvidenceReader(ctx.get('sessionQuery'));
   await ctx.sessionProjections.register(artifactProjection);
-  const baseDispatch = createWorkbenchDispatcher(config, () => ctx.workspaceRegistry.list(), sessionFamilyReader(ctx),
+  const baseDispatch = createWorkbenchDispatcher({...config, workspacePaths: []},
+    ids => ctx.benchforgeAccess.rootsFor(ids, config.workspacePaths), sessionFamilyReader(ctx),
     preparation, execution, associations, readEvidence);
   /** 执行统一工作台路由，并在阶段复核写入后立即协调生产续接状态。 */
   const dispatch = async (url, request) => {

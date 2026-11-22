@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from capabilities.isaac_sim.usd_materials import usd, array, material_usd
-from capabilities.isaac_sim.mesh_materials import author_mesh_materials
+from capabilities.isaac_sim.mesh_materials import author_mesh_materials, prepare_mesh_textures
 from capabilities.isaac_sim.scene_requirements import (
     UnsupportedScene, UNSUPPORTED_MATERIAL_FIELDS, validate_capture_requirements,
 )
@@ -64,6 +64,69 @@ def physics_lines(obj):
     return result
 
 
+# 每个可见分片只保留其面实际引用的顶点，并以同一索引同步 UV、法线和颜色。
+def _mesh_parts(mesh, vertices, transform, name, identity, material_settings, materials):
+    import numpy as np
+
+    faces = np.asarray(mesh.get('triangles', mesh.get('faces')))
+    if (faces.ndim != 2 or faces.shape[1] != 3 or not len(faces)
+            or faces.dtype.kind not in 'iu' or faces.min() < 0 or faces.max() >= len(vertices)):
+        raise ValueError('Registered mesh needs triangles with valid vertex indices')
+    records = mesh.get('materials') or [None]
+    assignments = mesh.get('material_index', [0] * len(faces))
+    if len(assignments) != len(faces):
+        raise ValueError('Mesh face material indices must match its triangles')
+    groups = {}
+    for face, index in enumerate(assignments):
+        if type(index) is not int or not 0 <= index < len(records):
+            raise ValueError('Mesh face material indices must match its triangles')
+        groups.setdefault(index, []).append(face)
+
+    normals = None
+    interpolation = mesh.get('normals_interpolation', 'vertex')
+    if mesh.get('normals'):
+        normals = transform_mesh_normals(mesh['normals'], transform['T_local_from_source'])
+        expected = len(vertices) if interpolation == 'vertex' else len(faces) * 3
+        if interpolation not in ('vertex', 'faceVarying') or len(normals) != expected:
+            raise ValueError('Mesh normals do not match their declared interpolation')
+    vertex_attributes = {}
+    for key in ('texcoords', 'colors', 'vertex_colors'):
+        if mesh.get(key):
+            if len(mesh[key]) != len(vertices):
+                raise ValueError(f'Mesh {key} must match its vertices')
+            vertex_attributes[key] = np.asarray(mesh[key])
+
+    separate_collider = len(groups) > 1
+    if separate_collider:
+        # 整网碰撞保持原拓扑。代理仅供物理使用，不参与渲染与实例标注。
+        yield name, vertices, faces, ['uniform token purpose = "proxy"', 'token visibility = "invisible"'], True, None
+    visuals = mesh.get('appearance', {}).get('source_visuals', [])
+    for index, selected in sorted(groups.items()):
+        part_name = f'{name}_Material{index}' if separate_collider else name
+        mat_name = f'{identity}_{part_name}'
+        if separate_collider:
+            used, remap = np.unique(faces[selected], return_inverse=True)
+            part_faces = remap.reshape(-1, 3)
+            points = vertices[used]
+        else:
+            used = slice(None)
+            part_faces, points = faces, vertices
+        subset = {'vertices': points, 'faces': part_faces, 'materials': [records[index]] if records[index] else [],
+                  'appearance': {'source_visuals': visuals[index:index + 1]}}
+        subset.update({key: values[used].tolist() for key, values in vertex_attributes.items()})
+        attrs, definitions = author_mesh_materials(subset, mat_name, material_settings)
+        materials.extend(definitions)
+        attrs.append('rel material:binding = </World/Materials/' + mat_name + '>')
+        if normals is not None:
+            sliced = (normals[used] if interpolation == 'vertex'
+                      else normals.reshape(-1, 3, 3)[selected].reshape(-1, 3))
+            attrs.append('normal3f[] normals = ' + array(sliced.tolist())
+                         + ' (interpolation = "' + interpolation + '")')
+        binding = {'material_index': index, 'material_prim': '/World/Scene/Materials/' + mat_name,
+                   'textures': (records[index] or {}).get('textures', {})}
+        yield part_name, points, part_faces, attrs, not separate_collider, binding
+
+
 # 将场景程序编译为USD与显式输入清单，真实执行证据仍由后续原生回执提供。
 def compile_scene(program, assets_root, settings):
     """Return USD bytes plus declared inputs; only later native receipts are evidence."""
@@ -81,6 +144,8 @@ def compile_scene(program, assets_root, settings):
     placements = {row['object_id']: row for row in preview['objects']}
     sources = settings.get('asset_sources', {})
     imports, entities, materials, nodes = [], {}, [], []
+    texture_dependencies = {}
+    mesh_assets, light_inputs = {}, []
     for obj in program['objects']:
         identity, kind = obj['id'], obj['kind']
         placement = placements[identity]
@@ -126,32 +191,51 @@ def compile_scene(program, assets_root, settings):
             visual_path = root + '/' + name
             mat_name = identity + '_' + name
             mat = material(program, part, settings_material) if parts else settings_material
-            attrs, primitive, vertices = [], {'box': 'Cube', 'sphere': 'Sphere', 'cylinder': 'Cylinder', 'mesh': 'Mesh'}.get(shape), None
+            attrs, primitive = [], {'box': 'Cube', 'sphere': 'Sphere', 'cylinder': 'Cylinder', 'mesh': 'Mesh'}.get(shape)
             if primitive is None:
                 raise UnsupportedScene(f'No A100 SceneProgram geometry mapping for {shape}')
             if shape == 'mesh':
-                mesh = load(obj['asset_id'])
+                mesh, dependencies = prepare_mesh_textures(
+                    load(obj['asset_id']), Path(assets_root) / obj['asset_id'], obj['asset_id'])
+                for dependency in dependencies:
+                    path = dependency['relative_path']
+                    if path in texture_dependencies and texture_dependencies[path] != dependency:
+                        raise ValueError('A100 texture bundle paths must have unique file content')
+                    texture_dependencies[path] = dependency
                 vertices, transform = transform_mesh_geometry(mesh['vertices'], obj['size'], mesh.get('coordinate_frame'), obj.get('mesh_transform'))
-                triangles = mesh.get('triangles', mesh.get('faces'))
-                if triangles is None:
-                    raise ValueError('Registered mesh has no triangles')
-                attrs += ['point3f[] points = ' + array(vertices.tolist()),
-                          'int[] faceVertexCounts = ' + '[' + ','.join('3' for _ in triangles) + ']',
-                          'int[] faceVertexIndices = [' + ','.join(str(i) for face in triangles for i in face) + ']',
-                          'uniform token subdivisionScheme = "none"']
-                mesh_attrs, mesh_materials = author_mesh_materials(mesh, mat_name, mat)
-                attrs += mesh_attrs
-                materials.extend(mesh_materials)
-                if mesh.get('normals'):
-                    normals = transform_mesh_normals(mesh['normals'], transform['T_local_from_source'])
-                    interpolation = mesh.get('normals_interpolation', 'vertex')
-                    expected = len(vertices) if interpolation == 'vertex' else len(triangles) * 3
-                    if interpolation not in ('vertex', 'faceVarying') or len(normals) != expected:
-                        raise ValueError('Mesh normals do not match their declared interpolation')
-                    attrs.append('normal3f[] normals = ' + array(normals.tolist()) +
-                                 ' (interpolation = "' + interpolation + '")')
-                dims = [1, 1, 1]
+                mesh_assets[identity] = {'entity_id': identity, 'asset_id': obj['asset_id'],
+                    'vertices': len(vertices), 'bindings': [], 'transform': transform}
+                for part_name, points, faces, part_attrs, collision, binding in _mesh_parts(
+                    mesh, vertices, transform, name, identity, mat, materials
+                ):
+                    if binding:
+                        mesh_assets[identity]['bindings'].append({'prim_path': root + '/' + part_name, **binding})
+                    part_attrs += [
+                        'point3f[] points = ' + array(points.tolist()),
+                        'int[] faceVertexCounts = [' + ','.join('3' for _ in faces) + ']',
+                        'int[] faceVertexIndices = [' + ','.join(map(str, faces.ravel().tolist())) + ']',
+                        'uniform token subdivisionScheme = "none"',
+                        'double3 xformOp:translate = ' + usd(part.get('offset', [0, 0, 0])),
+                        'float3 xformOp:rotateXYZ = ' + usd(part.get('rotation_deg_xyz', [0, 0, 0])),
+                        'double3 xformOp:scale = (1, 1, 1)',
+                        'uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]',
+                    ]
+                    apis = ['MaterialBindingAPI']
+                    if collision:
+                        apis += ['PhysicsCollisionAPI', 'PhysicsMeshCollisionAPI']
+                        part_attrs += [
+                            'bool physics:collisionEnabled = true',
+                            'rel material:binding:physics = </World/Physics/' + identity + '>',
+                            'uniform token physics:approximation = ' + usd('convexDecomposition' if obj['dynamic'] else 'none'),
+                        ]
+                        entity['geometry_parts'].append({'prim_path': root + '/' + part_name, 'shape': shape,
+                            'size': part['size'], 'offset': part.get('offset', [0, 0, 0]),
+                            'rotation_deg_xyz': part.get('rotation_deg_xyz', [0, 0, 0]),
+                            'vertices': points.tolist()})
+                    children.append(f'def Mesh "{part_name}" (prepend apiSchemas = {json.dumps(apis)}) {{\n' +
+                                    '\n'.join(part_attrs) + '\n}')
                 entity['mesh_transform'] = transform
+                continue
             else:
                 materials.append(material_usd(mat_name, mat))
                 if shape == 'box':
@@ -169,14 +253,10 @@ def compile_scene(program, assets_root, settings):
                 'double3 xformOp:scale = ' + usd(dims),
                 'uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]']
             apis = ['PhysicsCollisionAPI', 'MaterialBindingAPI']
-            if shape == 'mesh':
-                apis.append('PhysicsMeshCollisionAPI')
-                attrs.append('uniform token physics:approximation = "convexDecomposition"' if obj['dynamic'] else 'uniform token physics:approximation = "none"')
             children.append(f'def {primitive} "{name}" (prepend apiSchemas = {json.dumps(apis)}) {{\n' + '\n'.join(attrs) + '\n}')
             entity['geometry_parts'].append({'prim_path': visual_path, 'shape': shape,
                 'size': part['size'], 'offset': part.get('offset', [0, 0, 0]),
-                'rotation_deg_xyz': part.get('rotation_deg_xyz', [0, 0, 0]),
-                **({'vertices': vertices.tolist()} if vertices is not None else {})})
+                'rotation_deg_xyz': part.get('rotation_deg_xyz', [0, 0, 0])})
         attrs = physics_lines(obj) + ['custom string a100sim:semanticLabel = ' + usd(obj['label']),
             'double3 xformOp:translate = ' + usd(center),
             'float xformOp:rotateZ = ' + usd(obj.get('yaw_deg', 0)),
@@ -195,6 +275,8 @@ def compile_scene(program, assets_root, settings):
         if not light.get('enabled', True):
             continue
         kind = 'DomeLight' if light['kind'] == 'environment' else 'RectLight'
+        light_inputs.append({'prim_path': '/World/Scene/Lights/Light' + str(index), 'kind': kind,
+            'authored': {key: light[key] for key in ('id', 'color', 'intensity', 'size') if key in light}})
         attrs = ['color3f inputs:color = ' + usd(light.get('color', [1, 1, 1])),
                  'float inputs:intensity = ' + usd(light.get('intensity', 1))]
         if kind == 'RectLight':
@@ -217,5 +299,9 @@ def compile_scene(program, assets_root, settings):
                           ('Materials', materials), ('Physics', physical_materials)]:
         text += f'def Scope "{name}" {{\n' + '\n'.join(content) + '\n}\n'
     text += '}\n'
-    return {'usd': text, 'entities': entities, 'imports': imports, 'samples_per_pixel': spp,
+    return {'usd': text, 'entities': entities, 'imports': imports,
+            'mesh_assets': mesh_assets, 'light_inputs': light_inputs,
+            'texture_dependencies': [texture_dependencies[path]
+                                     for path in sorted(texture_dependencies)],
+            'samples_per_pixel': spp,
             'cameras': ['/World/Scene/Cameras/View' + str(i) for i in range(len(cameras))]}

@@ -10,7 +10,7 @@ import {z} from 'zod';
 import {createStageReviewReader,reviewReadConfig} from '../../../production/reviews.mjs';
 
 export const name = 'benchforge-capture';
-export const inject = ['workspaceRegistry','storageDomain','agents','sessionController'];
+export const inject = ['benchforgeAccess','storageDomain','agents','sessionController'];
 export const Config = Schema.object({
   ...reviewReadConfig,
   productionConfig: Schema.string().default(''),
@@ -35,7 +35,7 @@ export async function apply(ctx, config) {
   const {configPath} = loaded;
   const configuredRoots = config.workspacePaths?.length ? config.workspacePaths : [path.dirname(configPath)];
   /** 合并配置根目录和已注册工作区，过滤空路径并去重。 */
-  const roots = cwd => [...configuredRoots, ...ctx.workspaceRegistry.list().map(workspace => workspace.path)]
+  const roots = (cwd, sessionId) => ctx.benchforgeAccess.rootsFor([sessionId], configuredRoots).map(workspace => workspace.path)
     .filter(root => {
       const relative = path.relative(root, cwd);
       return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
@@ -69,7 +69,7 @@ export async function apply(ctx, config) {
       try {
         await continuation.resume(agent);
         const cwd=agent.session.header?.cwd;
-        if (cwd && roots(cwd).length && agent.session.header?.origin !== 'subagent')
+        if (cwd && roots(cwd, agent.id).length && agent.session.header?.origin !== 'subagent')
           await continuation.reconcile(agent,{recover:true});
       } catch(error) {ctx.logger(name).error(error);}
     },0);
@@ -82,7 +82,7 @@ export async function apply(ctx, config) {
     const decision = await next();
     if (decision.kind !== 'enter') return decision;
     const cwd = agent.session.header?.cwd;
-    if (cwd && roots(cwd).length && agent.session.header?.origin !== 'subagent') {
+    if (cwd && roots(cwd, agent.id).length && agent.session.header?.origin !== 'subagent') {
       await associations.record(agent, agent.session.snapshotEvents().slice(-64));
       await continuation.reconcile(agent,{signal});
     }
