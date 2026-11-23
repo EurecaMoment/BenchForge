@@ -134,6 +134,22 @@ test('failed repair notification identifies the preserved baseline across runs',
   await h.dispose();
 });
 
+test('a transport failure offers only the original failed task for retry, without repair feedback',async()=>{
+  const terminal=Promise.withResolvers();
+  const h=harness({read:()=>terminal.promise});h.plan();h.capture('sf_original');
+  await h.runtime.reconcile(h.agent);
+  assert.equal(h.runtime.waitingForCapture(h.agent),true);
+  terminal.resolve({run_id:'sf_original',state:'FAILED_FINAL',terminal:true,tasks:[
+    {id:'sf_original.scene0',state:'FAILED_FINAL',phase:'capture',failure:{stage:'capture_execution',error:'OperationalError'}},
+  ]});
+  await h.runtime.settled();
+  const message=h.sent[0].content[0].text;
+  assert.match(message,/"recovery":\{"tool":"benchforge_retry","arguments":\{"task_id":"sf_original.scene0"\}\}/);
+  assert.doesNotMatch(message,/本次采集验收失败|批量预检/);
+  assert.equal(h.runtime.waitingForCapture(h.agent),false);
+  await h.dispose();
+});
+
 test('a notice lost before log commit is redelivered after restart',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a notice lost before log commit is redelivered after restart。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();await h.dispose();
   const next=harness({data:h.data,events:h.events});next.runtime.restore();await next.runtime.settled();

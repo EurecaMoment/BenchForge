@@ -4,14 +4,16 @@ import {HarnessError} from '@deepseek-ai/dsh-error';
 import {createServiceClient, loadServiceConfig} from '../tools/scene/service_client.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 
+// 为连接恢复和有界退避预留同一总期限，调用者取消仍即时生效。
+const defaultReviewReadTimeoutMs = 30000;
 export const reviewReadConfig = {
   productionConfig: Schema.string().default(''),
-  reviewReadTimeoutMs: Schema.number().min(1).default(10000),
+  reviewReadTimeoutMs: Schema.number().min(1).default(defaultReviewReadTimeoutMs),
 };
 
 /** Only committed backend state may authorize production. No local DB or approval cache. */
 /** 创建有超时和调用取消约束的复核只读接口，复用服务客户端并允许失败后重连。 */
-export function createStageReviewReader({productionConfig, reviewReadTimeoutMs=10000,
+export function createStageReviewReader({productionConfig, reviewReadTimeoutMs=defaultReviewReadTimeoutMs,
   service, getEnvironmentValue}={}) {
   let client;
   /** 调用服务读取指定或最新复核，校验返回状态并传播取消及读取错误。 */

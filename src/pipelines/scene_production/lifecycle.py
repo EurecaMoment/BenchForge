@@ -23,6 +23,7 @@ class SceneLifecycle:
 
     # 按工作流及执行模式校验引用与显式程序要求，决定是否准入场景任务。
     def admit(self, intents, workflow, submitted_programs):
+        frozen_design = None
         scene_modes = (
             [intent.get("execution_mode") for intent in intents] if workflow == "scene" else []
         )
@@ -47,6 +48,9 @@ class SceneLifecycle:
                     admission = admit_program(
                         self.root, submission["program"], allow_generated=True, execution_mode=mode
                     )
+                    if len(intents) == 1 and intent.get('capture_only'):
+                        declaration = admission.get('scene_brief') or admission.get('geometry_exception') or {}
+                        frozen_design = {k: declaration[k] for k in ('id','plan_path','plan_version') if k in declaration}
                     lineage_task_id = intent.get("refine_task_id") or intent.get("extend_task_id")
                     if lineage_task_id:
                         from capabilities.scene_authoring.contracts.scene_design import (
@@ -65,6 +69,7 @@ class SceneLifecycle:
         for submission in submitted_programs or []:
             if submission:
                 validate_scene_requirements(submission["program"])
+        return frozen_design
 
     # 在场景工作流完成前要求有效的生产验收回执。
     def require_success(self, directory, unit):

@@ -19,11 +19,16 @@ const noticeKey = (record,context) => `capture:${record.owner}:${record.run_id}:
 /** 将结构化采集结果序列化为通知所需的文本内容。 */
 const text = record => {
   const state = outcome(record);
-  return `采集结果通知：${state}。${captureFailure(record.observation) ?
+  const notice=captureNotice({...record.observation,run_id:record.run_id},record.error);
+  const recovery=notice.tasks.some(task=>task.recovery);
+  return `采集结果通知：${state}。${recovery ?
+    '采集执行中断。对需要恢复的工作项直接使用下方 recovery 中的工具及原样参数。它会在原作业上续接已保存的原生回执。其他正在运行的作业由宿主分别跟踪。' :
+    (record.observation?.tasks || []).some(task=>task.failure?.scene_review || task.quality?.scene_quality_passed === false) ?
     '本次采集验收失败。读取完整审查文件，保留原始硬要求。从 repair_progress.next_base 指向的 task_id 和 revision 读取 program.json；用该版实拍和原生回执核实本轮修好、退化及尚未解决的项。回归时回到基线，单独复用有证据的改进；无进展时换一种修法。若缺少可比历史，先建立参照。以十轮批量修复为预算，优先解决共同根因；每轮预检后统一采集，超出预算说明剩余问题与策略，整体验收通过才推进。' :
     record.error ? '后台查询失败，保留原作业，先用 benchforge_wait(background=true) 恢复跟踪。不要重复提交仍在运行的作业。' :
+    captureFailure(record.observation) ? '读取对应工作项的 detail 与失败阶段，按服务回执恢复原任务。' :
     '提交受理、采集完成和场景验收是不同状态。读取实际回执，验收通过后续跑原评测；单次采集结束不等于整项任务交付。'}
-${JSON.stringify(captureNotice({...record.observation,run_id:record.run_id},record.error))}
+${JSON.stringify(notice)}
 如果真实外部条件阻止修复，使用 benchforge_scene_blocker 保存具体证据与缺失条件，然后向用户说明。可执行的下一步必须现在执行，不能只列计划就结束。`;
 };
 
@@ -50,6 +55,16 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
       instruction:'The host owns this wait and restores it after reload. Terminal success or failure returns to this session.'}});
   /** 列出指定会话拥有的全部持久化采集续接记录。 */
   const records = owner => [...table.entries()].map(([,row])=>row).filter(row=>row.owner === owner);
+  /** 只有本轮生产提交已由活跃观察器接管，才能在等待采集时正常收尾。 */
+  function waitingForCapture(agent) {
+    const context = history(agent.session);
+    const latest = context.captures.at(-1);
+    if (!latest || context.completed || context.interrupted) return false;
+    const key = keyOf(agent.id, latest.run_id);
+    const record = table.get(key);
+    return record?.state === 'watching' && record.task_seq === context.taskSeq &&
+      active.get(key)?.generation === record.generation;
+  }
   /** 优先使用已持有的 Agent，否则通过原生控制器恢复记录所有者。 */
   async function ownerOf(record) {
     return agents.get(record.owner) || await resolveAgent(record.owner);
@@ -279,5 +294,5 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
   }
   /** 禁止新增观察、取消整个续接寿命，并等待已持有任务退出。 */
   async function dispose() {closed = true;lifecycle.abort();await settled();}
-  return {register,reconcile,stopping,block,restore,resume,dispose,settled,records};
+  return {register,reconcile,stopping,block,restore,resume,dispose,settled,records,waitingForCapture};
 }

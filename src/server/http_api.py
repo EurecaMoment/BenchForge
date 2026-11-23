@@ -32,6 +32,9 @@ scene_intent = _scene_requests.scene_intent
 
 # 将领域异常映射为 HTTP 状态，区分缺失资源、拒绝访问、请求错误和内部故障。
 def request_error_status(method, exc):
+    from sqlalchemy.exc import OperationalError, TimeoutError as DatabaseTimeout
+    if isinstance(exc, (DatabaseTimeout, OperationalError)):
+        return 503
     if isinstance(exc, FileNotFoundError) or (isinstance(exc, KeyError) and method == 'GET'):
         return 404
     if isinstance(exc, PermissionError):
@@ -145,7 +148,8 @@ def main():
 
         # 序列化 JSON 响应，并将成功创建的运行绑定到当前已验证会话。
         def reply(self,value,status=200):
-            if status < 300 and isinstance(value, dict) and value.get('run_id'):
+            from server.access_requests import creates_run
+            if status < 300 and creates_run(urlparse(self.path).path) and isinstance(value, dict) and value.get('run_id'):
                 from service_access.access_scope import current_access
                 access = current_access()
                 if access is not None:

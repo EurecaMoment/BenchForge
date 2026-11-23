@@ -2,7 +2,6 @@
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
 from threading import Thread
 
 from sqlalchemy.exc import OperationalError
@@ -13,6 +12,7 @@ from capabilities.asset_generation.generation import ResourceWait
 from service_access.request_context import RunCancelled
 from storage.scene_jobs.store import uid
 from pipelines.scene_production.service_failures import stage_failure
+from pipelines.scene_production.stage_control import StageControl
 
 
 class _StageStore:
@@ -74,40 +74,13 @@ def coordinate(
     # 执行已领取阶段，持续续约并将取消或租约失效传播到规划、采集和评审。
     def execute(claimed_task, owner):
         stage_store = _StageStore(store, owner) if owner else store
-        lease_stop = Event()
+        task_stop = StageControl(store, claimed_task, owner, stop)
         lease_thread = None
         if owner and callable(getattr(store, 'renew_stage', None)):
-            # 定期续租；续租异常或所有权丢失时触发本阶段停止信号。
-            def keep_lease():
-                while not lease_stop.wait(15):
-                    try:
-                        renewed = store.renew_stage(claimed_task['id'], owner, lease_seconds=60)
-                    except Exception:
-                        renewed = False
-                    if not renewed:
-                        lease_stop.set()
-                        return
-
-            lease_thread = Thread(target=keep_lease, daemon=True)
+            lease_thread = Thread(target=task_stop.renew, daemon=True)
             lease_thread.start()
         try:
             try:
-                class TaskSignal:
-                    # 初始化运行取消状态及最近一次数据库检查时间。
-                    def __init__(self):
-                        self.checked = 0
-                        self.canceled = False
-
-                    # 合并服务停止、租约失效与运行取消状态，并限制数据库检查频率。
-                    def is_set(self):
-                        if time.monotonic() - self.checked > 3:
-                            self.canceled = (
-                                store.snapshot(claimed_task['run_id'])['state'] == 'CANCELED'
-                            )
-                            self.checked = time.monotonic()
-                        return stop.is_set() or lease_stop.is_set() or self.canceled
-
-                task_stop = TaskSignal()
                 task = claimed_task
                 phase = task['unit']['phase']
                 if phase == 'capture':
@@ -243,14 +216,14 @@ def coordinate(
                         state='CANCELED',
                         failure={'stage': claimed_task['unit'].get('phase'), 'error': str(exc)},
                     )
-                elif not stop.is_set():
+                elif not task_stop.detached():
                     stage_store.update(
                         claimed_task['id'],
                         state='FAILED_FINAL',
                         failure=stage_failure(exc, claimed_task['unit'].get('phase')),
                     )
         finally:
-            lease_stop.set()
+            task_stop.done.set()
             if lease_thread is not None:
                 lease_thread.join(timeout=1)
 
@@ -305,7 +278,11 @@ def coordinate(
 
                 owner = uid('stage')
                 if callable(getattr(store, 'claim_stage', None)):
-                    claimed = store.claim_stage(task['id'], owner)
+                    try:
+                        claimed = store.claim_stage(task['id'], owner)
+                    except (DatabaseTimeout, OperationalError):
+                        # 未确认领取成功时等待下一轮，已有租约防止重复执行。
+                        break
                     if not claimed:
                         continue
                     task = claimed

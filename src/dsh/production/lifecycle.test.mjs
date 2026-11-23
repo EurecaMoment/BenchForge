@@ -20,7 +20,7 @@ test('production projection consumes canonical execution metadata after a misspe
 });
 
 /** 创建可控时钟、事件投影、持久化表与调度队列，驱动生产复核生命周期测试。 */
-function harness() {
+function harness(waitingForCapture=()=>false) {
   let clock=100000,state=productionProjection.init({cwd:'/workspace'}),seq=0,live=true,restored=0;
   const events=[],sent=[],records=new Map(),timers=[];
   const agent={id:'session-test',status:'running',session:{header:{cwd:'/workspace'}},
@@ -34,7 +34,7 @@ function harness() {
   /** 用测试调度器、可控复核服务和 Agent 恢复计数创建生产生命周期实例。 */
   const create=(advanceReview)=>createProductionLifecycle({projection:{/** 返回夹具当前生产投影，模拟会话投影服务。 */ stateOf:()=>state},table,agents:{/** 按夹具的驻留标记决定当前 Agent 是否可直接取得。 */ get:()=>live?agent:undefined},advanceReview,
     /** 恢复测试 Agent 的驻留状态，并累计宿主恢复次数。 */
-    restoreAgent:async()=>{restored++;live=true;return agent;},
+    waitingForCapture,restoreAgent:async()=>{restored++;live=true;return agent;},
     /** 根据可控时钟返回复核等待或已到期状态。 */
     readReview:async()=>{
       if(review instanceof Error)throw review;
@@ -112,6 +112,18 @@ test('capture submissions and terminal notices project distinct production state
 const productionRequest={source:{kind:'user'},content:[{type:'text',text:
   '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段。\nexecution_mode=production；quantity_contract=minimum。\n生产100条机器狗轨迹数据。'}]};
 const emptyReply={message:{role:'assistant',content:[]}};
+
+test('a visible progress report can finish its turn while the host owns the wait',async()=>{
+  let watching=true;
+  const h=harness(()=>watching),runtime=h.create();
+  h.plan();h.receipt('benchforge_capture',{run_id:'sf_capture',state:'submitted'});
+  h.event('assistant/message',{message:{content:[{type:'text',text:'采集仍在执行。'}]}});
+  for(let i=0;i<4;i++)await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,0);
+  watching=false;
+  await runtime.stopping({agent:h.agent,turn:1});assert.equal(h.sent.length,1);
+  await runtime.dispose();
+});
 
 test('production is tracked before its first saved plan and an empty stop requests the next concrete action',/** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：production is tracked before its first saved plan and an empty stop requests the next concrete action。 */ async()=>{
   const h=harness();h.event('turn/start',{turn:1});h.event('user/message',productionRequest);

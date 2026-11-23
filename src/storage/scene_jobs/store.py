@@ -9,6 +9,7 @@ from database.schema import request_keys
 from storage.scene_jobs.metadata import Repository
 from storage.scene_jobs.metadata import runs
 from storage.scene_jobs.metadata import tasks
+from storage.scene_jobs.active_capture import capture_identity, find_active_capture
 from storage.files import safe_path
 from service_access.request_context import RunContext
 from service_access.access_scope import current_access
@@ -59,10 +60,12 @@ class Store:
                 session_id=external_context.session_id,
                 parent_run_id=inferred_parent,
             )
-        self.lifecycle.admit(intents, workflow, submitted_programs)
+        design = self.lifecycle.admit(intents, workflow, submitted_programs)
         submitted_programs=submitted_programs or []
         if submitted_programs and (workflow!='scene' or len(submitted_programs)!=len(intents)):
             raise ValueError('SceneProgram snapshots must align with scene intents')
+        identity = (capture_identity(intents, submitted_programs, design)
+                    if access is not None and not external_context.parent_run_id else None)
         with self.repo.transaction() as c:
             lock_entity(c, 'scene-request', key)
             old=c.execute(select(self.keys).where(self.keys.c.id==key)).mappings().first()
@@ -73,17 +76,28 @@ class Store:
                     prior_context.get(field) == getattr(external_context, field)
                     for field in ('workspace_id', 'session_id', 'parent_run_id')
                 )
+                if identity and context_matches and prior['plan'].get('capture_identity') == identity:
+                    return old['run_id']
                 previous_submissions = list(map(self.lifecycle.submission_identity, prior['plan'].get('submitted_programs', [])))
                 if (prior['plan'].get('intents')!=intents or prior['plan'].get('workflow','scene')!=workflow
                         or previous_submissions != list(map(self.lifecycle.submission_identity, submitted_programs)) or not context_matches):
                     raise ValueError('request_key already belongs to a different request')
                 return old['run_id']
+            if identity:
+                existing = find_active_capture(c, access.scope, identity)
+                if existing:
+                    c.execute(self.keys.insert().values(id=key, run_id=existing))
+                    return existing
             rid=uid('sf')
             run_context = external_context.for_run(rid)
             plan={'schema':'benchforge.pipeline/v1','intents':intents,'workflow':workflow,'created':time.time(),'code_version':'0.3.0'}
             if submitted_programs:plan['submitted_programs']=submitted_programs
             plan['context'] = run_context.to_dict()
-            c.execute(runs.insert().values(id=rid,state='PENDING',plan=plan,created_at=str(time.time()),code_revision='benchforge-0.2.0'))
+            scope_fields = {}
+            if identity:
+                plan['capture_identity'] = identity
+                scope_fields = {'session_id': access.scope.session_id, 'workspace_id': access.scope.workspace_id}
+            c.execute(runs.insert().values(id=rid,state='PENDING',plan=plan,created_at=str(time.time()),code_revision='benchforge-0.2.0',**scope_fields))
             for i,intent in enumerate(intents):
                 tid=f'{rid}.scene{i}'
                 unit={'intent':intent,'index':i,'workflow':workflow,'phase':workflow if workflow in {'asset','layout','generation'} else 'plan','revision':0}
@@ -102,6 +116,11 @@ class Store:
         if value['plan'].get('schema') != 'benchforge.pipeline/v1':
             raise ValueError('not a BenchForge run')
         return value
+
+    def run_state(self, rid):
+        """取消轮询只读取运行状态，避免反复加载完整场景及全部工作项。"""
+        with self.repo.engine.connect() as connection:
+            return connection.execute(select(runs.c.state).where(runs.c.id == rid)).scalar_one()
 
     # 锁定工作项后按预期状态和租约所有者更新字段，拒绝过期执行者写入。
     def update(self,tid,*,expected_state=None,expected_owner=None,**fields):

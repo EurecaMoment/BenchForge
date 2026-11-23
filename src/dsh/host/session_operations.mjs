@@ -43,6 +43,7 @@ export async function apply(ctx, config) {
     advanceReview:reviews.advance,createMessage:createUserMessage,/** 记录后台生产生命周期中的异常，保留宿主故障线索。 */ onError:error=>logger.error(error),maxStopRecoveries:config.maxStopRecoveries,
     /** 在恢复生产前协调该会话仍在进行的采集续接任务。 */
     reconcileCaptures:(agent,signal)=>ctx.get('benchforgeCapture')?.continuation.reconcile(agent,{signal}),
+    waitingForCapture:agent=>ctx.get('benchforgeCapture')?.continuation.waitingForCapture(agent),
     /** 经官方会话控制器恢复指定 Agent，并把解析失败向调用方传播。 */
     restoreAgent:async id=>{
       const result=await ctx.sessionController.resolveAgent(id);

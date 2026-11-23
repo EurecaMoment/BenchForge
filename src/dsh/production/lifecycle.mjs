@@ -6,7 +6,7 @@ import {reviewSnapshot, reviewNotice, reviewChanges} from './review_snapshot.mjs
 /** Conversation policy; all facts come from the projection and domain receipts. */
 /** 创建生产任务生命周期控制器，按会话协调复核、停止恢复、通知去重和宿主卸载。 */
 export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
-  schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
+  waitingForCapture=()=>false,schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
   const timers=new Map(), queues=new Map(), reminders=new Map(), checks=new Map();
   const lifetime=new AbortController();
   let disposed=false;
@@ -213,6 +213,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const delivered=view.state==='completed'&&view.delivered;
     const visible=state.lastResponse?.visible ?? view.lastTextSeq>=0;
     if((waiting||blocked||delivered)&&visible)return;
+    if(visible && view.state==='waiting_capture' && waitingForCapture(agent))return;
     const key=`${agent.id}:${turn}:${view.state}:${view.plan}:${view.run}:${view.completed}:${review?.review_id||0}:${review?.state||''}`;
     const last=reminders.get(agent.id);
     if(last?.stop===key&&last.response===state.lastResponse?.seq)return;

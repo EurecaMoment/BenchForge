@@ -9,6 +9,11 @@ _START = {"/start", "/capture", "/layout", "/asset", "/diffusion", "/sam3",
 _PATHS = {"source_image", "source_mask", "source_mesh", "source_gaussian", "scene_program_path"}
 
 
+def creates_run(route):
+    """只在创建运行的入口登记身份，状态轮询复用既有授权。"""
+    return route in _START
+
+
 # 在读取业务运行前核对其已存工作区与会话归属，可信操作者请求沿用独立认证。
 def require_run(engine, run_id):
     access = current_access()
@@ -50,7 +55,7 @@ def authorize_request(store, route, value):
         return {'session_id': access.scope.session_id}
     if route == '/workbench/scene-catalog':
         raise PermissionError('Use the authorized shared asset catalog')
-    if route in _START:
+    if creates_run(route):
         result["context"] = {"workspace_id": access.scope.workspace_id, "session_id": access.scope.session_id}
         if result.get("request_key"):
             # Idempotency keys cannot collide with another session's request.
