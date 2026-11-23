@@ -48,7 +48,7 @@ def _overview():
             'limit': 'positive count, default 20; pages fit the response byte budget', 'workspace_id': 'optional lossless JSON copy of all matches'},
         'workflow': [
             'For a new scene, first generate or reuse a scene-wide diffusion design reference and inspect its image. Use an existing user reference when supplied. Choose benchforge_diffusion or the optional benchforge_layout pipeline; asset product images do not replace the scene reference. Use the reference to choose spatial composition, asset reuse or generation, material detail and lighting, then build SceneProgram and compare actual captures against it. Keep the reference available for later corrections; it is a design target, not geometry or GT.',
-            'TRELLIS.2 returns Y-up PBR meshes. Register them with mesh_import, then choose their placement and physical dimensions.',
+            'Use TRELLIS.2 for suitable standalone scene objects when no semantically matching registered asset exists. The benchforge_trellis task registers each returned Y-up PBR mesh and includes its asset_id in generation_stage.json; use that ID in SceneProgram with kind=mesh. Use mesh_import only for a separate user-provided static mesh. Structural architecture and articulated robots should use appropriate native or procedural representations.',
             'Independent tools produce images, masks, meshes and depth predictions. Read task evidence before using outputs.',
             'Optional pipelines: layout prepares a design reference; asset generates a registered asset; run plans, captures and exports a scene.',
             'Write SceneProgram with standard file tools or task_code and submit scene_program_path to preserve your design. Scene data, assets, lights and cameras are operator-controlled.',
@@ -72,7 +72,7 @@ def _load_rows(store, section, item_id, settings=None):
         tools = {
             'diffusion':{'tool':'benchforge_diffusion','inputs':'prompt; optional source_image for editing','outputs':'image source_path'},
             'sam3':{'tool':'benchforge_scene_sam3','inputs':'source_image and prompts or pixel box instances','outputs':'all masks, boxes and scores'},
-            'trellis':{'tool':'benchforge_trellis','inputs':'source_image and objects with selected source_mask','outputs':'Y-up PBR meshes with unmeasured scale'},
+            'trellis':{'tool':'benchforge_trellis','inputs':'source_image and objects with selected source_mask','outputs':'registered Y-up PBR meshes with asset_id and unmeasured scale'},
             'depth':{'tool':'benchforge_depth','inputs':'source_image','outputs':'predicted depth arrays, camera parameters and visualization'},
             'mesh_import':{'tool':'benchforge_mesh_import','inputs':'static GLB/glTF/OBJ/PLY/STL source_mesh, label and source frame; optional source_gaussian; USD/robots use native upload/import','outputs':'registered asset_id and geometry'},
         }

@@ -171,8 +171,15 @@ def validate_reference(design, object_ids=None):
         keys = ('origin_object_id', 'observer_object_id', 'facing_target_object_id') if frame['kind'] == 'user' else ('origin_object_id',)
         if any(not isinstance(frame.get(k), str) or not frame[k].strip() for k in keys):
             raise ValueError('spatial reference needs explicit source objects')
-        if object_ids is not None and any(frame[k] not in object_ids for k in keys):
-            raise ValueError('spatial reference names an unavailable object')
+        if object_ids is not None:
+            missing = [(key, frame[key]) for key in keys if frame[key] not in object_ids]
+            if missing:
+                details = ', '.join(f"{key}={value!r}" for key, value in missing)
+                available = ', '.join(sorted(object_ids)) or '(none)'
+                raise ValueError(
+                    f"spatial reference frame {frame['id']!r} names unavailable object(s): {details}; "
+                    f'current program object IDs: {available}'
+                )
         if frame['kind'] == 'user':
             if frame.get('front') not in {'toward_observer', 'observer_forward'}:
                 raise ValueError('user frame front must distinguish work-surface front from observer forward')
@@ -392,7 +399,12 @@ def scene_brief(program, policy=None, root=None, *, resolved_design=_UNRESOLVED_
         return None
     _, design, path = saved
     if not ((policy or {}).get('require_scene_brief') or (policy or {}).get('enforce_realism')) and 'summary' not in design:return None
-    validate_scene_brief(design, {obj['id'] for obj in program['objects']})
+    try:
+        validate_scene_brief(design, {obj['id'] for obj in program['objects']})
+    except ValueError as error:
+        raise ValueError(
+            f"Saved scene plan {path} design {design['id']!r} is incompatible with this program: {error}"
+        ) from error
     if root:
         for source in program.get('provenance',{}).get('sources',[]):
             if not isinstance(source,dict) or source.get('kind')!='original_scene':continue

@@ -7,12 +7,14 @@ from threading import Event
 import unittest
 from unittest.mock import Mock, patch
 
+from capabilities.isaac_sim.native_geometry import NativeAssetGeometryError
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
 from pipelines.scene_production.lifecycle import SceneLifecycle
 from pipelines.scene_production import repair
 from pipelines.scene_production.scheduler import coordinate
 from pipelines.scene_production.service_failures import (
-    SERVICE_OWNER, SERVICE_STAGE, is_service_failure, stage_failure,
+    SERVICE_OWNER, SERVICE_STAGE, is_execution_diagnosis, is_remote_job_failure,
+    is_service_failure, stage_failure,
 )
 from service_access.scene_service import ScenePreflightRejected
 
@@ -135,6 +137,44 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
         self.assertEqual(failure['issues'], [service_issue()])
         self.assertEqual(failure['stage'], SERVICE_STAGE)
 
+    def test_native_terminal_job_receipt_is_persisted_without_service_guessing(self):
+        """Native failed-job operation and reason survive capture failure serialization."""
+        error = RuntimeError('Isaac Sim job job-1 FAILED: ImportError: native material')
+        error.job = {'job_id': 'job-1', 'request_id': 'request-1', 'operation': 'scene.capture',
+                     'state': 'FAILED', 'failure': {'code': 'ImportError', 'message': 'native material'},
+                     'artifacts': [], 'timings': {'total_seconds': 1.0}, 'result': {'large': 'omitted'}}
+        failure = stage_failure(error, 'capture')
+        self.assertEqual(failure['remote_job_failure'], {
+            'job_id': 'job-1', 'request_id': 'request-1', 'operation': 'scene.capture',
+            'state': 'FAILED', 'failure': {'code': 'ImportError', 'message': 'native material'},
+            'artifacts': [], 'timings': {'total_seconds': 1.0},
+        })
+        self.assertTrue(is_remote_job_failure(failure))
+        self.assertFalse(is_service_failure(failure))
+        self.assertEqual(failure['repair_owner'], 'isaac_sim_execution')
+        self.assertFalse(failure['retry_unchanged'])
+        error.job['state'] = 'CANCELLED'
+        self.assertFalse(is_execution_diagnosis(stage_failure(error, 'capture')))
+
+    def test_missing_native_geometry_is_typed_as_execution_diagnosis(self):
+        """Missing measured geometry/colliders are retained outside layout repair."""
+        error = NativeAssetGeometryError('wheel', geometry_present=True, colliders_present=False)
+        failure = stage_failure(error, 'capture')
+        self.assertEqual(failure['issues'][0]['code'], 'native_asset_geometry_missing')
+        self.assertEqual(failure['issues'][0]['object_ids'], ['wheel'])
+        self.assertTrue(failure['issues'][0]['evidence']['measured_geometry_present'])
+        self.assertFalse(failure['issues'][0]['evidence']['enabled_colliders_present'])
+        self.assertTrue(is_execution_diagnosis(failure))
+        self.assertFalse(is_service_failure(failure))
+
+    def test_native_execution_diagnosis_cannot_retry_the_unchanged_capture(self):
+        """Same-scene retry is blocked until diagnosis produces a corrected submission."""
+        task = deepcopy(self.task)
+        task['failure'] = stage_failure(NativeAssetGeometryError(
+            'wheel', geometry_present=True, colliders_present=False), 'capture')
+        with self.assertRaisesRegex(ValueError, 'unchanged capture is blocked'):
+            SceneLifecycle(self.root).retry(task, None, 'auto', self.directory)
+
     def test_repair_stops_before_model_on_service_preflight_failure(self):
         """基线实时预检发现服务错配时不调用模型，也不修改场景。"""
         report = {'issues': [service_issue()], 'passed': False}
@@ -178,7 +218,7 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
         self.assertEqual(record['attempt'], 0)
         self.assertEqual(record['pending_repair_attempt'], 1)
 
-    def run_repair_batch_once(self, record, response):
+    def run_repair_batch_once(self, record, response, *, expect_repair=False):
         """驱动一次真实批次循环并保存状态，隔离审核、HTTP 和后续轮询。"""
         batch = self.root / 'batch'
         repair.save(batch / 'targets.json', [{'id': 'source', 'name': 'scene',
@@ -199,7 +239,10 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
               patch.object(repair.time, 'sleep', side_effect=StopIteration)):
             with self.assertRaises(StopIteration):
                 repair.main()
-        revise.assert_not_called()
+        if expect_repair:
+            revise.assert_called_once()
+        else:
+            revise.assert_not_called()
         return json.loads(status.read_text())
 
     def test_batch_http_admission_failure_waits_instead_of_repairing(self):
@@ -223,6 +266,70 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
         self.assertEqual(result['service_resume_state'], 'capturing')
         self.assertEqual(result['attempt'], 1)
         self.assertEqual(result['failure']['issues'], self.error.issues)
+
+    def test_batch_native_terminal_failure_requires_diagnosis_without_revising_or_recapturing(self):
+        """A terminal Isaac receipt is retained and never routed to automatic scene rewrite."""
+        record = {'state': 'capturing', 'attempt': 1, 'name': 'scene',
+                  'run_id': 'run', 'task_id': 'run.scene'}
+        error = RuntimeError('Isaac Sim job job-1 FAILED: material mapping')
+        error.job = {'job_id': 'job-1', 'request_id': 'request-1', 'operation': 'scene.capture',
+                     'state': 'FAILED', 'failure': {'code': 'UnsupportedMaterial',
+                     'message': 'No faithful PBR mapping for native material None'}, 'artifacts': []}
+        task = {**self.task, 'state': 'FAILED_FINAL',
+                'failure': stage_failure(error, 'capture')}
+        result = self.run_repair_batch_once(record, {'tasks': [task]})
+        self.assertEqual(result['state'], 'needs_execution_diagnosis')
+        self.assertEqual(result['attempt'], 1)
+        self.assertEqual(result['failure']['remote_job_failure']['failure']['message'],
+                         'No faithful PBR mapping for native material None')
+
+    def test_batch_native_geometry_failure_requires_diagnosis_without_revising_or_recapturing(self):
+        """A missing native collider receipt cannot become a scene-layout repair request."""
+        record = {'state': 'capturing', 'attempt': 1, 'name': 'scene',
+                  'run_id': 'run', 'task_id': 'run.scene'}
+        task = {**self.task, 'state': 'FAILED_FINAL',
+                'failure': stage_failure(NativeAssetGeometryError(
+                    'pottery_wheel', geometry_present=True, colliders_present=False), 'capture')}
+        result = self.run_repair_batch_once(record, {'tasks': [task]})
+        self.assertEqual(result['state'], 'needs_execution_diagnosis')
+        self.assertEqual(result['attempt'], 1)
+        self.assertEqual(result['failure']['issues'][0]['code'], 'native_asset_geometry_missing')
+
+    def test_batch_visual_acceptance_failure_still_queues_scene_repair(self):
+        """Captured visual/physical rejection continues through the existing repair route."""
+        record = {'state': 'capturing', 'attempt': 1, 'name': 'scene',
+                  'run_id': 'run', 'task_id': 'run.scene'}
+        task = {**self.task, 'state': 'FAILED_FINAL',
+                'unit': {**self.task['unit'], 'phase': 'review'},
+                'failure': {'scene_review': {'passed': False, 'issues': ['visible object floats']}}}
+        self.run_repair_batch_once(record, {'tasks': [task]}, expect_repair=True)
+
+    def test_repair_batch_reports_failures_instead_of_claiming_success(self):
+        targets = [{'id': 'good'}, {'id': 'bad'}, {'id': 'blocked'}]
+        for identity, state in (('good', 'accepted'), ('bad', 'failed_final'),
+                                ('blocked', 'needs_execution_diagnosis')):
+            path = self.root / identity / 'status.json'
+            repair.save(path, {'state': state})
+
+        summary = repair.batch_summary(targets, self.root)
+
+        self.assertEqual(summary['state'], 'blocked')
+        self.assertEqual(summary['accepted'], ['good'])
+        self.assertEqual(summary['failed'], ['bad'])
+        self.assertEqual(summary['blocked'], ['blocked'])
+        self.assertEqual((summary['accepted_count'], summary['failed_count'], summary['blocked_count']), (1, 1, 1))
+
+    def test_repair_batch_succeeds_only_when_every_target_is_accepted(self):
+        targets = [{'id': 'first'}, {'id': 'second'}]
+        for target in targets:
+            repair.save(self.root / target['id'] / 'status.json', {'state': 'accepted'})
+
+        summary = repair.batch_summary(targets, self.root)
+
+        self.assertEqual(summary['state'], 'succeeded')
+        self.assertEqual(summary['accepted_count'], len(targets))
+        self.assertEqual(summary['failed_count'], 0)
+        self.assertEqual(summary['blocked_count'], 0)
 
 
 if __name__ == '__main__':

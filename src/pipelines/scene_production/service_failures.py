@@ -32,6 +32,43 @@ def is_service_failure(value):
     return any(is_service_failure(row) for row in failure_issues(value))
 
 
+def remote_job_failure(value):
+    """Return a bounded receipt for an Isaac terminal-job failure, if present."""
+    job = getattr(value, 'job', None)
+    if not isinstance(job, dict):
+        return None
+    failure = job.get('failure')
+    if (not isinstance(job.get('job_id'), str) or not job['job_id']
+            or not isinstance(job.get('operation'), str) or not job['operation']
+            or job.get('state') != 'FAILED'
+            or not isinstance(failure, dict)
+            or not isinstance(failure.get('code'), str)
+            or not isinstance(failure.get('message'), str)):
+        return None
+    return {key: deepcopy(job[key]) for key in
+            ('job_id', 'request_id', 'operation', 'state', 'failure', 'artifacts', 'timings')
+            if key in job}
+
+
+def is_remote_job_failure(value):
+    """Recognize a persisted native terminal receipt without guessing from prose."""
+    return isinstance(value, dict) and isinstance(value.get('remote_job_failure'), dict)
+
+
+def is_execution_diagnosis(value):
+    """Return diagnosis evidence for typed native execution failures only."""
+    if isinstance(value, dict):
+        if value.get('execution_diagnosis') == 'isaac_sim_execution':
+            return True
+        if is_remote_job_failure(value):
+            return True
+        return any(is_execution_diagnosis(row) for row in failure_issues(value))
+    if remote_job_failure(value) is not None:
+        return True
+    return any(row.get('repair_owner') == 'isaac_sim_execution'
+               for row in failure_issues(value))
+
+
 def stage_failure(error, phase):
     """持久保存阶段异常及完整服务问题，避免把服务错配交给几何修复。"""
     failure = {'error': type(error).__name__, 'detail': str(error)[:1000]}
@@ -40,6 +77,14 @@ def stage_failure(error, phase):
         failure['issues'] = issues
     if phase == 'capture':
         failure.update(stage='capture_execution', native_receipts_retained=True)
+        remote = remote_job_failure(error)
+        if remote is not None:
+            failure.update(remote_job_failure=remote, repair_owner='isaac_sim_execution',
+                           retry_unchanged=False)
+        issues = failure_issues(error)
+        if any(row.get('repair_owner') == 'isaac_sim_execution' for row in issues):
+            failure.update(execution_diagnosis='isaac_sim_execution',
+                           repair_owner='isaac_sim_execution', retry_unchanged=False)
     if is_service_failure(error):
         failure.update(stage=SERVICE_STAGE, repair_owner=SERVICE_OWNER, retry_unchanged=False)
     return failure

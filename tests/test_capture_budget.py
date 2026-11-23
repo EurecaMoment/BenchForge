@@ -15,7 +15,8 @@ from server.http_api import request_error_payload
 from service_access.access_scope import TrustedAccess, access_context
 from service_access.request_context import RunCancelled
 from storage.access_identity import register_session_workspace
-from storage.scene_jobs.capture_budget import CaptureBudgetExhausted, LIMIT, RESERVATION_EVENT
+from storage.scene_jobs.capture_budget import CaptureBudgetExhausted, LIMIT, RESERVATION_EVENT, scene_key
+from storage.scene_jobs.repair_history import repair_history
 from tests.database_fixtures import use_postgres
 
 
@@ -29,6 +30,10 @@ class CaptureBudgetTests(unittest.TestCase):
             self.store.repo.engine, host_id='test', session_id=sid, owner_id='owner',
             workspace_id='workspace-test', root_path=self.root,
         ) for sid in ('one', 'two')}
+        self.scopes['other_host_same_session'] = register_session_workspace(
+            self.store.repo.engine, host_id='other-host', session_id='one', owner_id='owner',
+            workspace_id='workspace-other', root_path=self.root,
+        )
         self.design = {'id': 'frozen-design', 'plan_path': '/saved/plan.json', 'plan_version': [8, 42]}
         self.enterContext(patch.object(self.store.lifecycle, 'admit', side_effect=lambda *_: self.design))
 
@@ -134,8 +139,57 @@ class CaptureBudgetTests(unittest.TestCase):
             ('export-only', {'views': []}),
         ):
             self.assertTrue(self.submit(name, **options)[0])
-        self.design = {**self.design, 'plan_version': [10, 43]}
-        self.assertTrue(self.submit('new-frozen-design')[0])
+        self.design = {**self.design, 'plan_path': '/workspace/revisions/scene-plan-r2.json',
+                       'plan_version': [10, 43]}
+        with self.assertRaises(CaptureBudgetExhausted):
+            self.submit('same-design-resaved-plan')
+        self.design = {**self.design, 'id': 'another-design'}
+        self.assertTrue(self.submit('new-design-identity')[0])
+
+    def test_scene_budget_identity_ignores_plan_revisions_and_geometry_but_keeps_scene_design_boundary(self):
+        program = {'scene_id': 'room'}
+        original = {'id': 'design-a', 'plan_path': '/saved/plan.json', 'plan_version': [8, 42]}
+        resaved = {**original, 'plan_path': '/saved/revisions/plan-r2.json', 'plan_version': [10, 43]}
+        self.assertEqual(scene_key(program, original), scene_key(program, resaved))
+        self.assertEqual(scene_key({'scene_id': 'room', 'objects': [{'id': 'changed'}]}, original),
+                         scene_key(program, original))
+        self.assertNotEqual(scene_key(program, original), scene_key(program, {**resaved, 'id': 'design-b'}))
+        self.assertNotEqual(scene_key(program, original), scene_key({'scene_id': 'room-v2'}, original))
+
+    def test_durable_reservations_survive_plan_relocation(self):
+        self.seed(LIMIT)
+        self.design = {**self.design, 'plan_path': '/workspace/revisions/plan-r2.json',
+                       'plan_version': [10, 43]}
+        with self.assertRaises(CaptureBudgetExhausted) as error:
+            self.submit('would-be-eleventh-after-plan-relocation')
+        self.assertEqual(error.exception.budget['used'], LIMIT)
+
+    def test_scene_budget_is_scoped_to_workspace_and_session(self):
+        self.seed(LIMIT, legacy=True)
+
+        other_session = self.submit('same-design-other-session', session='two')
+        other_workspace = self.submit('same-design-other-workspace', session='other_host_same_session')
+
+        self.assertTrue(other_session[0])
+        self.assertTrue(other_workspace[0])
+
+    def test_repair_history_keeps_same_design_across_plan_relocation(self):
+        prior, _ = self.seed(1, legacy=True)[0]
+        current, _ = self.submit('repair-after-plan-relocation')
+        old_brief = {**self.design, 'plan_path': '/workspace/revisions/plan-r1.json'}
+        review = {'passed': True, 'repair_progress': {'decision': 'accepted'},
+                  'production_acceptance': {'enforced': True, 'capture_token': prior,
+                                            'scene_id': 'room', 'scene_brief': old_brief}}
+        with self.store.repo.transaction() as connection:
+            connection.execute(work_items.update().where(work_items.c.id == prior).values(
+                state='SUCCEEDED', result={'scene_review': review}, failure=None))
+
+        history = repair_history(self.store.repo.engine,
+                                 {'id': current, 'run_id': current.split('.')[0]},
+                                 {'scene_id': 'room', 'scene_brief': self.design})
+
+        self.assertEqual([row['task_id'] for row in history], [prior])
+        self.assertTrue(history[0]['passed'])
 
     def test_retrieve_retained_capture_after_limit_without_allowing_a_new_token(self):
         task, program = self.submit('already-rendering')
@@ -180,7 +234,7 @@ class CaptureBudgetTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=1) as workers:
             with self.store.repo.transaction() as connection:
                 lock_entity(connection, 's2-capture-budget', scope.workspace_id, scope.session_id,
-                            'room', self.design['id'], self.design['plan_path'], self.design['plan_version'])
+                            'room', self.design['id'], self.design['plan_path'])
                 independent = workers.submit(self.reserve, *other_scene).result(timeout=5)
                 self.assertEqual(independent['used'], 1)
         self.assertEqual(self.reserve(*blocked_scene)['used'], LIMIT)

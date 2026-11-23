@@ -35,11 +35,11 @@ class CaptureBudgetExhausted(ValueError):
 
 
 def scene_key(program, design):
-    """Use admission's saved design and scene identity, independent of capture options."""
+    """Bind the S2 budget to stable scene/design IDs, not plan file metadata."""
     design = design or {}
     design_id = design.get('scene_design_id') or design.get('id')
-    values = (program.get('scene_id'), design_id, design.get('plan_path'), design.get('plan_version'))
-    return (*values[:3], tuple(values[3])) if all(values) and isinstance(values[3], (list, tuple)) else None
+    values = (program.get('scene_id'), design_id)
+    return values if all(isinstance(value, str) and value.strip() for value in values) else None
 
 
 def admitted_scene_key(record, program):
@@ -56,7 +56,7 @@ def capture_budget(connection, root, workspace, session, key, *, reservation=Non
     """Count distinct native capture tokens using durable reservations and old receipts."""
     if reservation is not None:
         lock_entity(connection, 's2-capture-budget', workspace, session, *key)
-    scene, design, plan, version = key
+    scene, design = key
     rows = connection.execute(text("""
         WITH owned_tasks AS (
             SELECT w.id, w.run_id, w.state, w.unit, w.failure, w.result
@@ -83,7 +83,9 @@ def capture_budget(connection, root, workspace, session, key, *, reservation=Non
                    false AS accepted, EXISTS (SELECT 1 FROM committed c WHERE c.task_id = w.id
                        AND c.token = e.payload->>'token') AS captured, e.id AS event_id, false AS needs_admission
             FROM owned_tasks w JOIN events e ON e.run_id = w.run_id AND e.work_item_id = w.id
-            WHERE e.event = :reservation_event AND e.payload->'scene_key' = CAST(:scene_key AS jsonb)
+            WHERE e.event = :reservation_event
+              AND e.payload->'scene_key'->>0 = :scene
+              AND e.payload->'scene_key'->>1 = :design
             UNION ALL
             SELECT w.id AS task_id, w.unit->'revision' AS revision, receipt->>'capture_token' AS token,
                    w.state = 'SUCCEEDED' AND review->'passed' = 'true'::jsonb AS accepted,
@@ -95,8 +97,6 @@ def capture_budget(connection, root, workspace, session, key, *, reservation=Non
               AND w.unit->'intent'->>'execution_mode' IS DISTINCT FROM 'exploration'
               AND COALESCE(w.unit->'intent'->'capture_options'->'view_indices', 'null'::jsonb) <> '[]'::jsonb
               AND COALESCE(declaration->>'scene_design_id', declaration->>'id') = :design
-              AND declaration->>'plan_path' = :plan
-              AND declaration->'plan_version' = CAST(:version AS jsonb)
             UNION ALL
             SELECT task_id, revision, token, false AS accepted, true AS captured, NULL AS event_id,
                    true AS needs_admission FROM committed
@@ -106,7 +106,6 @@ def capture_budget(connection, root, workspace, session, key, *, reservation=Non
         FROM evidence WHERE token IS NOT NULL
         ORDER BY token, needs_admission, accepted DESC NULLS LAST, captured DESC, event_id DESC NULLS LAST
     """), {'workspace': workspace, 'session': session, 'scene': scene, 'design': design,
-             'plan': plan, 'version': json.dumps(version), 'scene_key': json.dumps(key),
              'reservation_event': RESERVATION_EVENT}).mappings().all()
     attempts = {}
     for row in rows:

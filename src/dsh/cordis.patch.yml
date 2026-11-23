@@ -135,22 +135,24 @@
             when the shared workspace and execution ownership are clear.
 
             Use persistent shells when a sequence benefits from a retained environment.
-            For Python transformations or large structured payloads, use
-            benchforge_task_code or save a script first and invoke it with a short
-            shell command; do not embed multiline scripts or large JSON in a shell
-            command argument.
-            Filesystem, jobs, file tools and runtime inspection remain available.
-            Use BenchForge tools for production operations; the backend submits directly
-            to the configured a100sim.v1.Simulator service. Use benchforge_isaac_sim
-            for live catalog discovery, explicit native session/robot/world commands
-            and job artifact downloads. No separate capture process is required.
+            For Python transformations or large structured payloads, use benchforge_task_code
+            or save a script first and invoke it with a short shell command; do not
+            embed multiline scripts or large JSON in a shell command argument. Filesystem,
+            jobs, file tools and runtime inspection remain available. Use BenchForge
+            tools for production operations; the backend submits directly to the configured
+            a100sim.v1.Simulator service. Use benchforge_isaac_sim for live catalog
+            discovery, explicit native session/robot/world commands and job artifact
+            downloads. No separate capture process is required.
 
             Use benchforge_diffusion for images, benchforge_scene_sam3 for masks,
             benchforge_depth for DA3 depth, and benchforge_trellis for TRELLIS.2 meshes.
             These tools return production task IDs. Read the completed task evidence
-            to obtain output paths. DA3 returns predicted depth in meters. TRELLIS.2
-            returns a Y-up PBR mesh with unmeasured scale. Use benchforge_capture
-            for simulator evidence.
+            for output paths and asset IDs. A successful benchforge_trellis task already
+            registers each mesh; use its returned asset_id with SceneProgram kind=mesh
+            and do not send that same output through benchforge_mesh_import again.
+            Use benchforge_mesh_import for separate user-provided static meshes. DA3
+            returns predicted depth in meters. TRELLIS.2 returns a Y-up PBR mesh with
+            unmeasured scale. Use benchforge_capture for simulator evidence.
 
             Diffusion, SAM3, SAM3D, depth, mesh import, geometry preview, capture,
             run and asset operations are composable capabilities. Inspect the returned
@@ -319,7 +321,9 @@
             继续同一个 run。S2 审核结束后才开始 S3 正式采集，并完成标注、对齐和来源核验，通过 bindings.evidence 验收；collection.validate
             只验收真实输入，不会代替采集。场景预览图片或轨迹条数不能代替场景验收或整批采集完成。验收由生产服务数据库持有，不得创建或改写通过记录。缺少能力时明确报告阻塞，不能用起终点重置冒充连续仿真轨迹；需要连续轨迹时逐步控制、步进、记录实际状态与同步传感器，规划插值属于设计值。
 
-            按需要使用已配置的 Diffusion、SAM3、DA3、TRELLIS 与 Isaac 工具，说明实际选用及不适用的原因；不可将预测当真值。使用当前会话的
+            场景资产默认优先复用语义匹配的已登记资产；没有合适资产时，对陶器、家具、器具、工具、装饰品等独立可辨认物件优先使用 TRELLIS，随后直接使用其已登记
+            asset_id。建筑结构和墙顶地面等场景构件按场景几何或原生资产构造；需要关节或控制的机器人使用仿真器原生本体。不要因为路线偏好把不合适的对象硬塞进
+            TRELLIS，也不要把适用的独立物件退化成方块或空壳。Diffusion、SAM3、DA3 与 Isaac 工具按需要配合使用，说明实际选用和不适用原因；不可将预测当真值。使用当前会话的
             workspace，任务代码与可编辑输入保存在 tasks/ 下。
 
             '

@@ -11,6 +11,21 @@ from pathlib import Path
 from storage.files import safe_path, write_json
 
 
+# 将可读 USDA 层无损导出为紧凑 USDC，保留同目录贴图引用并降低 gRPC 上传体积。
+def export_binary_usd(source, destination):
+    source, destination = Path(source), Path(destination)
+    if source.parent.resolve() != destination.parent.resolve() or destination.suffix.lower() != '.usdc':
+        raise ValueError('Binary USD must be exported beside its source as a .usdc layer')
+    from pxr import Usd
+
+    stage = Usd.Stage.Open(str(source))
+    if stage is None:
+        raise ValueError('A100 scene compiler did not produce a readable USD layer')
+    if not stage.GetRootLayer().Export(str(destination)):
+        raise ValueError('OpenUSD could not export the scene as binary USDC')
+    return destination
+
+
 # 按路径稳定暂存贴图依赖，并应用 OmniPBR ORM 粗糙度贴图的金属度因子。
 def stage_texture_dependencies(dependencies, directory):
     staged = []

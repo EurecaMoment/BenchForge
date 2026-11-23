@@ -94,6 +94,34 @@ class SceneDiagnosticsTests(unittest.TestCase):
             self.assertIn(field, brief['message'])
         self.assertTrue(any(row['code'] == 'recognizable_asset_required' for row in report['issues']))
 
+    def test_spatial_reference_mismatch_identifies_saved_design_and_current_ids(self):
+        plan = self.root / 'plan.json'
+        design = {
+            'id': 'desk_layout', 'name': 'Desk layout', 'summary': 'A desk and chair arrangement.',
+            'hard_requirements': ['The chair faces the desk.'],
+            'physical_assumptions': ['The desk and chair remain static.'],
+            'object_roles': [{'object_id': 'unknown_object', 'role': 'desk'}],
+            'relations': [{'source': 'unknown_object', 'type': 'supported_by',
+                           'target': 'ground', 'description': 'The desk rests on the floor.'}],
+            'spatial_reference': {
+                'schema': 'benchforge.review-reference/v1', 'world_up': [0, 0, 1],
+                'frames': [{'id': 'desk_user', 'kind': 'user', 'origin_object_id': 'bench_e2',
+                            'observer_object_id': 'stool_e2', 'facing_target_object_id': 'bench_e2',
+                            'front': 'toward_observer'}],
+            },
+        }
+        plan.write_text(json.dumps({'schema': 'benchforge.assessment/v1',
+                                    'scenes': {'designs': [design]}}), encoding='utf-8')
+        self.program['provenance'] = {'sources': [{'kind': 'scene_plan', 'path': str(plan),
+                                                   'scene_design_id': 'desk_layout'}]}
+
+        report = self.inspect(policy={'enforce_realism': True})
+
+        issue = next(row for row in report['issues'] if row['code'] == 'scene_brief')
+        for expected in ('plan.json', 'desk_layout', 'desk_user', "origin_object_id='bench_e2'",
+                         "observer_object_id='stool_e2'", 'current program object IDs: unknown_object'):
+            self.assertIn(expected, issue['message'])
+
     # 验证尺寸无效时仍继续报告资源缺失。
     def test_missing_assets_are_reported_even_when_dimensions_are_invalid(self):
         self.program['objects'] = [object_record('a', kind='mesh', asset_id='missing_a', size=[0, 1, 1]),

@@ -1,6 +1,6 @@
 ---
 name: fast-trellis
-description: 使用 FastTrellis2 将选定图像对象重建为 Y-up PBR 网格，核验遮罩与网格产物，注册资产并明确尺度、物理和仿真验收边界。
+description: 使用 FastTrellis2 将选定图像对象重建为已登记的 Y-up PBR 网格，核验遮罩与网格产物，并说明尺度、物理和仿真验收边界。
 ---
 
 # FastTrellis2 对象重建
@@ -9,7 +9,7 @@ description: 使用 FastTrellis2 将选定图像对象重建为 Y-up PBR 网格�
 
 ## 能力发现与访问边界
 
-先读 `benchforge_scene_catalog({"section":"generation_tools","item_id":"trellis"})`；准备注册时再查 `item_id:"mesh_import"`。以当前工具 schema 为准。模型与服务由部署配置选择，不读取 `third_party`、部署源码、配置或凭证，不猜地址、不直接轮询提供方。只使用本会话工作区和工具明确提供的任务资源，文件路径原样复制回执。
+先读 `benchforge_scene_catalog({"section":"generation_tools","item_id":"trellis"})`。该工具会登记生成的网格并返回 `asset_id`；仅当要导入另一份独立用户网格时才查 `item_id:"mesh_import"`。以当前工具 schema 为准。模型与服务由部署配置选择，不读取 `third_party`、部署源码、配置或凭证，不猜地址、不直接轮询提供方。只使用本会话工作区和工具明确提供的任务资源，文件路径原样复制回执。
 
 ## 重建接口：benchforge_trellis
 
@@ -34,20 +34,14 @@ description: 使用 FastTrellis2 将选定图像对象重建为 Y-up PBR 网格�
 1. 保存提交返回的 `run_id`、`task_id`；`accepted` 不是重建完成。
 2. 独立生成任务需显式调用 `benchforge_wait({"run_id":"<run_id>","background":true})` 注册观察，或用 `timeout_seconds:30` 有界等待。提供方作业的跟踪由后端完成，模型不直接操作其 job URL。
 3. 查看 `benchforge_scene_status`；任务成功后读取 `benchforge_scene_evidence({"task_id":"<task_id>","file":"generation_stage.json"})`。
-4. `assets` 每项包含 `object_id`、网格文件名 `asset`、`source_path`、`source_frame:"y_up"`、实际 `model`、`provider_job_id`、`metric_reconstruction:false`；`files` 列出实际 GLB 等证据，`gt_source:false` 明示生成属性。
+4. `assets` 每项包含 `object_id`、网格文件名 `asset`、`source_path`、`source_frame:"y_up"`、实际 `model`、`provider_job_id`、`metric_reconstruction:false`、已登记的 `asset_id` 和 `registration`；`files` 列出实际 GLB 等证据，`gt_source:false` 明示生成属性。
 5. 服务中断后先查询原 run。后端保存提供方 job 回执以便恢复，不要因为暂时没有 GLB 就重复提交同一对象。需要恢复已失败阶段时依据失败信息使用 `benchforge_retry`，不要用 retry 覆盖已经冻结的不同输入；修正输入应新建生成请求。
 
-## 注册接口：benchforge_mesh_import
+## 在 SceneProgram 中使用已登记资产
 
-重建成功不自动注册为 SceneProgram 资产。将选定的 GLB `source_path` 交给 `benchforge_mesh_import`：
+TRELLIS 任务成功后，等待状态为 `SUCCEEDED` 并读取 `generation_stage.json` 中对应对象的 `assets[].asset_id`。将该值直接填入 SceneProgram 的 `asset_id`，并将对象设为 `kind:"mesh"`。不要再次把同一个 TRELLIS 输出交给 `benchforge_mesh_import`，否则会重复转换和登记。
 
-```json
-{"source_mesh":"<TRELLIS 返回的网格 source_path>","label":"chair","source_frame":"y_up"}
-```
-
-该工具必填 `source_mesh`、`label`；可选 `source_frame`（`sam3d_camera`、`y_up`、`z_up`）、`source_up_axis`（`Y`、`Z`）、`size_hint_m`（三个有限正数，单位米）、`source_gaussian`（已有且配对的 Gaussian NPZ）。TRELLIS.2 GLB 使用 `y_up`，不要错误声明为 `sam3d_camera` 或同时传入矛盾的轴信息。`source_gaussian` 仅用于已有配对数据，不意味着本次 TRELLIS 调用会生成 Gaussian。
-
-注册同样返回异步 `run_id`、`task_id`，需等待成功并读取其 `generation_stage.json`。结果的 `assets[].asset_id` 是注册身份，`registration` 含边界、来源、几何、外观及物理说明。可以通过 `benchforge_scene_catalog({"section":"generated_assets","item_id":"<asset_id>"})` 查选定资产详情。
+`benchforge_mesh_import` 用于导入单独提供的 GLB/glTF/OBJ/PLY/STL 静态网格。TRELLIS.2 GLB 使用 `y_up` 坐标系；导入外部文件时按实际来源声明坐标系，不要把 `y_up` 错报为 `sam3d_camera`。`source_gaussian` 仅用于已有配对数据，不意味着本次 TRELLIS 调用会生成 Gaussian。可以通过 `benchforge_scene_catalog({"section":"generated_assets","item_id":"<asset_id>"})` 查询登记资产详情。
 
 ## 尺度、朝向与验收
 

@@ -33,6 +33,30 @@ def _strict_policy(root, execution_mode):
     policy = policy_for(root) if execution_mode is None else policy_for(root, execution_mode)
     return policy if execution_mode != 'exploration' else {}
 
+SCENE_ASSET_ROUTE_GUIDANCE = (
+    'Prefer an existing registered asset when it semantically matches the requested object. '
+    'For a suitable independent recognizable object with no semantic match, prefer kind=generated '
+    'with a specific visual generation prompt; the backend runs diffusion→SAM3→TRELLIS and registers '
+    'the resulting mesh automatically. Keep architectural structure and room geometry procedural, '
+    'use native assets for articulated or simulator-specific objects, and retain suitable existing assets. '
+    'This is a soft default without quotas: choose another representation when it better fits the object or task.'
+)
+
+# 在资产生成前校验完整候选、父场景继承、保存简报和生产准入。
+def _validate_scene_candidate(root, program, execution_mode, *, base=None, complete=False):
+    candidate = deepcopy(program)
+    if base and not complete:
+        candidate = merge_scene_extension(base, candidate)
+    validate_program(candidate)
+    if base:
+        candidate_objects = {obj['id']: obj for obj in candidate['objects']}
+        existing_ids = {obj['id'] for obj in base['objects']}
+        if (any(candidate_objects.get(obj['id']) != obj for obj in base['objects']) or
+                not set(candidate_objects) - existing_ids):
+            raise ValueError('A scene extension must preserve every existing parent object unchanged and add at least one object')
+    admit_program(root, candidate, allow_generated=True, execution_mode=execution_mode)
+    return candidate
+
 # 在程序副本上按 JSON 指针应用字段替换，支持追加列表项及完整文档替换。
 def apply_scene_replacements(proposal, edits):
     """Apply field edits to a copy; complete ScenePrograms can also be returned."""
@@ -84,7 +108,8 @@ def plan_scene(store,task,stop):
     direct=bool(submission) and not unit.get('quality_repairs',0) and not unit.get('operator_feedback')
     strict=bool(_strict_policy(store.root,execution_mode))
     if strict and not submission:raise ValueError('Unchecked scene planners are disabled; submit a complete SceneProgram')
-    prompt='' if direct else 'You plan scenes for an embodied dataset. Realize the requested function with recognizable registered or generated assets, plausible scale, supports, access paths and functional layout. Never substitute cubes, primitives or composite proxies for real objects. Missing assets or execution evidence must cause an explicit failure. Produce a coherent scene for this frozen requirement. '+json.dumps(unit['intent'],ensure_ascii=False)+'\n'+SCENE_SCHEMA_DESCRIPTION
+    prompt='' if direct else ('You plan scenes for an embodied dataset. Realize the requested function with recognizable assets, plausible scale, supports, access paths and functional layout. Never substitute cubes, primitives or composite proxies for real objects. Missing assets or execution evidence must cause an explicit failure. Produce a coherent scene for this frozen requirement. '
+        + SCENE_ASSET_ROUTE_GUIDANCE + '\n' + json.dumps(unit['intent'],ensure_ascii=False) + '\n' + SCENE_SCHEMA_DESCRIPTION)
     tools=GenerationTools(store.root, engine=store.repo.engine, task_id=task['id'])
     # 读取已登记网格的顶点和坐标系信息，供场景几何预览使用。
     @lru_cache(maxsize=8)
@@ -161,8 +186,9 @@ def plan_scene(store,task,stop):
             if (any(submitted.get(obj['id'])!=obj for obj in base['objects']) or
                     not set(submitted)-existing):
                 raise ValueError('A submitted scene extension must preserve every existing parent object unchanged')
+        admit_program(store.root,p,allow_generated=True,execution_mode=execution_mode)
         write_json(directory/'proposal.json',p)
-    elif (directory/'proposal.json').exists():
+    elif (directory/'proposal.json').exists() and not strict:
         p=json.loads((directory/'proposal.json').read_text())
         validate_program(p)
     else:
@@ -171,20 +197,25 @@ def plan_scene(store,task,stop):
         # model responses remain reusable after an engineering contract repair.
         start=max([int(path.name.rsplit('_',1)[-1]) for path in previous_traces if path.name.rsplit('_',1)[-1].isdigit()],default=-1)+1 if any((path/'validation_error.json').exists() for path in previous_traces) else 0
         raw=None;error='';p=None
+        cached_proposal=directory/'proposal.json'
+        cached_complete=cached_proposal.is_file()
+        if cached_complete:
+            raw=json.loads(cached_proposal.read_text())
         seed_file=directory/'repair_seed.json'
-        candidates=[seed_file] if seed_file.is_file() else sorted((path/'validation_error.json' for path in previous_traces if (path/'validation_error.json').is_file()),key=lambda path:int(path.parent.name.rsplit('_',1)[-1]),reverse=True)
-        for candidate in candidates:
-            seed=json.loads(candidate.read_text())
-            value=seed.get('proposal',seed)
-            if isinstance(value,dict) and isinstance(value.get('objects'),list) and isinstance(value.get('schema'),str):
-                raw=value;break
+        if raw is None:
+            candidates=[seed_file] if seed_file.is_file() else sorted((path/'validation_error.json' for path in previous_traces if (path/'validation_error.json').is_file()),key=lambda path:int(path.parent.name.rsplit('_',1)[-1]),reverse=True)
+            for candidate in candidates:
+                seed=json.loads(candidate.read_text())
+                value=seed.get('proposal',seed)
+                if isinstance(value,dict) and isinstance(value.get('objects'),list) and isinstance(value.get('schema'),str):
+                    raw=value;break
         needs_quality_repair=quality_seed is not None or bool(operator_feedback)
         if needs_quality_repair:
             if raw is None:raw=quality_seed
             error=quality_feedback
         if raw is not None:
             try:
-                p=merge_scene_extension(base,raw) if base else raw;validate_program(p)
+                p=_validate_scene_candidate(store.root,raw,execution_mode,base=base,complete=cached_complete)
             except (ValueError,KeyError,TypeError,IndexError) as exc:error=str(exc);p=None
             if needs_quality_repair:p=None
         if p is None:
@@ -195,8 +226,9 @@ def plan_scene(store,task,stop):
                     if raw is not None:
                         feedback=error+('\nScene repair context: '+quality_feedback if quality_feedback and quality_feedback!=error else '')
                         try:
-                            preview=preview_scene_geometry(merge_scene_extension(base,raw) if base else raw,mesh_loader=load_preview_mesh)
-                            if base:
+                            candidate=raw if cached_complete else (merge_scene_extension(base,raw) if base else raw)
+                            preview=preview_scene_geometry(candidate,mesh_loader=load_preview_mesh)
+                            if base and not cached_complete:
                                 # Advice references replacement paths in the delta,
                                 # while parent geometry only supplies support context.
                                 delta_paths={obj['id']:f'/objects/{i}' for i,obj in enumerate(raw['objects'])}
@@ -210,26 +242,30 @@ def plan_scene(store,task,stop):
                             feedback+='\n'+REPAIR_GUIDANCE+'\nBounded repair capture/history context: '+json.dumps(repair_context,ensure_ascii=False)
                             if repair_baseline is not None and raw!=repair_baseline:
                                 feedback+='\nUncaptured candidate changes so far (not executed): '+json.dumps(scene_changes(repair_baseline,raw,repair_older),ensure_ascii=False)
-                        response=completion(scene_repair_prompt(raw,feedback,unit['intent'],base)+layout_instruction,trace,images,49152,stop=stop,context=unit.get('run_context'))
+                        response=completion(scene_repair_prompt(raw,feedback,unit['intent'],None if cached_complete else base)+layout_instruction,trace,images,49152,stop=stop,context=unit.get('run_context'))
                         # Accept either a complete scene or field edits.
                         raw=response if isinstance(response,dict) and response.get('schema') in SCENE_SCHEMAS else apply_scene_replacements(raw,response)
                     else:
                         response=completion(prompt+('\nPrevious response failed: '+error if error else ''),trace,images,49152,stop=stop,context=unit.get('run_context'))
                         raw=response if isinstance(response,dict) and isinstance(response.get('objects'),list) else None
                         if raw is None:raise ValueError('planner response must be a scene object with objects list')
-                    p=merge_scene_extension(base,raw) if base else raw
-                    validate_program(p)
+                    p=_validate_scene_candidate(store.root,raw,execution_mode,
+                                                base=base,complete=cached_complete)
                     break
                 except (ValueError,KeyError,TypeError,IndexError) as exc:
                     error=str(exc)
                     trace.mkdir(parents=True,exist_ok=True)
-                    write_json(trace/'validation_error.json',{'error':type(exc).__name__,'detail':error,'proposal':raw})
+                    failure={'error':type(exc).__name__,'detail':error,'proposal':raw}
+                    if isinstance(exc,ScenePreflightError):
+                        failure['scene_preflight']=exc.report
+                        write_json(trace/'scene_preflight.json',exc.report)
+                    write_json(trace/'validation_error.json',failure)
                     record_progress(directory,'scene_plan_correction',attempt=start+attempt+1,
                                     error=error,evidence_file=trace.relative_to(directory).as_posix()+'/validation_error.json')
                     # A malformed replacement must not hide the still-invalid
                     # scene field behind an unrelated JSON-pointer error.
                     if raw is not None:
-                        try:validate_program(merge_scene_extension(base,raw) if base else raw)
+                        try:_validate_scene_candidate(store.root,raw,execution_mode,base=base,complete=cached_complete)
                         except (ValueError,KeyError,TypeError,IndexError) as remaining:
                             if str(remaining)!=error:error+='\nUnresolved scene validation: '+str(remaining)
                     if attempt==2:raise ValueError('scene planning exhausted 3 attempts: '+error) from exc

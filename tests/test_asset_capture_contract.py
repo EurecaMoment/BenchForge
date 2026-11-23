@@ -15,7 +15,9 @@ import trimesh
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 from capabilities.asset_generation.mesh_export import export_mesh
-from capabilities.isaac_sim.asset_bundle import stage_texture_dependencies, upload_asset_bundle
+from capabilities.isaac_sim.asset_bundle import (
+    export_binary_usd, stage_texture_dependencies, upload_asset_bundle,
+)
 from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
 from capabilities.isaac_sim.native_geometry import exported_entities
 
@@ -114,6 +116,20 @@ class AssetCaptureContractTests(unittest.TestCase):
         scene = package / "scene.usda"
         scene.write_text(compiled["usd"], encoding="utf-8")
         dependencies = stage_texture_dependencies(compiled["texture_dependencies"], package)
+        binary_scene = export_binary_usd(scene, package / "scene.usdc")
+        self.assertLess(binary_scene.stat().st_size, scene.stat().st_size)
+        binary_stage = Usd.Stage.Open(str(binary_scene))
+        binary_mesh = UsdGeom.Mesh(binary_stage.GetPrimAtPath("/World/Objects/cube/Part0"))
+        self.assertEqual(len(binary_mesh.GetPointsAttr().Get()), len(record["vertices"]))
+        self.assertEqual(len(binary_mesh.GetFaceVertexIndicesAttr().Get()), len(record["faces"]) * 3)
+        binary_shader = UsdShade.Shader(
+            binary_stage.GetPrimAtPath("/World/Materials/cube_Part0/Surface")
+        )
+        self.assertEqual(binary_shader.GetPrim().GetAttribute(
+            "info:mdl:sourceAsset:subIdentifier").Get(), "OmniPBR")
+        for slot in ("diffuse_texture", "ORM_texture"):
+            reference = binary_shader.GetInput(slot).Get()
+            self.assertTrue((package / str(reference)).is_file())
 
         class RecordingClient:
             def __init__(self):
@@ -128,12 +144,12 @@ class AssetCaptureContractTests(unittest.TestCase):
                 return result
 
         client = RecordingClient()
-        asset = upload_asset_bundle(client, scene, package, dependencies)
-        self.assertEqual(asset["relative_path"], "scene.usda")
+        asset = upload_asset_bundle(client, binary_scene, package, dependencies)
+        self.assertEqual(asset["relative_path"], "scene.usdc")
         self.assertEqual(len(client.uploads), 3)
         self.assertEqual(len({upload["asset_id"] for upload in client.uploads}), 1)
         self.assertEqual({upload["relative_path"] for upload in client.uploads},
-                         {"scene.usda", *(item["relative_path"] for item in dependencies)})
+                         {"scene.usdc", *(item["relative_path"] for item in dependencies)})
         metallic = next(item["path"] for item in dependencies
                         if "metallic_roughness" in item["relative_path"])
         with Image.open(metallic) as image:

@@ -13,7 +13,9 @@ from capabilities.isaac_sim.scene_requirements import validate_scene_requirement
 from capabilities.isaac_sim.capture_contract import (
     capture_capabilities, capture_service_client, native_edit_arguments, native_import_arguments, require_capture_service,
 )
-from capabilities.isaac_sim.asset_bundle import stage_texture_dependencies, upload_asset_bundle
+from capabilities.isaac_sim.asset_bundle import (
+    export_binary_usd, stage_texture_dependencies, upload_asset_bundle,
+)
 from capabilities.isaac_sim.appearance_evidence import appearance_evidence, observe_render_sources
 from capabilities.scene_authoring.catalog.native_reference import native_references
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
@@ -97,6 +99,7 @@ def execute_capture(store, task, stop, *, config, client=None):
         compiled = _compile_for_task(store, task, program, settings)
         source = attempt / 'scene.usda'
         source.write_text(compiled['usd'], encoding='utf-8')
+        upload_source = export_binary_usd(source, attempt / 'scene.usdc')
         texture_files = stage_texture_dependencies(
             compiled.get('texture_dependencies', []), attempt)
         own_client = client is None
@@ -108,7 +111,7 @@ def execute_capture(store, task, stop, *, config, client=None):
         try:
             capability = capture_capabilities(client)
             require_capture_service(capability, compiled, scope)
-            source_ref = upload_asset_bundle(client, source, attempt, texture_files)
+            source_ref = upload_asset_bundle(client, upload_source, attempt, texture_files)
             _, imported = requests.extension('import', 'asset.import', {'source': source_ref, 'path': '/World/Scene'})
             identity = imported['session_id']
             write_json(attempt / 'session.json', {'session_id': identity, 'capture_token': token})

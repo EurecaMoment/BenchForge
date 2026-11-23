@@ -20,7 +20,7 @@ from capabilities.scene_authoring.validation.diagnostics import ScenePreflightEr
 from service_access.configuration import isaac_config
 from service_access.scene_service import ScenePreflightRejected
 from pipelines.scene_production.service_failures import (
-    SERVICE_OWNER, current_capture_settings, failure_issues, is_service_failure,
+    SERVICE_OWNER, current_capture_settings, failure_issues, is_execution_diagnosis, is_service_failure,
     require_live_service, stage_failure,
 )
 
@@ -110,6 +110,25 @@ def save(path, value):
     temporary.replace(path)
 
 
+# 汇总修复批次终态；只有每个目标均获真实验收才报告成功。
+def batch_summary(targets, root):
+    records = {}
+    for target in targets:
+        path = root / target['id'] / 'status.json'
+        records[target['id']] = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+    accepted = sorted(identity for identity, record in records.items() if record.get('state') == 'accepted')
+    failed = sorted(identity for identity, record in records.items()
+                    if record.get('state') in {'failed_final', 'planning_failed'})
+    blocked = sorted(identity for identity, record in records.items()
+                     if record.get('state') == 'needs_execution_diagnosis')
+    state = ('blocked' if blocked else 'failed' if failed else
+             'succeeded' if targets and len(accepted) == len(targets) else 'incomplete')
+    return {'state': state, 'targets': len(targets), 'accepted': accepted,
+            'failed': failed, 'blocked': blocked, 'accepted_count': len(accepted),
+            'failed_count': len(failed), 'blocked_count': len(blocked),
+            'needs_execution_diagnosis': blocked, 'updated_at': time.time()}
+
+
 # 将服务 HTTP 错误恢复成结构化预检异常或可诊断的服务调用错误。
 def raise_service_error(route, error):
     body = error.read().decode(errors='replace')
@@ -169,7 +188,7 @@ def revise(config, row, folder, attempt=0, feedback=None):
     prompt = '''你是场景制作与空间布局修复者。使用所附实际场景图片、原始完整程序、物理/几何反馈，修复真实场景中不合生活常识或物理逻辑的关系，同时保留用途、主要物体和风格。不要泛泛而谈，不准改服务或降低验收标准。
 返回严格 JSON：{"brief":{"name":"中文标题","summary":"200到400字的完整场景段落，描述用途、空间、主要物体、朝向、支撑、照明、动线及取用关系","hard_requirements":[原始硬要求逐字保留],"object_roles":[{"object_id":"真实id","role":"用途与位置关系"}],"relations":[{"source":"id","type":"supported_by|mounted_to|clearance|near|facing|inside","target":"id或ground","description":"明确关系及理由"}],"physical_assumptions":["仿真材质、质量和安装方式的假设及验证范围"]},"changes":["引用实际视角或物理回执，说明发现及如何修改"],"unresolved":["尚未解决、需要补充机位或等待后续验证的问题；没有则返回空数组"],"evidence_refs":[{"path":"capture/view_0.png","observation":"该真实视角中的具体发现"},{"path":"capture/evidence.json","observation":"原生物理或验收回执中的具体发现"}],"replacements":[{"path":"/objects/0","value":完整物体记录}]}
 replacements 使用 JSON Pointer；新增字段可以直接添加，删除物体时替换完整 /objects 列表。不可只改摘要而不改错误程序；若上一轮发现摘要遗漏，可补充或修订软设计，但保留原始硬要求，写清观察依据。不要重复已失败的方案。
-默认真实资产。允许具有可辨认形态的多部件家具/工具，但单个几何包络替代家具不合格；不要把床/沙发/椅子/柜子替换成粗方块。尽可能复用现有真实 mesh，比例与朝向根据实际图像和资产尺寸判断，不要盲猜。需要时使用已注册 native 资产并采用其自然尺寸比例。没有资产时报告缺口，不虚构 asset_id。
+保留语义、形态和用途匹配的现有网格。实拍中缺失或形态错误的独立物件若没有合适资产，优先在原对象记录使用 kind:"generated"、generation:{"prompt":"完整独立物件的形态、材质和外观"}，清除旧网格标识或代理部件，保留 ID、尺寸、姿态和物理要求。执行阶段会通过 TRELLIS 生成并登记网格，再用实际几何预检和采集。建筑构件可保留原生构造；关节、驱动和传感器依赖合适的原生本体。比例与朝向按实际图像和资产尺寸判断。
 support 引用整个父物体顶部，不是内部层板；内部层板用准确负 base_z 和真实层板几何计算。多部件整体 envelope 可能大于实际零件高度，须按实际接触面设偏移。桌面物品和书架摆件应清楚支撑，不能穿进桌面或漂浮。不要把桌上物体放在座椅/柜体内部。
 地面和墙体保留实际厚度和合理位置。悬挂/壁挂静态物应在 metadata.spatial_attachment 显式写 {target:实际墙或顶棚id,method:"static_mount",axis:0|1|2,object_face:"min"|"max",target_face:相反面}，并真正贴合相应表面（不能只写metadata）；这仅代表静态固定安装，不能冒充动态物理实测。放置地面的物体实际底部贴地。
 家具面向用途：沙发/椅子朝向桌面或活动区，窗与墙洞一致，柜门、座椅使用空间、走道不得被遮挡；不必要的重复残次小装饰可在changes说明后整理，不能删掉主要物体以绕过修复。不要引入不可用的外部依赖。
@@ -199,8 +218,15 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
             candidate = apply_scene_replacements(program, result)
             available_assets = {obj.get('asset_id') for obj in program['objects'] if obj.get('asset_id')}
             for obj in candidate['objects']:
+                if obj.get('kind') == 'generated':
+                    # A new reconstruction must not inherit the superseded mesh
+                    # identity, quality receipt, or primitive assembly.
+                    for field in ('asset_id', 'asset_quality', 'parts'):
+                        obj.pop(field, None)
                 if obj.get('kind') == 'mesh' and obj.get('asset_id') not in available_assets:
-                    raise ValueError('Use an existing source asset or registered native asset; unknown mesh requested: ' + str(obj.get('asset_id')))
+                    raise ValueError(f"{obj['id']}: mesh {obj.get('asset_id')!r} is absent from the source scene. "
+                                     'For a new standalone object use kind=generated with generation.prompt, '
+                                     'or reuse a matching source asset.')
             brief = result['brief'];brief['id'] = 'repair_design'
             brief['hard_requirements'] = deepcopy(protected)
             validate_scene_brief(brief, {obj['id'] for obj in candidate['objects']})
@@ -224,7 +250,7 @@ support 引用整个父物体顶部，不是内部层板；内部层板用准确
             provenance['sources'].append({'kind': 'scene_plan', 'path': str(plan_file), 'scene_design_id': 'repair_design'})
             admission = inspect_capture_program(config['artifacts'], candidate,
                 settings=isaac_config(config), execution_mode=config.get('execution_mode'),
-                allow_generated=False)
+                allow_generated=True)
             save(work / ('candidate_preflight_' + str(trial) + '.json'), admission)
             require_repair_service(admission, candidate, work)
             if not admission['passed']:
@@ -271,12 +297,12 @@ def main():
         def plan_one(row):
             folder = root / row['id']
             existing = folder / 'status.json'
-            if existing.is_file() and json.loads(existing.read_text(encoding='utf-8')).get('state') in {'planned','capturing','accepted','needs_repair','waiting_service'}:return
+            if existing.is_file() and json.loads(existing.read_text(encoding='utf-8')).get('state') in {'planned','capturing','accepted','needs_repair','needs_execution_diagnosis','waiting_service'}:return
             try:revise(config, row, folder)
             except Exception as error:
                 # A slow author request must not overwrite a newer saved plan.
                 current=json.loads(existing.read_text(encoding='utf-8')) if existing.is_file() else {}
-                if current.get('state') not in {'planned','capturing','accepted','needs_repair','waiting_service'}:
+                if current.get('state') not in {'planned','capturing','accepted','needs_repair','needs_execution_diagnosis','waiting_service'}:
                     if is_service_failure(error):
                         current.update(source_id=row['id'], name=row['name'], attempt=0,
                                        pending_repair_attempt=0, updated_at=time.time())
@@ -321,7 +347,7 @@ def main():
             folder = root / row['id'];status_file = folder / 'status.json'
             if not status_file.is_file():continue
             record = json.loads(status_file.read_text(encoding='utf-8'))
-            if record['state'] in {'accepted', 'failed_final', 'planning_failed'}:
+            if record['state'] in {'accepted', 'failed_final', 'planning_failed', 'needs_execution_diagnosis'}:
                 completed += 1;continue
             if record['state'] == 'needs_repair' and is_service_failure(record.get('failure') or {}):
                 wait_for_service(record, record['failure'], 'capturing' if record.get('task_id') else 'planned')
@@ -403,6 +429,17 @@ def main():
                         wait_for_service(record, execution_failure, 'capturing')
                         save(status_file, record)
                         continue
+                    if is_execution_diagnosis(execution_failure):
+                        retained = {'directory':str(directory),
+                            'issues':execution_failure.get('issues', []),
+                            'detail':execution_failure.get('detail'),
+                            'repair_owner':'isaac_sim_execution', 'retry_unchanged':False,
+                            'next_action':'inspect_native_receipt_and_asset_before_revising_scene'}
+                        if isinstance(execution_failure.get('remote_job_failure'), dict):
+                            retained['remote_job_failure'] = execution_failure['remote_job_failure']
+                        record.update(state='needs_execution_diagnosis', failure=retained)
+                        save(status_file, record)
+                        continue
                     review_transport=(task.get('unit',{}).get('phase')=='review' and execution_failure.get('error') in {'TimeoutError','URLError','ConnectionError','OSError','RemoteDisconnected','ConnectionResetError','ConnectionAbortedError'})
                     if review_transport:failure=execution_failure
                     record.update(state='needs_transport_recovery' if transport_only else 'needs_review_recovery' if review_transport else 'needs_repair', failure={'directory':str(directory),'issues':failure,
@@ -416,7 +453,7 @@ def main():
                     record['pending_repair_attempt']=repair_attempt;save(status_file,record)
                     repairing[row['id']]=repair_pool.submit(revise,config,row,folder,repair_attempt,record['failure'])
         if completed == len(targets):
-            save(root/'progress.json', {'state':'finished','targets':len(targets),'updated_at':time.time()})
+            save(root/'progress.json', batch_summary(targets, root))
             break
         time.sleep(10)
 

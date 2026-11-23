@@ -9,9 +9,27 @@ from capabilities.scene_authoring.catalog.operators import catalog_response
 from capabilities.asset_generation.generation_stage import validate_generation_request
 from capabilities.asset_generation.generation import GenerationTools
 from capabilities.asset_generation.mesh_input import validate_mesh_input
+from pipelines.scene_production.planning import SCENE_ASSET_ROUTE_GUIDANCE
 
 
 class AssetDiscoveryTests(unittest.TestCase):
+    # 确保场景规划把 TRELLIS 作为合适独立物件的软默认路线，并保留其他表示方式。
+    def test_scene_planner_prefers_trellis_without_forcing_every_object(self):
+        self.assertIn('existing registered asset when it semantically matches', SCENE_ASSET_ROUTE_GUIDANCE)
+        self.assertIn('suitable independent recognizable object', SCENE_ASSET_ROUTE_GUIDANCE)
+        self.assertIn('diffusion→SAM3→TRELLIS', SCENE_ASSET_ROUTE_GUIDANCE)
+        self.assertIn('without quotas', SCENE_ASSET_ROUTE_GUIDANCE)
+        self.assertIn('articulated or simulator-specific objects', SCENE_ASSET_ROUTE_GUIDANCE)
+
+    # 确认目录描述与实现一致，TRELLIS 资产会自动登记并直接返回 SceneProgram 可用身份。
+    def test_trellis_catalog_reports_registered_mesh_output(self):
+        store = SimpleNamespace(root=Path('.'))
+        result = catalog_response(store, {'section': 'generation_tools', 'item_id': 'trellis'})
+        item = result['items'][0]['value']
+        self.assertIn('registered', item['outputs'])
+        self.assertIn('asset_id', item['outputs'])
+        self.assertNotIn('mesh_import', item['outputs'])
+
     # 验证目录仅把部署已绑定的原生资源标为可用，避免将内置名称当成安装证明。
     def test_catalog_does_not_claim_unbound_assets_are_installed(self):
         request = {'section': 'native_assets', 'item_id': 'mug'}

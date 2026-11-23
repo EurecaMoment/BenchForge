@@ -75,9 +75,16 @@ class SceneRepairProgressTests(unittest.TestCase):
         chain += [row(sibling, passed=True), row(self.ref,'advance',sibling)]
         self.assertEqual(choose_baseline(chain), sibling)
 
-    def test_plan_change_during_review_invalidates_the_comparison(self):
-        self.base['receipt']['scene_brief']={'id':'design','plan_version':[10,1]}
-        current={**receipt({}),'scene_brief':{'id':'design','plan_version':[12,2]}}
+    def test_resaved_same_design_preserves_repair_baseline(self):
+        self.base['receipt']['scene_brief']={'id':'design','plan_path':'/saved/revision_1/plan.json','plan_version':[10,1]}
+        current={**receipt({}),'scene_brief':{'id':'design','plan_path':'/saved/revision_2/plan.json','plan_version':[12,2]}}
+        result=repair_decision(self.base,self.candidate,current,{'passed':False},{'view_1.png'})
+        self.assertEqual(result['decision'],'uncompared')
+        self.assertEqual(result['next_base'], self.ref)
+
+    def test_different_design_identity_does_not_inherit_repair_baseline(self):
+        self.base['receipt']['scene_brief']={'id':'design-a','plan_path':'/saved/a.json','plan_version':[10,1]}
+        current={**receipt({}),'scene_brief':{'id':'design-b','plan_path':'/saved/a.json','plan_version':[12,2]}}
         result=repair_decision(self.base,self.candidate,current,{'passed':False},{'view_1.png'})
         self.assertEqual(result['decision'],'uncompared')
         self.assertIsNone(result['next_base'])

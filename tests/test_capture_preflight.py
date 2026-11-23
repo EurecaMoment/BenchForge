@@ -18,6 +18,41 @@ from test_scene_diagnostics import sample, object_record
 
 
 class CapturePreflightTests(unittest.TestCase):
+    def test_repair_can_hand_off_a_missing_prop_to_the_generation_stage(self):
+        """修复计划保存待生成的物件，执行时仍须使用已实现网格通过最终预检。"""
+        from pipelines.scene_production import repair
+        program = sample()
+        obj = program['objects'][0]
+        (self.root / 'program.json').write_text(json.dumps(program), encoding='utf-8')
+        generated = {**obj, 'kind': 'generated', 'generation': {'prompt': 'A complete stoneware jug'},
+                     'asset_id': 'obsolete_mesh', 'asset_quality': {'semantic_review': 'old'},
+                     'parts': [{'shape': 'box'}]}
+        expected_generated = {key: value for key, value in generated.items()
+                              if key not in {'asset_id', 'asset_quality', 'parts'}}
+        proposal = {
+            'replacements': [{'path': '/objects/0', 'value': generated}],
+            'brief': {
+                'name': 'Workshop', 'summary': 'Workshop with a jug on the floor.',
+                'physical_assumptions': ['Stable ground'],
+                'object_roles': [{'object_id': obj['id'], 'role': 'Water storage'}],
+                'relations': [{'source': obj['id'], 'target': 'ground', 'type': 'supported_by',
+                               'description': 'The base sits on the floor.'}],
+            },
+        }
+        config = {'_workspace': str(self.root), '_session': 'session', 'artifacts': str(self.root),
+                  'execution_mode': 'exploration'}
+        row = {'id': 'source', 'name': 'Workshop', 'source_directory': str(self.root)}
+        with (patch.object(repair, 'author_completion', return_value=proposal),
+              patch.object(repair, 'review', return_value={'review_id': 'test'})):
+            record = repair.revise(config, row, self.root / 'repairs')
+        saved = json.loads(Path(record['program_path']).read_text(encoding='utf-8'))
+        self.assertEqual(saved['objects'][0], expected_generated)
+        self.assertTrue(record['admission']['passed'])
+        self.assertIn('asset_not_realized', [issue['code'] for issue in record['admission']['issues']])
+        final = inspect_capture_program(self.root, saved, policy={}, allow_generated=False)
+        self.assertFalse(final['passed'])
+        self.assertIn('source_geometry_unavailable', [issue['code'] for issue in final['issues']])
+
     # 创建相互独立的临时工作区，供程序与适配器批量预检。
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()

@@ -162,6 +162,20 @@ class DshPresetTests(unittest.TestCase):
         self.assertEqual(persona(published), persona(self.generated(True)))
         self.assertEqual(len([row for row in plugins(published) if row['id'] == 'benchforge-invocation']), 1)
 
+    # 确保活动人设与 FastTRELLIS 技能准确描述资产自动登记和适用对象偏好。
+    def test_trellis_guidance_prefers_suitable_objects_and_uses_registered_asset_id(self):
+        profile = self.generated(True)
+        prefix = persona(profile)['prefix']
+        self.assertIn('优先使用 TRELLIS', prefix)
+        self.assertIn('直接使用其已登记 asset_id', prefix)
+        self.assertIn('不合适的对象硬塞进 TRELLIS', prefix)
+        self.assertIn('do not send that same output through benchforge_mesh_import again', prefix)
+
+        skill = Path(__file__).parents[1] / 'src/dsh/skills/fast-trellis/SKILL.md'
+        text = skill.read_text(encoding='utf-8')
+        self.assertIn('该工具会登记生成的网格并返回 `asset_id`', text)
+        self.assertIn('不要再次把同一个 TRELLIS 输出交给 `benchforge_mesh_import`', text)
+
 
 if __name__ == '__main__':
     unittest.main()

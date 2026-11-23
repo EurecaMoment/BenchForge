@@ -5,6 +5,26 @@ from pathlib import Path
 import numpy as np
 
 
+class NativeAssetGeometryError(ValueError):
+    """Missing exported native geometry or colliders that scene layout cannot repair."""
+
+    def __init__(self, identity, *, geometry_present, colliders_present):
+        self.issues = [{
+            "code": "native_asset_geometry_missing",
+            "path": "/objects",
+            "message": "Isaac Sim export did not provide measured geometry and enabled colliders for this native asset.",
+            "object_ids": [identity],
+            "basis": "isaac_sim_native_export",
+            "severity": "error",
+            "blocking": True,
+            "repair_owner": "isaac_sim_execution",
+            "retry_unchanged": False,
+            "evidence": {"measured_geometry_present": geometry_present,
+                         "enabled_colliders_present": colliders_present},
+        }]
+        super().__init__("Native asset requires measured geometry and enabled colliders: " + identity)
+
+
 # 从原生导出中提取完整实体边界，拒绝用目录尺寸包络或截断数组替代测量。
 def exported_entities(source, declared):
     """No catalog envelopes or truncated inspection arrays certify native bounds."""
@@ -55,9 +75,8 @@ def exported_entities(source, declared):
             world = points @ matrix[:3, :3] + matrix[3, :3]
             boxes.append((world.min(axis=0), world.max(axis=0)))
         if not boxes or not colliders:
-            raise ValueError(
-                "Native asset requires measured geometry and enabled colliders: " + identity
-            )
+            raise NativeAssetGeometryError(identity, geometry_present=bool(boxes),
+                                           colliders_present=bool(colliders))
         low, high = (
             np.min([row[0] for row in boxes], axis=0),
             np.max([row[1] for row in boxes], axis=0),

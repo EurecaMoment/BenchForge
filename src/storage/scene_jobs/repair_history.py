@@ -1,12 +1,11 @@
 """Read repair lineage from completed, session-owned scene jobs."""
-import json
 from sqlalchemy import text
 
 
 def repair_history(engine, task, acceptance):
     """只查询同一已授权会话、冻结计划与场景下的终态采集。"""
     brief = acceptance.get('scene_brief') or {}
-    if not all(brief.get(key) for key in ('id', 'plan_path', 'plan_version')) or not acceptance.get('scene_id'):
+    if not brief.get('id') or not acceptance.get('scene_id'):
         return []
     with engine.connect() as connection:
         return connection.execute(text("""
@@ -24,10 +23,8 @@ def repair_history(engine, task, acceptance):
               AND w.state IN ('SUCCEEDED','FAILED_FINAL') AND r.state <> 'CANCELED'
               AND receipt->'enforced' = 'true'::jsonb AND receipt->>'capture_token' IS NOT NULL
               AND receipt->>'scene_id' = :scene AND receipt->'scene_brief'->>'id' = :design
-              AND receipt->'scene_brief'->>'plan_path' = :plan
-              AND receipt->'scene_brief'->'plan_version' = CAST(:version AS jsonb)
             ORDER BY (SELECT max(e.id) FROM events e WHERE e.run_id = r.id AND e.work_item_id = w.id
                       AND e.event = 'benchforge.transition' AND e.payload->>'state' = w.state),
                      r.created_at, w.id
         """), dict(run_id=task['run_id'], task_id=task['id'], scene=acceptance['scene_id'],
-                   design=brief['id'], plan=brief['plan_path'], version=json.dumps(brief['plan_version']))).mappings().all()
+                   design=brief['id'])).mappings().all()

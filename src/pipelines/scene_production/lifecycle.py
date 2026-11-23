@@ -10,7 +10,7 @@ from capabilities.scene_authoring.validation.acceptance import (
 from capabilities.scene_authoring.validation.policy import policy_for, check_references
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
 from pipelines.scene_production.service_failures import (
-    is_service_failure, verify_capture_service_recovery,
+    is_execution_diagnosis, is_service_failure, verify_capture_service_recovery,
 )
 
 
@@ -131,6 +131,11 @@ class SceneLifecycle:
             return self.review_only(task)
         tid = task["id"]
         recovery_id = None
+        if is_execution_diagnosis(task.get('failure') or {}):
+            raise ValueError(
+                'Inspect the retained Isaac Sim failure and correct the asset or execution path '
+                'before retrying; unchanged capture is blocked'
+            )
         service_recovery = is_service_failure(task.get('failure') or {})
         settings_changed = False
         if service_recovery:

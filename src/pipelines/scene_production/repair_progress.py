@@ -115,7 +115,7 @@ def repair_decision(base, candidate, acceptance, review, current_views):
         return {**result, 'decision': decision, 'next_base': candidate if decision == 'initial' else previous}
     before = base['receipt'].get('scene_brief') or {}
     after = acceptance.get('scene_brief') or {}
-    if any(before.get(k) != after.get(k) for k in ('id','plan_path','plan_version')):
+    if before.get('id') != after.get('id'):
         return {**result, 'decision': 'uncompared', 'next_base': None}
     native = native_changes(base['receipt'], acceptance)
     comparison = review.get('repair_comparison')
