@@ -24,6 +24,7 @@ _STAGED_OUTPUTS = (
 
 def local_bundle_entries(profile, preset, dsh):
     """Find enabled plugin entries that load this checkout's build products."""
+    dsh = Path(dsh).resolve()
     if isinstance(profile, list):
         return set().union(*(local_bundle_entries(row, preset, dsh) for row in profile))
     if not isinstance(profile, dict) or str(profile.get('disabled')).lower() == 'true':

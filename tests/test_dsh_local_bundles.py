@@ -49,7 +49,7 @@ class LocalBundleTests(unittest.TestCase):
             ]},
         ]
         self.assertEqual(local_bundle_entries(profile, preset, self.dsh),
-                         {self.entry, self.dsh / 'client/index.js'})
+                         {self.entry.resolve(), (self.dsh / 'client/index.js').resolve()})
 
     def test_rebuilds_after_source_changes_and_missing_output(self):
         with patch('dsh.local_bundles.subprocess.run', side_effect=self.build) as build:
