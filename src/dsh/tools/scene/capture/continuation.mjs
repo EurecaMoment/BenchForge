@@ -9,6 +9,7 @@ import {captureNotice} from './notice.mjs';
 const keyOf = (owner, run) => `${owner}:${run}`;
 /** 判断复核是否处于需要暂停自动采集推进的状态。 */
 const suspendedReview = review => review && ['paused','needs_input','check_failed'].includes(review.state);
+const reviewUnavailable = Symbol('review temporarily unavailable');
 /** 判断持久化续接记录是否仍需要后台观察或最终结果投递。 */
 const observable = record => ['watching','terminal','observer_failed','delivered'].includes(record?.state);
 /** 把采集终态和诊断转换为用于通知的结果类别。 */
@@ -69,12 +70,25 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
   async function ownerOf(record) {
     return agents.get(record.owner) || await resolveAgent(record.owner);
   }
-  /** 核对会话未被中断且阶段复核允许推进，防止后台观察绕过暂停。 */
+  /** 区分审核服务短暂超时与调用方明确取消，前者不得结束原生对话轮次。 */
+  async function currentReview(agent,signal) {
+    try {
+      return await readReview(agent.session.header.cwd,agent.id,now(),signal);
+    } catch (error) {
+      signal.throwIfAborted();
+      if (error.name==='TimeoutError' || error.code==='BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE') return reviewUnavailable;
+      throw error;
+    }
+  }
+  /** 后台持有原作业；审核暂不可读时退避，读取确切状态后再投递。 */
   async function allowed(agent,signal=lifetime) {
-    if (!agent || history(agent.session).interrupted) return false;
-    const review=await readReview(agent.session.header.cwd, agent.id,now(),signal);
-    signal.throwIfAborted();
-    return !history(agent.session).interrupted&&!suspendedReview(review);
+    for (let backoff=1000;agent && !history(agent.session).interrupted;backoff=Math.min(30000,backoff*2)) {
+      const review=await currentReview(agent,signal);
+      signal.throwIfAborted();
+      if (review!==reviewUnavailable) return !history(agent.session).interrupted&&!suspendedReview(review);
+      await delay(backoff,signal);
+    }
+    return false;
   }
   /** 仅向仍拥有该生产任务且允许继续的会话投递终态结果，并持久化通知状态。 */
   async function deliver(record,signal=lifetime) {
@@ -201,10 +215,12 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     if (context.interrupted || context.completed || recover && !context.production) return;
     const latest = context.captures.at(-1);
     if (!latest) return;
+    if (waitingForCapture(agent)) return;
     // Upgrade old production sessions only at their latest capture. Never replay
     // historical failed attempts or acquire an unrelated ordinary conversation.
-    const review = await readReview(agent.session.header.cwd,agent.id,now(),signal);
+    const review = await currentReview(agent,signal);
     signal.throwIfAborted();
+    if (review===reviewUnavailable) return;
     const updated=history(agent.session);
     if(updated.interrupted||updated.completed||updated.taskSeq!==context.taskSeq)return;
     if (context.production || latest.turn === context.turn) await register(agent,latest,
@@ -218,8 +234,10 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     if (context.interrupted || context.completed || !context.activeTurn) return;
     const latest = context.captures.at(-1);
     if (!latest || latest.turn !== context.turn && !context.production) return;
-    const review = await readReview(agent.session.header.cwd,agent.id,now(),signal);
+    if (waitingForCapture(agent)) return;
+    const review = await currentReview(agent,signal);
     signal.throwIfAborted();
+    if (review===reviewUnavailable) return;
     const updated=history(agent.session);
     if(updated.interrupted||updated.completed||updated.taskSeq!==context.taskSeq)return;
     if (suspendedReview(review)||review?.state==='waiting_user') return;

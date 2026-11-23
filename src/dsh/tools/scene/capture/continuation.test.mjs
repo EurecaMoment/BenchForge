@@ -150,6 +150,31 @@ test('a transport failure offers only the original failed task for retry, withou
   await h.dispose();
 });
 
+test('a review deadline in a turn hook preserves the turn and the original capture',async()=>{
+  let offline=true;
+  const h=harness({review:()=>{if(offline)throw new DOMException('review deadline','TimeoutError');return null;}});
+  h.plan();h.capture();
+  await h.runtime.reconcile(h.agent);
+  await h.stop();
+  assert.equal(h.sent.length,0);
+  offline=false;
+  await h.runtime.reconcile(h.agent);await h.runtime.settled();
+  assert.equal(h.sent.length,1);
+  await h.dispose();
+});
+
+test('a background review outage keeps the same observer and honors a newly paused review',async()=>{
+  let reads=0;
+  const h=harness({review:()=>{
+    if(++reads===1)throw Object.assign(new Error('review unavailable'),{code:'BENCHFORGE_REVIEW_STORAGE_UNAVAILABLE'});
+    return {state:'paused'};
+  }});
+  await h.runtime.register(h.agent,{run_id:'sf_scene'});
+  await h.runtime.settled();
+  assert.equal(reads,2);assert.equal(h.sent.length,0);assert.equal(h.requests.length,0);
+  assert.equal(h.runtime.records(h.agent.id)[0].state,'paused');await h.dispose();
+});
+
 test('a notice lost before log commit is redelivered after restart',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a notice lost before log commit is redelivered after restart。 */ async()=>{
   const h=harness();h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();await h.dispose();
   const next=harness({data:h.data,events:h.events});next.runtime.restore();await next.runtime.settled();
