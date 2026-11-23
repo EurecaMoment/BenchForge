@@ -20,6 +20,14 @@ description: 通过 BenchForge 已配置的 Isaac Sim 服务查询能力、导�
 
 SceneProgram 可以直接使用本会话上传的原生资产：对象设为 `kind="native"`，`native_asset` 填入上传返回的 `asset_id`、`relative_path`，以及来源资产的 `size`、`source_up_axis`，按需声明 `fix_base`。不要修改源码中的原生目录、部署配置或服务器全局资产目录。目录中的 `configured` 仅说明有绑定，不代表资源存在、渲染成功或机器人能运动；`unconfigured` 不能当作可直接使用。普通 `mesh_import` 接受 GLB/glTF/OBJ/PLY/STL 静态网格，不能通过转换 USD 来保证关节语义。保留机器人原生表示后，仍须用仿真器实际回执验证关节、控制和采集能力。
 
+手写 USD 几何的整物体底色使用 `color3f[] primvars:displayColor = [(r, g, b)] (interpolation = "constant")`。上传返回 `usd_display_color_scalar` 时，按提示修正工作区图层，保留原 RGB，再上传并导入修正后的资产。渲染效果以实际 `scene.capture` 图像为准。
+
+### 运动本体与官方资产
+
+静态机器人外形使用 FastTrellis。用户要求本体移动、行走、抓取或执行关节动作时，优先选 Isaac Sim 能力目录或资产目录中明确可用的关节模型；核对来源和测量说明，并确认实际关节、驱动和控制回执。仅有机器人名称、USD 后缀或 `configured` 状态不能证明模型可控。姿态烘焙、去除关节驱动的展示模型只能用于静态外观。
+
+没有合适的已配置模型时，使用制造商或 NVIDIA 官方发布且许可证允许的 USD/URDF/MJCF 资产。把资产放进本会话工作区，再用 `benchforge_isaac_sim` 的 `upload` 和实时目录公开的导入操作登记；按返回的句柄提交 SceneProgram。不要把官方资产转换成静态网格，也不要猜主机路径、绕过会话上传或编辑全局目录。机器人运动须用实际模拟回执验收。
+
 ## 观察到完成，验证产物
 
 `submit` / `invoke` 返回受理作业。保存返回的 `job.job_id` 和 `receipt_path`，对同一作业调用 `status` 或最长 60 秒的 `wait`。`QUEUED`、`RUNNING`、`accepted`、观察超时都不等于完成；等待超时不重提作业、不自动取消。

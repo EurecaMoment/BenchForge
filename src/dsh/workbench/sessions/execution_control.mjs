@@ -17,7 +17,6 @@ const same = (a,b) => a?.provider === b?.provider && a?.model === b?.model && a?
 /** 创建父生产会话的推理强度与历史压缩控制器，持久化状态并绑定宿主清理。 */
 export function createExecutionTuning({ctx, pairing}) {
   const records = new Map(), files = new Map(), writes = new Map(), compacting = new Set();
-  const forwardedSummaries=new WeakSet();
   const controller = new AbortController();
   /** 构造带响应状态的执行配置错误。 */
   const error = (message,status=400) => Object.assign(new Error(message),{status});
@@ -118,22 +117,6 @@ export function createExecutionTuning({ctx, pairing}) {
     } finally {compacting.delete(id);}
   }
   const disposers=[
-    ctx.on('llm/stream',/** 仅为当前压缩引擎的辅助请求追加摘要长度要求，保留原路由、历史前缀和提供方流。 */ function(options,next) {
-      const record=records.get(options.sessionId);
-      if(forwardedSummaries.has(options) || options.purpose!=='compaction' || Object.isFrozen(options) ||
-        !['waiting_for_boundary','waiting_for_idle','running'].includes(record?.compact?.state) ||
-        options.provider!==record.selected.provider || options.model!==record.selected.model)return next();
-      const last=options.messages.at(-1);
-      if(last?.role!=='user' || !last.content?.some(block=>block.type==='text' && block.text.includes('compaction engine')))return next();
-      // The public llm/stream seam permits a replacement stream for a
-      // caller-owned auxiliary request. Keep its route/config and cached
-      // history prefix, clone the final directive, and never rewrite a frozen
-      // Agent-loop request. The provider's actual chunks and finish pass through.
-      const directive='\nCheckpoint size target: at most 1500 tokens total. Keep all eight required sections. Preserve the current objective, user hard requirements, accepted artifacts, pending job identities, current files and one next action. Refer to saved scripts/ledgers by path; do not copy full code, old tool output, superseded revisions or every historical retry. Older detail remains in the archived session log and saved artifacts. Give the latest true state precedence over earlier provisional claims. Output only the concise checkpoint.';
-      const replaced={...options,messages:[...options.messages.slice(0,-1),{...last,content:last.content.map(block=>block.type==='text'?{...block,text:block.text+directive}:block)}]};
-      forwardedSummaries.add(replaced);
-      return this.stream(replaced);
-    },{prepend:true}),
     ctx.on('agent/pre-step',/** 在步骤边界执行已登记的安全历史压缩，然后继续原生准入链。 */ async(input,next)=>{
       await compactAtBoundary(input);return next();
     },{prepend:true}),

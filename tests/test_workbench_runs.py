@@ -9,11 +9,38 @@ from database.engine import engine_for
 from pipelines.benchmark.execution.documents import RunDocuments
 from service_access.access_scope import TrustedAccess, access_context
 from storage.access_identity import register_session_workspace, revoke_scope
-from storage.pipeline_queries import query_pipeline_runs
+from storage.pipeline_queries import query_pipeline_runs, latest_production_execution
 from tests.database_fixtures import use_postgres
 
 
 class WorkbenchRunQueryTests(unittest.TestCase):
+    def test_latest_execution_uses_registered_database_state_and_retains_completion(self):
+        """续接查询忽略嵌套运行及文件篡改，完整结束后不回捞较早失败记录。"""
+        access = self.scopes['a']; root = Path(access.root_path)
+        run = root / 'operations/production/pipeline_run'
+        plan = {'production_contract': 'benchforge.production-stages/v1',
+                'stage_review_key': str(run.parent / 'plan.json'),
+                'steps': [{'id': 'scene', 'uses': 'scene.acceptance'}]}
+        with access_context(access):
+            docs = RunDocuments(run)
+            docs.save('plan.json', plan)
+            docs.save('state.json', {'state': 'needs_evidence', 'run_path': str(run),
+                                    'steps': {'scene': {'state': 'needs_evidence'}}})
+            nested = RunDocuments(run / 'nested')
+            nested.save('plan.json', {'steps': []})
+            nested.save('state.json', {'state': 'running'})
+        result = latest_production_execution(root, 'session-a')
+        self.assertEqual(result['run'], str(run))
+        self.assertEqual(result['state']['state'], 'needs_evidence')
+        (run / 'state.json').write_text('{"state":"completed"}', encoding='utf8')
+        self.assertEqual(latest_production_execution(root, 'session-a')['state']['state'], 'needs_evidence')
+        with access_context(access):
+            docs.save('state.json', {'state': 'completed', 'run_path': str(run), 'steps': {}})
+        self.assertEqual(latest_production_execution(root, 'session-a')['state']['state'], 'completed')
+        self.assertIsNone(latest_production_execution(self.scopes['b'].root_path, 'session-b'))
+        revoke_scope(self.engine, access.scope)
+        self.assertIsNone(latest_production_execution(root, 'session-a'))
+
     def setUp(self):
         """为每个用例准备独立数据库及两个真实登记的会话工作区。"""
         self.database_url = use_postgres(self)

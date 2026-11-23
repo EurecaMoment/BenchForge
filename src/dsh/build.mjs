@@ -107,6 +107,7 @@ await build({
     'subagent-policy': 'dsh/presets/subagent_policy.mjs',
     invocation: 'dsh/tools/invocation/executor.mjs',
     'review-policy': 'dsh/production/review_policy.mjs',
+    'summary-policy': 'dsh/context/summary_policy.mjs',
     access: 'dsh/access/host.mjs',
     'component-skills': 'dsh/access/skills.mjs',
   },

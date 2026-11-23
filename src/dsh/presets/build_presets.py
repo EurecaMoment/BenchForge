@@ -17,8 +17,10 @@ def build(standard, python, config_path, service_config, *, package_imports=Fals
     entries = definition.build(standard, python, service_config, config_path=config_path,
                                package_imports=package_imports)
     # This is the upstream Loader identity, disabled before our Host provider mounts.
-    return [{'id': 'session-query-sqlite', 'disabled': True}, {'insert': entries},
-            *([] if package_imports else base.model_patches(config_path))]
+    models = [] if package_imports else base.model_patches(config_path)
+    profile = [{'id': 'session-query-sqlite', 'disabled': True}, {'insert': entries}, *models]
+    base.configure_context_policy(profile, models)
+    return profile
 
 
 # 解析构建路径与解释器设置，生成可移植或本机专用的预设 YAML。

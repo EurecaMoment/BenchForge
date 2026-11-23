@@ -47,6 +47,9 @@ def usage(capabilities, catalog, *, operation=None, feature_id=None):
             'with native_asset containing the returned asset_id/relative_path, source size and up axis. '
             'Do not edit source catalogs or deployment asset directories. Native import preserves the '
             'source representation; verify articulation and controller support from actual service evidence.',
+            'For a constant USD display color, author color3f[] primvars:displayColor = [(r, g, b)] '
+            '(interpolation = "constant"). When upload reports usd_display_color_scalar, keep the '
+            'original RGB in this array form, upload and import the corrected layer, then verify scene.capture.',
         ],
         'actions': {
             'guide': 'Read this guide and live summaries; operation or feature_id selects full live details.',

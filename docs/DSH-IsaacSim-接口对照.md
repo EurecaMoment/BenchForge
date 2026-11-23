@@ -45,6 +45,8 @@ BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `a100sim.v1.Simula
 
 上传先冻结会话文件，再校验其依赖闭包。USD、材质、纹理、URDF/MJCF 和 glTF 等不能携带越界路径或未授权外链；必要解析器缺失时拒绝上传。同一 owner 的新会话可通过授权资产版本复用生成网格、材质和纹理，不读取原对话目录。资产共享也不自动授予原仿真世界的控制权。
 
+USD 上传检查复用现有图层解析，在回执的 `warnings` 中列出最多 16 处带标量 RGB 默认值的 `primvars:displayColor`，包含图层文件名和属性路径。A100 材质读取器把该属性当作颜色数组。整物体底色可将原 RGB 写成 `color3f[] primvars:displayColor = [(r, g, b)] (interpolation = "constant")`，然后上传、导入新版本并实际采集。检查只读取上传图层和 USDZ 包中的图层成员，保留上传字节与原回执。[上传用法和示例](../src/dsh/skills/isaac-sim/references/tool-api.md#上传提交观察下载)
+
 ### SceneProgram 引用本会话原生资产
 
 `benchforge_isaac_sim(action=upload)` 返回的 `asset_id` 和 `relative_path` 可以直接写入对象的 `native_asset`，对象使用 `kind="native"`。该字段还要求源坐标下以米计的 `size:[x,y,z]` 和 `source_up_axis:"Y"|"Z"`，可选 `fix_base`。对象自身的 `size` 则是场景 Z-up 下的目标尺寸。适配器转换源尺寸轴向后计算缩放，沿用 `asset.import` 和 `scene.edit`，不要求修改源码目录、静态资产表或部署配置。

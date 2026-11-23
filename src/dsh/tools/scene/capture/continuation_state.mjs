@@ -1,22 +1,24 @@
 import {canonicalToolName} from '../../invocation/identifiers.mjs';
 import {budgetRejection, captureProducers} from './budget.mjs';
+import {backgroundWaitRun} from './capture_watch.mjs';
 /** 合并消息中的文本块，供识别生产请求与通知内容使用。 */
 const body = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n');
 /** 容错解析工具事件中的 JSON 文本，忽略无法解析的内容。 */
 const json = text => {try {return JSON.parse(text);} catch {return null;}};
 
 /** 创建空的采集历史归约状态，初始化轮次、调用、任务代际和中断标记。 */
-const initial = () => ({calls:new Map(),captures:new Map(),budgets:new Map(),turn:0,production:false,completed:false,
+const initial = () => ({calls:new Map(),captures:new Map(),budgets:new Map(),waits:new Set(),turn:0,production:false,completed:false,
   interrupted:false,disposalSeq:0,workflowSeq:0,activitySeq:0,activeTurn:false,taskSeq:0,taskKey:'',seq:-1});
 /** 按事件序号增量归约原生历史，追踪生产任务、采集提交、停止及交付状态。 */
 function consume(state, events) {
-  const {calls,captures,budgets} = state;
+  const {calls,captures,budgets,waits} = state;
   for (const event of events) {
     if (event.seq != null && event.seq <= state.seq) continue;
     state.seq = event.seq ?? state.seq;
     const data = event.data;
     if (event.type === 'turn/start') {state.turn = data.turn; state.interrupted = false; state.disposalSeq = 0; state.activeTurn = false;}
     if (event.type === 'user/message' && ['benchforge/capture-watch','benchforge/capture-continuation','benchforge/production-resume'].includes(data.source?.kind)) state.activeTurn = true;
+    if (event.type === 'user/message' && data.source?.kind === 'benchforge/capture-watch') waits.delete(data.source.capture?.run_id);
     if (event.type === 'turn/end' && data.reason?.kind === 'aborted') {
       state.interrupted = data.reason.reason?.kind !== 'disposed';
       if (!state.interrupted) state.disposalSeq = event.seq;
@@ -42,6 +44,7 @@ function consume(state, events) {
       if ((receipt.review_revision?.kind === 'new_task' || state.completed || !state.production) && key !== state.taskKey) {
         captures.clear();
         budgets.clear();
+        waits.clear();
         state.taskSeq = event.seq;
         state.taskKey = key;
         state.workflowSeq = 0;
@@ -57,6 +60,9 @@ function consume(state, events) {
         state.workflowSeq = event.seq;
     }
     if (['benchforge_scene_status','benchforge_scene_evidence','benchforge_wait'].includes(name)) state.activeTurn = true;
+    if (name === 'benchforge_wait' && backgroundWaitRun(receipt)) waits.add(receipt.run_id);
+    if ((['benchforge_scene_status','benchforge_wait'].includes(name) && terminalCapture(receipt)) ||
+        (name === 'benchforge_cancel' && receipt.cancel_requested === true)) waits.delete(receipt.run_id);
     if (receipt.production_contract === 'benchforge.production-stages/v1') state.production = true;
     if (name === 'benchforge_pipeline_run' && receipt.state === 'completed') state.completed = true;
     const run = receipt.run_id || (name === 'benchforge_retry' ? receipt.task_id?.split('.')[0] : '');
@@ -67,7 +73,7 @@ function consume(state, events) {
     state.activeTurn = true;
   }
   const {calls:ignored,...value} = state;
-  return {...value,captures:[...captures.values()],budgets:[...budgets.values()]};
+  return {...value,captures:[...captures.values()],budgets:[...budgets.values()],waits:[...waits]};
 }
 
 /** Recover ownership and obligations from standard DSH events, including PTC. */

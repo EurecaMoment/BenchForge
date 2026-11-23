@@ -1,7 +1,9 @@
 """从工具参数解析到上传校验的回归：本地来源与资产内部文件名不可混用。"""
 
+import importlib.util
 import os
 from pathlib import Path
+from shutil import copyfile
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
@@ -46,6 +48,33 @@ class IsaacUploadInputTests(unittest.TestCase):
                 self.assertEqual(request['relative_path'], name)
                 with self.assertRaises(PermissionError):
                     validate_upload(request['source_path'], request['relative_path'])
+
+    @unittest.skipUnless(importlib.util.find_spec('pxr'), 'USD parser is not installed')
+    def test_upload_returns_display_color_warning_and_sends_original_bytes(self):
+        source = self.source.with_name('room.usda')
+        original = b'#usda 1.0\ndef Cube "Wall" {\n color3f primvars:displayColor = (1, 0, 0)\n}\n'
+        source.write_bytes(original)
+        client = Mock(endpoint='simulator:50051')
+
+        def upload(path, *, asset_id, relative_path):
+            self.assertEqual(path.read_bytes(), original)
+            return {'asset_id': asset_id, 'relative_path': relative_path}
+
+        client.upload.side_effect = upload
+        request = {**self.request, 'source_path': str(source), 'relative_path': 'rooms/room.usda'}
+        with (access_context(self.access),
+                patch('capabilities.isaac_sim.tool_api.A100Client', return_value=client),
+                patch('capabilities.isaac_sim.tool_api.NativeResources', return_value=Mock(access=self.access)),
+                patch('capabilities.isaac_sim.upload_access.copy_input',
+                      side_effect=lambda root, path, target, *, limit: copyfile(path, target))):
+            result = execute(resolve_arguments(request, self.workspace), self.directory, {})
+        client.upload.assert_called_once()
+        self.assertEqual(result['asset'], {'asset_id': 'owned-asset', 'relative_path': 'rooms/room.usda'})
+        warning, = result['warnings']
+        self.assertEqual(warning['code'], 'usd_display_color_scalar')
+        self.assertEqual(warning['layer'], 'rooms/room.usda')
+        self.assertEqual(warning['path'], '/Wall.primvars:displayColor')
+        self.assertEqual(source.read_bytes(), original)
 
     @unittest.skipUnless(os.name == 'posix', 'Private upload snapshots require Linux descriptors')
     def test_scoped_upload_transmits_snapshot_and_preserves_asset_identity(self):

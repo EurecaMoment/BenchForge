@@ -10,6 +10,7 @@ import grpc
 
 from capabilities.isaac_sim.grpc import simulator_pb2 as pb
 from capabilities.isaac_sim.grpc.simulator_pb2_grpc import SimulatorServicer, add_SimulatorServicer_to_server
+from capabilities.isaac_sim.grpc.transport import document
 from capabilities.isaac_sim.tool_api import execute
 
 
@@ -18,6 +19,7 @@ class DiscoveryService(SimulatorServicer):
     def __init__(self):
         self.availability = pb.AVAILABLE
         self.calls = []
+        self.job = None
 
     # 返回测试能力及当前可用性，用于区分已声明与已验证支持。
     def GetCapabilities(self, request, context):
@@ -41,6 +43,12 @@ class DiscoveryService(SimulatorServicer):
             support=pb.PARTIAL, availability=pb.AVAILABLE,
             request_schema={'type': 'object', 'properties': {'path': {'type': 'string'}},
                             'required': ['path']})])])
+
+    def GetJob(self, request, context):
+        self.calls.append('GetJob')
+        if self.job is None or request.job_id != self.job.job_id:
+            context.abort(grpc.StatusCode.NOT_FOUND, 'No such job')
+        return self.job
 
 
 class GuideTests(unittest.TestCase):
@@ -109,3 +117,46 @@ class GuideTests(unittest.TestCase):
         feature = self.guide(feature_id='sessions.extended.asset.import')['result']['live']['features'][0]
         self.assertEqual(feature['support'], 'PARTIAL')
         self.assertEqual(feature['request_schema']['properties'], {'path': {'type': 'string'}})
+
+    def observe(self, job, action='status'):
+        self.service.job = job
+        self.service.calls.clear()
+        with patch('capabilities.isaac_sim.tool_api.NativeJobs') as jobs:
+            jobs.return_value.require.return_value = job.request_id
+            result = execute({'action': action, 'job_id': job.job_id},
+                             self.root / 'operations' / action, self.config)
+        self.assertEqual(result['job'], document(job))
+        self.assertEqual(json.loads(Path(result['receipt_path']).read_text()), document(job))
+        self.assertEqual(self.service.calls, ['GetJob'] * (2 if action == 'wait' else 1))
+        return result
+
+    def test_failed_extended_capture_preserves_job_and_guides_camera_recovery(self):
+        job = pb.Job(job_id='capture', request_id='capture-request',
+                     operation='extension.extended.scene.capture', state=pb.FAILED,
+                     failure=pb.Failure(code='FAILED_PRECONDITION',
+                                        message='a perspective USD camera is required'))
+        for action in ('status', 'wait'):
+            with self.subTest(action=action):
+                hint = self.observe(job, action)['recovery_hint']
+                self.assertIn('benchforge_capture(scene_program_path=...)', hint)
+                self.assertIn('extension.extended.scene.inspect', hint)
+                self.assertIn('extension.extended.scene.capture', hint)
+                self.assertIn('same session_id', hint)
+                self.assertIn('perspective Camera prims', hint)
+                self.assertIn('new request_id', hint)
+
+    def test_camera_hint_only_applies_to_the_observed_failure(self):
+        capture = 'extension.extended.scene.capture'
+        camera_error = 'a perspective USD camera is required'
+        cases = [
+            (capture, pb.CANCELLED, camera_error),
+            (capture, pb.FAILED, 'renderer ran out of memory'),
+            ('extension.scene.capture', pb.FAILED, camera_error),
+            ('extension.extended.scene.inspect', pb.FAILED, camera_error),
+            (capture, pb.SUCCEEDED, ''),
+        ]
+        for operation, state, message in cases:
+            with self.subTest(operation=operation, state=state, message=message):
+                job = pb.Job(job_id='capture', request_id='capture-request', operation=operation,
+                             state=state, failure=pb.Failure(message=message))
+                self.assertNotIn('recovery_hint', self.observe(job))

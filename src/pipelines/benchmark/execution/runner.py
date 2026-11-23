@@ -26,6 +26,7 @@ from capabilities.task_catalog.allocation import counts_for
 from pipelines.benchmark.design.production_allocation import step_allocations
 from storage.operation_outputs import operation_workspace, logical_path, physical_path, logical_value, publish_current, persistent_outputs
 from pipelines.benchmark.execution.delivery_contract import verify_delivery
+from pipelines.benchmark.execution.run_identity import run_root as resolve_run_root, validate_rebinding
 
 SERVICE_ROUTES = {'benchforge.start': '/start', 'benchforge.capture': '/capture',
                   'benchforge.asset': '/asset', 'benchforge.refine': '/refine', 'benchforge.extend': '/extend',
@@ -91,7 +92,8 @@ def execute_step(step, arguments, directory, environment, client):
 # 在运行锁或私有持久输出上下文内推进一次执行，允许状态读取独立进行。
 def run(args, directory, config=None, client=service_call):
     """Advance one run under a lock; status readers need not acquire it."""
-    run_root = Path(args['run']).resolve() if args.get('run') else Path(directory) / 'pipeline_run'
+    run_root = resolve_run_root(args, directory)
+    args = {**args, 'run': str(run_root)}
     from service_access.access_scope import current_access
     if current_access() is not None:
         with persistent_outputs(run_root, config) as private:
@@ -109,11 +111,11 @@ def _run_locked(args, directory, config, client):
     frozen = run_root/'plan.json'
     documents = RunDocuments(run_root)
     previous_plan = documents.load('plan.json')
-    if previous_plan is not None and logical_value(previous_plan) != logical_value(plan):
-        raise ValueError('Plan changed; create a new pipeline run to retain prior evidence')
+    state = documents.load('state.json') or {'schema': 'benchforge.pipeline-state/v1', 'steps': {}, 'state': 'running'}
+    state['run_path'] = str(logical_path(run_root))
+    validate_rebinding(previous_plan, plan, state)
     documents.save('plan.json', plan)
     state_path = run_root/'state.json'
-    state = documents.load('state.json') or {'schema': 'benchforge.pipeline-state/v1', 'steps': {}, 'state': 'running'}
     # Older deployments may have no private receipt copies. Reconstruct only
     # PostgreSQL-authored step results, never trust mutable workspace state.json.
     for step_id, prior in state.get('steps', {}).items():
@@ -229,11 +231,11 @@ def _run_locked(args, directory, config, client):
         if prior and prior['state'] == 'completed':
             arguments = bind(step.get('arguments', {}), environment)
             if documents.load('steps/' + step['id'] + '/request.json') != arguments:
-                raise ValueError('Completed step inputs changed; create a new plan/run')
+                raise ValueError('Completed step inputs changed; use an explicit new run with the same approved plan to revalidate evidence. Do not restart S1 for an execution repair.')
             if step['uses'] in COLLECTION_OPERATIONS:
                 file = Path(prior['result']['evidence'])
                 if not file.is_file() or prior['result'].get('evidence_version') != [file.stat().st_size, file.stat().st_mtime_ns]:
-                    raise ValueError('Validated collection changed; save a revised plan and validate S3 again')
+                    raise ValueError('Validated collection changed; use an explicit new run with the same approved plan and validate S3 again. Do not restart S1 for changed evidence.')
                 for name, version in prior['result'].get('source_versions', {}).items():
                     source = Path(name)
                     if not source.is_file() or version != [source.stat().st_size, source.stat().st_mtime_ns]:

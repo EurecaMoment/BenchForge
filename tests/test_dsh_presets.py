@@ -33,6 +33,23 @@ def persona(profile):
 
 
 class DshPresetTests(unittest.TestCase):
+    def test_benchforge_preserves_bash_and_disables_host_plugin_management(self):
+        """常规工具保留，宿主管理仅在 BenchForge 预设停用；升级后同样生效。"""
+        source = standard()
+        rows = source[0]['insert'][0]['config']['plugins']
+        rows.extend([{'id': 'tool-plugin-manager', 'name': '@deepseek-ai/dsh-plugin-manager/tools'},
+                     {'id': 'tool-bash', 'name': '@deepseek-ai/dsh-tool-bash'}])
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'missing-config.json'
+            generated = build(source, 'python3', config, config, package_imports=True)
+        prior = deepcopy(generated)
+        next(row for row in plugins(prior) if row['id'] == 'tool-plugin-manager').pop('disabled')
+        for result in (generated, migrate_profile(prior, generated)):
+            by_id = {row['id']: row for row in plugins(result)}
+            self.assertIs(by_id['tool-plugin-manager']['disabled'], True)
+            self.assertFalse(by_id['tool-bash'].get('disabled'))
+        self.assertNotIn('disabled', rows[-2])
+
     # 验证组件指南在 profile 合并后仍唯一存在，且只作用于自有预设。
     def test_component_skills_survive_profile_merge_and_remain_preset_scoped(self):
         for portable in (False, True):

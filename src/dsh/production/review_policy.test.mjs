@@ -19,6 +19,10 @@ test('reads, status, previews, validated plans and bounded draft edits remain us
     'benchforge_scene_evidence', 'benchforge_wait', 'benchforge_pipeline_plan']) {
     assert.equal(reviewDenial({name}, pending, '/workspace'), undefined, name);
   }
+  assert.equal(reviewDenial({name: 'benchforge_prepare', arguments: {action: 'status'}}, pending, '/workspace'), undefined);
+  for (const args of [{}, {action: 'start'}]) {
+    assert.ok(reviewDenial({name: 'benchforge_prepare', arguments: args}, pending, '/workspace'));
+  }
   for (const action of ['guide', 'capabilities', 'catalog', 'assets', 'status', 'wait', 'download']) {
     assert.equal(reviewDenial({name: 'benchforge_isaac_sim', arguments: {action}}, pending, '/workspace'), undefined);
   }

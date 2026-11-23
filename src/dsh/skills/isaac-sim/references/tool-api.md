@@ -10,7 +10,7 @@
 | `capabilities` | 无 | `result.capabilities` 包含操作、可用性、范围和公开 schema |
 | `catalog` | 可选 `feature_id` | 产品域/功能及 `support`、`availability`、`request_schema`、`fixed_arguments`；过滤后为 `result.features` |
 | `assets` | 无 | 服务已上传资产的标识及相对文件名，不提供任意服务端文件浏览 |
-| `upload` | `source_path`；可选 `asset_id`、`relative_path` | 来源必须是当前工作区内已保存文件；返回 `asset` 中的标识与相对路径 |
+| `upload` | `source_path`；可选 `asset_id`、`relative_path` | 来源必须是当前工作区内已保存文件，返回 `asset` 中的标识与相对路径。发现 USD 格式问题时可附带 `warnings` |
 | `submit` | `request`；可选 `request_id` | `request` 是一个原生任务消息；返回 `job`、`receipt_path`，受理不代表完成 |
 | `invoke` | `feature_id`、`request`；可选 `request_id` | `request` 直接是该功能的参数，不再套 `extension`；返回持久作业 |
 | `status` | `job_id` | `job` 的状态、结果、失败原因和产物清单 |
@@ -47,6 +47,16 @@
 ```json
 {"action":"upload","source_path":"tasks/example/work/scene.usda"}
 ```
+
+若 `warnings` 包含 `usd_display_color_scalar`，打开 `layer` 指定的图层，在 `path` 指定的属性中保留原 RGB 并改成单元素数组。
+
+```usda
+color3f[] primvars:displayColor = [(0.72, 0.68, 0.62)] (
+    interpolation = "constant"
+)
+```
+
+提示随上传回执返回。修正后上传工作区中的新版本，用新回执中的句柄导入，然后以 `scene.capture` 的实际图像确认效果。上面的写法用于整物体底色，逐顶点和逐面颜色继续使用对应插值方式的数组。
 
 使用上传返回的 `asset.asset_id` / `asset.relative_path`：
 

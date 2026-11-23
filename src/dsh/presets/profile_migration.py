@@ -52,6 +52,7 @@ def _merge_configuration(old, new):
 def _merge_preset(row, previous):
     incoming = row['config']
     prior = previous.get('config', {})
+    base.preserve_context_overrides(incoming['plugins'], prior.get('plugins', []))
     previous_plugins = {plugin['id']: plugin for plugin in prior.get('plugins', []) if 'id' in plugin}
     plugins = []
     for plugin in incoming['plugins']:

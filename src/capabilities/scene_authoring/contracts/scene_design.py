@@ -55,6 +55,14 @@ def validate_geometry_declarations(scenes):
     if not isinstance(designs, list) or any(not isinstance(row, dict) for row in designs):
         raise ValueError('scenes.designs must contain scene designs')
     design_ids = {row.get('id') for row in designs}
+    for index, design in enumerate(designs):
+        if design.get('geometry_exceptions') and not any(
+                isinstance(row, dict) and row.get('scene_design_id') == design.get('id')
+                for row in declarations):
+            raise ValueError(f'scenes.designs[{index}].geometry_exceptions is misplaced; '
+                             'declare it in scenes.geometry_exceptions with scene_design_id, '
+                             'scene_id, object_ids, purpose, reason, simplifications, '
+                             'retained_constraints and excluded_claims')
     seen = set()
     for value in declarations:
         if not isinstance(value, dict):
@@ -87,7 +95,10 @@ def saved_design(program, policy=None):
         raise ValueError('Reference one saved scene production plan')
     reference = references[0]
     if not isinstance(reference.get('path'), str):
-        raise ValueError('Scene plan needs its saved absolute path')
+        raise ValueError('Scene plan reference needs the field "path" containing its saved absolute path: '
+                         '{"kind":"scene_plan","path":"<returned plan path>",'
+                         '"scene_design_id":"<design id>"}. '
+                         'Repair provenance.sources in the scene program; do not recreate the plan.')
     path = Path(reference['path'])
     if not path.is_absolute():
         raise ValueError('Scene plan must be an existing saved JSON document')

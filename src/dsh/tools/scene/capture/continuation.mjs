@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
-import {compactCaptureObservation, captureRunId} from './capture_watch.mjs';
+import {compactCaptureObservation, captureRunId, pendingRunObservation} from './capture_watch.mjs';
 import {createCaptureHistory, captureFailure, repeatedRepairFailure, noticeDelivered, terminalCapture} from './continuation_state.mjs';
 import {captureNotice} from './notice.mjs';
 import {budgetMatches, captureBudgetCode} from './budget.mjs';
@@ -19,12 +19,19 @@ const outcome = record => record.error ? 'observer_failed' : record.observation?
 const exhausted = record => record?.observation?.tasks?.length === 1 && record.observation.tasks.find(task =>
   task.state === 'FAILED_FINAL' && (task.failure?.stage === 'capture_budget' || task.failure?.code === captureBudgetCode ||
    (task.failure?.scene_review?.passed === false && task.capture_budget?.remaining === 0)))?.capture_budget;
+const workflowOf = record => record.observation?.tasks?.find(task=>task.workflow)?.workflow || 'scene';
 /** 根据运行、代际和任务上下文生成稳定通知键，避免旧结果重复续接新任务。 */
 const noticeKey = (record,context) => `capture:${record.owner}:${record.run_id}:${record.generation}:${outcome(record)}` +
   (context.activeTurn && context.disposalSeq ? `:disposal:${context.disposalSeq}` : '');
 /** 将结构化采集结果序列化为通知所需的文本内容。 */
 const text = record => {
   const state = outcome(record);
+  if (workflowOf(record) !== 'scene') {
+    const instruction = record.error ? '用 benchforge_wait(background=true) 恢复原作业跟踪。' :
+      '读取已保存的实际作业回执和产物，继续依赖步骤；场景验收和阶段审核照常执行。';
+    return `后台作业结果通知：${state}。${instruction}\n` +
+      JSON.stringify(captureNotice({...record.observation,run_id:record.run_id},record.error));
+  }
   const notice=captureNotice({...record.observation,run_id:record.run_id},record.error);
   const recovery=notice.tasks.some(task=>task.recovery);
   return `采集结果通知：${state}。${exhausted(record) ?
@@ -148,7 +155,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
           return save({...record,state:'settled'});
       }
       const message = createMessage({source:{kind:'benchforge/capture-watch',noticeKey:key,form:'notice',summary:`采集状态：${outcome(record)}`,
-        capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation),...(budget && {capture_budget:budget})}},
+        capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation),workflow:workflowOf(record),...(budget && {capture_budget:budget})}},
         content:[{type:'text',text:text(record)},...images]});
       // steer wakes a driver even if it is crossing the final-response boundary.
       if (agent.status === 'running') agent.steer(message); else agent.followup(message);
@@ -222,7 +229,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     active.set(key,observer);
   }
   /** 串行登记当前会话的采集提交，保留幂等关系并按需恢复已暂停观察。 */
-  async function register(agent, submission, {resume = false} = {}) {
+  async function register(agent, submission, {resume = false, observation} = {}) {
     if (closed) throw Error('Capture tracking is unloading; the submitted task is retained by the service');
     const run = captureRunId(submission.run_id), owner = agent.id;
     if (!/^[A-Za-z0-9_-]+$/.test(owner) || !/^sf_[A-Za-z0-9_-]+$/.test(run)) throw Error('Capture tracking requires a native session and run identity');
@@ -231,7 +238,8 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     const operation = previous.catch(()=>{}).then(/** 在同一会话运行队列内建立或升级续接记录，再启动对应代际的宿主观察器。 */ async()=>{
       let record = table.get(key);
       if (!record) record = await save({owner,run_id:run,generation:submission.call_id || run,
-        submitted_at:submission.submitted_at || now(),task_seq:submission.task_seq ?? history(agent.session).taskSeq,state:'watching'});
+        submitted_at:submission.submitted_at || now(),task_seq:submission.task_seq ?? history(agent.session).taskSeq,state:'watching',
+        ...(observation ? {observation} : {})});
       if (submission.retry && submission.call_id && record.generation !== submission.call_id) {
         record = await save({owner,run_id:run,generation:submission.call_id,
           submitted_at:submission.submitted_at || now(),task_seq:submission.task_seq ?? history(agent.session).taskSeq,state:'watching'}, {replace:true});
@@ -248,6 +256,23 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     });
     registration.set(key,operation);
     try {return await operation;} finally {if(registration.get(key)===operation)registration.delete(key);}
+  }
+  async function wait(agent, run, observation) {
+    if (observation?.run_id !== captureRunId(run)) throw new Error('Invalid background wait identity');
+    if (!pendingRunObservation(observation)) return observation;
+    const registered = await register(agent,{run_id:observation.run_id},{resume:true,observation});
+    return {...observation,...registered,watch:{...registered.watch,accepted:registered.watch.state === 'watching'}};
+  }
+
+  // Only explicit wait receipts for the current task and accepted service observations can park a turn.
+  function hasPendingWait(agent) {
+    const context = history(agent.session);
+    if (closed || context.interrupted || context.completed) return false;
+    return context.waits.some(run=>{
+      const key = keyOf(agent.id,run), row = table.get(key);
+      return row?.state === 'watching' && row.task_seq === context.taskSeq && row.observation?.run_id === run &&
+        pendingRunObservation(row.observation) && active.get(key)?.generation === row.generation;
+    });
   }
   /** 从最新原生采集事件协调续接记录，只恢复仍属于当前任务的运行。 */
   async function reconcile(agent, {recover = false,signal:turnSignal} = {}) {
@@ -273,7 +298,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     const signal=turnSignal?AbortSignal.any([lifetime,turnSignal]):lifetime;
     signal.throwIfAborted();
     const context = history(agent.session);
-    if (context.interrupted || context.completed || !context.activeTurn) return;
+    if (context.interrupted || context.completed || !context.activeTurn || hasPendingWait(agent)) return;
     const latest = context.captures.at(-1);
     if (!latest || latest.turn !== context.turn && !context.production) return;
     if (waitingForCapture(agent) || currentBudget(agent)) return;
@@ -356,5 +381,5 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
   }
   /** 禁止新增观察、取消整个续接寿命，并等待已持有任务退出。 */
   async function dispose() {closed = true;lifecycle.abort();await settled();}
-  return {register,reconcile,stopping,block,restore,resume,dispose,settled,records,waitingForCapture,currentBudget};
+  return {register,wait,hasPendingWait,reconcile,stopping,block,restore,resume,dispose,settled,records,waitingForCapture,currentBudget};
 }

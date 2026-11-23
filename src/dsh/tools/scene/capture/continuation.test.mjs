@@ -11,6 +11,7 @@ import {repairEvidence,repairImageContent} from './repair_evidence.mjs';
 import {trackCaptureSubmission} from './submission.mjs';
 import {captureNotice} from './notice.mjs';
 import {createDeliveryReview} from './quality_review.mjs';
+import {createProductionLifecycle} from '../../../production/lifecycle.mjs';
 
 /** 构造带场景质量诊断的最终失败观察结果，允许指定运行和具体问题。 */
 const failure = (run='sf_scene', issue='dog_go2 has no recognizable asset', scene='apartment') => ({
@@ -125,6 +126,66 @@ test('delivery review uses retained evidence after the matching scene is exhaust
   task.capture_scene_key='frozen-two';
   await review({agent:h.agent,turn:1,signal:h.abort.signal});
   assert.match(h.sent.at(-1).content[0].text,/submit one revised capture/);
+});
+
+const layout = (run, state='RUNNING') => ({run_id:run,state,terminal:state!=='RUNNING',
+  tasks:[{id:run+'.scene0',state,workflow:'layout'}]});
+
+test('production stops while an explicit owned layout wait is live and resumes normal limits after it settles',async t=>{
+  const terminal=Promise.withResolvers();
+  const h=harness({read:()=>terminal.promise});h.plan();
+  t.after(async()=>{terminal.resolve(layout('sf_layout','SUCCEEDED'));await h.dispose();});
+  const view={active:true,turn:1,workflowTurn:1,state:'running',plan:'/workspace/plan.json',workspace:'/workspace',run:'',revision:1};
+  const lifecycle=createProductionLifecycle({projection:{stateOf:()=>({view,notices:[],lastResponse:{seq:h.events.length,visible:false}})},
+    table:{get:()=>undefined,put:()=>{}},createMessage:value=>value,hasPendingWait:h.runtime.hasPendingWait});
+  t.after(()=>lifecycle.dispose());
+
+  const wait=await h.runtime.wait(h.agent,'sf_layout',layout('sf_layout'));
+  assert.equal(wait.watch.accepted,true);
+  h.call('benchforge_wait',wait);
+  await lifecycle.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,0);
+  for(let attempt=0;attempt<3;attempt++){
+    h.append('assistant/message',{message:{content:[]}});
+    await lifecycle.stopping({agent:h.agent,turn:1});
+  }
+  assert.equal(h.sent.length,0);
+
+  terminal.resolve(layout('sf_layout','SUCCEEDED'));await h.runtime.settled();
+  assert.equal(h.sent.length,1);
+  assert.equal(h.sent[0].source.capture.workflow,'layout');
+  assert.equal(h.sent[0].source.capture.state,'SUCCEEDED');
+  h.consume();
+  for(let attempt=0;attempt<2;attempt++){
+    h.append('assistant/message',{message:{content:[]}});
+    await lifecycle.stopping({agent:h.agent,turn:2});h.consume();
+  }
+  h.append('assistant/message',{message:{content:[]}});
+  await assert.rejects(lifecycle.stopping({agent:h.agent,turn:2}),{code:'BENCHFORGE_PRODUCTION_INCOMPLETE'});
+});
+
+test('explicit waits keep distinct outcomes across reload and cancellation',async t=>{
+  const read=(_route,_args,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));
+  const h=harness({read});h.plan();
+  await assert.rejects(h.runtime.wait(h.agent,'sf_foreign',layout('sf_other')),/identity/);
+  assert.equal((await h.runtime.wait(h.agent,'sf_old',layout('sf_old','SUCCEEDED'))).watch,undefined);
+  for(const run of ['sf_layout','sf_second','sf_cancelled'])
+    h.call('benchforge_wait',await h.runtime.wait(h.agent,run,layout(run)));
+  assert.equal(h.runtime.hasPendingWait(h.agent),true);
+  assert.equal(h.runtime.hasPendingWait({...h.agent,id:'another-session'}),false);
+  h.call('benchforge_cancel',{run_id:'sf_cancelled',cancel_requested:true});
+  const outcomes=new Map([['sf_layout','SUCCEEDED'],['sf_second','FAILED_FINAL'],['sf_cancelled','CANCELED']]);
+  await h.dispose();
+
+  const next=harness({data:h.data,events:h.events,read:async(_route,args)=>layout(args.run_id,outcomes.get(args.run_id))});
+  t.after(()=>next.dispose());
+  next.runtime.restore();
+  await next.runtime.settled();
+  assert.equal(next.runtime.hasPendingWait(next.agent),false);
+  assert.deepEqual(next.sent.map(message=>message.source.capture.state).sort(),['FAILED_FINAL','SUCCEEDED']);
+  next.consume();
+  next.runtime.restore();await next.runtime.settled();
+  assert.equal(next.sent.length,2);
 });
 
 test('capture reconciliation and stopping can be cancelled during a stalled backend read',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：capture reconciliation and stopping can be cancelled during a stalled backend read。 */ async t=>{

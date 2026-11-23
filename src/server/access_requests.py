@@ -74,6 +74,8 @@ def authorize_request(store, route, value):
                     # evidence has separate export APIs and is not an alternate
                     # workspace for this input contract.
                     workspace_path(child)
+                elif key == 'design_task_id' and isinstance(child, str):
+                    require_run(store.repo.engine, child.split('.scene', 1)[0])
                 else:
                     paths(child)
         elif isinstance(item, list):

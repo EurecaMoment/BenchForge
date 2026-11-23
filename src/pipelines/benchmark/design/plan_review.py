@@ -2,6 +2,8 @@
 from copy import deepcopy
 from pathlib import Path
 
+from pipelines.benchmark.design.reference_equivalence import align_reference
+
 
 CONTRACT_FIELDS = ('schema', 'pipeline_id', 'objective', 'inputs', 'steps', 'selections',
                    'template_contracts', 'assessment', 'production_contract', 'user_markdown')
@@ -36,6 +38,14 @@ def _object_renames(before, after):
     detail = lambda row: {key: value for key, value in row.items() if key != 'object_id'}
     if any(detail(left) != detail(right) for left, right in zip(old, new)):
         return {}
+    # A surviving ID cannot be reassigned and identical roles are not evidence
+    # for choosing between indistinguishable objects. Fail closed in either case.
+    common = set(old_ids) & set(new_ids)
+    changed = [i for i, pair in enumerate(zip(old_ids, new_ids)) if pair[0] != pair[1]]
+    if any(old_ids[i] in common or new_ids[i] in common for i in changed):
+        return {}
+    if any(any(detail(old[i]) == detail(old[j]) for j in changed if i != j) for i in changed):
+        return {}
     return dict(zip(old_ids, new_ids))
 
 
@@ -49,6 +59,7 @@ def _align_repairs(before, after):
             continue
         mapping = _object_renames(left, right)
         renames[left['id']] = mapping
+        align_reference(left, right, mapping)
         for row in left.get('object_roles', []):
             row['object_id'] = mapping.get(row.get('object_id'), row.get('object_id'))
         for row in left.get('relations', []):
@@ -112,10 +123,8 @@ def revision_review(plan, target, previous=None, base_plan=None, *, new_task=Fal
     before, after = _contract(previous), _contract(plan)
     _align_repairs(before, after)
     changed = _changes(before, after)
-    source = lambda value: (value.get('authoring_sources', {}).get('request_path')
-                            or value.get('authoring_sources', {}).get('assessment_path'))
-    different_source = bool(source(previous) and source(plan) and source(previous) != source(plan))
-    new_task = new_task or (different_source and not applied_edit)
+    # 请求文件只是可移动的编写来源；只有显式新任务才能切断计划谱系。
+    # 更换路径或从文件改为内联提交，仍须比较契约并执行要求保留检查。
     if not new_task and not applied_edit and not draft_edit:
         _preserve_requirements(before, after)
     # applies_edit is trusted only after verification against the active pending

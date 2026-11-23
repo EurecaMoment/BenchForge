@@ -122,6 +122,42 @@ def Xform "World" {
         with self.assertRaises(PermissionError):
             validate_upload(self.file('foreign.usda', document.replace('TEXTURE', '../private.png')))
 
+    @unittest.skipUnless(importlib.util.find_spec('pxr'), 'USD parser is not installed')
+    def test_scalar_display_color_warns_and_constant_array_passes(self):
+        scalar = self.file('color.usda', '''#usda 1.0
+def Cube "Wall" {
+    uniform color3f primvars:displayColor = (0.72, 0.68, 0.62)
+}
+''')
+        original = scalar.read_bytes()
+        warnings = validate_upload(scalar, 'room/color.usda')
+        self.assertEqual([(item['code'], item['layer'], item['path']) for item in warnings],
+                         [('usd_display_color_scalar', 'room/color.usda', '/Wall.primvars:displayColor')])
+        self.assertEqual(scalar.read_bytes(), original)
+        repaired = self.file('repaired.usda', '''#usda 1.0
+def Cube "Wall" {
+    color3f[] primvars:displayColor = [(0.72, 0.68, 0.62)] (interpolation = "constant")
+}
+def Shader "Surface" {
+    color3f inputs:diffuseColor = (0.72, 0.68, 0.62)
+}
+''')
+        self.assertEqual(validate_upload(repaired), [])
+
+    @unittest.skipUnless(importlib.util.find_spec('pxr'), 'USD parser is not installed')
+    def test_display_color_warning_names_the_usdz_member(self):
+        path = self.root / 'room.usdz'
+        with ZipFile(path, 'w') as archive:
+            archive.writestr('layers/wall.usda', '''#usda 1.0
+def Cube "Wall" {
+    color3f primvars:displayColor = (0.72, 0.68, 0.62)
+}
+''')
+        warnings = validate_upload(path)
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0]['layer'], 'layers/wall.usda')
+        self.assertEqual(warnings[0]['path'], '/Wall.primvars:displayColor')
+
     # 验证二进制 USD 以不组合外部依赖的方式检查，仍能拦截越界子层。
     @unittest.skipUnless(importlib.util.find_spec('pxr'), 'USD parser is not installed')
     def test_binary_usd_is_inspected_without_composition(self):

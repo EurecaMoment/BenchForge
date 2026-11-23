@@ -22,6 +22,8 @@ export const Config = Schema.object({
   cleanupTimeoutMs: Schema.number().min(1).default(5000),
   reviewTimeoutMs: Schema.number().min(1).default(15000),
   maxStopRecoveries: Schema.number().min(1).default(2),
+  progressSilenceMs: Schema.number().min(1000).default(60000),
+  progressReminderIntervalMs: Schema.number().min(1000).default(300000),
 });
 
 const notices = defineDomain({name:'benchforge_production',version:1,tables:{sessions:domainTable(z.object({
@@ -39,10 +41,12 @@ export async function apply(ctx, config) {
   const logger=ctx.logger(name);
   const reviews=createStageReviewClient(ctx.subprocess,{...config,environment,/** 把阶段复核子进程回收异常交给宿主日志记录。 */ onCleanupError:error=>logger.error(error)});
   const production=createProductionLifecycle({projection,table:domain.table('sessions'),agents:ctx.agents,
+    progressSilenceMs:config.progressSilenceMs,progressReminderIntervalMs:config.progressReminderIntervalMs,
     readReview:createStageReviewReader({...config,/** 从启动环境快照解析阶段复核服务所需的配置值。 */ getEnvironmentValue:name=>launchEnvironmentOf(ctx).get(name)?.value}).byId,
     advanceReview:reviews.advance,createMessage:createUserMessage,/** 记录后台生产生命周期中的异常，保留宿主故障线索。 */ onError:error=>logger.error(error),maxStopRecoveries:config.maxStopRecoveries,
     /** 在恢复生产前协调该会话仍在进行的采集续接任务。 */
     reconcileCaptures:(agent,signal)=>ctx.get('benchforgeCapture')?.continuation.reconcile(agent,{signal}),
+    hasPendingWait:agent=>ctx.get('benchforgeCapture')?.continuation.hasPendingWait?.(agent),
     waitingForCapture:agent=>ctx.get('benchforgeCapture')?.continuation.waitingForCapture(agent),
     captureBudget:agent=>ctx.get('benchforgeCapture')?.continuation.currentBudget(agent),
     /** 经官方会话控制器恢复指定 Agent，并把解析失败向调用方传播。 */

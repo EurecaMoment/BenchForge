@@ -47,7 +47,7 @@ def _overview():
             'item_id': 'exact listed id; use for full selected details', 'offset': 'use next_offset with the same filters',
             'limit': 'positive count, default 20; pages fit the response byte budget', 'workspace_id': 'optional lossless JSON copy of all matches'},
         'workflow': [
-            'For a new scene, first generate or reuse a scene-wide diffusion design reference and inspect its image. Use an existing user reference when supplied. Choose benchforge_diffusion or the optional benchforge_layout pipeline; asset product images do not replace the scene reference. Use the reference to choose spatial composition, asset reuse or generation, material detail and lighting, then build SceneProgram and compare actual captures against it. Keep the reference available for later corrections; it is a design target, not geometry or GT.',
+            'Use benchforge_scene_preflight and benchforge_capture with a complete SceneProgram. For an image-led design, reuse the original reference or optionally generate a new one. benchforge_layout can provide editable position and size estimates and registered assets. Compare actual captures with the task requirements and any design reference.',
             'Use TRELLIS.2 for suitable standalone scene objects when no semantically matching registered asset exists. The benchforge_trellis task registers each returned Y-up PBR mesh and includes its asset_id in generation_stage.json; use that ID in SceneProgram with kind=mesh. Use mesh_import only for a separate user-provided static mesh. Structural architecture and articulated robots should use appropriate native or procedural representations.',
             'Independent tools produce images, masks, meshes and depth predictions. Read task evidence before using outputs.',
             'Optional pipelines: layout prepares a design reference; asset generates a registered asset; run plans, captures and exports a scene.',
@@ -73,7 +73,11 @@ def _load_rows(store, section, item_id, settings=None):
             'diffusion':{'tool':'benchforge_diffusion','inputs':'prompt; optional source_image for editing','outputs':'image source_path'},
             'sam3':{'tool':'benchforge_scene_sam3','inputs':'source_image and prompts or pixel box instances','outputs':'all masks, boxes and scores'},
             'trellis':{'tool':'benchforge_trellis','inputs':'source_image and objects with selected source_mask','outputs':'registered Y-up PBR meshes with asset_id and unmeasured scale'},
-            'depth':{'tool':'benchforge_depth','inputs':'source_image','outputs':'predicted depth arrays, camera parameters and visualization'},
+            'depth':{'tool':'benchforge_depth','provider':'FastDA3','inputs':'source_image; optional matching camera intrinsics and extrinsics','outputs':'estimated_metric_depth array with explicit meter units, camera parameters and visualization; relative or unitless responses fail'},
+            'reference_layout':{'tool':'benchforge_layout',
+                'inputs':'name, description and layout.objects with object_id, label, optional segmentation_prompt/count/requires_articulation; optional layout.camera',
+                'workflow':'For a generated reference, configured FastFLUX creates the design image. FastSAM3 and FastDA3 analyze that exact image in parallel. Ordinary visible objects, including static robot shells, default to registered FastTrellis meshes. Moving bodies use an Isaac Sim articulated asset verified in the live catalog or a supported uploaded official model. Fixed architecture uses exact authored geometry. The camera is an explicit layout assumption when the image has no measured calibration.',
+                'outputs':'layout/reference.png, layout_estimate_overlay.png and layout_estimate.json with detected masks, estimated camera/world positions and sizes, registered asset IDs, missing detections and reconstruction errors. Treat all estimates as editable design guidance, never simulator GT.'},
             'mesh_import':{'tool':'benchforge_mesh_import','inputs':'static GLB/glTF/OBJ/PLY/STL source_mesh, label and source frame; optional source_gaussian; USD/robots use native upload/import','outputs':'registered asset_id and geometry'},
         }
         return _rows(tools)

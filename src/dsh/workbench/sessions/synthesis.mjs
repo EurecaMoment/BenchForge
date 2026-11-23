@@ -6,6 +6,7 @@ import {readChildCatalog} from '../../host/session_family.mjs';
 const queues = new Map();
 const nativeIdleProbes = new WeakMap();
 const NATIVE_ACTIVITY_PROBE_MS = 50;
+const TERMINAL_AGENT_STATUSES = new Set(['inactive', 'completed', 'terminated']);
 const SCHEMA = 'benchforge.synthesis-sessions/v1';
 const PERSONA = `You are a BenchForge preparation worker for one self-contained artifact assignment. Read the supplied frozen plan, contracts and relevant saved evidence. Write only inside the assigned output directory. Start file operations by changing to that directory and using explicit paths; preserve parent plans, scene selections, runner state, accepted artifacts and other workers' files.
 At the start of file work, batch-copy the supplied source scripts or programs into your directory and save manifest.json with status preparing, the working artifact paths and known missing inputs. Use the supplied source paths instead of rediscovering the workspace or checking the whole production chain first. On recovery, preserve saved edits and continue the existing working copies. If a source is actually missing, record its exact path and continue the already determined scope; when no source was supplied, save the known design or script scaffold and preparing manifest first.
@@ -195,12 +196,62 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
         reason: probe?.reason || 'Agent.whenIdle() is unavailable; agentStatus alone cannot confirm idle'};
       if (probe.state === 'error') return {available: true, agentStatus, idleConfirmed: false,
         activityPending: agentStatus === 'running' ? true : null, error: probe.error};
-      return {available: true, agentStatus,
-        idleConfirmed: probe.state === 'settled' && agentStatus === 'idle',
-        activityPending: probe.state === 'pending' || agentStatus === 'running'};
+      const idleConfirmed = probe.state === 'settled' &&
+        (agentStatus === 'idle' || TERMINAL_AGENT_STATUSES.has(agentStatus));
+      return {available: true, agentStatus, idleConfirmed,
+        activityPending: probe.state === 'pending' || agentStatus === 'running' ? true : idleConfirmed ? false : null};
     } catch (error) {
       return {available: Boolean(agent), agentStatus: null, idleConfirmed: false,
         activityPending: null, error: activityError(error)};
+    }
+  }
+
+  /** Check one accepted child through the native session log without starting an Agent. */
+  async function savedChildActivity(task, parentId, access, readCatalog, signal) {
+    const unknown = {available: false, agentStatus: null, idleConfirmed: false, activityPending: null};
+    const query = get('sessionQuery');
+    if (!get('agents') || !query?.observeSession) return {...unknown, reason: 'Native session activity is unavailable'};
+    try {
+      const binding = access.get(task.childId);
+      if (binding.state !== 'active' || binding.parentSessionId !== parentId ||
+          task.childWorkspace !== binding.rootPath ||
+          task.childOutputDirectory !== path.join(binding.rootPath, 'tasks', 'preparation')) {
+        return {...unknown, reason: 'The saved preparation does not match the managed child workspace'};
+      }
+      const catalog = await readCatalog();
+      if (!catalog.some(child => child.id === task.childId && child.mode === 'continuable')) {
+        return {...unknown, reason: 'The native parent did not register this preparation child'};
+      }
+      const observed = await query.observeSession(task.childId, {signal, projectionMode: 'none'});
+      try {
+        signal?.throwIfAborted();
+        const {header} = observed;
+        if (header.id !== task.childId || header.parentSession !== parentId ||
+            header.origin !== 'subagent' || header.cwd !== binding.rootPath) {
+          return {...unknown, reason: 'The saved native child identity differs from the preparation'};
+        }
+        const {events} = observed;
+        const assignment = events.find(event => event.type === 'user/message' &&
+          event.data.source?.kind === 'user' && (!task.messageId || event.data.id === task.messageId));
+        // Startup recovery can lack a returned message ID. Verify the original
+        // native prompt names the reserved preparation directory in that case.
+        const acceptedInput = task.messageId || (task.recovered && assignment?.data.content?.some(block =>
+          block.type === 'text' && block.text.startsWith(PERSONA + '\n\n') &&
+          block.text.includes(`\nAssigned output directory: ${task.childOutputDirectory}\n`)));
+        if (!assignment || !acceptedInput) return {...unknown, reason: 'The accepted preparation input is absent from the native log'};
+        const boundary = events.findLast(event => event.type === 'turn/start' || event.type === 'turn/end');
+        const step = events.findLast(event => event.type === 'step/start');
+        const pending = boundary?.type === 'turn/start' || events.some(event => event.seq > (boundary?.seq ?? -1) &&
+          event.type === 'agent/inbox/spliced' && (event.data.inserted?.length || event.data.outcome === 'canceled'));
+        const idleConfirmed = boundary?.type === 'turn/end' && boundary.data.reason?.kind === 'completed' &&
+          assignment.seq < boundary.seq && step?.data.turn === boundary.data.turn && !pending;
+        return {available: true, agentStatus: idleConfirmed ? 'completed' : null, idleConfirmed,
+          activityPending: pending, source: 'session_log',
+          ...(idleConfirmed ? {} : {reason: 'The native child has no settled, successful final turn'})};
+      } finally { observed[Symbol.dispose](); }
+    } catch (error) {
+      signal?.throwIfAborted();
+      return {...unknown, error: activityError(error)};
     }
   }
 
@@ -240,7 +291,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
     const cwd = await directory(nonempty(parentHeader?.cwd, 'parent cwd'), 'parent cwd');
     if (!inside(root, cwd)) throw new SynthesisError('The parent Agent belongs to another workspace', 403);
     const service = get('subagents');
-    if (!service?.startActivation) throw new SynthesisError('Native subagent service is unavailable', 503);
+    if (requireAgent && !service?.startActivation) throw new SynthesisError('Native subagent service is unavailable', 503);
     const access = get('benchforgeAccess');
     if (!access) throw new SynthesisError('Managed conversation workspaces are unavailable', 503);
     if (access.get(parentId).rootPath !== cwd || root !== cwd)
@@ -379,6 +430,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
         let saves = Promise.resolve();
         /** 将当前批次快照串行写入记录文件，保持任务启动状态的顺序。 */
         const save = () => { saves = saves.then(() => write(recordPath, record)); return saves; };
+        const handoffRequest = JSON.stringify({action: 'status', batch_key: batchKey});
         await Promise.all(ready.map(/** 为待启动子任务预留独立工作区、制作输入快照并调用原生激活接口。 */ async task => {
           try {
             signal?.throwIfAborted();
@@ -398,7 +450,7 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
                 PERSONA + '\n\n' +
                 (frozenPlan ? `Saved frozen plan: ${frozenPlan}\nRead this snapshot for the assigned preparation.\n\n` : '') +
                 `Granted input snapshots: ${JSON.stringify(task.inputSnapshots)}\nUse snapshot paths instead of their original parent paths.\n` +
-                `Assigned output directory: ${childOutputDirectory}\nSave preparation files directly in this directory. The Host hands them back when you finish; do not write the parent workspace.\n\n${task.prompt}`}],
+                `Assigned output directory: ${childOutputDirectory}\nSave preparation files directly in this directory. In your final reply, tell the parent to collect the drafts with benchforge_prepare(${handoffRequest}). Do not write the parent workspace.\n\n${task.prompt}`}],
               ...(reasoningSelection.selectedEffort ? {agentOptions: {reasoningEffort: reasoningSelection.selectedEffort}} : {}),
               maxDepth: 1, signal: signal || new AbortController().signal});
             if (result.childId !== task.childId || typeof result.messageId !== 'string' || !result.messageId) {
@@ -422,12 +474,14 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
   }
   /** 读取并协调指定父会话的批次记录，补充原生活动状态后返回当前回执。 */
   async function read({parentId, batchKey}, signal) {
-    const {dir} = await scope(parentId, false, signal);
+    const {root, dir, access} = await scope(parentId, false, signal);
     const recordPath = fileOf(dir, batchKey);
     const value = await serialized(dir, /** 串行读取并协调批次记录，验证父会话归属后补充原生活动状态。 */ async () => {
       const record = await json(recordPath);
       if (!record) return {parentId, batchKey, recordPath, state: 'not_started', acceptedCount: 0, tasks: []};
       if (record.parentId !== parentId) throw new SynthesisError('This batch belongs to another parent', 403);
+      if (record.schema !== SCHEMA || record.batchKey !== batchKey || record.workspacePath !== root)
+        throw new SynthesisError('This preparation batch does not match its managed workspace', 403);
       const release = await lock(path.join(dir, '.startup.lock'));
       if (!release) return receipt(record, recordPath, 'Workspace preparation registration is in progress');
       try {
@@ -435,13 +489,26 @@ export function createSynthesisSessions({ctx, workspacePath, batchSize = 3}) {
         return receipt(record, recordPath);
       } finally { await release(); }
     });
+    let catalog;
+    const readCatalog = () => catalog ??= readChildCatalog(get('sessionQuery'), parentId, signal);
     const [parentNativeActivity, ...taskActivities] = await Promise.all([
-      nativeActivity(parentId), ...value.tasks.map(task => nativeActivity(task.childId)),
+      nativeActivity(parentId),
+      ...value.tasks.map(async task => {
+        const activity = await nativeActivity(task.childId);
+        return !activity.available && task.state === 'accepted'
+          ? savedChildActivity(task, parentId, access, readCatalog, signal) : activity;
+      }),
     ]);
-    const access = get('benchforgeAccess');
     for (let index = 0; index < value.tasks.length; index++) {
+      signal?.throwIfAborted();
       const task = value.tasks[index];
-      if (access && task.childOutputDirectory && taskActivities[index].idleConfirmed) {
+      const activity = taskActivities[index];
+      if (activity.source === 'session_log' && get('agents')?.get(task.childId)) {
+        taskActivities[index] = {...activity, agentStatus: null, idleConfirmed: false, activityPending: true,
+          reason: 'The child resumed while the saved handoff was being checked'};
+        continue;
+      }
+      if (task.state === 'accepted' && task.childOutputDirectory && activity.idleConfirmed) {
         try { task.handoff = await access.exportPreparation(task.childId, parentId, task.outputDirectory); }
         catch (error) { task.handoff = {accepted: false, error: error.message}; }
       }

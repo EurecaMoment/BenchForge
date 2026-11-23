@@ -5,6 +5,16 @@ export function captureRunId(value) {
   return typeof value==='string' ? (/^(sf_[A-Za-z0-9_-]+)\.scene\d+$/.exec(value)?.[1] || value) : value;
 }
 
+export function pendingRunObservation(value) {
+  return /^sf_[A-Za-z0-9_-]+$/.test(value?.run_id || '') && Array.isArray(value.tasks) &&
+    value.terminal !== true && ['PENDING','READY','RUNNING'].includes(value.state);
+}
+
+export function backgroundWaitRun(value) {
+  return value?.watch?.background === true && value.watch.accepted === true && pendingRunObservation(value)
+    ? value.run_id : '';
+}
+
 /** 按白名单摘取已定义字段，避免观察摘要暴露无关内部数据。 */
 function fields(value, names) {
   return Object.fromEntries(names.filter(name => value?.[name] !== undefined).map(name => [name, value[name]]));

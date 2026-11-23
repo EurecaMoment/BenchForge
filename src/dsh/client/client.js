@@ -114,8 +114,8 @@ var benchforgeClient = (() => {
       productionCompleted: "\u6D41\u6C34\u7EBF\u5DF2\u5B8C\u6210",
       productionAwaitingUpdate: "\u6B63\u5728\u7B49\u5F85\u8FDB\u5C55\u8BF4\u660E",
       productionRecentFailure: "\u6700\u8FD1\u4E00\u6B21\u8C03\u7528\u5931\u8D25\uFF0C\u7B49\u5F85\u5904\u7406",
-      productionWaitingCapture: "\u91C7\u96C6\u5DF2\u63D0\u4EA4\uFF0C\u7B49\u5F85\u771F\u5B9E\u7ED3\u679C",
-      productionNeedsRepair: "\u91C7\u96C6\u6216\u9A8C\u6536\u5931\u8D25\uFF0C\u5F85\u4FEE\u590D",
+      productionWaitingCapture: "\u7B49\u5F85\u540E\u53F0\u4F5C\u4E1A\u7ED3\u679C",
+      productionNeedsRepair: "\u4F5C\u4E1A\u6216\u9A8C\u6536\u5931\u8D25\uFF0C\u5F85\u4FEE\u590D",
       productionSceneReady: "\u91C7\u96C6\u5DF2\u5B8C\u6210\uFF0C\u7EE7\u7EED\u751F\u4EA7\u6D41\u7A0B",
       productionCaptureError: "\u91C7\u96C6\u8DDF\u8E2A\u5F02\u5E38\uFF0C\u5F85\u6062\u590D",
       productionBlocked: "\u4EFB\u52A1\u53D7\u963B\uFF0C\u5C1A\u672A\u5B8C\u6210",
@@ -168,7 +168,8 @@ var benchforgeClient = (() => {
       appendRequest: "\u8FFD\u52A0\u8981\u6C42",
       newProduction: "\u65B0\u5EFA\u751F\u4EA7\u4EFB\u52A1",
       productionSettings: "\u6570\u636E\u751F\u4EA7\u914D\u7F6E",
-      composerProductionHint: "\u5F00\u542F\u540E\uFF0C\u914D\u7F6E\u968F\u672C\u6761\u6D88\u606F\u4E00\u8D77\u53D1\u9001\u3002",
+      composerProductionHint: "\u5F00\u542F\u540E\u81EA\u52A8\u542F\u7528\u667A\u80FD\u4F53\u56E2\u961F\u534F\u4F5C\uFF0C\u53EF\u624B\u52A8\u5173\u95ED\uFF1B\u751F\u4EA7\u914D\u7F6E\u968F\u672C\u6761\u6D88\u606F\u4E00\u8D77\u53D1\u9001\u3002",
+      teamEnableFailed: "\u672A\u80FD\u5F00\u542F\u667A\u80FD\u4F53\u56E2\u961F\u534F\u4F5C\uFF0C\u8BF7\u91CD\u8BD5\u3002",
       productionToolbar: "\u6570\u636E\u751F\u4EA7",
       enableProductionSettings: "\u542F\u7528\u751F\u4EA7\u914D\u7F6E",
       newProductionShort: "\u65B0\u5EFA\u751F\u4EA7",
@@ -297,6 +298,7 @@ var benchforgeClient = (() => {
       clearFilters: "\u6E05\u7A7A\u7B5B\u9009",
       searchTemplates: "\u641C\u7D22\u6A21\u677F",
       readFailed: "\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5\u3002",
+      recordRetrying: "\u5DE5\u4F5C\u53F0\u66F4\u65B0\u8F83\u6162\uFF0C\u6B63\u5728\u4FDD\u7559\u73B0\u6709\u5185\u5BB9\u5E76\u91CD\u8BD5\u3002",
       retry: "\u91CD\u8BD5",
       sampleRemoved: "\u8BE5\u6837\u672C\u5DF2\u4E0D\u5728\u5F53\u524D\u7ED3\u679C\u4E2D\uFF0C\u5DF2\u8FD4\u56DE\u5217\u8868\u3002",
       stageStateSource: "\u6B65\u9AA4\u72B6\u6001\u6765\u6E90",
@@ -589,8 +591,8 @@ var benchforgeClient = (() => {
       productionCompleted: "Pipeline completed",
       productionAwaitingUpdate: "Awaiting a progress update",
       productionRecentFailure: "Recent tool failure awaiting resolution",
-      productionWaitingCapture: "Capture submitted, awaiting results",
-      productionNeedsRepair: "Capture or acceptance failed, repair required",
+      productionWaitingCapture: "Awaiting background job results",
+      productionNeedsRepair: "Job or acceptance failed, repair required",
       productionSceneReady: "Capture complete, production continues",
       productionCaptureError: "Capture tracking needs recovery",
       productionBlocked: "Task blocked, incomplete",
@@ -643,7 +645,8 @@ var benchforgeClient = (() => {
       appendRequest: "Add requirements",
       newProduction: "New production task",
       productionSettings: "Data production settings",
-      composerProductionHint: "When enabled, these settings are included with this message.",
+      composerProductionHint: "Enables agent team collaboration, which you can turn off manually. Production settings are included with this message.",
+      teamEnableFailed: "Unable to enable agent team collaboration. Please retry.",
       productionToolbar: "Production",
       enableProductionSettings: "Enable production settings",
       newProductionShort: "New task",
@@ -772,6 +775,7 @@ var benchforgeClient = (() => {
       clearFilters: "Clear filters",
       searchTemplates: "Search templates",
       readFailed: "Could not read the records. Please retry.",
+      recordRetrying: "Workbench updates are delayed. Keeping the last data and retrying.",
       retry: "Retry",
       sampleRemoved: "This sample is no longer in the current results. Returned to the list.",
       stageStateSource: "Step status source",
@@ -4033,21 +4037,28 @@ var benchforgeClient = (() => {
       hero,
       canSubmit,
       configureProduction,
+      enableTeam,
       openScenes
     }) {
       const demand = useStore((value) => value.demand);
       const input = useInput((value) => value);
       const enabled = input.occurrences.some((row) => row.source === PRODUCTION_SOURCE);
-      const busy = input.phase !== "plain" || Boolean(input.claim);
+      const [configuring, setConfiguring] = React.useState(false);
+      const busy = configuring || input.phase !== "plain" || Boolean(input.claim);
       const [error, setError] = React.useState("");
       const [advanced, setAdvanced] = React.useState(false);
       const advancedId = React.useId();
-      const toggle = (checked) => {
+      const toggle = async (checked) => {
+        if (busy) return;
+        setConfiguring(true);
         try {
+          if (checked && !enabled) await enableTeam();
           configureProduction(demand, checked);
           setError("");
         } catch (reason) {
           setError(reason.message);
+        } finally {
+          setConfiguring(false);
         }
       };
       const change = (patch) => {
@@ -4186,6 +4197,15 @@ var benchforgeClient = (() => {
         }
       }
     });
+  }
+
+  // src/ui/workbench/production-team.js
+  async function enableProductionTeam(ctx, sessionId, failureMessage) {
+    const team = ctx.sessions.binding(sessionId).session.projections.faceOf("agentTeam").getSnapshot();
+    if (team?.enabled) return;
+    if (!ctx.remote.agentTeams) throw new Error(failureMessage);
+    const result = await ctx.remote.agentTeams.setEnabled(sessionId, true);
+    if (!result.ok) throw new Error(result.error?.message || failureMessage);
   }
 
   // src/ui/workbench/products-resource.js
@@ -4893,8 +4913,8 @@ var benchforgeClient = (() => {
       ctx.effect(() => ctx.locale.register(NS, dictionaries));
       const t = ctx.locale.bind(NS);
       ctx.inject(
-        ["remote.benchforgeWorkbench", "resources"],
-        /** 在原生远程与资源服务可用后注册工作台资源、按会话隔离的存储及界面插槽。 */
+        ["remote.benchforgeWorkbench", "remote.agentTeams", "resources"],
+        /** 在原生远程、团队与资源服务可用后注册工作台资源、按会话隔离的存储及界面插槽。 */
         (workbenchCtx) => {
           const requestWorkbench = createWorkbenchRequest(workbenchCtx.remote);
           workbenchCtx.effect(
@@ -4917,6 +4937,8 @@ var benchforgeClient = (() => {
               requestWorkbench,
               /** 将当前会话身份附到生产配置更新操作。 */
               configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
+              /** 用户打开数据生产时，通过原生团队接口启用当前对话协作。 */
+              enableTeam: () => enableProductionTeam(workbenchCtx, sessionId, t("teamEnableFailed")),
               /** 调用当前原生会话的取消接口，失败时向界面报告原因。 */
               stopExecution: async () => {
                 const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();

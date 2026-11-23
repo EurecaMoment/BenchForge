@@ -11,7 +11,8 @@ from pathlib import Path
 from capabilities.scene_authoring.geometry.relations import native_part_bounds
 from capabilities.scene_authoring.geometry.relations import overlap_unresolved
 from capabilities.scene_authoring.geometry.relations import transported_mesh_bounds
-from capabilities.scene_authoring.validation.policy import policy_for, structure, attachment
+from capabilities.scene_authoring.validation.policy import policy_for, structure
+from capabilities.scene_authoring.contracts.mounting import attachment
 from capabilities.scene_authoring.validation.preflight import inspect_program
 from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, format_issue
 from capabilities.scene_authoring.validation.review_reference import facing_observation_issue
@@ -170,6 +171,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             if overlap_unresolved(left_parts, right_parts):
                 label = left['id'] + '/' + right['id']
                 physical_advisories.append(label + ': conservative bounds overlap. Check actual contact, clearance or obstruction where the task depends on it')
+    style=admission.get('scene_style','realistic_assets')
     native_relation_checks = []
     action_objects = {row.get('object_id') for row in actions}
     for index, relation in enumerate(brief_relations):
@@ -218,8 +220,6 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
         observations = rows[0].get('evidence', [])
         if not observations or any(not captured_observation(item,frames) for item in observations):
             issues.append('Life check lacks a concrete captured-view observation: ' + name)
-    style=admission.get('scene_style','realistic_assets')
-    brief = admission.get('scene_brief')
     frozen_file = Path(capture).parent / 'scene_admission.json'
     if brief and frozen_file.is_file():
         frozen = json.loads(frozen_file.read_text(encoding='utf-8')).get('scene_brief')

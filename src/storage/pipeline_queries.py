@@ -28,6 +28,8 @@ def _summary_document():
         ELSE jsonb_strip_nulls(jsonb_build_object(
           'state', document->'state', 'run_id', document->'run_id', 'step', document->'step',
           'next', document->'next', 'missing_binding', document->'missing_binding',
+          'stage', document->'stage', 'error', document->'error',
+          'run_path', document->'run_path', 'stage_review', document->'stage_review',
           'steps', COALESCE((
             SELECT jsonb_object_agg(step.key, jsonb_strip_nulls(jsonb_build_object(
               'state', step.value->'state', 'error', step.value->'error',
@@ -106,3 +108,50 @@ def query_pipeline_runs(workspace, runs, *, sessions=(), history=False, database
             if name == 'state':
                 record['updated_at'] = row['updated_at'].isoformat()
     return [record for record in records.values() if 'state' in record]
+
+
+def latest_production_execution(workspace, session):
+    """读取同会话最近的顶层生产执行，排除嵌套运行和可被编辑的文件投影。"""
+    root = Path(workspace).resolve()
+    engine = engine_for(resolve_workspace_url(root))
+    namespace = workspace_namespace(engine, root, session_id=session)
+    plans = select(pipeline_documents.c.workspace_id, pipeline_documents.c.session_id,
+                   pipeline_documents.c.run_id,
+                   pipeline_documents.c.document['stage_review_key'].as_string().label('plan_key'),
+                   pipeline_documents.c.document['steps'].label('steps')).where(
+                       pipeline_documents.c.name == 'plan.json',
+                       pipeline_documents.c.document['production_contract'].as_string() ==
+                       'benchforge.production-stages/v1').subquery('plans')
+    query = select(pipeline_documents.c.run_id, _summary_document().label('state'),
+                   plans.c.plan_key, plans.c.steps).join(plans,
+        (plans.c.workspace_id == pipeline_documents.c.workspace_id) &
+        (plans.c.session_id == pipeline_documents.c.session_id) &
+        (plans.c.run_id == pipeline_documents.c.run_id))
+    query = query.join(workspaces, workspaces.c.workspace_id == pipeline_documents.c.workspace_id)
+    query = query.where(pipeline_documents.c.workspace_id == namespace,
+                        pipeline_documents.c.session_id == session,
+                        workspaces.c.root_path == os.path.normcase(str(root)), workspaces.c.state == 'active',
+                        pipeline_documents.c.name == 'state.json')
+    with engine.connect() as connection, connection.begin():
+        connection.exec_driver_sql('SET TRANSACTION READ ONLY')
+        connection.exec_driver_sql("SET LOCAL statement_timeout = '5000ms'")
+        row = connection.execute(query.order_by(pipeline_documents.c.updated_at.desc(),
+                                                pipeline_documents.c.run_id).limit(1)).mappings().first()
+    if not row:
+        return None
+    result = dict(row)
+    candidates = [result['state'].get('run_path')]
+    if result['plan_key']:
+        candidates.append(str(Path(result['plan_key']).parent / 'pipeline_run'))
+    # 兼容早期按操作目录存放的运行；路径由数据库操作索引提供，不扫描任务文件。
+    def matched(paths):
+        """仅采用当前工作区内、摘要与数据库运行身份一致的路径。"""
+        return next((str(Path(path).resolve()) for path in paths if path
+                         and Path(path).resolve().is_relative_to(root)
+                         and run_document_key(path) == result['run_id']), '')
+    result['run'] = matched(candidates)
+    if not result['run']:
+        from storage.operation_index import query_operations
+        result['run'] = matched(str(Path(item['artifact']) / 'pipeline_run') for item in
+                               query_operations(root, sessions=[session], tools=['pipeline_run'], limit=201))
+    return result

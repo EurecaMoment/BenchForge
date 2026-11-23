@@ -11,6 +11,38 @@ FIELDS = {
 }
 CONTROL_FIELDS = {'validate_only'}
 
+REVISION_INPUTS = ('execution_mode', 'quantity_contract', 'scene_selection',
+                   'preserve_source_splits', 'target_scene_count', 'seed', 'split')
+
+
+# 同任务修订继承省略的生产约束与等价模板分配；显式输入仍须经过完整契约校验。
+def inherit_revision_inputs(args, previous):
+    if previous is None or args.get('new_task', False):
+        return args, []
+    value, inherited = deepcopy(args), []
+    for key in ('objective', 'pipeline_id', 'user_markdown'):
+        if key not in value and key in previous:
+            value[key] = deepcopy(previous[key])
+            inherited.append(key)
+    inputs = value.setdefault('inputs', {})
+    if not isinstance(inputs, dict):
+        raise ValueError('inputs must be an object')
+    for key in REVISION_INPUTS:
+        if key not in inputs and key not in value and key in previous.get('inputs', {}):
+            inputs[key] = deepcopy(previous['inputs'][key])
+            inherited.append('inputs.' + key)
+    selections = previous.get('selections', [])
+    prior_ids = {tid for row in selections for tid in row.get('template_ids', [])}
+    selectors = any(value.get(key) for key in ('capability', 'capabilities', 'task_ids'))
+    template_ids = value.get('template_ids')
+    same_templates = not template_ids or set(template_ids) == prior_ids
+    same_count = ('target_items' not in value or
+                  value['target_items'] == sum(row['count'] for row in selections))
+    if ('selections' not in value and selections and not selectors and same_templates and same_count):
+        value['selections'] = deepcopy(selections)
+        inherited.append('selections')
+    return value, inherited
+
 
 # 读取工作区中的有界 JSON 请求文件，要求文件存在且正文为对象。
 def _document(source, workspace, field):

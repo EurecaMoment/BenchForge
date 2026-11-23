@@ -1,143 +1,143 @@
 {
   "office_sofa": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_Sofa.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_sofa_v4.usda",
     "size": [
-      0.82,
-      2.04,
-      0.79
+      1.50416,
+      0.75723,
+      0.81354
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "upholstered office sofa",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "two-seat fabric sofa, gray-green, clean FLUX+FastTrellis2 v4 rebuild",
+    "source": "A100 asset store pack benchforge-office-props; FLUX design + SAM3 mask + FastTrellis2 v4 rebuild (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider, 2026-11-17 round 19; supersedes office_sofa.usda (immutable, kept for historical captures)",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_armchair": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_Armchair.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_armchair_v4.usda",
     "size": [
-      0.82,
-      1.04,
-      0.79
+      0.74988,
+      0.4984,
+      0.63032
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "upholstered lounge armchair",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "lounge armchair, warm fabric, clean FLUX+FastTrellis2 v4 rebuild",
+    "source": "A100 asset store pack benchforge-office-props; FLUX design + SAM3 mask + FastTrellis2 v4 rebuild (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider, 2026-11-17 round 19; supersedes office_armchair.usda (immutable, kept for historical captures)",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_coffee_table": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_TableCoffee.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_coffee_table_v4.usda",
     "size": [
-      0.5,
-      0.9,
-      0.46
+      0.63186,
+      0.29188,
+      0.36133
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "coffee table",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "low wooden coffee table, clean FLUX+FastTrellis2 v4 rebuild",
+    "source": "A100 asset store pack benchforge-office-props; FLUX design + SAM3 mask + FastTrellis2 v4 rebuild (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider, 2026-11-17 round 19; supersedes office_coffee_table.usda (immutable, kept for historical captures)",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_desk": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_TableD.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_desk.usda",
     "size": [
-      0.9,
-      2,
-      0.75986
+      1.49884,
+      0.93956,
+      0.7259
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "office work table",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "work desk",
+    "source": "A100 asset store pack benchforge-office-props; SAM3D reconstruction from server store vt_dining_table (model prediction, not measured GT), baked to self-contained USDA",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_chair": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_ChairOffice.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_chair_v2.usda",
     "size": [
-      0.63123,
-      0.65126,
-      1.177
+      0.5538,
+      0.5109,
+      0.82
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "office task chair",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "padded office swivel chair with 5-star caster base and armrests",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_chair_v2.glb (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_bookcase": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_BookcaseA.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_bookcase_v4.usda",
     "size": [
-      0.418,
-      1.84,
-      2.22
+      1.2,
+      0.35718,
+      0.9453
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "bookcase",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "white 2x2 cube bookshelf with colorful real book spines, FLUX+FastTrellis2 v4 rebuild",
+    "source": "A100 asset store pack benchforge-office-props; FLUX design + SAM3 mask + FastTrellis2 v4 rebuild (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider, 2026-11-17 round 19; supersedes office_bookcase_v3.usda (immutable, kept for historical captures)",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_monitor": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_MonitorPC.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_monitor.usda",
     "size": [
-      0.205,
-      0.532,
-      0.5299
+      0.54366,
+      0.15086,
+      0.45
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "desktop monitor",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "desktop monitor with stand",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_monitor.glb (model prediction, not measured GT), baked to self-contained USDA",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_laptop": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_NotebookOpen.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_laptop.usda",
     "size": [
-      0.20978,
-      0.29987,
-      0.01928
+      0.36,
+      0.35353,
+      0.30547
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "open notebook (identity requires rendered inspection; not assumed to be a computer)",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "open laptop",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_laptop.glb (model prediction, not measured GT), baked to self-contained USDA",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_plant": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_Plant01.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_plant_v3.usda",
     "size": [
-      1.30492,
-      1.54161,
-      1.75496
+      1.3147,
+      1.322,
+      1.4
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "potted indoor plant",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "floor potted dracaena, dense opaque foliage in white cylindrical pot",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_plant_v3.glb (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_lamp": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_Lamp.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_lamp.usda",
     "size": [
-      0.21,
-      0.21,
-      0.50799
+      0.41397,
+      0.41317,
+      1.5
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "office lamp",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "floor lamp",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_lamp.glb (model prediction, not measured GT), baked to self-contained USDA",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_book": {
     "root": "isaac",
@@ -154,60 +154,74 @@
     "measurement": "USD geometry bounds; physical properties uncalibrated"
   },
   "office_books": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_BooksSet_01.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_book_v2.usda",
     "size": [
-      0.18014,
-      0.36323,
-      0.2465
+      0.2335,
+      0.2387,
+      0.045
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "group of books",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "hardcover book with navy cloth cover and gold spine lines (stack of three placed individually)",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_book_v2.glb (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_file_cabinet": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_FileCabinet_01.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_file_cabinet_v4.usda",
     "size": [
-      0.703,
-      0.3921,
-      1.34069
+      0.5409,
+      0.58678,
+      0.72102
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "file cabinet",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "three-drawer metal filing cabinet, light gray, clean FLUX+FastTrellis2 v4 rebuild",
+    "source": "A100 asset store pack benchforge-office-props; FLUX design + SAM3 mask + FastTrellis2 v4 rebuild (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider, 2026-11-17 round 19; supersedes office_file_cabinet_v3.usda (immutable, kept for historical captures)",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_water_cooler": {
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_WaterCooler.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_water_cooler_v4.usda",
     "size": [
-      0.34,
-      0.41935,
+      0.39904,
+      0.3867,
       1.1
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "water dispenser",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "floor-standing water cooler with bottle, clean FLUX+FastTrellis2 v4 rebuild",
+    "source": "A100 asset store pack benchforge-office-props; FLUX design + SAM3 mask + FastTrellis2 v4 rebuild (model prediction, not measured GT), baked to self-contained USDA with convex-hull collider, 2026-11-17 round 19; supersedes office_water_cooler.usda (immutable, kept for historical captures)",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
   },
   "office_window": {
     "supports_native_opacity_multiplier": true,
-    "root": "isaac",
-    "path": "Environments/Office/Props/SM_Window_3m_A.usd",
+    "root": "props",
+    "path": "benchforge-office-props/office_window.usda",
     "size": [
-      0.12,
-      3.0,
-      3.0
+      1.1144,
+      0.5052,
+      1.4
     ],
     "source_up_axis": "Z",
     "source_meters_per_unit": 1.0,
-    "description": "modular 3m window",
-    "source": "installed NVIDIA Isaac asset library",
-    "measurement": "USD geometry bounds; physical properties uncalibrated"
+    "description": "framed window with sky panes (opaque)",
+    "source": "A100 asset store pack benchforge-office-props; FLUX+SAM3+FastTrellis2 generation trellis2:office_window.glb (model prediction, not measured GT), baked to self-contained USDA",
+    "measurement": "baked USDA mesh axis-aligned bounds in metres (display units); physical properties uncalibrated"
+  },
+  "unitree_go2": {
+    "root": "props",
+    "path": "benchforge-go2/go2_standing.usdc",
+    "size": [
+      0.73222,
+      0.32404,
+      0.38772
+    ],
+    "source_up_axis": "Z",
+    "source_meters_per_unit": 1.0,
+    "description": "Unitree Go2 quadruped robot",
+    "source": "A100 asset store pack benchforge-go2 (official Unitree Go2 USD, pose-baked standing)",
+    "measurement": "scene.inspect measured standing extents 0.73222 x 0.32404 x 0.38772 m; official mesh/link/joint hierarchy retained, joint drives stripped and links baked to nominal stance after robot.reset teleport verified in-session; inert through the exact 180-step settle (bbox identical before/after); original dynamic MJCF/USD kept for S3 actuated-trajectory collection"
   }
 }

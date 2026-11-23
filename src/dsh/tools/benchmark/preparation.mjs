@@ -38,12 +38,20 @@ export async function savedPreparationPlan(workspace, planPath, agent, signal) {
   throw new Error('The saved plan is not associated with the current parent conversation');
 }
 
-/** 从已保存并验证的父计划建立准备子任务，传递批次标识、任务清单和取消信号。 */
+/** 用已验证的父计划启动准备工作，或从父会话自己的批次领取准备稿。 */
 export function createPreparationHandler(preparation) {
-  return /** 先验证父会话保存计划的归属，再按显式批次和任务清单启动原生准备子任务。 */ async (args, exec) => {
-    const scope = await savedPreparationPlan(args.workspace, args.plan_path, exec.agent, exec.signal);
+  return async (args, {agent, signal}) => {
+    if (args.action === 'status') {
+      const header = agent?.session?.header;
+      if (!header?.cwd || !agent.id || agent.id !== header.id) throw new Error('Preparation needs the current parent Agent');
+      return preparation(header.cwd).read({parentId: agent.id, batchKey: args.batch_key}, signal);
+    }
+    if (!args.workspace || !args.plan_path || !args.tasks?.length) {
+      throw new Error('Starting preparation requires workspace, plan_path and tasks');
+    }
+    const scope = await savedPreparationPlan(args.workspace, args.plan_path, agent, signal);
     return preparation(scope.workspacePath).start({
       parentId: scope.parentId, planPath: scope.planPath, batchKey: args.batch_key, tasks: args.tasks,
-    }, exec.signal);
+    }, signal);
   };
 }

@@ -20,6 +20,7 @@ from storage.confined_files import copy_input
 
 
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+_MAX_UPLOAD_WARNINGS = 16
 _OPAQUE = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tif', '.tiff',
            '.exr', '.hdr', '.npy', '.npz', '.bin', '.ply', '.stl'}
 
@@ -118,7 +119,7 @@ def _wavefront(path, suffix):
 
 
 # 仅解析单个USD图层并遍历资产引用，不组合场景或追踪尚未授权的依赖。
-def _usd(path):
+def _usd(path, name, warnings):
     try:
         from pxr import Sdf
     except ImportError as exc:
@@ -162,16 +163,28 @@ def _usd(path):
             if key == 'subLayerOffsets':
                 continue  # Numeric offsets have no Python conversion on some USD builds.
             info = spec.GetInfo(key)
+            if (key == 'default' and spec_path.name == 'primvars:displayColor'
+                    and len(warnings) < _MAX_UPLOAD_WARNINGS and isinstance(spec, Sdf.AttributeSpec)
+                    and spec.typeName == Sdf.ValueTypeNames.Color3f
+                    and not isinstance(info, Sdf.ValueBlock)):
+                warnings.append({
+                    'code': 'usd_display_color_scalar',
+                    'layer': name,
+                    'path': str(spec_path),
+                    'message': 'A100 capture expects primvars:displayColor as color3f[]. '
+                               'Preserve the RGB value in a one-element array with constant '
+                               'interpolation, then upload and import the corrected layer before capture.',
+                })
             if key == 'subLayers':
-                for name in info:
-                    _relative(name)
+                for sublayer in info:
+                    _relative(sublayer)
             else:
                 value(info)
     layer.Traverse('/', inspect)
 
 
 # 在受限临时目录逐项验证USDZ成员，拒绝超量、重复、加密、链接及嵌套压缩包。
-def _usdz(path):
+def _usdz(path, warnings):
     with ZipFile(path) as archive, TemporaryDirectory(prefix='benchforge-usdz-') as directory:
         members = archive.infolist()
         if len(members) > 4096 or sum(info.file_size for info in members) > MAX_UPLOAD_BYTES:
@@ -197,15 +210,16 @@ def _usdz(path):
                     if remaining < 0:
                         raise ValueError('USDZ member exceeds its declared size')
                     output.write(data)
-            _validate(member, suffix)
+            _validate(member, info.filename, warnings)
 
 
 # 按文件格式选择惰性依赖解析器，未支持且非不透明数据格式时拒绝上传。
-def _validate(path, suffix):
+def _validate(path, name, warnings):
+    suffix = PurePosixPath(name).suffix.lower()
     if suffix in {'.usd', '.usda', '.usdc'}:
-        _usd(path)
+        _usd(path, name, warnings)
     elif suffix == '.usdz':
-        _usdz(path)
+        _usdz(path, warnings)
     elif suffix in {'.urdf', '.xml', '.mjcf'}:
         _xml(path, suffix)
     elif suffix == '.gltf':
@@ -220,17 +234,19 @@ def _validate(path, suffix):
 
 # 校验服务器实际接收的文件名和冻结字节，限制文件大小并验证其格式依赖。
 def validate_upload(path, relative_path=None):
-    """Validate the exact immutable bytes and name that the server will receive."""
+    """Validate the upload and return nonblocking format warnings for its layers."""
     path = Path(path)
     name = _relative(relative_path or path.name)
     if not path.is_file() or path.stat().st_size > MAX_UPLOAD_BYTES:
         raise ValueError('Asset upload must be a bounded regular file')
-    _validate(path, PurePosixPath(name).suffix.lower())
+    warnings = []
+    _validate(path, name, warnings)
+    return warnings
 
 
 # 将授权工作区文件复制到私有临时区并验证快照，再仅向上传调用者提供该路径。
 @contextmanager
-def snapshot_upload(path, relative_path=None):
+def snapshot_upload(path, relative_path=None, *, warnings=None):
     """Yield a private validated snapshot; never expose its path to task code."""
     access = current_access()
     if access is None:
@@ -243,5 +259,7 @@ def snapshot_upload(path, relative_path=None):
             raise RuntimeError('Upload staging must be outside the model workspace')
         snapshot = Path(directory) / ('upload' + PurePosixPath(name).suffix)
         copy_input(access.root_path, path, snapshot, limit=MAX_UPLOAD_BYTES)
-        validate_upload(snapshot, name)
+        diagnostics = validate_upload(snapshot, name)
+        if warnings is not None:
+            warnings.extend(diagnostics)
         yield snapshot

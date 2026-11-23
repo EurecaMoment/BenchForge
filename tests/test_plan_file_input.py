@@ -6,11 +6,26 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from pipelines.benchmark.design.plan_input import CONTROL_FIELDS, FIELDS, resolve_request
+from pipelines.benchmark.design.plan_input import CONTROL_FIELDS, FIELDS, resolve_request, inherit_revision_inputs
 from pipelines.benchmark.design.planner import plan
 
 
 class PlanFileInputTests(unittest.TestCase):
+    def test_revision_defaults_preserve_policies_without_overriding_explicit_changes(self):
+        """省略字段继承活动计划；显式变更和独立新任务仍按原输入校验。"""
+        previous = {'objective': 'Existing task', 'inputs': {'execution_mode': 'production', 'seed': 7},
+                    'selections': [{'template_ids': ['C43-T01'], 'count': 10, 'reason': 'Distance'}]}
+        args = {'template_ids': ['C43-T01'], 'inputs': {'seed': 9}}
+        result, inherited = inherit_revision_inputs(args, previous)
+        self.assertEqual(result['inputs'], {'seed': 9, 'execution_mode': 'production'})
+        self.assertEqual(result['selections'], previous['selections'])
+        self.assertNotIn('inputs.seed', inherited)
+        self.assertEqual(args, {'template_ids': ['C43-T01'], 'inputs': {'seed': 9}})
+        separate = {**args, 'new_task': True}
+        self.assertEqual(inherit_revision_inputs(separate, previous), (separate, []))
+        changed, _ = inherit_revision_inputs({'template_ids': ['C53-T01']}, previous)
+        self.assertNotIn('selections', changed)
+
     def test_every_public_plan_field_is_accepted_by_the_file_transport(self):
         """逐项对账 DSH 公开计划参数，新增参数不能再次遗漏文件传输白名单。"""
         source = Path(__file__).resolve().parents[1] / 'src/dsh/tools/benchmark/contracts.mjs'
@@ -60,6 +75,7 @@ class PlanFileInputTests(unittest.TestCase):
         """实际规划入口识别文件内校验开关，返回缺项而不保存计划或开启评审。"""
         directory = self.root / 'operations' / 'validation'
         with (patch('pipelines.benchmark.design.planner.exclusive_run') as lock,
+              patch('pipelines.benchmark.design.planner.current', return_value=None),
               patch('pipelines.benchmark.design.planner.activate') as activate,
               patch('pipelines.benchmark.design.planner.gate') as gate):
             result = plan({'request_path': str(self.request), '_dsh_context': {'session_id': 'session'}}, directory)

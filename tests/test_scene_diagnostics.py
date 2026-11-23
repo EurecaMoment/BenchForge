@@ -11,6 +11,8 @@ from capabilities.scene_authoring.validation.contract_diagnostics import Program
 from capabilities.scene_authoring.geometry.preview import compact_preview, mesh_fit_preview
 from capabilities.scene_authoring.program_submission import inspect_program_submission, read_program_submission
 from capabilities.capture.operator_evidence import evidence
+from capabilities.scene_authoring.catalog.operators import catalog_response
+from capabilities.scene_authoring.validation.acceptance import VISUAL_CHECKS, admit_program, capture_acceptance
 from capabilities.scene_authoring.validation.preflight import inspect_program, ScenePreflightError
 # 构造最小合法新颖场景，供独立错误组合与预检报告测试。
 def sample():
@@ -38,6 +40,224 @@ class SceneDiagnosticsTests(unittest.TestCase):
     def inspect(self, program=None, **options):
         return inspect_program(self.root, self.program if program is None else program,
                                policy=options.pop('policy', {}), **options)
+
+    # 写入完整有效的生产计划，使关系测试实际经过保存的简报。
+    def write_wall_art_brief(self):
+        design = {'id': 'design', 'name': 'Gallery', 'summary': 'A framed print on the gallery wall',
+                  'hard_requirements': ['Keep the print on the room wall'],
+                  'physical_assumptions': ['The wall and frame are static'],
+                  'object_roles': [{'object_id': 'wall_art', 'role': 'framed print'}],
+                  'relations': [{'source': 'wall_art', 'type': 'mounted_to', 'target': 'building_shell',
+                                 'description': 'The wall carries the frame'}]}
+        plan = self.root / 'plan.json'
+        plan.write_text(json.dumps({'schema': 'benchforge.assessment/v1',
+                                    'scenes': {'designs': [design]}}), encoding='utf-8')
+        self.program['provenance'] = {'sources': [{'kind': 'scene_plan', 'path': str(plan),
+                                                  'scene_design_id': 'design'}]}
+
+    # 挂载声明缺字段时一次性给出字段、类型和值域及动态对象严格性，避免关系错误掩盖根因。
+    def test_malformed_mount_reports_fields_without_null_relation_duplicate(self):
+        self.write_wall_art_brief()
+        self.program['objects'] = [
+            object_record('building_shell', kind='box', size=[4, 4, 3], dynamic=False),
+            object_record('wall_art', kind='box', size=[1, .1, 1], support='ground',
+                          dynamic=False, metadata={'spatial_attachment': {'target': 'building_shell'}}),
+        ]
+        report = self.inspect(policy={'enforce_realism': True})
+        mount = next(row for row in report['issues'] if row['code'] == 'static_mount')
+        self.assertEqual(mount['evidence']['mount_declaration_present'], True)
+        self.assertIn('method', mount['evidence']['missing_fields'])
+        self.assertIn('axis', mount['evidence']['missing_fields'])
+        self.assertIn('dynamic_requirement', mount['evidence'])
+        self.assertIn('Required fields:', mount['message'])
+        self.assertIn('dynamic must be exactly false', mount['message'])
+        self.assertEqual(report['scene_brief']['id'], 'design')
+        self.assertFalse(any(row['code'] == 'scene_brief_relation_mismatch'
+                             for row in report['issues']))
+
+    # 挂载关系未声明时保留关系问题，但明确这是缺失声明而非读取失败。
+    def test_missing_mount_relation_identifies_absent_declaration(self):
+        self.write_wall_art_brief()
+        self.program['objects'] = [
+            object_record('building_shell', kind='box', size=[4, .2, 3], dynamic=False,
+                          tags=['architectural_structure']),
+            object_record('wall_art', kind='mug', size=[.0924, .1272, .091], dynamic=False),
+        ]
+        report = self.inspect(policy={'enforce_realism': True})
+        issue = next(row for row in report['issues']
+                     if row['code'] == 'scene_brief_relation_mismatch')
+        self.assertFalse(issue['evidence']['mount_declaration_present'])
+        self.assertEqual(issue['evidence']['mismatch_kind'], 'missing_mount_declaration')
+        self.assertEqual(issue['path'], '/objects/1/metadata/spatial_attachment')
+        self.assertIn('item_id=mounting', issue['message'])
+        self.assertFalse(issue['blocking'])
+        self.assertEqual(issue['severity'], 'warning')
+        self.assertEqual(issue['evidence']['review_required'],
+                         'captured_view_and_native_relation_check')
+        self.assertTrue(report['passed'])
+        self.assertEqual(report['status'], 'needs_verification')
+
+    def test_mounting_contract_is_discoverable(self):
+        response = catalog_response(None, {'section': 'contracts', 'item_id': 'mounting'})
+        contract = response['items'][0]['value']
+        self.assertEqual(contract['field_path'], 'objects[].metadata.spatial_attachment')
+        self.assertEqual(contract['required_fields'], ['target', 'method', 'axis', 'object_face', 'target_face'])
+
+    def test_window_mount_and_cabinet_support_are_gated_by_capture(self):
+        mounted = {'target': 'wall_east', 'method': 'static_mount', 'axis': 1,
+                   'object_face': 'min', 'target_face': 'max'}
+        self.program['objects'] = [
+            object_record('wall_east', label='East wall', size=[2, .2, 2]),
+            object_record('wall_west', label='West wall', size=[2, .2, 2], xy=[0, 2]),
+            object_record('window_frame', label='Fixed window frame', size=[1.2, .1, .8],
+                          xy=[0, .15], base_z=.8, metadata={'spatial_attachment': mounted}),
+            object_record('floor_plinth', label='Floor plinth', size=[.9, 1, .2], xy=[3, 0]),
+            object_record('cabinet_east', label='Cabinet', size=[.5, .5, .5],
+                          xy=[3, 0], support='floor_plinth'),
+        ]
+        relations = [
+            {'source': 'window_frame', 'type': 'mounted_to', 'target': 'wall_east',
+             'description': 'The window is fixed to the east wall'},
+            {'source': 'cabinet_east', 'type': 'supported_by', 'target': 'floor_plinth',
+             'description': 'The cabinet rests on the plinth'},
+        ]
+        design = {'id': 'design', 'name': 'Window and cabinet', 'summary': 'An east window and cabinet',
+                  'hard_requirements': ['Include a mounted window and a supported cabinet'],
+                  'physical_assumptions': ['All objects are static'],
+                  'object_roles': [{'object_id': 'window_frame', 'role': 'window frame'},
+                                   {'object_id': 'cabinet_east', 'role': 'storage cabinet'}],
+                  'relations': relations}
+        exception = {'scene_design_id': 'design', 'scene_id': 'test', 'object_ids': ['cabinet_east'],
+                     'purpose': 'Validate the specified contacts', 'reason': 'Isolate geometry',
+                     'simplifications': 'Cabinet envelope', 'retained_constraints': 'Cabinet support',
+                     'excluded_claims': 'Furniture realism'}
+        plan = self.root / 'plan.json'
+        plan.write_text(json.dumps({'schema': 'benchforge.assessment/v1',
+                                    'scenes': {'designs': [design], 'geometry_exceptions': [exception]}}),
+                        encoding='utf-8')
+        self.program['provenance'] = {'sources': [{'kind': 'scene_plan', 'path': str(plan),
+                                                  'scene_design_id': 'design'}]}
+        (self.root / 'scene_policy.json').write_text('{"enabled":true,"enforce_realism":true}', encoding='utf-8')
+        capture = self.root / 'capture'
+        capture.mkdir()
+        (capture / 'view_0.png').write_bytes(b'fixture-view')
+        observation = {'view': 'view_0.png', 'observation': 'Window and cabinet are visible.'}
+        review = {
+            'acceptable': True,
+            'visual_realism': {'status': 'matches_declared_geometry'},
+            'life_review': {'checks': [{'check': name, 'passed': True, 'evidence': [observation]}
+                                       for name in VISUAL_CHECKS]},
+            'brief_alignment': {'passed': True, 'hard_requirements_preserved': True,
+                                'observations': [observation], 'unresolved': [],
+                                'requirement_checks': [{'index': 0, 'passed': True, **observation}],
+                                'relation_checks': []},
+        }
+        report = {'status': 'captured', 'renderable': True, 'token': 'fixture-capture'}
+        bounds = {
+            'wall_east': ([-1, -.1, 0], [1, .1, 2]),
+            'wall_west': ([-1, 1.9, 0], [1, 2.1, 2]),
+            'window_frame': ([-.6, .1, .8], [.6, .2, 1.6]),
+            'floor_plinth': ([2.55, -.5, 0], [3.45, .5, .2]),
+            'cabinet_east': ([2.75, -.25, .2], [3.25, .25, .7]),
+        }
+        for mismatch in (None, 'window_frame', 'cabinet_east'):
+            with self.subTest(mismatch=mismatch), patch(
+                    'capabilities.scene_authoring.validation.policy.environment_value', return_value=None):
+                program = copy.deepcopy(self.program)
+                measured = bounds.copy()
+                if mismatch == 'window_frame':
+                    program['objects'][2].update(xy=[0, 2.15], metadata={
+                        'spatial_attachment': {**mounted, 'target': 'wall_west'}})
+                    measured[mismatch] = ([-.6, 2.1, .8], [.6, 2.2, 1.6])
+                elif mismatch == 'cabinet_east':
+                    program['objects'][4].update(xy=[4, 0], support='ground')
+                    measured[mismatch] = ([3.75, -.25, 0], [4.25, .25, .5])
+                evidence = {'origin': 'isaac_native', 'token': report['token'],
+                            'physics': {'stable': True, 'steps': 60, 'dt': 1 / 60},
+                            'frames': [{'frame_id': 'view_0'}],
+                            'entities': {key: {'world_aabb': {'min': lo, 'max': hi},
+                                               'collision': {'paths': ['/' + key]}}
+                                         for key, (lo, hi) in measured.items()}}
+                admission = admit_program(self.root, program, execution_mode='production')
+                warnings = [row for row in admission['issues'] if row['code'] == 'scene_brief_relation_mismatch']
+                self.assertEqual(len(warnings), int(mismatch is not None))
+                self.assertTrue(all(not row['blocking'] for row in warnings))
+                receipt = capture_acceptance(self.root, program, report, evidence, review, capture,
+                                             execution_mode='production')
+                self.assertEqual(receipt['passed'], mismatch is None, receipt['issues'])
+                self.assertEqual([row['source'] for row in receipt['native_relation_checks'] if not row['passed']],
+                                 [mismatch] if mismatch else [])
+                self.assertEqual(bool(receipt['physical_issues']), mismatch == 'window_frame')
+                if mismatch == 'cabinet_east':
+                    check = next(row for row in receipt['native_relation_checks'] if row['source'] == mismatch)
+                    self.assertIsNone(check['passed'])
+                    self.assertTrue(check['visual_check_required'])
+                    self.assertIn('Scene brief needs complete captured evidence for relation_checks', receipt['issues'])
+
+    # 目标已声明但未通过对象准入时，明确说明几何检查未执行。
+    def test_mount_target_without_geometry_is_explicitly_not_evaluated(self):
+        self.write_wall_art_brief()
+        self.program['objects'] = [
+            object_record('building_shell', kind='box', size=[0, 4, 3], dynamic=False),
+            object_record('wall_art', kind='box', dynamic=False,
+                metadata={'spatial_attachment': {'target': 'building_shell', 'method': 'static_mount',
+                                                 'axis': 1, 'object_face': 'min', 'target_face': 'max'}}),
+        ]
+        report = self.inspect(policy={'enforce_realism': True})
+        self.assertFalse(any(row['code'] == 'scene_brief_relation_mismatch'
+                             for row in report['issues']))
+        skipped = next(row for row in report['skipped_checks'] if row['check'] == 'static_mount_geometry')
+        self.assertIn('is declared but unavailable to geometry checks', skipped['reason'])
+        self.assertEqual(skipped['evidence']['target_id'], 'building_shell')
+        self.assertTrue(skipped['evidence']['target_declared'])
+        self.assertFalse(skipped['evidence']['target_admitted'])
+        self.assertEqual(skipped['status'], 'not_evaluated')
+        self.assertTrue(any(row['blocking'] and row['path'] == '/objects/0/size'
+                            for row in report['issues']))
+        self.assertEqual(report['status'], 'blocked')
+
+    # 非字符串目标也应返回结构化字段错误。
+    def test_mount_target_with_wrong_json_type_returns_field_diagnostics(self):
+        for target in (['building_shell'], {'id': 'building_shell'}):
+            with self.subTest(target=target):
+                self.program['objects'] = [object_record(
+                    'wall_art', metadata={'spatial_attachment': {'target': target}})]
+                report = self.inspect()
+                evidence = next(row['evidence'] for row in report['issues'] if row['code'] == 'static_mount')
+                self.assertIn('target', evidence['invalid_fields'])
+                self.assertEqual(evidence['declared_target'], target)
+                self.assertFalse(evidence['geometry_target_available'])
+
+    # 几何不可评估时仍可用声明 ID 对账简报中的目标。
+    def test_unavailable_mount_geometry_preserves_wrong_declared_target(self):
+        self.write_wall_art_brief()
+        self.program['objects'] = [
+            object_record('building_shell'), object_record('other_wall', size=[0, 4, 3]),
+            object_record('wall_art', metadata={'spatial_attachment': {
+                'target': 'other_wall', 'method': 'static_mount', 'axis': 1,
+                'object_face': 'min', 'target_face': 'max'}})]
+        report = self.inspect(policy={'require_scene_brief': True})
+        mismatch = next(row['evidence'] for row in report['issues']
+                        if row['code'] == 'scene_brief_relation_mismatch')
+        self.assertEqual(mismatch['expected_target'], 'building_shell')
+        self.assertEqual(mismatch['declared_target'], 'other_wall')
+        self.assertEqual(mismatch['mismatch_kind'], 'target_mismatch')
+
+    # 简报目标不符但场景程序可渲染时，预检保留警告并放行首轮图像检查。
+    def test_relation_mismatch_is_nonblocking_for_first_capture(self):
+        self.write_wall_art_brief()
+        self.program['objects'] = [
+            object_record('building_shell', kind='box', size=[4, .2, 3], dynamic=False,
+                          tags=['architectural_structure']),
+            object_record('wall_art', kind='mug', size=[.0924, .1272, .091], dynamic=False),
+        ]
+        report = self.inspect(policy={'require_scene_brief': True})
+        issue = next(row for row in report['issues']
+                     if row['code'] == 'scene_brief_relation_mismatch')
+        self.assertEqual(issue['severity'], 'warning')
+        self.assertFalse(issue['blocking'])
+        self.assertTrue(report['passed'])
+        self.assertEqual(report['status'], 'needs_verification')
 
     # 验证字段、对象、相机和其他区块的独立错误全部被收集。
     def test_independent_fields_objects_cameras_and_sections_are_collected(self):
@@ -92,7 +312,24 @@ class SceneDiagnosticsTests(unittest.TestCase):
         for field in ('/name', '/summary', '/hard_requirements', '/physical_assumptions',
                       '/object_roles/0', '/relations/0'):
             self.assertIn(field, brief['message'])
-        self.assertTrue(any(row['code'] == 'recognizable_asset_required' for row in report['issues']))
+        self.assertFalse(any(row['code'] == 'trellis_asset_required' for row in report['issues']))
+
+    def test_authored_geometry_needs_only_declared_representation_and_physics(self):
+        self.write_wall_art_brief()
+        self.program['objects'] = [
+            object_record('building_shell', size=[4, .2, 3], label='Wall'),
+            object_record('wall_art', xy=[1, 1], size=[.5, .3, .2], label='Marker'),
+        ]
+        policy = {'enforce_realism': True}
+        report = self.inspect(policy=policy)
+        self.assertTrue(report['passed'], report['issues'])
+        self.assertFalse(any(row['code'] == 'trellis_asset_required' for row in report['issues']))
+
+        self.program['objects'][1].update(dynamic=True, tags=['articulation_required'])
+        blocked = self.inspect(policy=policy)
+        self.assertFalse(blocked['passed'])
+        self.assertTrue({'specialist_asset_required', 'physical_material_missing'} <=
+                        {row['code'] for row in blocked['issues'] if row['blocking']})
 
     def test_spatial_reference_mismatch_identifies_saved_design_and_current_ids(self):
         plan = self.root / 'plan.json'

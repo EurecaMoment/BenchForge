@@ -17,6 +17,7 @@ from service_access.progress import record_progress
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
 from capabilities.scene_authoring.geometry.preview import compact_preview
 from capabilities.scene_authoring.geometry.preview import GUIDANCE as GEOMETRY_GUIDANCE
+from capabilities.scene_authoring.validation.asset_policy import GUIDANCE as ASSET_GUIDANCE
 from capabilities.scene_authoring.program_submission import handoff_receipt
 from capabilities.scene_authoring.validation.acceptance import policy_for
 from capabilities.scene_authoring.validation.acceptance import admit_program
@@ -118,6 +119,7 @@ def plan_scene(store,task,stop):
         return {key:mesh.get(key) for key in ('vertices','coordinate_frame')}
     if not direct:
         prompt+='\n'+GEOMETRY_GUIDANCE
+        prompt+='\n'+ASSET_GUIDANCE
         prompt+='\nReusable generated assets: '+json.dumps(tools.catalog(),ensure_ascii=False)
     base=None;quality_seed=None;quality_feedback='';images=[];parent_directory=None
     repair_source=None;repair_previous=None;repair_context=None;repair_baseline=None;repair_older=None
@@ -167,12 +169,34 @@ def plan_scene(store,task,stop):
     layout_image=prepare_layout(tools,unit['intent'],directory,stop,parent_directory,design_directory=prepared)
     record_progress(directory,'scene_planning',layout_reference_ready=bool(layout_image))
     layout_instruction=''
+    layout_estimate_path=directory/'layout_estimate.json'
+    layout_estimate=(json.loads(layout_estimate_path.read_text(encoding='utf8'))
+                     if layout_estimate_path.is_file() else None)
     if layout_image:
         images.append(layout_image)
-        layout_instruction='\nThe LAST attached image is a design/layout reference (not a captured simulator frame). Use its composition and object relationships as design guidance, but derive metric dimensions, supports and executable geometry explicitly. Existing base objects remain immutable for extend; image editing does not override this. Preserve provenance and never use diffusion pixels or predicted geometry as native GT. Missing objects may use kind=generated with a detailed product prompt, reusing the existing diffusion→SAM3→TRELLIS asset route; do not replace complex objects with simplistic cubes merely to match the picture.'
+        overlay_path=directory/'layout_estimate_overlay.png'
+        if overlay_path.is_file():
+            images.append(overlay_path)
+        layout_instruction='\nThe last attached image is the FastSAM3 segmentation overlay for the preceding design/layout reference. Both are design evidence, not simulator captures. Use the image-derived object centers, FastDA3 depth and dimensions below as initial placement estimates, then adjust them to satisfy supports, orientation, collisions, room structure and functional clearances. Reuse registered mesh IDs where they fit the task. Choose geometry and assets that match the required appearance and dimensions. For a body that must move or be controlled, use an Isaac Sim articulated asset verified through the live catalog and inspect whether it has active joints and drives; a pose-baked display model does not satisfy motion. Never use a TRELLIS shell or proxy as a moving body. Do not randomize reference-based positions. Existing base objects remain immutable for extend. Preserve provenance and never use image predictions as native GT.'
+        if layout_estimate is not None:
+            layout_instruction+='\nImage-derived initial layout estimate (editable prediction, not GT): '+json.dumps({
+                'status':layout_estimate.get('status'),
+                'camera_assumption':layout_estimate.get('camera_assumption'),
+                'objects':[{key:row.get(key) for key in ('object_id','label','representation',
+                          'representation_reason','mesh_asset_id','reconstruction_status',
+                          'requires_articulation','position_estimate')} for row in layout_estimate.get('objects',[])],
+                'missing_objects':layout_estimate.get('missing_objects',[]),
+                'reconstruction_errors':layout_estimate.get('reconstruction_errors',[]),
+            },ensure_ascii=False)
+            layout_instruction+=' Use reported mesh_asset_id and geometry suggestions as starting values. For missing detections or failed reconstruction, keep the requested object and state what evidence is missing instead of substituting a proxy.'
         prompt+=layout_instruction
         if repair_context is not None:
-            repair_context['attachment_manifest'].append({'attachment_index':len(images),'role':'design_reference_only','path':str(layout_image)})
+            reference_index=len(images)-1 if overlay_path.is_file() else len(images)
+            repair_context['attachment_manifest'].append({'attachment_index':reference_index,
+                'role':'design_reference_only','path':str(layout_image)})
+            if overlay_path.is_file():
+                repair_context['attachment_manifest'].append({'attachment_index':len(images),
+                    'role':'predicted_segmentation_overlay','path':str(overlay_path)})
     if repair_context is not None:
         bound_repair_context(repair_context)
         write_json(directory/'repair_context.json',repair_context)

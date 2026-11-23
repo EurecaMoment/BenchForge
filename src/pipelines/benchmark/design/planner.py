@@ -18,8 +18,10 @@ from pipelines.benchmark.design.plan_versions import current
 from pipelines.benchmark.design.plan_versions import activate
 from pipelines.benchmark.design.plan_versions import verify_application
 from pipelines.benchmark.design.plan_input import resolve_request
+from pipelines.benchmark.design.plan_input import inherit_revision_inputs
 from pipelines.benchmark.design.plan_input import FIELDS
 from pipelines.benchmark.design.plan_review import revision_review
+from pipelines.benchmark.design.continuity import execution_repair_receipt
 from pipelines.benchmark.design.production_steps import complete_production_steps, validate_production_steps
 from storage.execution_lock import exclusive_run, RunBusyError
 from pipelines.reviews.service import gate, review as review_status
@@ -48,6 +50,11 @@ def plan(args, directory, config=None):
 def _plan(args, directory, config, authoring_sources):
     if type(args.get('new_task', False)) is not bool:
         raise ValueError('new_task must be a boolean')
+    session = args.get('_dsh_context', {}).get('session_id')
+    workspace = operation_workspace(directory)
+    active = current(workspace, session) if session else None
+    previous = read(active['plan']) if active else None
+    args, inherited = inherit_revision_inputs(args, previous)
     catalog = {t['id']: t for t in all_templates()}
     objective = args.get('objective', '')
     selectors = {k: args[k] for k in ('capability', 'capabilities', 'template_ids', 'task_ids') if args.get(k)}
@@ -138,9 +145,6 @@ def _plan(args, directory, config, authoring_sources):
         return {'state': 'needs_plan_revision', 'issues': ['Provide assessment_path or assessment for validation']}
     if authoring_sources:
         value['authoring_sources'] = authoring_sources
-    session = args.get('_dsh_context', {}).get('session_id')
-    workspace=operation_workspace(directory)
-    active=current(workspace,session) if session else None
     edit=args.get('_plan_edit')
     application_resolution=None
     if not edit:
@@ -155,10 +159,28 @@ def _plan(args, directory, config, authoring_sources):
     markdown=args.get('_user_markdown',args.get('user_markdown'))
     if markdown is not None and (not isinstance(markdown,str) or not markdown.strip() or len(markdown)>512_000):
         raise ValueError('user_markdown must be a non-empty document no larger than 512 KB')
+    if markdown is not None:
+        value['user_markdown'] = markdown
+    target = Path(directory)/'plan.json'
+    applied_edit = bool(active and active['pending'] and args.get('applies_edit') == active['plan'])
+    base_plan = value.get('edit_revision', {}).get('base_plan') if applied_edit else active['plan'] if active else None
+    previous = read(base_plan) if base_plan else None
+    value['stage_review_key'], value['review_revision'] = revision_review(
+        value, logical_path(target), previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit,
+        draft_edit=bool(edit))
+    repair = execution_repair_receipt(workspace, session, active, previous, value['review_revision'],
+                                      user_edit=bool(edit) or applied_edit)
+    if repair:
+        return {**repair, 'authoring_sources': authoring_sources}
     if args.get('validate_only'):
+        next_step = 'Submit the same file path with validate_only=false. Execution repairs retain the current review and production stage.'
+        if value['review_revision']['kind'] == 'contract_change':
+            next_step = ('This revision requires a new S1 review. Resolve any active user pause '
+                         'or pending instruction before saving it with validate_only=false.')
         return {'state': 'validated', 'authoring_sources': authoring_sources,
+                'inherited_fields': inherited, 'review_revision': value['review_revision'],
                 'target_items': value['assessment']['dataset']['target_items'],
-                'next': 'Submit the same file path with validate_only=false to save the plan and open S1 review.'}
+                'next': next_step}
     if markdown is not None:
         value['user_markdown']=markdown
         markdown_path=Path(directory)/'assessment-plan.md'
@@ -167,13 +189,6 @@ def _plan(args, directory, config, authoring_sources):
         if edit:
             value['edit_revision']['markdown_path']=str(markdown_path.resolve())
     if args.get('applies_edit'):value['applies_edit']=args['applies_edit']
-    target = Path(directory)/'plan.json'
-    applied_edit = bool(active and active['pending'] and args.get('applies_edit') == active['plan'])
-    base_plan = value.get('edit_revision', {}).get('base_plan') if applied_edit else active['plan'] if active else None
-    previous = read(base_plan) if base_plan else None
-    value['stage_review_key'], value['review_revision'] = revision_review(
-        value, logical_path(target), previous, base_plan, new_task=args.get('new_task', False), applied_edit=applied_edit,
-        draft_edit=bool(edit))
     if session and not edit:
         pending = review_status(workspace, session)
         if (pending['state'] in ('paused', 'needs_input')
@@ -194,6 +209,7 @@ def _plan(args, directory, config, authoring_sources):
             'production_contract': value.get('production_contract'), 'total_steps': len(value['steps']),
             'stage_review': review,
              'review_revision': value['review_revision'],
+            'inherited_fields': inherited,
             'assessment_status': 'structured' if value.get('assessment') else 'legacy_summary',
             'selections': selections, 'evidence_required_for': unsupported,
             'next': qualify('Apply the saved user edit with pipeline_plan(applies_edit=plan) before pipeline_run. S1 review opens after the executable application is validated.'

@@ -1,6 +1,5 @@
 """Application use cases for starting and revising scene workflows."""
 from capabilities.capture.capture_scope import capture_scope
-from capabilities.asset_generation.layout import default_layout
 from capabilities.asset_generation.layout import validate_layout
 from pipelines.scene_production.preflight import read_capture_submission
 from capabilities.dataset_authoring.quantity import validate_quantity_contract
@@ -88,6 +87,12 @@ def start_scene_request(
     if not isinstance(intents, list) or not 1 <= len(intents) <= max_scenes:
         raise ValueError("scene count exceeds registered run budget")
     normalized = [_scene_intent(item, {**value, "root": store.root}) for item in intents]
+    for intent in normalized:
+        if not intent.get("scene_program_path") and not intent.get("layout"):
+            raise ValueError(
+                "A new image-led scene needs layout.objects or a completed benchforge_layout "
+                "reference with layout_estimate.json before planning."
+            )
     submissions = [
         submission_reader(store.root, intent["scene_program_path"], execution_mode=intent["execution_mode"])
         if "scene_program_path" in intent
@@ -100,10 +105,6 @@ def start_scene_request(
         prior_reference_checker = require_prior_reference
     for intent in normalized:
         prior_reference_checker(store, intent)
-    normalized = [
-        {**intent, "layout": intent.get("layout") or default_layout(intent)}
-        for intent in normalized
-    ]
     kwargs = {}
     context = context_from_request(value)
     if context is not None:

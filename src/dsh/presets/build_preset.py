@@ -7,6 +7,11 @@ import subprocess
 import sys
 import yaml
 
+if __package__:
+    from dsh.presets.context_policy import configure_context_policy, preserve_context_overrides
+else:
+    from context_policy import configure_context_policy, preserve_context_overrides
+
 DSH_ROOT = Path(__file__).resolve().parents[1]
 SOURCE = DSH_ROOT.parent
 if (SOURCE / 'service_access/__init__.py').is_file():
@@ -188,7 +193,9 @@ def refresh_model_patches(preset_path, config_path, *, refresh_host=None):
     refresh_preset_identity(profile)
     if refresh_host is not None:
         refresh_host(profile)
-    refresh_host_models(profile, model_patches(config_path))
+    patches = model_patches(config_path)
+    refresh_host_models(profile, patches)
+    configure_context_policy(profile, patches)
     enabled = model_tools(config_path)
     for patch in profile:
         for row in patch.get('insert', []):

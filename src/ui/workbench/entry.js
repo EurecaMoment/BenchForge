@@ -11,6 +11,7 @@ import {createComposerComponents} from './components/composer.js';
 import {createWorkbenchViewStore} from './composer-store.js';
 import {createProductionInput} from './production-input.js';
 import {canStartProduction} from './production-permissions.js';
+import {enableProductionTeam} from './production-team.js';
 import {createProductsResource, productsResourceAddress} from './products-resource.js';
 import workbenchRemote from '../../dsh/remote/lib/typert.remote-client.js';
 import {STAGES} from '../../dsh/production/stages.mjs';
@@ -70,7 +71,7 @@ function createClient(React, defineStore, ui) {
     await ctx.remote.$mount(workbenchRemote);
     ctx.effect(() => ctx.locale.register(NS, dictionaries));
     const t = ctx.locale.bind(NS);
-    ctx.inject(['remote.benchforgeWorkbench', 'resources'], /** 在原生远程与资源服务可用后注册工作台资源、按会话隔离的存储及界面插槽。 */ (workbenchCtx) => {
+    ctx.inject(['remote.benchforgeWorkbench', 'remote.agentTeams', 'resources'], /** 在原生远程、团队与资源服务可用后注册工作台资源、按会话隔离的存储及界面插槽。 */ (workbenchCtx) => {
       const requestWorkbench = createWorkbenchRequest(workbenchCtx.remote);
       workbenchCtx.effect(() => workbenchCtx.resources.register(createProductsResource(workbenchCtx.remote)),
         'benchforge-workbench: conversation products resource');
@@ -86,6 +87,8 @@ function createClient(React, defineStore, ui) {
           requestWorkbench,
           /** 将当前会话身份附到生产配置更新操作。 */
           configureProduction: (demand, enabled) => production.configureProduction(sessionId, demand, enabled),
+          /** 用户打开数据生产时，通过原生团队接口启用当前对话协作。 */
+          enableTeam: () => enableProductionTeam(workbenchCtx, sessionId, t('teamEnableFailed')),
           /** 调用当前原生会话的取消接口，失败时向界面报告原因。 */
           stopExecution: async () => {
             const result = await workbenchCtx.sessions.binding(sessionId).session.cancel();

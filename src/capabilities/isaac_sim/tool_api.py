@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 
+from capabilities.isaac_sim.grpc import simulator_pb2 as pb
 from capabilities.isaac_sim.grpc.tasks import DurableTasks
 from capabilities.isaac_sim.grpc.transport import A100Client, RemoteJobFailed, document
 from capabilities.isaac_sim.guide import usage
@@ -70,15 +71,17 @@ def execute(args, directory, config):
                 raise ValueError('Upload source must be a saved file inside this conversation workspace')
             if args.get('asset_id'):
                 resources.require('asset', args['asset_id'])
+            warnings = []
             if resources.access is not None:
                 from capabilities.isaac_sim.upload_access import snapshot_upload
-                with snapshot_upload(source, args.get('relative_path')) as snapshot:
+                with snapshot_upload(source, args.get('relative_path'), warnings=warnings) as snapshot:
                     asset = client.upload(snapshot, asset_id=args.get('asset_id', ''),
                                           relative_path=args.get('relative_path') or source.name)
             else:
                 asset = client.upload(source, asset_id=args.get('asset_id', ''), relative_path=args.get('relative_path'))
             resources.remember('asset', asset['asset_id'], origin='upload')
-            return {'action': action, 'asset': asset}
+            return {'action': action, 'asset': asset,
+                    **({'warnings': warnings} if warnings else {})}
         if action in ('submit', 'invoke'):
             owners = NativeJobs(workspace)
             key = args.get('request_id')
@@ -129,8 +132,19 @@ def execute(args, directory, config):
                     job = client.get(job_id)
             result = {'action': action, 'job': document(job)}
             resources.observe(result['job'])
+            if (action in ('status', 'wait') and job.state == pb.FAILED
+                    and job.operation == 'extension.extended.scene.capture'
+                    and job.failure.message == 'a perspective USD camera is required'):
+                result['recovery_hint'] = (
+                    'For a scene preview, reuse the saved SceneProgram and its existing cameras with '
+                    'benchforge_capture(scene_program_path=...). For capture in this native session, '
+                    'look up extension.extended.scene.inspect and extension.extended.scene.capture '
+                    'with benchforge_isaac_sim(action="guide", operation=...). Use extended.scene.inspect '
+                    'with the same session_id and put the exact paths of perspective Camera prims from '
+                    'the inspection into cameras. If none exist, add or import a perspective USD camera '
+                    'using the operations supported by the live guide, then inspect again. Submit '
+                    'the corrected native capture with a new request_id.')
             if action == 'download':
-                from capabilities.isaac_sim.grpc import simulator_pb2 as pb
                 if job.state != pb.SUCCEEDED:
                     raise ValueError('Only a succeeded native job can publish artifacts')
                 # Downloads belong to the current private output stage and are
@@ -146,7 +160,7 @@ def execute(args, directory, config):
                 result['artifacts'] = [{'path': item['source_path'], 'title': 'Isaac Sim · ' + item['name'],
                                         **({'stage': stage} if stage else {})}
                                        for item in result['files']]
-            write_json(directory / 'job.json', document(job))
+            write_json(directory / 'job.json', result['job'])
             result['receipt_path'] = str(directory / 'job.json')
             return result
         raise ValueError('Unknown Isaac Sim action')

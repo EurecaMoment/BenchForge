@@ -42,8 +42,21 @@ async function fixture(t) {
     get(name){return this[name];},
   };
   await apply(context, {serviceConfig:config});
-  return {requests, state, tools, tool:tools.get('benchforge_scene_preflight')};
+  return {requests, state, tools, tool:tools.get('benchforge_scene_preflight'),evidence:tools.get('benchforge_scene_evidence')};
 }
+
+test('registered evidence pages preserve task metadata and strip presentation parameters from HTTP',async t=>{
+  const {requests,state,evidence}=await fixture(t);
+  state.reply={task_id:'sf_one',state:'FAILED_FINAL',revision:0,data:{issues:Array.from({length:60},(_,i)=>'issue '+i)}};
+  const args={task_id:'sf_one',file:'scene_review.json',json_pointer:'/issues',offset:20,limit:5};
+  const value=await evidence.execute(args,{signal:new AbortController().signal});
+  const rendered=JSON.parse(evidence.output.render(args,value)[0].text);
+  assert.equal(rendered.task_id,'sf_one');
+  assert.equal(rendered.state,'FAILED_FINAL');
+  assert.deepEqual(rendered.data,state.reply.data.issues.slice(20,25));
+  assert.equal(rendered.report_view.next_offset,25);
+  assert.deepEqual(requests[0].body,{task_id:'sf_one',file:'scene_review.json'});
+});
 
 /** 生成包含大量阻塞问题的场景诊断，验证完整问题列表及预览裁剪行为。 */
 function report() {
@@ -66,7 +79,14 @@ test('preflight preserves every diagnostic and forwards mode through the registe
   const value = await tool.execute({scene_program_path:'/workspace/scene.json'},
     {signal:new AbortController().signal});
   assert.deepEqual(validateJsonSchemaValue(tool.output.schema, value, ''), []);
-  const visible = JSON.parse(tool.output.render({}, value)[0].text);
+  const overviewText = tool.output.render({}, value)[0].text;
+  const overview = JSON.parse(overviewText);
+  assert.ok(overviewText.length < 8192);
+  assert.equal(overview.report_view.complete, false);
+  assert.equal(overview.passed, false);
+  assert.equal(overview.report_path, state.reply.report_path);
+  assert.equal(overview.issues.total, 80);
+  const visible = JSON.parse(tool.output.render({detail:true}, value)[0].text);
   assert.deepEqual(visible.issues, state.reply.issues);
   assert.deepEqual(visible.repair_groups, state.reply.repair_groups);
   assert.deepEqual(visible.skipped_checks, state.reply.skipped_checks);

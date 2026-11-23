@@ -3,6 +3,7 @@ from capabilities.scene_authoring.contracts.scene_program import SCENE_V1_MAX_OB
 from capabilities.scene_authoring.contracts.scene_program import SCENE_V2_MAX_OBJECTS
 from capabilities.scene_authoring.contracts.scene_program import APPEARANCE_FIELDS
 from capabilities.scene_authoring.catalog.native import ASSETS
+from capabilities.scene_authoring.contracts.mounting import CONTRACT as MOUNTING_CONTRACT
 
 # 返回场景编写合同的机器可读能力摘要，不进行运行时能力探测。
 def scene_contract_capabilities():
@@ -13,6 +14,7 @@ def scene_contract_capabilities():
             'benchforge.scene/v2': {'max_objects': SCENE_V2_MAX_OBJECTS, 'max_cameras':64, 'executor': 'a100sim.v1.Simulator'},
         },
         'extensions': ['scene_graph', 'rooms', 'zones', 'portals', 'assets', 'materials', 'lights', 'render_environment', 'navigation', 'affordances', 'semantic_layers', 'provenance'],
+        'mounting': MOUNTING_CONTRACT,
         'asset_sources': ['builtin', 'usd', 'mesh', 'generated', 'diffusion', 'trellis', 'sam3d', 'procedural', 'imported'],
         'native_assets': {key:{field:value for field,value in asset.items() if field!='path'} for key,asset in ASSETS.items()},
         'capture_adapter': {'protocol': 'a100sim.v1.Simulator', 'native_rtx': False,
@@ -35,7 +37,7 @@ def scene_contract_capabilities():
             'camera_count': 'all authored views retained across batches', 'exposure': 0},
         'outdoor_geometry':{'allowed':True,'method':'explicitly create outdoor objects with supported kinds and registered assets',
             'limits':'respect scene bounds; preserve synthetic/program provenance; HDR images alone are not geometry or GT'},
-        'layout_guidance':{'design_tool':'benchforge_layout','file_handoff':'an existing reference is optional; the pipeline generates one when omitted. To use a reference while authoring task code, generate and inspect it first','prepared_source':{'mode':'reference','design_task_id':'completed layout task ID'},'modes':['generate','edit','reference'],'source':'registered image or captured parent source_view','generator':'FLUX.2-klein-9B','authority':'design reference only; native Isaac provides GT','generated_objects':'diffusion/SAM3/TRELLIS via generated kind'},
+        'layout_guidance':{'design_tool':'benchforge_layout','workflow':'provide expected object inventory; FastFLUX prepares a reference, FastSAM3 and FastDA3 analyze it, and ordinary visible objects including static robot shells default to registered FastTrellis meshes','outputs':['design reference','segmentation overlay','editable image-derived positions and sizes','registered asset IDs'],'prepared_source':{'mode':'reference','design_task_id':'completed layout task ID'},'modes':['generate','edit','reference'],'camera':'provided calibration or recorded virtual-camera assumption','authority':'predictions guide an editable SceneProgram; native Isaac provides GT','native_exceptions':'fixed architectural structure and explicitly articulated/control bodies; select a live-verified Isaac asset with joints and drives'},
         'executable_interactions': [],
         'native_trajectories': {'tool': 'benchforge_isaac_sim',
             'operations': ['world.collect', 'world.observe', 'robot.command', 'robot.replay', 'physics.body'],

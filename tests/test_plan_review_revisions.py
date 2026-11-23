@@ -1,4 +1,6 @@
 """Regression: scene repairs must not restart a released S1 window."""
+from capabilities.scene_authoring.contracts.scene_design import validate_scene_brief
+from pipelines.benchmark.design.plan_review import revision_review
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from hashlib import sha256
@@ -16,6 +18,9 @@ from pipelines.benchmark.design.plan_versions import current
 from storage.artifacts import read, write
 from storage.execution_lock import exclusive_run
 from pipelines.reviews.service import review
+from pipelines.benchmark.execution.documents import RunDocuments
+from service_access.access_scope import TrustedAccess, access_context
+from storage.access_identity import register_session_workspace
 
 
 class PlanReviewRevisionTests(unittest.TestCase):
@@ -121,6 +126,25 @@ class PlanReviewRevisionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'preserve original hard requirements'):
             self.save(changed)
 
+    def test_frame_rename_keeps_deadline_changed_observer_restarts(self):
+        args = deepcopy(self.args)
+        design = args['assessment']['scenes']['designs'][0]
+        frame = {'id': 'viewpoint', 'kind': 'user', 'origin_object_id': 'floor',
+                 'observer_object_id': 'sofa', 'facing_target_object_id': 'dog_go2', 'front': 'toward_observer'}
+        design['spatial_reference'] = {'schema': 'benchforge.review-reference/v1', 'world_up': [0, 0, 1], 'frames': [frame]}
+        first = self.save(args)['stage_review']
+        self.clock += 30
+        design['object_roles'][0]['object_id'] = 'seat'
+        design['relations'][0]['source'] = frame['observer_object_id'] = 'seat'
+        args['assessment']['scenes']['geometry_exceptions'][0]['object_ids'] = ['seat', 'sofa_arm']
+        second = self.save(args)['stage_review']
+        self.assertEqual((second['review_id'], second['deadline']), (first['review_id'], first['deadline']))
+        frame['observer_object_id'] = 'dog_go2'
+        frame['facing_target_object_id'] = 'seat'
+        third = self.save(args)['stage_review']
+        self.assertNotEqual(third['review_id'], first['review_id'])
+        self.assertGreater(third['deadline'], second['deadline'])
+
     # 验证数量、评分等硬契约变化生成新评审，并列出变化字段。
     def test_contract_changes_require_a_new_review_and_report_changed_fields(self):
         cases = {
@@ -170,8 +194,8 @@ class PlanReviewRevisionTests(unittest.TestCase):
         changed['assessment']['scenes']['designs'][0]['hard_requirements'] = ['A new geometry experiment']
         self.assertEqual(self.save(changed)['review_revision']['kind'], 'new_task')
 
-    # 验证显式新任务及新请求谱系不会复用旧任务的放行。
-    def test_new_request_and_explicit_new_task_do_not_reuse_review(self):
+    # 验证只有显式新任务建立新谱系，移动请求文件仍复用原审核。
+    def test_explicit_new_task_is_independent_of_request_location(self):
         first = self.save()
         separate = self.save({**self.args, 'new_task': True})
         self.assertNotEqual(separate['stage_review']['review_id'], first['stage_review']['review_id'])
@@ -179,8 +203,83 @@ class PlanReviewRevisionTests(unittest.TestCase):
         write(one, self.args); write(two, self.args)
         first = self.save({'request_path': str(one)})
         separate = self.save({'request_path': str(two)})
-        self.assertEqual(separate['review_revision']['kind'], 'new_task')
-        self.assertNotEqual(separate['stage_review']['review_id'], first['stage_review']['review_id'])
+        self.assertEqual(separate['review_revision']['kind'], 'execution_repair')
+        self.assertEqual(separate['stage_review']['review_id'], first['stage_review']['review_id'])
+
+    def test_unfinished_execution_rejects_replacement_before_saving_or_validation(self):
+        """真实数据库内未完成的 S2 阻止隐式换任务，预检与保存返回同一个续跑入口。"""
+        scope = register_session_workspace(engine_for(self.database_url), host_id='host-test',
+            session_id=self.session, owner_id='owner-test', root_path=str(self.root))
+        first = self.save()
+        review(self.root, self.session, 'continue')
+        run = Path(first['plan']).parent / 'pipeline_run'
+        with access_context(TrustedAccess(scope, str(self.root))):
+            docs = RunDocuments(run)
+            docs.save('plan.json', read(first['plan']))
+            docs.save('state.json', {'state': 'needs_evidence', 'run_path': str(run),
+                'steps': {'accepted_scenes': {'state': 'needs_evidence'}}})
+        for new_task in (False, True):
+            for validate_only in (False, True):
+                changed = deepcopy(self.args)
+                changed.update(new_task=new_task, validate_only=validate_only)
+                changed['assessment']['dataset']['target_items'] = 5
+                result = self.save(changed)
+                self.assertEqual(result['state'], 'needs_execution_repair')
+                self.assertEqual(result['stage'], 'S2')
+                self.assertEqual(result['resume']['arguments'], {'plan': first['plan'], 'run': str(run)})
+                self.assertFalse(result['review_revision']['applied'])
+                self.assertFalse((self.root / 'operations' / str(self.index) / 'plan.json').exists())
+                self.assertEqual(current(self.root, self.session)['plan'], first['plan'])
+                self.assertEqual(review(self.root, self.session)['review_id'], first['stage_review']['review_id'])
+        # 普通修复继续可用，且文件副本伪造完成不能解除生产保护。
+        write(run / 'state.json', {'state': 'completed'})
+        self.assertTrue(self.save()['review_revision']['review_reused'])
+        self.assertEqual(self.save(changed)['state'], 'needs_execution_repair')
+        with access_context(TrustedAccess(scope, str(self.root))):
+            docs.save('state.json', {'state': 'completed', 'run_path': str(run),
+                                   'steps': {'accepted_scenes': {'state': 'completed'}}})
+        changed['validate_only'] = False
+        self.assertEqual(self.save(changed)['state'], 'planned')
+
+    def test_unfinished_execution_still_allows_verified_workbench_changes(self):
+        """用户经工作台修改需求仍可保存草稿，不能把修复边界变成无法修改需求。"""
+        first = self.save()
+        changed = deepcopy(self.args)
+        changed['assessment']['dataset']['target_items'] = 5
+        changed['_plan_edit'] = {'base_plan': first['plan'], 'changes': ['dataset'], 'application_required': True}
+        with patch('pipelines.benchmark.design.continuity.latest_production_execution') as lookup:
+            self.assertEqual(self.save(changed)['state'], 'planned')
+            lookup.assert_not_called()
+
+    # 验证改名或内联提交不能绕过原任务硬要求保护。
+    def test_relocated_request_cannot_drop_requirements(self):
+        one, two = self.root / 'original.json', self.root / 'revision.json'
+        write(one, self.args)
+        self.save({'request_path': str(one)})
+        changed = deepcopy(self.args)
+        changed['assessment']['annotations']['require_robot_locomotion'] = False
+        write(two, changed)
+        with self.assertRaisesRegex(ValueError, 'preserve require_robot_locomotion'):
+            self.save({'request_path': str(two)})
+
+    # 验证文件改为内联时继承省略的执行约束和原模板分组，不再意外重开 S1。
+    def test_file_to_inline_revision_keeps_production_inputs(self):
+        args = deepcopy(self.args)
+        args['inputs'].update(execution_mode='production', quantity_contract='minimum',
+                             scene_selection={'allow_new_scenes': True, 'selected_scenes': []})
+        request = self.root / 'request.json'
+        write(request, args)
+        first = self.save({'request_path': str(request)})
+        review(self.root, self.session, 'continue')
+        saved = self.save({'objective': args['objective'], 'assessment': args['assessment'],
+                           'template_ids': ['C43-T01'], 'target_items': 10})
+        self.assertEqual(saved['stage_review']['review_id'], first['stage_review']['review_id'])
+        self.assertTrue(saved['stage_review']['can_continue'])
+        self.assertEqual(saved['review_revision']['changed_fields'], [])
+        document = read(saved['plan'])
+        for key in ('execution_mode', 'quantity_contract', 'scene_selection'):
+            self.assertEqual(document['inputs'][key], args['inputs'][key])
+            self.assertIn('inputs.' + key, saved['inherited_fields'])
 
     # 验证修复计划保留用户暂停和待处理指令状态。
     def test_repairs_preserve_pause_and_pending_instruction(self):
@@ -256,6 +355,67 @@ class PlanReviewRevisionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Another plan revision'):
                 self.save()
             self.assertEqual(self.save(session='another-session')['stage_review']['state'], 'waiting_user')
+
+
+class RelationContractReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.relations = [
+            {'source': 'cabinet_east', 'type': 'supported_by', 'target': 'ground',
+             'description': 'The cabinet stands on the floor.'},
+            {'source': 'cabinet_east', 'type': 'supported_by', 'target': 'desk_main',
+             'description': 'The floor-standing cabinet is to the right of the desk.',
+             'reference_frame': 'desk_frame', 'expected_direction': ['right']},
+            {'source': 'window_main', 'type': 'mounted_to', 'target': 'building_shell',
+             'description': 'The window is attached to the building shell.'},
+        ]
+        self.objects = {'cabinet_east', 'desk_main', 'window_main', 'building_shell'}
+        self.design = {
+            'id': 'study', 'name': 'Study', 'summary': 'Study with a desk, cabinet and window.',
+            'hard_requirements': ['A study with real furniture'],
+            'physical_assumptions': ['The cabinet is static.'],
+            'object_roles': [{'object_id': key, 'role': key} for key in sorted(self.objects)],
+            'relations': self.relations,
+            'spatial_reference': {'schema': 'benchforge.review-reference/v1', 'world_up': [0, 0, 1],
+                'frames': [{'id': 'desk_frame', 'kind': 'world', 'origin_object_id': 'desk_main',
+                            'front_world': [0, 1, 0], 'right_world': [1, 0, 0]}]},
+        }
+        self.previous = {
+            'production_contract': 'benchforge.production-stages/v1',
+            'stage_review_key': 'original-review', 'user_markdown': 'Keep the original furniture.',
+            'authoring_sources': {'request_path': 'request.json'},
+            'assessment': {'scenes': {'designs': [self.design]}},
+        }
+
+    def check_revision(self, indices):
+        result = deepcopy(self.previous)
+        design = result['assessment']['scenes']['designs'][0]
+        for index in indices:
+            design['relations'][index]['type'] = 'near'
+        validate_scene_brief(self.design, self.objects)
+        validate_scene_brief(design, self.objects)
+        key, detail = revision_review(result, 'revised-plan.json', self.previous, 'original-plan.json')
+        self.assertEqual(key, str(Path('revised-plan.json').resolve()))
+        self.assertEqual(detail['base_plan'], 'original-plan.json')
+        self.assertEqual(detail['kind'], 'contract_change')
+        self.assertFalse(detail['review_reused'])
+        self.assertEqual(detail['changed_fields'],
+                         [f'assessment.scenes.designs.0.relations.{index}.type' for index in indices])
+        return result
+
+    def test_cabinet_and_window_changes_are_listed_in_the_fresh_review(self):
+        for indices in ((1,), (2,), (1, 2)):
+            with self.subTest(indices=indices):
+                self.check_revision(indices)
+        self.assertEqual([row['type'] for row in self.relations],
+                         ['supported_by', 'supported_by', 'mounted_to'])
+
+    def test_multiple_actual_supports_are_not_equivalent_to_near(self):
+        self.design['hard_requirements'].append('The cabinet legs and the desk rail both carry the cabinet.')
+        self.relations[1]['description'] = 'The desk rail carries part of the cabinet load on its right side.'
+        revised = self.check_revision((1,))
+        revised['assessment']['scenes']['designs'][0]['hard_requirements'] = []
+        with self.assertRaisesRegex(ValueError, 'preserve original hard requirements'):
+            revision_review(revised, 'revised-plan.json', self.previous, 'original-plan.json')
 
 
 if __name__ == '__main__':

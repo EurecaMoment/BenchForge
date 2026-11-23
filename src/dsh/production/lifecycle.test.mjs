@@ -129,6 +129,51 @@ test('a synchronous retry budget rejection blocks only its current S2 capture',a
   assert.equal((await h.preStep(runtime)).kind,'enter');
 });
 
+test('a capture notice admitted in this step suppresses only the stale generic progress reminder',/** 验证尚未提交的采集终态通知原样进入模型，不同时追加仍在等待采集的旧提醒。 */ async()=>{
+  for(const state of ['FAILED_FINAL','SUCCEEDED','observer_failed']) {
+    const h=harness();h.plan();h.receipt('benchforge_capture',{run_id:'sf_capture',state:'submitted'});h.setTime(161000);
+    const runtime=h.create(),capture={source:{kind:'benchforge/capture-watch',noticeKey:'capture:sf_capture:'+state,
+      capture:{run_id:'sf_capture',state,failed:state==='FAILED_FINAL'}},content:[{type:'text',text:'采集状态与下一步'}]};
+    const input={source:{kind:'user'},content:[{type:'text',text:'保留原参数'}]};
+    const decision={kind:'enter',messages:[capture,input]};
+    assert.equal(h.view().state,'waiting_capture');
+    const result=await runtime.preStep({agent:h.agent},async()=>decision);
+    assert.equal(result,decision);assert.deepEqual(result.messages,[capture,input]);
+    assert.equal(h.view().state,'waiting_capture');
+    h.event('user/message',capture);
+    const expected=state==='FAILED_FINAL'?'needs_repair':state==='SUCCEEDED'?'scene_ready':'capture_error';
+    assert.equal(h.view().state,expected);
+    const next=await h.preStep(runtime);
+    assert.equal(next.messages.length,1);
+    assert.match(next.messages[0].content[0].text,new RegExp('状态='+expected));
+    assert.doesNotMatch(next.messages[0].content[0].text,/状态=waiting_capture/);
+    await runtime.dispose();
+  }
+});
+
+test('accepted waits remain visible at turn end and layout results do not complete a scene',()=>{
+  const h=harness();
+  h.event('turn/start',{turn:1});
+  h.receipt('benchforge_pipeline_plan',{state:'planned',production_contract:'benchforge.production-stages/v1',plan:'/workspace/plan.json'});
+  for(const run_id of ['sf_layout','sf_other']) {
+    h.receipt('benchforge_wait',{run_id,state:'RUNNING',terminal:false,tasks:[],watch:{background:true,accepted:true}});
+  }
+  h.event('turn/end',{turn:1,reason:{kind:'completed'}});
+  assert.equal(h.view().state,'waiting_capture');
+  h.event('turn/start',{turn:2});
+  h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_layout',state:'SUCCEEDED',workflow:'layout',failed:false}}});
+  assert.equal(h.view().state,'running');
+  assert.equal(h.view().delivered,false);
+  assert.equal(h.view().completed,0);
+  h.event('turn/end',{turn:2,reason:{kind:'completed'}});
+  assert.equal(h.view().state,'waiting_capture');
+  h.event('turn/start',{turn:3});
+  h.receipt('benchforge_cancel',{run_id:'sf_other',cancel_requested:true});
+  h.receipt('benchforge_wait',{run_id:'sf_cancelled',state:'CANCELED',terminal:true,tasks:[],watch:{background:true,accepted:true}});
+  h.event('turn/end',{turn:3,reason:{kind:'completed'}});
+  assert.equal(h.view().state,'incomplete');
+});
+
 const productionRequest={source:{kind:'user'},content:[{type:'text',text:
   '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段。\nexecution_mode=production；quantity_contract=minimum。\n生产100条机器狗轨迹数据。'}]};
 const emptyReply={message:{role:'assistant',content:[]}};
@@ -269,6 +314,164 @@ test('an applied execution repair does not enqueue a second continuation for the
   await runtime.dispose();
 });
 
+/** 记录服务端已放行的 S1，并进入具有部分完成证据和运行身份的 S3。 */
+function enterCollection(h,release='continued') {
+  h.plan();
+  h.receipt('benchforge_stage_review',{review_id:1,revision:9,state:release,stage:'S1',artifact:'/workspace/plan.json',deadline:400});
+  h.receipt('benchforge_pipeline_run',{state:'needs_evidence',stage:'S3',run:'/workspace/existing-run',total_steps:6,
+    steps:{scene:{state:'completed'},collection:{state:'pending'}}});
+}
+
+/** 构造服务端对当前计划执行修补的回执，允许用例替换需验证的契约字段。 */
+function executionRepair(overrides={}) {
+  return {state:'planned',production_contract:'benchforge.production-stages/v1',plan:'/workspace/repaired-plan.json',total_steps:4,
+    review_revision:{kind:'execution_repair',review_reused:true,base_plan:'/workspace/plan.json'},
+    stage_review:{review_id:1,revision:9,stage:'S1',artifact:'/workspace/repaired-plan.json',deadline:400,state:'continued'},...overrides};
+}
+
+test('equivalent released plan repairs preserve collection progress after the active review is cleared',/** 验证执行修补仅更新计划引用，清空当前复核后仍保留运行和进度，且标准事件重放结果一致。 */ ()=>{
+  for(const release of ['elapsed','continued']) {
+    const h=harness();enterCollection(h,release);h.event('deliverables/presented',{});
+    const before=h.view();
+    assert.equal(before.review,null);
+    h.receipt('benchforge_pipeline_plan',executionRepair());
+    const after=h.view();
+    assert.equal(after.plan,'/workspace/repaired-plan.json');
+    for(const key of ['run','state','stage','completed','total','delivered','review'])assert.deepEqual(after[key],before[key],key);
+    const replayed=h.events.reduce(productionProjection.apply,productionProjection.init({cwd:'/workspace'}));
+    productionProjection.stateSchema.parse(replayed);
+    assert.deepEqual(replayed.view,after);
+    assert.equal(replayed.planReview.review_id,1);assert.equal(replayed.planReview.revision,9);
+    assert.equal(productionProjection.stateVersion,14);
+  }
+});
+
+test('a freshly released repair receipt can update an earlier waiting S1 snapshot',/** 验证后台放行通知尚未提交时，采用同一复核的更新服务端回执，无需客户端自行推断批准。 */ ()=>{
+  const h=harness();h.plan();
+  h.receipt('benchforge_pipeline_run',{state:'needs_evidence',stage:'S3',run:'/workspace/existing-run',total_steps:6,
+    steps:{scene:{state:'completed'},collection:{state:'pending'}}});
+  h.receipt('benchforge_pipeline_plan',executionRepair());
+  assert.equal(h.view().plan,'/workspace/repaired-plan.json');assert.equal(h.view().run,'/workspace/existing-run');
+  assert.equal(h.view().stage,'S3');assert.equal(h.view().completed,1);assert.equal(h.view().total,6);
+});
+
+test('reused S1 repairs retain the newer stage review and its single continuation notice',/** 验证修补旧 S1 不覆盖 S2 审核，生命周期保留运行身份并只投递一次当前窗口的放行通知。 */ async()=>{
+  const h=harness();enterCollection(h);
+  const sceneReview={review_id:2,revision:3,state:'waiting_user',stage:'S2',artifact:'/workspace/scene.json',deadline:700};
+  h.receipt('benchforge_stage_review',sceneReview);h.setReview(sceneReview);
+  const runtime=h.create();await runtime.observe(h.agent);
+  h.receipt('benchforge_pipeline_plan',executionRepair());
+  assert.equal(h.view().plan,'/workspace/repaired-plan.json');assert.deepEqual(h.view().review,sceneReview);
+  assert.equal(h.view().state,'waiting_user');assert.equal(h.view().stage,'S2');assert.equal(h.view().completed,1);
+  await runtime.observe(h.agent);await runtime.refresh(h.agent.id);
+  assert.equal(h.sent.length,0);
+  assert.equal(h.records.get(h.agent.id).plan,'/workspace/repaired-plan.json');
+  assert.equal(h.records.get(h.agent.id).run,'/workspace/existing-run');
+  h.setReview({...sceneReview,revision:4,state:'continued'});await runtime.refresh(h.agent.id);
+  assert.equal(h.sent.length,1);assert.equal(h.sent[0].source.review.review_id,2);
+  assert.match(h.sent[0].content[0].text,/plan=\/workspace\/repaired-plan\.json；run=\/workspace\/existing-run/);
+  h.event('user/message',h.sent[0]);h.agent.inbox.nextStep=[];
+  h.receipt('benchforge_pipeline_plan',executionRepair({plan:'/workspace/repaired-again.json',
+    review_revision:{kind:'execution_repair',review_reused:true,base_plan:'/workspace/repaired-plan.json'}}));
+  await runtime.observe(h.agent);await runtime.refresh(h.agent.id);
+  assert.equal(h.sent.length,1);assert.equal(h.view().review.review_id,2);assert.equal(h.view().review.state,'continued');
+  assert.equal(h.records.get(h.agent.id).plan,'/workspace/repaired-again.json');
+  await runtime.dispose();
+});
+
+test('new plan receipts cannot reopen S1 after execution has entered a later stage',/** 验证 S2 之后的新任务、合同变化及未放行计划均不能覆盖当前生产。 */ ()=>{
+  const base=executionRepair();
+  const cases=[
+    {review_revision:{...base.review_revision,kind:'contract_change'}},
+    {review_revision:{...base.review_revision,kind:'new_task'}},
+    {review_revision:{...base.review_revision,review_reused:false}},
+    {review_revision:{...base.review_revision,base_plan:'/workspace/other-plan.json'}},
+    {stage_review:{...base.stage_review,review_id:3}},
+    ...['waiting_user','paused','needs_input','check_failed'].map(state=>({stage_review:{...base.stage_review,state,revision:10}})),
+  ];
+  for(const overrides of cases) {
+    const h=harness();enterCollection(h);h.event('deliverables/presented',{});
+    const receipt=executionRepair(overrides);h.receipt('benchforge_pipeline_plan',receipt);
+    assert.equal(h.view().plan,'/workspace/plan.json');assert.equal(h.view().stage,'S3');assert.equal(h.view().state,'needs_repair');
+    assert.equal(h.view().run,'/workspace/existing-run');assert.equal(h.view().completed,1);assert.equal(h.view().total,6);
+    assert.equal(h.view().delivered,true);assert.equal(h.view().review,null);
+  }
+  const h=harness();enterCollection(h);
+  h.receipt('benchforge_stage_review',{review_id:2,revision:3,state:'waiting_user',stage:'S2',artifact:'/workspace/scene.json',deadline:700});
+  h.receipt('benchforge_pipeline_plan',executionRepair({
+    review_revision:{...base.review_revision,kind:'contract_change',review_reused:false},
+    stage_review:{...base.stage_review,review_id:3,state:'waiting_user'},
+  }));
+  assert.equal(h.view().stage,'S2');assert.equal(h.view().review.review_id,2);assert.equal(h.view().review.state,'waiting_user');
+  assert.equal(h.view().run,'/workspace/existing-run');assert.equal(h.view().completed,1);
+});
+
+test('a stale S1 repair cannot reset progress after the current review was cleared',/** 验证清空当前复核不会丢失 S1 版本保护，旧修补回执不能倒退阶段或覆盖计划。 */ ()=>{
+  const h=harness();enterCollection(h);const before=h.view(),base=executionRepair();
+  h.receipt('benchforge_pipeline_plan',executionRepair({stage_review:{...base.stage_review,revision:8}}));
+  for(const key of ['plan','run','state','stage','completed','total','review'])assert.deepEqual(h.view()[key],before[key],key);
+});
+
+test('plan validation and historical S1 reads preserve every execution stage',/** 验证 S2–S5 的准备稿预检和历史查询不会修改活动执行与进度。 */ ()=>{
+  for(const stage of ['S2','S3','S4','S5']) {
+    const h=harness();enterCollection(h);
+    h.receipt('benchforge_pipeline_run',{state:'needs_evidence',stage,run:'/workspace/run',completed:1});
+    const before=h.view();
+    for(const receipt of [{state:'validated'}, {state:'needs_plan_revision',issues:['Fix draft field']},
+        {state:'needs_template_selection'}]) {
+      h.receipt('benchforge_pipeline_plan',receipt);
+      for(const key of ['plan','run','state','stage','completed','total','review']) assert.deepEqual(h.view()[key],before[key],key);
+    }
+    h.receipt('benchforge_stage_review',executionRepair().stage_review);
+    assert.equal(h.view().stage,stage);assert.equal(h.view().run,'/workspace/run');
+  }
+});
+
+test('replay cannot regress a started stage after a newly saved replacement plan',/** 验证历史 S2 执行后的普通新计划回执不能清空运行并重新打开 S1。 */ ()=>{
+  const h=harness();enterCollection(h);const before=h.view();
+  h.receipt('benchforge_pipeline_plan',{state:'planned',production_contract:'benchforge.production-stages/v1',
+    plan:'/workspace/accidental-new-plan.json',total_steps:4,review_revision:{kind:'new_task',review_reused:false},
+    stage_review:{review_id:2,stage:'S1',artifact:'/workspace/accidental-new-plan.json',deadline:900,state:'waiting_user'}});
+  assert.equal(h.view().stage,'S3');assert.equal(h.view().run,before.run);
+  assert.equal(h.view().state,'needs_repair');assert.equal(h.view().review,null);
+  assert.match(h.view().error,/不可由新计划回执重置/);
+});
+
+test('a rejected replacement points at execution repair without arming S1 again',/** 验证后端拒绝覆盖时采用原运行续接入口，清除旧 S1 展示但不虚报完成。 */ async()=>{
+  const h=harness();h.plan();
+  h.receipt('benchforge_pipeline_plan',{state:'needs_execution_repair',stage:'S2',
+    plan:'/workspace/plan.json',run:'/workspace/run',completed:0,total_steps:4,error:'Repair current scene',
+    review_revision:{kind:'new_task',applied:false}});
+  assert.equal(h.view().stage,'S2');assert.equal(h.view().state,'needs_repair');
+  assert.equal(h.view().run,'/workspace/run');assert.equal(h.view().review,null);
+  const runtime=h.create();await runtime.observe(h.agent);
+  assert.equal(h.timers.length,0);await runtime.dispose();
+});
+
+test('a real capture notice repairs historical S1 display but preserves an unreleased review',/** 验证重放真实采集通知可恢复旧对话的 S2 展示，未放行审核仍保留。 */ ()=>{
+  for(const state of ['elapsed','continued','waiting_user','paused','check_failed']) {
+    const h=harness();h.plan();
+    h.receipt('benchforge_stage_review',{review_id:1,stage:'S1',state,artifact:'/workspace/plan.json',deadline:400});
+    h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_capture',state:'FAILED_FINAL',failed:true}}});
+    if(['elapsed','continued'].includes(state)) {
+      assert.equal(h.view().stage,'S2');assert.equal(h.view().review,null);
+    } else {assert.equal(h.view().stage,'S1');assert.equal(h.view().review.state,state);}
+    assert.equal(h.view().completed,0);
+  }
+});
+
+test('release notices remain reusable after capture clears the current review without reopening S1',/** 验证通过标准生命周期通知获得的 S1 放行可供后续修补复用，且不会重新调度该旧窗口。 */ async()=>{
+  const h=harness();h.plan();const runtime=h.create();await runtime.observe(h.agent);
+  h.setReview({review_id:1,revision:9,state:'continued',deadline:400,stage:'S1'});await runtime.refresh(h.agent.id);
+  h.event('user/message',h.sent[0]);h.agent.inbox.nextStep=[];
+  h.receipt('benchforge_capture',{run_id:'sf_capture',state:'submitted'});
+  h.receipt('benchforge_pipeline_plan',executionRepair());
+  assert.equal(h.view().stage,'S2');assert.equal(h.view().state,'waiting_capture');assert.equal(h.view().review,null);
+  await runtime.observe(h.agent);await runtime.refresh(h.agent.id);
+  assert.equal(h.records.get(h.agent.id).review,null);assert.equal(h.sent.length,1);
+  await runtime.dispose();
+});
+
 test('long tool errors do not become model progress text',/** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：long tool errors do not become model progress text。 */ ()=>{
   const h=harness();h.plan();const before=h.view().lastTextAt;
   h.setTime(160000);h.receipt('benchforge_scene_status',{state:'SUCCEEDED'});
@@ -396,8 +599,12 @@ test('progress reminders preserve fresh user input and can recur without floodin
   h.setTime(161000);
   const result=await runtime.preStep({agent:h.agent},async()=>({kind:'enter',messages:[input]}));
   assert.equal(result.messages[0],input);assert.equal(result.messages.length,2);
-  h.setTime(222000);await h.preStep(runtime);assert.equal(h.sent.length,1);
+  h.setTime(222000);await h.preStep(runtime);assert.equal(h.sent.length,0);
+  h.event('user/message',result.messages[1]);
   await runtime.dispose();
+  const restored=h.create();
+  h.setTime(330000);await h.preStep(restored);assert.equal(h.sent.length,0);
+  await restored.dispose();
 });
 
 test('backend rounds advance with the browser closed, retain their deadline after reload, then resume once',/** 验证生产阶段状态、复核门禁和任务续接在该用例中的具体边界，完成准备、调用和结果断言。用例：backend rounds advance with the browser closed, retain their deadline after reload, then resume once。 */ async()=>{

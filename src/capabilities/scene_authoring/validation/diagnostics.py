@@ -107,16 +107,20 @@ class SceneDiagnostics:
         self.issues.append(issue)
 
     # 记录因依赖不可用等原因未执行的检查及解释。
-    def skip(self, check, path, reason):
-        self.skipped.append({'check': check, 'path': path, 'reason': reason,
-                             'status': 'not_evaluated'})
+    def skip(self, check, path, reason, **evidence):
+        row = {'check': check, 'path': path, 'reason': reason, 'status': 'not_evaluated'}
+        if evidence:
+            row['evidence'] = evidence
+        self.skipped.append(row)
 
     # 独立执行一个检查，收集常见输入错误并记录检查是否完成。
     def attempt(self, check, path, function, *, object_ids=(), basis='declared_program'):
         try:
             value = function()
         except (ValueError, OSError, KeyError, TypeError, IndexError) as error:
-            self.add(check, path, str(error), basis=basis, object_ids=object_ids)
+            evidence = getattr(error, 'evidence', None)
+            self.add(check, path, str(error), basis=basis, object_ids=object_ids,
+                     **(evidence if isinstance(evidence, dict) else {}))
             return False, None
         self.checked.append({'check': check, 'path': path})
         return True, value

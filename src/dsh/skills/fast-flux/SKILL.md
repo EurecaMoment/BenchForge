@@ -46,7 +46,7 @@ description: 使用已配置的 FLUX 图像生成与编辑工具制作场景设�
 
 - 需要对象资产时，将图像 `source_path` 交给 `benchforge_scene_sam3`，选定遮罩后交给 `benchforge_trellis`；不必为了调用小模型而无目的地串行跑完整链条。
 - 需要场景参考时，可把这张图以 `layout:{"mode":"reference","source_image":"<source_path>"}` 交给支持 layout 的场景工具。它伴随真实仿真结果接受对照检查，不替代 SceneProgram 或 Isaac Sim 捕获。
-- 可选 `benchforge_layout` 是另一条设计参考流程，要求 `name`、`description`，并支持 `layout.mode` 为 `generate`、`edit`、`reference`。已有合适图像时复用，不反复生成。
+- 新建图像驱动场景时优先调用 `benchforge_layout`，并提供 `layout.objects` 清单。该流程使用配置中的 FastFLUX 准备设计图，再调用 FastSAM3、FastDA3 和 FastTrellis，返回分割叠图、对象资产及可编辑摆放估计。随后模型检查证据并调整完整 SceneProgram。已有合适图像时通过 reference 模式复用，不反复生成。
 
 ## 失败处理
 

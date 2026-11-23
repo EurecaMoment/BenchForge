@@ -187,6 +187,9 @@ class ModelClient:
         if 'intrinsics' in request:
             payload.update(task='multiview', intrinsics=[request['intrinsics']], extrinsics=[request['extrinsics']])
         result = self._json('depth/estimations', 'POST', payload)
+        units = result.get('units')
+        if not isinstance(units, str) or units.strip().casefold() not in {'m', 'meter', 'meters'}:
+            raise ValueError('FastDA3 depth response must explicitly declare meter units')
         output = Path(request['output_dir'])
         output.mkdir(parents=True, exist_ok=True)
         archive, depth_path, preview = (output / name for name in ('depth.npz', 'depth.npy', 'depth.png'))
@@ -200,7 +203,7 @@ class ModelClient:
         normalized = (depth - low) / max(float(high - low), 1e-6)
         Image.fromarray(np.uint8(np.clip(normalized, 0, 1) * 255)).save(preview)
         return {'depth': str(depth_path), 'visualization': str(preview), 'archive': str(archive),
-                'depth_type': 'estimated_metric_depth', 'units': result['units'],
+                'depth_type': 'estimated_metric_depth', 'units': units,
                 'scale': 'model-predicted; larger values indicate farther surfaces',
                 'intrinsics': result['intrinsics'], 'extrinsics': result['extrinsics'],
                 'extrinsics_convention': result['extrinsics_convention'],

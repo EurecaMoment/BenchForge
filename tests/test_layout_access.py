@@ -12,9 +12,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from capabilities.asset_generation.layout import start_design_request
+from capabilities.asset_generation.layout import validate_layout
 from database.access import AccessScope
 from database.schema import request_keys
 from server import http_api
+from server.access_requests import authorize_request
 from service_access.access_scope import TrustedAccess, access_context
 from storage.scene_jobs.store import Store
 
@@ -34,7 +36,10 @@ class LayoutAccessTests(unittest.TestCase):
         self.connection.execute.return_value.mappings.return_value.first.return_value = None
         self.access = TrustedAccess(AccessScope('host', 'session-a', 'workspace-a', 'owner', 1, 1), str(self.root))
         self.request = {'request_key': 'dsh:session-a:call-layout', 'name': 'villa2f_drone_explore',
-                        'description': '现代二层别墅室内斜俯视广角，黑色四旋翼无人机悬停楼梯上方'}
+                        'description': '现代二层别墅室内斜俯视广角，黑色四旋翼无人机悬停楼梯上方',
+                        'layout': {'mode': 'generate', 'prompt': 'Modern villa interior with a static drone display.',
+                                   'objects': [{'object_id': 'drone', 'label': 'black quadcopter drone'},
+                                               {'object_id': 'sofa', 'label': 'sofa'}]}}
 
     def inserted(self):
         """读取真实存储层生成的插入参数，核对持久化身份与业务意图。"""
@@ -122,3 +127,41 @@ class LayoutAccessTests(unittest.TestCase):
             result = start_design_request(self.store, self.request)
         self.assertEqual(result['state'], 'accepted')
         self.assertNotIn('session_id', next(row['plan'] for row in self.inserted() if 'plan' in row)['context'])
+
+    def test_new_layout_requires_object_inventory(self):
+        request = {key: value for key, value in self.request.items() if key != 'layout'}
+        with self.assertRaisesRegex(ValueError, 'layout.objects'):
+            start_design_request(self.store, request)
+        self.store.lifecycle.admit.assert_not_called()
+
+    def test_layout_object_ids_are_unique_after_count_expansion(self):
+        request = {'mode': 'generate', 'prompt': 'Room interior', 'objects': [
+            {'object_id': 'chair', 'label': 'chair', 'count': 2},
+            {'object_id': 'chair_1', 'label': 'another chair'},
+        ]}
+        with self.assertRaisesRegex(ValueError, 'collide after count expansion'):
+            validate_layout(request)
+
+    def test_invalid_layout_camera_is_rejected_before_admission(self):
+        request = {
+            'request_key': 'call-layout-camera',
+            'name': 'camera validation',
+            'description': 'Validate image-derived camera input.',
+            'layout': {
+                'mode': 'generate', 'prompt': 'A room with a table.',
+                'objects': [{'object_id': 'table', 'label': 'table'}],
+                'camera': {'position': [0, 0, 1]},
+            },
+        }
+        with self.assertRaisesRegex(ValueError, 'requires position and target'):
+            start_design_request(self.store, request)
+        self.store.lifecycle.admit.assert_not_called()
+
+    def test_layout_reference_is_scoped_to_the_current_session(self):
+        request = {'request_key': 'call-layout', 'layout': {
+            'mode': 'reference', 'design_task_id': 'sf_0123456789abcdef.scene0',
+        }}
+        with access_context(self.access), patch('server.access_requests.require_run') as require_run:
+            authorize_request(self.store, '/layout', request)
+
+        require_run.assert_called_once_with(self.store.repo.engine, 'sf_0123456789abcdef')

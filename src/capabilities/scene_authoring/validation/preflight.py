@@ -14,7 +14,9 @@ from capabilities.scene_authoring.geometry.preview import preview_scene_geometry
 from capabilities.scene_authoring.validation.support_relations import support_path
 from capabilities.scene_authoring.contracts.scene_design import geometry_exception, scene_brief, saved_design
 from capabilities.scene_authoring.validation.diagnostics import SceneDiagnostics, ScenePreflightError
-from capabilities.scene_authoring.validation.policy import attachment, check_references, detailed_construction, policy_for, structure
+from capabilities.scene_authoring.contracts.mounting import attachment
+from capabilities.scene_authoring.validation.policy import check_references, detailed_construction, policy_for, structure
+from capabilities.scene_authoring.validation.asset_policy import PROXY_KINDS, is_generated_asset, native_asset_requirement
 
 
 # 判断三维点是否位于给定中心和尺寸的轴对齐范围内。
@@ -142,35 +144,58 @@ def _design_diagnostics(root, program, policy, diagnostics):
 
 
 # 检查前景资产、简化声明及静态安装关系，收集对象级准入问题。
-def _object_admission(program, objects, indexes, policy, declaration, brief, declared, diagnostics):
+def _object_admission(root, program, objects, indexes, policy, declaration, brief, declared,
+                      diagnostics, allow_generated):
     by_id = {obj['id']: obj for obj in objects}
+    declared_objects = {obj['id']: obj for obj in _records(program, 'objects')
+                        if isinstance(obj, dict) and isinstance(obj.get('id'), str)}
     simplified = set(declaration['object_ids']) if declaration else set()
     mounts = {}
-    declared_ids = {row['id'] for row in _records(program, 'objects')
-                    if isinstance(row, dict) and isinstance(row.get('id'), str)}
     if policy and not any(not structure(obj) for obj in objects) and not diagnostics.skipped:
         diagnostics.add('foreground_missing', '/objects',
                         'Realistic scenes need recognizable foreground assets', basis='scene_policy')
     for obj in objects:
         key = obj['id']
         path = f'/objects/{indexes[key]}'
-        metadata = obj.get('metadata', {})
-        raw_mount = metadata.get('spatial_attachment') if isinstance(metadata, dict) else None
-        target = raw_mount.get('target') if isinstance(raw_mount, dict) else None
-        if not isinstance(metadata, dict) or (isinstance(target, str) and target in declared_ids and target not in by_id):
+        metadata_valid = isinstance(obj.get('metadata', {}), dict)
+        if metadata_valid:
+            ok, mount = diagnostics.attempt('static_mount', path + '/metadata/spatial_attachment',
+                lambda: attachment(obj, declared_objects), object_ids=[key])
+        else:
             ok, mount = False, None
             diagnostics.skip('static_mount', path + '/metadata/spatial_attachment',
-                             'mount metadata or target geometry is invalid')
-        else:
-            ok, mount = diagnostics.attempt('static_mount', path + '/metadata/spatial_attachment',
-                                            lambda: attachment(obj, by_id), object_ids=[key])
+                             'metadata contract is invalid')
+        if not ok:
+            if metadata_valid:
+                details = diagnostics.issues[-1].get('evidence', {})
+                target = details.get('declared_target')
+                details['geometry_target_available'] = isinstance(target, str) and target in by_id
+        elif mount and mount['target'] not in by_id:
+            diagnostics.skip('static_mount_geometry', path + '/metadata/spatial_attachment/target',
+                             f"Target '{mount['target']}' is declared but unavailable to geometry checks "
+                             'because its object record did not pass scene admission; mount geometry and '
+                             'scene-brief physical alignment were not evaluated',
+                             target_id=mount['target'], target_declared=True,
+                             target_admitted=False)
         if ok:
             mounts[key] = mount
+        kind = obj['kind']
+        generated_mesh = kind == 'mesh' and is_generated_asset(root, obj.get('asset_id'))
+        if policy and structure(obj) and (kind == 'generated' or generated_mesh):
+            diagnostics.add('architectural_asset_required', path + '/kind',
+                'Architectural structure and exact openings require native construction or an authored architectural asset',
+                basis='scene_asset_policy', object_ids=[key])
         if not policy or structure(obj):
             continue
-        kind = obj['kind']
+        specialist_need = native_asset_requirement(obj)
+        generated_candidate = kind == 'generated' and allow_generated
+        if key not in simplified and specialist_need and (
+                kind in PROXY_KINDS or generated_candidate or generated_mesh):
+            diagnostics.add('specialist_asset_required', path + '/kind',
+                'This object requires a dedicated imported or registered asset for ' + specialist_need,
+                basis='scene_asset_policy', object_ids=[key])
         if declared and key not in simplified:
-            if (kind not in ASSETS and kind not in {'mesh', 'bin', 'container', 'generated', 'native'}
+            if (kind not in ASSETS and kind not in PROXY_KINDS | {'mesh', 'generated', 'native'}
                     and not detailed_construction(obj)):
                 diagnostics.add('recognizable_asset_required', path + '/kind',
                     'Default scene design uses recognizable assets; simplified geometry needs an '
@@ -218,27 +243,37 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
                                  'source object contract or support component is invalid')
                 continue
             expected = relation['target']
-            kind = relation['type']
             path = f'/objects/{indexes[obj["id"]]}'
-            if kind == 'supported_by':
+            if relation['type'] == 'mounted_to':
+                if obj['id'] not in mounts:
+                    # 字段错误已由挂载校验报告，避免再把非法声明误报为未填写。
+                    continue
+                mount = mounts[obj['id']]
+                actual = mount['target'] if mount else None
+                details = {'mount_declaration_present': mount is not None,
+                           'mismatch_kind': 'missing_mount_declaration' if mount is None else 'target_mismatch'}
+                path += '/metadata/spatial_attachment'
+                message = (f"{obj['id']}: declare the static mount to '{expected}' here. Read the "
+                           "mounting contract in benchforge_scene_catalog (section=contracts, item_id=mounting)."
+                           if mount is None else
+                           f"{obj['id']}: declared mount target '{actual}' differs from scene brief target '{expected}'.")
+            elif relation['type'] == 'supported_by':
                 declared_path = support_path(by_id, obj['id'], expected)
                 if len(declared_path) > 1 and declared_path[-1] == expected:
                     continue
-                diagnostics.add('scene_brief_relation_mismatch', path + '/support',
-                    f"{obj['id']}: the declared support path does not establish '{expected}'. "
-                    'Review the actual support surface and assembly in captured views.',
-                    basis='saved_scene_plan', severity='warning',
-                    object_ids=[obj['id']] + ([expected] if expected in by_id else []),
-                    relation_index=index, expected_target=expected, declared_target=obj['support'],
-                    mismatch_kind='support_path_unconfirmed', support_path=declared_path,
-                    review_required='captured_view_and_native_relation_check')
-            elif kind == 'mounted_to':
-                actual = (mounts.get(obj['id']) or {}).get('target')
-                if actual != expected:
-                    diagnostics.add('scene_brief_relation_mismatch', path + '/metadata/spatial_attachment',
-                        obj['id'] + ': mounting contradicts saved scene brief',
-                        basis='saved_scene_plan', object_ids=[obj['id']] + ([expected] if expected in by_id else []),
-                        relation_index=index, expected_target=expected, declared_target=actual)
+                actual = obj['support']
+                details = {'mismatch_kind': 'support_path_unconfirmed', 'support_path': declared_path}
+                path += '/support'
+                message = (f"{obj['id']}: the declared support path does not establish '{expected}'. "
+                           'Review the actual support surface and assembly in captured views.')
+            else:
+                continue
+            if actual != expected:
+                diagnostics.add('scene_brief_relation_mismatch', path, message,
+                    basis='saved_scene_plan', object_ids=[obj['id']] + ([expected] if expected in by_id else []),
+                    severity='warning', relation_index=index, expected_target=expected,
+                    declared_target=actual, review_required='captured_view_and_native_relation_check',
+                    **details)
     return mounts, simplified
 
 
@@ -358,8 +393,8 @@ def inspect_program(root, program, *, policy=None, execution_mode=None, allow_ge
             declared = False
             diagnostics.skip('scene_plan', '/provenance', 'provenance contract is invalid')
     objects, indexes = _independent_geometry(program, contract_issues, diagnostics)
-    mounts, simplified = _object_admission(program, objects, indexes, policy, declaration,
-                                            brief, declared, diagnostics)
+    mounts, simplified = _object_admission(root, program, objects, indexes, policy, declaration,
+                                            brief, declared, diagnostics, allow_generated)
     geometry = _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
                                       policy, allow_generated, diagnostics)
     rooms = []

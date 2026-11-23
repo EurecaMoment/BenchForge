@@ -2,11 +2,13 @@ import {stageName, stageSummary} from './stages.mjs';
 import {waitWithSignal} from '../runtime/cancellation.mjs';
 import {ProductionIncompleteError} from './errors.mjs';
 import {reviewSnapshot, reviewNotice, reviewChanges} from './review_snapshot.mjs';
+import {progressReminder} from './progress_reminders.mjs';
 
 /** Conversation policy; all facts come from the projection and domain receipts. */
 /** 创建生产任务生命周期控制器，按会话协调复核、停止恢复、通知去重和宿主卸载。 */
-export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
-  waitingForCapture=()=>false,captureBudget=()=>null,schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
+export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},hasPendingWait=()=>false,waitingForCapture=()=>false,captureBudget=()=>null,now=Date.now,
+  schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2,
+  progressSilenceMs=60000,progressReminderIntervalMs=300000}) {
   const timers=new Map(), queues=new Map(), reminders=new Map(), checks=new Map();
   const lifetime=new AbortController();
   let disposed=false;
@@ -170,15 +172,18 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const observed=await observe(agent,signal);
     if(exhaustedCapture(agent,view))return decision;
     if(observed?.reviewUnavailable)return decision;
+    // 本步消息尚未提交到投影；真实采集通知已带状态与动作，避免再用旧视图追加矛盾提醒。
+    if(decision.messages.some(message=>message.source?.kind==='benchforge/capture-watch'&&message.source.capture))return decision;
     if(view.active&&view.workflowTurn===view.turn&&agent.status==='running') {
-      const previous=reminders.get(agent.id);
-      const silent=now()-view.lastTextAt>=60000;
-      const stageChanged=view.review&&previous?.review!==view.review.review_id;
-      const failed=view.error&&previous?.error!==view.error;
       const facts=reviewNotice(observed?.review,view.review);
       const reviewChanged=facts.review && JSON.stringify(facts.review)!==JSON.stringify(view.review);
-      if(reviewChanged || (silent||stageChanged||failed)&&(!previous||now()-previous.at>=60000)) {
-        reminders.set(agent.id,{...previous,at:now(),review:view.review?.review_id,error:view.error});
+      const previous=reminders.get(agent.id);
+      const progress=progressReminder({view:{...view,...reviewChanges(view,facts)},review:observed?.review || view.review,
+        previous:previous?.progress || projection.stateOf(agent.session).progressNotice,
+        now:now(),silenceMs:progressSilenceMs,repeatMs:progressReminderIntervalMs});
+      if(reviewChanged || progress) {
+        const reminder=progress || {fingerprint:'review:'+JSON.stringify(facts.review),textSeq:view.lastTextSeq,at:now()};
+        reminders.set(agent.id,{...previous,progress:reminder});
         // A review receipt in the projection can predate the user's Continue.
         // Read the domain before describing a wait; the UI is not its authority.
         const review=observed?.reviewReceipt || observed?.review;
@@ -189,7 +194,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
             review.state==='superseded' ? '已有更新的阶段回执，请读取当前状态。' :
               '该审核已放行，继续执行并报告真实执行错误；不要再次等待或因执行修补重开 S1。') : '';
         const message=notice('benchforge/production-progress',`${agent.id}:${view.revision}`,
-          `进度沟通提醒（系统状态）：请在继续工具调用前，用用户的语言简短说明已完成的工作、当前阶段、实际阻塞和下一步。最近记录阶段=${stageName(view.stage)||'计划'}，状态=${reviewChanges(view,facts).state || view.state}，本任务工具调用=${view.tools}，shell=${view.shells}。S2 是场景选取或新建，S3 是采集（包含标注）。${view.error?'最近调用失败，请说明实际原因并修正入口。':''}${reviewNotice}不要展示隐藏推理，不要把调用次数或文件数量当成完成比例。`,facts);
+          `进度沟通提醒：请简短说明实际产物、阻塞和下一步，然后执行该步骤。阶段=${stageName(view.stage)||'计划'}，状态=${reviewChanges(view,facts).state || view.state}。${view.error?'存在未解决错误，请按证据成组修复，避免重复读取同一报告。':''}${reviewNotice}不要展示隐藏推理或用工具调用次数充当完成比例。`,{...facts,progress:reminder});
         return {...decision,messages:[...decision.messages,message]};
       }
     }
@@ -200,7 +205,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     signal?.throwIfAborted();
     const state=projection.stateOf(agent.session);
     let view=state.view;
-    if(!view.active||view.workflowTurn!==view.turn)return;
+    if(!view.active||view.workflowTurn!==view.turn||hasPendingWait(agent))return;
     if(exhaustedCapture(agent,view))return;
     const observed=await observe(agent,signal);
     signal?.throwIfAborted();

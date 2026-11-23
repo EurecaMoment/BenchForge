@@ -8,18 +8,25 @@ export function createComposerComponents({React, ui}) {
 
   /** 展示并编辑当前会话的生产设置，将配置块与原生输入框状态保持同步。 */
   function ProductionComposer({t, sessionId, useInput, inputActions, useStore, actions, hero,
-    canSubmit, configureProduction, openScenes}) {
+    canSubmit, configureProduction, enableTeam, openScenes}) {
     const demand = useStore((value) => value.demand);
     const input = useInput((value) => value);
     const enabled = input.occurrences.some((row) => row.source === PRODUCTION_SOURCE);
-    const busy = input.phase !== 'plain' || Boolean(input.claim);
+    const [configuring, setConfiguring] = React.useState(false);
+    const busy = configuring || input.phase !== 'plain' || Boolean(input.claim);
     const [error, setError] = React.useState('');
     const [advanced, setAdvanced] = React.useState(false);
     const advancedId = React.useId();
-    /** 启用或关闭生产配置块，并把输入忙碌等失败显示给用户。 */
-    const toggle = (checked) => {
-      try {configureProduction(demand, checked); setError('');}
+    /** 仅在主动开启生产时启用原生团队；失败保留草稿，并允许用户重试。 */
+    const toggle = async (checked) => {
+      if (busy) return;
+      setConfiguring(true);
+      try {
+        if (checked && !enabled) await enableTeam();
+        configureProduction(demand, checked); setError('');
+      }
       catch (reason) {setError(reason.message);}
+      finally {setConfiguring(false);}
     };
     /** 先验证并更新原生生产配置，再保存需求字段和清除旧错误。 */
     const change = (patch) => {

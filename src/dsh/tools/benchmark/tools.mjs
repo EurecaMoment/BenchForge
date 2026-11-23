@@ -16,11 +16,12 @@ export function apply(ctx, config) {
     /** 将准备操作的结构化结果转换为文本工具输出。 */
     render: (_args, value) => [{type: 'text', text: JSON.stringify(value)}]};
   ctx.on('agent/turn-stopping',createDeliveryFileReview({createMessage:createUserMessage}));
-  ctx.tools.register(defineTool({name:'benchforge_prepare',description:'Prepare independent scene designs, annotation scripts or question shards in native continuable subagents. Binds the current parent and its saved plan, resolves the actual supported reasoning effort, preserves the model route and returns durable startup receipts. Create distinct output directories first. Workers only prepare; the parent merges, captures, verifies and opens the single user window for each completed stage. Startup acceptance is not a completed artifact.',parameters:{
-    workspace:{type:'string',required:true,description:'Absolute shared workspace containing the parent plan and worker directories.'},
-    plan_path:{type:'string',required:true,description:'Saved plan associated with the current parent conversation.'},
-    batch_key:{type:'string',required:true,description:'Stable identity for this exact preparation batch; reuse on retry.'},
-    tasks:{type:'array',required:true,items:{type:'object',additionalProperties:false,properties:{
+  ctx.tools.register(defineTool({name:'benchforge_prepare',description:'Start independent scene designs, annotation scripts or question shards in native child sessions. Startup binds the parent plan, preserves the model route, selects a supported reasoning effort and returns a startup receipt. After a child reports back, use action=status with the same batch_key to receive its draft files in the parent workspace. The parent merges, captures, verifies and opens the stage review.',parameters:{
+    action:{type:'string',enum:['start','status'],description:'start (default) registers work. status collects ready drafts from an existing batch.'},
+    workspace:{type:'string',description:'Required for start. Absolute managed workspace of the current parent.'},
+    plan_path:{type:'string',description:'Required for start. Saved plan associated with the current parent conversation.'},
+    batch_key:{type:'string',required:true,description:'Stable identity for this exact preparation batch; reuse on retry or status.'},
+    tasks:{type:'array',description:'Required for start. Create each distinct parent handoff directory first.',items:{type:'object',additionalProperties:false,properties:{
       key:{type:'string',required:true},label:{type:'string',required:true},
       prompt:{type:'string',required:true,description:'Self-contained goal, frozen inputs, requirements and deliverables.'},
       outputDirectory:{type:'string',required:true,description:'Existing parent handoff directory. The child writes in its own workspace; the Host copies its declared deliverables here.'},

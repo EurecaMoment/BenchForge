@@ -39,6 +39,7 @@ export function reviewDenial(exec, review, workspace) {
   if (reads.has(exec.name) || draftWrite(exec, workspace)) return;
   if (exec.name === 'benchforge_cancel') return; // Stopping existing work never advances a stage.
   if (exec.name === 'benchforge_pipeline_plan') return; // Validated drafts/revisions are domain-owned.
+  if (exec.name === 'benchforge_prepare' && args.action === 'status') return;
   if (exec.name === 'benchforge_stage_review' &&
       ['status', 'wait', 'pause', 'acknowledge', 'open', 'retry'].includes(args.action || 'status')) return;
   if (exec.name === 'benchforge_isaac_sim' && (inspections.has(args.action) || args.action === 'cancel')) return;

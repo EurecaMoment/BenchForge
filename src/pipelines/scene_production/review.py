@@ -66,7 +66,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                  '物理回执、静态包围盒疑点和视觉意见分开报告；建议将有关联的问题成组修复后统一采集。')
         if strict_policy:
             prompt += '\n待用实拍或动作证据核查的物理提示：' + json.dumps(physical_precheck.get('physical_advisories', []), ensure_ascii=False)
-            prompt+='''\n生产验收目标是场景可用于原始任务。保留用户要求、S2明确硬要求、关键物体身份与功能、可信支撑与动态稳定、可通行可操作及必要的观测和真值证据。任何仍无法验证的关键要求都必须失败。不要把计划中自行加的具体摆位、装饰风格或措辞提升为新硬要求。把不影响任务、物体辨识、物理稳定或使用的普通噪点、轻微材质光泽或阴影差异、静态布景小缝隙和装饰细节放在 optional_suggestions:[string]，可留空。它们不进入 issues、repair_suggestions、visual_realism 的 issues/prioritized_repairs 或 unresolved。用户明确要求的材质、光照、参考图成分或测量精度仍要逐项验收。包围盒交叠及部分支撑测量对任何物体均只用于定位，不能单独判穿插、失稳或净空不足。对明确的支撑、接触与净空要求，需要实际视图、真实动作或原生测量的正面证据；动作可通过的最低净空不能代替任务指定的距离测量。明显悬空、严重穿插、阻塞通路或影响真值仍须失败。不得仅凭名字、设计图或全静态 stable=true 宣称物理合理。额外返回 life_review:{checks:[{check:object_identity|realistic_scale|support_and_attachment|functional_layout|access_and_clearance,passed:boolean,evidence:[{view:"view_0.png",observation:"该实际视图中的具体可见现象"}]}]}。五项各一条，均引用实际视图的具体观察；可用场景返回 acceptable=true，普通真实场景的 visual_realism.status 为 visually_plausible。模型意见不是物理测量或GT。'''
+            prompt+='''\n生产验收目标是场景可用于原始任务。直接建模的几何按实际形状、比例、身份和功能验收；简化实验按保存计划声明的范围评审。保留用户要求、S2明确硬要求、关键物体身份与功能、可信支撑与动态稳定、可通行可操作及必要的观测和真值证据。任何仍无法验证的关键要求都必须失败。不要把计划中自行加的具体摆位、装饰风格或措辞提升为新硬要求。把不影响任务、物体辨识、物理稳定或使用的普通噪点、轻微材质光泽或阴影差异、静态布景小缝隙和装饰细节放在 optional_suggestions:[string]，可留空。它们不进入 issues、repair_suggestions、visual_realism 的 issues/prioritized_repairs 或 unresolved。用户明确要求的材质、光照、参考图成分或测量精度仍要逐项验收。包围盒交叠及部分支撑测量对任何物体均只用于定位，不能单独判穿插、失稳或净空不足。对明确的支撑、接触与净空要求，需要实际视图、真实动作或原生测量的正面证据；动作可通过的最低净空不能代替任务指定的距离测量。明显悬空、严重穿插、阻塞通路或影响真值仍须失败。不得仅凭名字、设计图或全静态 stable=true 宣称物理合理。额外返回 life_review:{checks:[{check:object_identity|realistic_scale|support_and_attachment|functional_layout|access_and_clearance,passed:boolean,evidence:[{view:"view_0.png",observation:"该实际视图中的具体可见现象"}]}]}。五项各一条，均引用实际视图的具体观察；可用场景返回 acceptable=true，普通真实场景的 visual_realism.status 为 visually_plausible。模型意见不是物理测量或GT。'''
         if strict_policy:
             admission = physical_precheck
             if admission.get('scene_brief'):
@@ -109,6 +109,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
         entity_fields={'shadow_settings','render_representation','appearance_scope','id','kind','label','prim_path','size','requested_size','initial_center','settled_center','final_center','current_center','declared_yaw_deg','world_transform','world_transform_convention','spatial_evidence_step','orientation_wxyz','world_aabb','support','dynamic','parameter_origin','physics','collision','appearance','geometry_parts'}
         dependency_fields={'appearance_scope','render_representation','gaussian','entity_id','kind','asset_id','asset_kind','embedded_geometry','vertices','triangles','source_frame','world_frame','source_up_axis','normalization','normalization_scale_xyz','uniform_scale','scale_mode','requested_size_limits_m','actual_size_m','source_bounds','oriented_bounds_before_scale','orientation_deg_xyz','orientation_source','source_watertight','appearance','appearance_overrides','transported_materials','transported_uvs','bound_texture_materials','texture_sampling','native_colliders_preserved','portability'}
         material_fields={'appearance_scope','entity_id','prim_path','kind','texture_id','texture_tint','uv_scale_m','color_space','normal_convention','calibration','source','roughness','metallic','applied','skipped'}
+        dependency_fields.add('texture_slots')
+        material_fields.update({'material_prim', 'material_inspected', 'mesh_inspected', 'renderer_reported_mesh'})
         receipt={'origin':evidence.get('origin'),'entities':[{key:value for key,value in entity.items() if key in entity_fields} for entity in evidence.get('entities',{}).values() if isinstance(entity,dict)],'asset_dependencies':[{key:value for key,value in dependency.items() if key in dependency_fields} for dependency in evidence.get('asset_dependencies',[]) if isinstance(dependency,dict)],'material_dependencies':[{key:value for key,value in dependency.items() if key in material_fields} for dependency in evidence.get('material_dependencies',[]) if isinstance(dependency,dict)],'realism':evidence.get('realism',{})}
         if strict_policy:
             # Full native receipts remain saved and are checked deterministically.
@@ -118,7 +120,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                            'world_aabb','support','dynamic','orientation_wxyz','parameter_origin'}
             receipt={'origin':evidence.get('origin'),
                      'entities':[{k:v for k,v in entity.items() if k in visual_fields} for entity in evidence.get('entities',{}).values()],
-                     'asset_dependencies':[{k:v for k,v in dependency.items() if k in {'entity_id','asset_id','actual_size_m','orientation_deg_xyz','render_representation','scale_mode'}}
+                     'asset_dependencies':[{k:v for k,v in dependency.items() if k in {'entity_id','asset_id','actual_size_m','orientation_deg_xyz','render_representation','scale_mode','texture_slots'}}
                                            for dependency in evidence.get('asset_dependencies',[])],
                      'scope':'compact visual context; full collider, part, support and material receipts remain in capture/evidence.json and acceptance checks'}
             prompt+='\n紧凑返回：每条观察只写一个具体可见事实（约20到45个汉字），不重复摘要；关键事项不确定仍须失败。只返回规定字段，禁止长篇重述程序。'
@@ -136,8 +138,10 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
         camera_receipts=[{'frame_id':frame.get('frame_id'),'image':frame.get('image'),'camera':frame.get('camera'),'step_id':frame.get('step_id')} for frame in evidence.get('frames',[])]
         prompt+='\n相机执行记录：'+json.dumps(camera_receipts,ensure_ascii=False)
         prompt+='\n实际外力动作证据：'+json.dumps(evidence.get('interaction',{}),ensure_ascii=False)
-        prompt+='\n环境贴图执行记录：'+json.dumps(evidence.get('environment_dependencies',[]),ensure_ascii=False)
-        prompt+='\n灯具尺寸执行记录：'+json.dumps(evidence.get('light_receipts',[]),ensure_ascii=False)
+        if evidence.get('environment_dependencies'):
+            prompt+='\n环境贴图执行记录：'+json.dumps(evidence['environment_dependencies'],ensure_ascii=False)
+        if evidence.get('light_receipts'):
+            prompt+='\n光源凭据（authored 为 USD 中的设置，renderer_radiance 为渲染器回报值）：'+json.dumps(evidence['light_receipts'],ensure_ascii=False)
         review_images=sorted(capture.glob('view_*.png'))
         if review_only:
             review_images = [capture/f'view_{index}.png' for index in range(len(program['cameras']))]

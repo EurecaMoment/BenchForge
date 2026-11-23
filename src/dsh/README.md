@@ -5,6 +5,10 @@ The button opens or closes DSH's native right sidebar in the current conversatio
 It preserves the session, draft, attachments and selected stage. New conversations
 start with the workbench closed.
 
+Enabling **数据生产** in the composer enables native agent team collaboration for
+that conversation through `agentTeams.setEnabled`. The native team switch remains
+available; editing production fields or reopening the workbench never overrides it.
+
 | Location | Responsibility |
 | --- | --- |
 | `presets/` | Compose the official standard preset, generate and install the profile |
@@ -16,6 +20,7 @@ start with the workbench closed.
 | `remote/` | Host/Client contract compiled by the official Typert generator |
 | `workbench/` | Host projections and Remote handlers for the single workbench |
 | `production/` | Production projection, bounded progress reminders and durable review continuation |
+| `context/` | Replayable checkpoint guidance through the native system prompt service |
 | `runtime/` | Shared cancellation-aware waiting without business state or process ownership |
 | `build.mjs` | Generate Typert Remote artifacts and bundle Host/browser entries |
 | `dist/` | Generated package entries and resources; excluded from version control |
@@ -73,6 +78,15 @@ runtime context, not a `cwd` persona variable. Verify a new session's first mode
 turn after changing a preset, in addition to loading existing conversations.
 
 ## Runtime boundaries
+
+Compaction policy lives in `presets/context_policy.py`; it preserves operator
+overrides and the main model's input/output limits. `context/summary_policy.mjs`
+contributes replayable checkpoint guidance. Production reminders use durable
+domain-state fingerprints, not tool counts, to avoid repeating unanswered notices.
+Large scene evidence and preflight reports offer bounded overviews and
+`json_pointer`/`offset`/`limit` selectors. `detail=true` returns complete selected
+data. Original reports and image evidence remain intact; incomplete views do not
+establish acceptance.
 
 Component guides live in `skills/<component>/SKILL.md`, with detailed references
 inside that component directory. The preset contributes the `benchforge-components`
