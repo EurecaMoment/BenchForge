@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from urllib.error import HTTPError
 from storage.files import write_json
 from service_access.openai_client import completion
