@@ -127,9 +127,14 @@ class AssetCaptureContractTests(unittest.TestCase):
         )
         self.assertEqual(binary_shader.GetPrim().GetAttribute(
             "info:mdl:sourceAsset:subIdentifier").Get(), "OmniPBR")
+        texture_paths = []
         for slot in ("diffuse_texture", "ORM_texture"):
             reference = binary_shader.GetInput(slot).Get()
-            self.assertTrue((package / str(reference)).is_file())
+            relative = Path(reference.path)
+            self.assertFalse(relative.is_absolute(), reference.path)
+            self.assertTrue((package / relative).is_file(), reference.path)
+            texture_paths.append(relative.as_posix())
+        self.assertCountEqual(texture_paths, [item["relative_path"] for item in dependencies])
 
         class RecordingClient:
             def __init__(self):
