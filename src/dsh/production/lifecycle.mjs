@@ -6,7 +6,7 @@ import {reviewSnapshot, reviewNotice, reviewChanges} from './review_snapshot.mjs
 /** Conversation policy; all facts come from the projection and domain receipts. */
 /** 创建生产任务生命周期控制器，按会话协调复核、停止恢复、通知去重和宿主卸载。 */
 export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},now=Date.now,
-  waitingForCapture=()=>false,schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
+  waitingForCapture=()=>false,captureBudget=()=>null,schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2}) {
   const timers=new Map(), queues=new Map(), reminders=new Map(), checks=new Map();
   const lifetime=new AbortController();
   let disposed=false;
@@ -45,6 +45,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
   }
   /** 读取该 Agent 会话当前的生产投影视图。 */
   const viewOf=agent=>projection.stateOf(agent.session).view;
+  const exhaustedCapture=(agent,view)=>view.stage==='S2' && (view.capture_budget || captureBudget(agent));
   /** 构造带稳定通知键和业务事实的原生提示消息。 */
   const notice=(kind,key,text,facts={})=>createMessage({source:{kind,noticeKey:key,form:'notice',summary:text,...facts},content:[{type:'text',text}]});
   /** 检查下一轮或下一步收件箱是否已包含同一通知，避免重复投递。 */
@@ -90,7 +91,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       // Tool-result projections can predate a backend round or user control.
       // Never replace the authoritative deadline with that older snapshot.
       if(['paused','needs_input','check_failed','superseded'].includes(current?.state) ||
-        ['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state)) record.suspended=true;
+        ['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state) || exhaustedCapture(agent,view)) record.suspended=true;
       if(prior?.key===key&&prior.suspended&&view.state==='interrupted')record.suspended=true;
       /** 忽略投影修订号来比较复核内容是否真正改变。 */
       const stable=value=>JSON.stringify(value && {...value,revision:0});
@@ -122,6 +123,9 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       signal.throwIfAborted();
       if(!agent||disposed)return false;
       const state=projection.stateOf(agent.session),view=state.view;
+      if (exhaustedCapture(agent,view)) {
+        await table.put(id,{...updated,suspended:true});return false;
+      }
       if(view.state==='interrupted') {
         // Unload is recoverable; explicit user cancellation must remain stopped.
         if(state.interruption!=='disposed') {
@@ -143,6 +147,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
       if(['needs_evidence','needs_plan_revision','failed','completed'].includes(view.state))return false;
       await reconcileCaptures(agent,signal);
       signal.throwIfAborted();
+      if (exhaustedCapture(agent,viewOf(agent))) return false;
       const recovered=state.notices.includes(record.key)&&view.state==='interrupted'&&state.interruption==='disposed';
       const key=recovered ? `${record.key}:disposal:${state.interruptionSeq}` : record.key;
       if(pendingNotice(agent,key))return true;
@@ -163,6 +168,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     if(decision.kind!=='enter')return decision;
     const view=viewOf(agent);
     const observed=await observe(agent,signal);
+    if(exhaustedCapture(agent,view))return decision;
     if(observed?.reviewUnavailable)return decision;
     if(view.active&&view.workflowTurn===view.turn&&agent.status==='running') {
       const previous=reminders.get(agent.id);
@@ -195,6 +201,7 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const state=projection.stateOf(agent.session);
     let view=state.view;
     if(!view.active||view.workflowTurn!==view.turn)return;
+    if(exhaustedCapture(agent,view))return;
     const observed=await observe(agent,signal);
     signal?.throwIfAborted();
     if(observed?.reviewUnavailable) {

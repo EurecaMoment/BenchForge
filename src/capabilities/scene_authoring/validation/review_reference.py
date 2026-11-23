@@ -10,7 +10,7 @@ FACING_GUIDANCE = (
     'front_to_target（toward、away、unclear 三选一）。结合已有机位判断：例如靠背到座垫前沿是就坐者面向，'
     '说明目标相对这个朝向在哪里；需要时可在 observation 引用另一个实拍机位。'
     '仅中心连线、yaw、物体名称或预期用途均不足以证明。背向填 away，无法辨认或证据冲突填 unclear，'
-    '两者均 passed=false；仅按简报要求检查源到目标，不自行要求目标回望或严格同轴。'
+    '两者均 passed=false；任务相关的朝向必须有正面证据。仅按简报要求检查源到目标，不自行要求目标回望或严格同轴。'
 )
 
 
@@ -46,7 +46,7 @@ def review_spatial_context(brief, evidence, native_checks=()):
     context = {'schema': 'benchforge.review-spatial-context/v1',
                'authority': 'native coordinate/support context only; actual images still determine visual/life acceptance',
                'resolved_frames': [], 'directional_facts': [], 'unresolved_reference': [],
-               'native_support_checks': [{k: row[k] for k in ('index','type','source','target','passed','evidence','basis') if k in row}
+               'native_support_checks': [{k: row[k] for k in ('index','type','source','target','passed','advisory','evidence','basis') if k in row}
                                         for row in native_checks if isinstance(row, dict)]}
     entities = evidence.get('entities', {})
     try:

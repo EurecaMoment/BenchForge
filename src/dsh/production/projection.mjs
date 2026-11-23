@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {canonicalToolName} from '../tools/invocation/identifiers.mjs';
 import {isProductionRequest} from './request.mjs';
 import {ReviewSnapshot, currentReviewSnapshot, reviewChanges, reviewSnapshot} from './review_snapshot.mjs';
+import {budgetMatches, budgetRejection, captureProducers} from '../tools/scene/capture/budget.mjs';
 
 export const PRODUCTION_PROJECTION = 'benchforgeProduction';
 export const ProductionView = z.object({
@@ -10,8 +11,10 @@ export const ProductionView = z.object({
   lastTool:z.string(), tools:z.number(), shells:z.number(), models:z.array(z.string()),
   workspace:z.string(), plan:z.string(), run:z.string(), state:z.string(), stage:z.string(),
   error:z.string(), review:ReviewSnapshot.nullable(), completed:z.number(), total:z.number(), delivered:z.boolean(),
+  capture_budget:z.record(z.string(),z.unknown()).nullable().optional(),
 });
 const State = z.object({view:ProductionView, errorTool:z.string(), errorCallSeq:z.number(), notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
+  captureRun:z.string().optional(),
   lastResponse:z.object({seq:z.number(),visible:z.boolean()}),
   calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string(), seq:z.number()}))});
 /** 提取消息中的可见文本块，合并并去掉两端空白。 */
@@ -23,7 +26,7 @@ const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benc
 const patch = (state, event, changes) => ({...state, view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:7, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:8, stateSchema:State,
   /** 根据会话头建立空生产状态，初始化工具追踪、通知和阶段进度字段。 */
   init:header => ({calls:{},errorTool:'',errorCallSeq:0,notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
@@ -44,7 +47,7 @@ export const productionProjection = {
         view.active && view.workflowTurn===view.turn && !['completed','waiting_user','paused','needs_input','needs_evidence','needs_plan_revision','blocked','failed'].includes(view.state)
           ? {state:'incomplete'} : {})});
     if(event.type === 'user/message' && isProductionRequest(event.data))
-      return patch({...state,errorTool:''},event,{active:true,workflowTurn:view.turn,state:view.plan?'running':'planning',stage:view.stage||'S1',error:''});
+      return patch({...state,errorTool:''},event,{active:true,workflowTurn:view.turn,state:view.plan?'running':'planning',stage:view.stage||'S1',error:'',capture_budget:null});
     if(event.type === 'user/message' && event.data.source?.kind==='benchforge/production-progress')
       return patch(state,event,reviewChanges(view,event.data.source));
     if(event.type === 'user/message' && ['benchforge/production-resume','benchforge/production-check-failed','benchforge/production-continue'].includes(event.data.source?.kind)) {
@@ -54,8 +57,9 @@ export const productionProjection = {
     }
     if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/capture-watch' && view.active) {
       const capture = event.data.source.capture;
-      if(capture) return patch({...state,errorTool:''},event,{workflowTurn:view.turn,state:capture.blocked?'blocked':capture.failed?'needs_repair':
-        capture.state==='SUCCEEDED'?'scene_ready':'capture_error',error:capture.blocked?(event.data.source.summary || '执行受阻，任务未完成。'):
+      if(capture && (!state.captureRun || capture.run_id===state.captureRun)) return patch({...state,errorTool:''},event,{workflowTurn:view.turn,
+        capture_budget:capture.capture_budget || view.capture_budget || null,state:capture.capture_budget||capture.blocked?'blocked':capture.failed?'needs_repair':
+        capture.state==='SUCCEEDED'?'scene_ready':'capture_error',error:capture.capture_budget?'本场景的正式采集预算已用完。':capture.blocked?(event.data.source.summary || '执行受阻，任务未完成。'):
           capture.failed?'采集或场景验收失败；读取实际报告并修复。':capture.state==='observer_failed'?'后台跟踪暂时失败，等待恢复。':''});
     }
     if(event.type === 'assistant/message') {
@@ -83,6 +87,13 @@ export const productionProjection = {
     const next = {...state,calls};
     if(!call.name.startsWith('benchforge_')) return next;
     const text = visible(message), receipt = parse(text);
+    const budget = captureProducers.has(call.name) && budgetRejection(receipt || text);
+    if (budget && view.active && ['S1','S2'].includes(view.stage)) {
+      if (!state.captureRun || budgetMatches(budget, state.captureRun))
+        return patch({...next,errorTool:call.name,errorCallSeq:call.seq},event,{workflowTurn:view.turn,
+          stage:'S2',state:'blocked',capture_budget:budget,error:receipt?.detail || '本场景的正式采集预算已用完。'});
+      return next;
+    }
     if(message?.isError || event.data.error) return patch({...next,errorTool:call.name,errorCallSeq:call.seq},event,{error:text.slice(0,700)});
     if(!receipt || typeof receipt !== 'object') return next;
     const activated = receipt.production_contract === 'benchforge.production-stages/v1';
@@ -100,8 +111,10 @@ export const productionProjection = {
     }
     const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review';
     if(!workflow) {
-      if(view.active && ['benchforge_capture','benchforge_refine','benchforge_run','benchforge_extend','benchforge_retry'].includes(call.name) && receipt.run_id)
-        Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,review:null});
+      if(view.active && captureProducers.has(call.name) && receipt.run_id) {
+        next.captureRun=receipt.run_id;
+        Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,review:null,capture_budget:null});
+      }
       if(view.active && call.name==='benchforge_scene_blocker' && receipt.state==='blocked') {
         next.errorTool=call.name;next.errorCallSeq=call.seq;
         Object.assign(changes,{workflowTurn:view.turn,state:'blocked',error:receipt.reason});
@@ -122,7 +135,11 @@ export const productionProjection = {
       if(snapshot){changes.review=snapshot;changes.stage=snapshot.stage;
         if(call.name==='benchforge_stage_review' && ['elapsed','continued'].includes(snapshot.state))changes.state='running';}
     }
-    if(activated && receipt.state==='planned') Object.assign(changes,{run:'',completed:0,total:receipt.total_steps || 4,delivered:false});
+    if(activated && receipt.state==='planned') {
+      delete next.captureRun;
+      Object.assign(changes,{run:'',completed:0,total:receipt.total_steps || 4,delivered:false,capture_budget:null});
+    }
+    if (/^S[3-5]$/.test(changes.stage || '')) changes.capture_budget=null;
     return patch(next,event,changes);
   },
   wire:{viewSchema:ProductionView,/** 返回供界面消费的生产投影视图。 */ view:state=>state.view},

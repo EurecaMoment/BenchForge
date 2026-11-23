@@ -42,7 +42,7 @@ async function fixture(t) {
     get(name){return this[name];},
   };
   await apply(context, {serviceConfig:config});
-  return {requests, state, tool:tools.get('benchforge_scene_preflight')};
+  return {requests, state, tools, tool:tools.get('benchforge_scene_preflight')};
 }
 
 /** 生成包含大量阻塞问题的场景诊断，验证完整问题列表及预览裁剪行为。 */
@@ -88,6 +88,28 @@ test('HTTP rejection retains the full report instead of only the bounded detail'
     assert.match(error.message, /Missing parent 79/);
     return true;
   });
+});
+
+test('capture and retry rejection expose the same structured history to DSH', async t => {
+  const {state, tools, requests} = await fixture(t);
+  const code = 'S2_CAPTURE_BUDGET_EXHAUSTED';
+  const budget = {scene_id:'room',scene_key:'frozen-room',limit:10,used:81,remaining:0,
+    evidence:[{task_id:'sf_room.scene0',revision:2,token:'token',accepted:true,captured:true}]};
+  state.status = 400;
+  state.reply = {code, detail:'summary', issues:[{code,capture_budget:budget}]};
+  for (const [name,args] of [
+    ['benchforge_capture',{scene_program_path:'/workspace/scene.json'}],
+    ['benchforge_retry',{task_id:'sf_room.scene0',capture_mode:'restart'}],
+  ]) {
+    await assert.rejects(tools.get(name).execute(args, {callId:'fixture-call',agent:{session:{id:'fixture-session'}},
+      signal:new AbortController().signal}), error => {
+      assert.ok(error instanceof HarnessError);
+      assert.equal(error.code, code);
+      assert.deepEqual(JSON.parse(error.message).issues[0].capture_budget, budget);
+      return true;
+    });
+  }
+  assert.deepEqual(requests.map(row=>row.route), ['/capture','/retry']);
 });
 
 test('cancellation reaches the request without starting a capture', /** 验证BenchForge 工具与宿主集成在该用例中的具体边界，完成准备、调用和结果断言。用例：cancellation reaches the request without starting a capture。 */ async t => {

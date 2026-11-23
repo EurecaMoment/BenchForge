@@ -153,7 +153,12 @@ def main():
     if not args.config_synced or args.check_config:
         refresh_model_patches(preset, model_config, refresh_host=insert_host_dependencies)
     try:
-        run([python,ROOT/'src/dsh/check_config.py','--preset',preset],cwd=ROOT,env=env)
+        preflight = [python, ROOT/'src/dsh/check_config.py', '--preset', preset]
+        if args.check_config:
+            preflight.append('--config-only')
+        else:
+            preflight.extend(['--node', config['node']])
+        run(preflight, cwd=ROOT, env=env)
     except subprocess.CalledProcessError as error:
         raise SystemExit(error.returncode) from None
     if args.check_config:

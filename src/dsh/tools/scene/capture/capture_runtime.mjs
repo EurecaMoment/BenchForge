@@ -4,6 +4,7 @@ import Schema from '@deepseek-ai/schemastery';
 import {createServiceClient,loadServiceConfig} from '../service_client.mjs';
 import {createCaptureAssociations} from './capture_associations.mjs';
 import {createCaptureContinuation} from './continuation.mjs';
+import {repairImageContent} from './repair_evidence.mjs';
 import {defineDomain, domainTable} from '@deepseek-ai/dsh-storage-domain';
 import {createUserMessage} from '@deepseek-ai/dsh-llm';
 import {z} from 'zod';
@@ -44,6 +45,7 @@ export async function apply(ctx, config) {
   const domain = await ctx.storageDomain.open(captures), controller = new AbortController(), timers = new Set();
   const service = createServiceClient(loaded);
   const continuation = createCaptureContinuation({table:domain.table('runs'),artifacts:loaded.config.artifacts,
+    repairImages:(tasks,agent,signal)=>repairImageContent(tasks,agent,signal,{access:ctx.benchforgeAccess,service}),
     /** 在当前可信访问作用域内读取采集服务接口。 */
     read:(route,args,signal)=>service(route,args,AbortSignal.any([signal,AbortSignal.timeout(route==='/wait'?75000:15000)])),
     signal:controller.signal,readReview:createStageReviewReader({...config,service}).latest,

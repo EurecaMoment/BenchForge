@@ -4,6 +4,7 @@ import os from 'node:os';
 import {createHmac} from 'node:crypto';
 import {currentAccessScope} from '../../access/context.mjs';
 import {HarnessError} from '@deepseek-ai/dsh-llm';
+import {budgetRejection, captureBudgetCode} from './capture/budget.mjs';
 
 export class ScenePreflightRejected extends HarnessError {
   /** 保留场景预检失败的完整响应与 HTTP 状态，供工具和界面展示可操作诊断。 */
@@ -203,6 +204,8 @@ export function createServiceClient({serviceUrl, operatorToken}) {
     if (!response.ok) {
       if (response.status === 400 && value.code === 'scene_preflight_failed' && value.preflight)
         throw new ScenePreflightRejected(value, response.status);
+      if (response.status === 400 && budgetRejection(value))
+        throw new HarnessError(JSON.stringify(value), captureBudgetCode);
       throw Object.assign(new Error(JSON.stringify(value)), {status:response.status, response:value});
     }
     return value;

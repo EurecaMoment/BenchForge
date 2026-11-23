@@ -10,6 +10,7 @@ from sqlalchemy.exc import TimeoutError as DatabaseTimeout
 from capabilities.asset_generation.generation import GenerationTools
 from capabilities.asset_generation.generation import ResourceWait
 from service_access.request_context import RunCancelled
+from storage.scene_jobs.capture_budget import CaptureBudgetExhausted
 from storage.scene_jobs.store import uid
 from pipelines.scene_production.service_failures import stage_failure
 from pipelines.scene_production.stage_control import StageControl
@@ -30,6 +31,10 @@ class _StageStore:
     # 为状态更新自动附加预期租约所有者，阻止过期执行者修改任务。
     def update(self, task_id, **fields):
         return self._store.update(task_id, expected_owner=self._owner, **fields)
+
+    def reserve_capture(self, task_id, token, program, *, retained=False):
+        return self._store.reserve_capture(task_id, token, program, expected_owner=self._owner,
+                                           retained=retained)
 
     # 在采集发布时强制校验本执行者的租约身份。
     def publish_capture(self, task_id, token, incoming):
@@ -187,6 +192,8 @@ def coordinate(
                     (plan_scene if phase == 'plan' else review_scene)(
                         stage_store, task, task_stop
                     )
+            except CaptureBudgetExhausted as exc:
+                stage_store.update(claimed_task['id'], state='FAILED_FINAL', failure=exc.failure())
             except RunCancelled as exc:
                 if task_stop.canceled:
                     stage_store.update(

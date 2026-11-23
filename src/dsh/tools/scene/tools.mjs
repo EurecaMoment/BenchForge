@@ -1,5 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
+import {saveSceneImage} from './capture/repair_evidence.mjs';
 import z from '@deepseek-ai/schemastery';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
@@ -63,21 +62,12 @@ async function submit(path,args,exec){
 const requestKey={type:'string',description:'Optional key to reuse the same request across separate tool calls. Omit to use this session and tool-call identity.'};
 const layoutInput={type:'object',additionalProperties:false,properties:{mode:{type:'string',enum:['generate','edit','reference'],required:true},prompt:{type:'string',description:'Visual description for generate/edit.'},source_image:{type:'string'},source_view:{type:'integer'},seed:{type:'integer'},design_task_id:{type:'string',description:'For mode=reference only: completed benchforge_layout task ID. Preserves diffusion provenance and avoids regeneration; no other source fields.'}}};
 const programInput={type:'string',description:'Complete SceneProgram JSON in the task workspace, written with standard file tools or task_code; the initial pass uses this snapshot directly.'};
-  /** 读取图片并保存为宿主附件，在每个异步边界检查调用是否已取消。 */
-  async function imageAttachment(imagePath,name,signal){
-    signal.throwIfAborted();
-    const data=await fs.promises.readFile(imagePath,{signal});
-    signal.throwIfAborted();
-    const attachment=await ctx.attachments.saveImage({data,mediaType:/\.jpe?g$/i.test(imagePath)?'image/jpeg':'image/png',name});
-    signal.throwIfAborted();
-    return attachment;
-  }
   const visuals=createDeliveryVisuals({api,/** 仅向支持图片输入的当前模型生成图片块，并逐张保存为宿主附件。 */ images:async(paths,agent,signal)=>{
     const routed=agent.session.requestHeader()?.config;
     const info=await ctx.llm.resolveModelInfo(routed?.provider??agent.options.provider,routed?.model??agent.options.model,signal);
     if(!info.inputModalities?.includes('image'))return [];
     const blocks=[];
-    for(const imagePath of paths)blocks.push({type:'image',attachment:await imageAttachment(imagePath,path.basename(imagePath),signal)});
+    for(const imagePath of paths)blocks.push({type:'image',attachment:await saveSceneImage(ctx.attachments,imagePath,signal)});
     return blocks;
   }});
   const review=createDeliveryReview({api,createMessage:createUserMessage,visuals,
@@ -132,7 +122,7 @@ const programInput={type:'string',description:'Complete SceneProgram JSON in the
       if(!attachments||!llm||provider===undefined||model===undefined)throw Error('Image evidence needs the attachment service and a resolved vision route; copy to workspace_id for file processing.');
       const info=await llm.resolveModelInfo(provider,model,exec.signal);
       if(!info.inputModalities?.includes('image'))throw Error('Current model route does not declare image input; use JSON evidence or copy the image to workspace_id.');
-      value.image=await imageAttachment(value.image_path,path.basename(value.image_path),exec.signal);
+      value.image=await saveSceneImage(attachments,value.image_path,exec.signal);
       delete value.image_path;
     }
     return value;
@@ -141,7 +131,7 @@ const programInput={type:'string',description:'Complete SceneProgram JSON in the
   ctx.tools.register(defineTool({name:'benchforge_run',description:"Produce a scene and dataset from natural-language requirements or scene_program_path. The pipeline prepares a diffusion reference unless one is supplied, then builds, captures, reviews and exports through Isaac Sim A100. Returns a durable run ID.",parameters:{request_key:requestKey,intents:{type:'array',required:true,items:{type:'object',additionalProperties:false,properties:{name:{type:'string',required:true},description:{type:'string',required:true},split:{type:'string',enum:['train','dev'],required:true},target_items:{type:'integer',description:'Number of dataset questions to export; this is not the scene entity count.'},layout:layoutInput,scene_program_path:programInput}}}},output:runOutput,/** 通过统一服务入口执行 /start 操作，并传递当前调用的取消信号。 */ execute:(args,exec)=>submit('/start',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_asset',description:"Generate with diffusion, SAM3 and the configured reconstruction tool, reconstruct source_image, import source_mesh, or reuse a catalog asset_id. Inputs use registered source paths. Returns a durable run ID.",parameters:{request_key:requestKey,intent:{type:'object',required:true,additionalProperties:false,properties:{name:{type:'string',required:true},description:{type:'string',required:true},label:{type:'string',description:'Semantic subject for SAM3 segmentation and asset registration; defaults to name.'},source_image:{type:'string'},source_mask:{type:'string'},source_mesh:{type:'string'},source_gaussian:{type:'string'},asset_id:{type:'string'},seed:{type:'integer'},source_up_axis:{type:'string',enum:['Y','Z']},size_hint_m:{type:'array',items:{type:'number'}},subject_box:{type:'array',items:{type:'number'},description:'Pixel xyxy box selecting the subject.'},edit_reference:{type:'boolean'}}}},output:runOutput,/** 通过统一服务入口执行 /asset 操作，并传递当前调用的取消信号。 */ execute:(args,exec)=>submit('/asset',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_extend',description:"Add objects to an accepted captured scene while retaining its existing entities and train/dev family. With strict scene policy, provide a complete scene_program_path that preserves all parent objects unchanged and includes the saved scene brief.",parameters:{request_key:requestKey,parent_task_id:{type:'string',required:true},name:{type:'string',required:true},description:{type:'string',required:true},target_items:{type:'integer',description:'Number of dataset questions to export; this is not the scene entity count.'},layout:layoutInput,scene_program_path:programInput},output:runOutput,/** 通过统一服务入口执行 /extend 操作，并传递当前调用的取消信号。 */ execute:(args,exec)=>submit('/extend',args,exec)}));
-  ctx.tools.register(defineTool({name:'benchforge_retry',description:"Recover a failed stage without a new scene version. Reuse retained native requests and downloads after interruption; only confirmed terminal failures start a new attempt. Quality failures still require refine/capture.",parameters:{task_id:{type:'string',required:true},feedback:{type:'string',description:'Optional concrete scene repair guidance for a failed planning stage, up to 12000 characters.'},capture_mode:{type:'string',enum:['auto','resume','restart'],description:'auto resumes retained native jobs unless they failed terminally. resume preserves request IDs and partial downloads. restart creates a new attempt only after prior jobs are confirmed terminal.'}},output:taskOutput,/** 通过统一服务入口执行 /retry 操作，并传递当前调用的取消信号。 */ execute:(args,exec)=>submit('/retry',args,exec)}));
+  ctx.tools.register(defineTool({name:'benchforge_retry',description:"Recover a failed stage without a new scene version. Reuse retained native requests and downloads after interruption; only confirmed terminal failures start a new attempt. Quality failures still require refine/capture.",parameters:{task_id:{type:'string',required:true},feedback:{type:'string',description:'Optional concrete scene repair guidance for a failed planning stage, up to 12000 characters.'},capture_mode:{type:'string',enum:['auto','resume','restart','review_only'],description:'auto resumes retained jobs. resume preserves their IDs and downloads. restart replaces terminal native jobs. review_only reassesses an eligible archived capture once under the updated acceptance policy, using its original images and physics.'}},output:taskOutput,/** 通过统一服务入口执行 /retry 操作，并传递当前调用的取消信号。 */ execute:(args,exec)=>submit('/retry',args,exec)}));
   ctx.tools.register(defineTool({name:'benchforge_scene_status',description:"Read a concise current stage, real failures, quality outcomes and evidence/receipt paths. run_id excludes .sceneN. Use detail=true when the full saved SceneProgram or task reports are needed; ordinary progress checks use the default summary. Lifecycle completion and scene quality are separate fields.",parameters:{run_id:{type:'string',required:true},detail:{type:'boolean'}},output:observationOutput,/** 获取采集证据，按当前模型的图片输入能力保存并返回可见附件。 */ execute:(args,exec)=>observation(args.detail?'/inspect':'/observe',args,exec.signal)}));
   ctx.tools.register(defineTool({name:'benchforge_wait',description:"Wait for capture progress. Scene submissions are tracked automatically by the host. Use background=true to recover tracking or attach an existing run: returns immediately and wakes this session on terminal state or observer failure, without model polling. Continue independent work or finish this turn while waiting. Synchronous waits remain bounded at 1..60 seconds. Read benchforge_scene_status with detail=true for full saved reports.",parameters:{run_id:{type:'string',required:true},background:{type:'boolean',description:'Register or recover one background observer for this session/run; no repeated wait calls are needed.'},timeout_seconds:{type:'integer',description:'Synchronous wait only, 1..60 seconds.'}},output:observationOutput,/** 通过统一服务入口执行 /observe 操作，并传递当前调用的取消信号。 */ execute:async(args,exec)=>{
     const {background,...request}=args;

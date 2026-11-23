@@ -109,6 +109,7 @@ class CaptureServiceContractTests(unittest.TestCase):
             self.assertGreater(len(rejected.exception.issues), 3)
             client.upload.assert_not_called()
             client.submit.assert_not_called()
+            store.reserve_capture.assert_not_called()
             store.publish_capture.assert_not_called()
 
     def test_preflight_reports_live_service_failure_without_claiming_simulation(self):

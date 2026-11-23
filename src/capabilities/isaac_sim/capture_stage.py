@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 
 from capabilities.capture.capture_scope import capture_scope
@@ -22,6 +23,7 @@ from service_access.configuration import isaac_config
 from service_access.progress import record_progress
 from service_access.request_context import check_cancelled
 from storage.files import write_json
+from storage.scene_jobs.capture_budget import CaptureBudgetExhausted
 
 
 # 分页读取原生场景节点，限制总量并拒绝不前进的游标。
@@ -134,6 +136,18 @@ def execute_capture(store, task, stop, *, config, client=None):
                 entities.update(exported_entities(source_geometry, native))
                 native_jobs.append(job.job_id)
             views = scope['view_indices']
+            if views:
+                check_cancelled(stop, 'native capture submission')
+                try:
+                    store.reserve_capture(task['id'], token, program,
+                                          retained=(attempt / 'jobs' / 'views-0' / 'receipt.json').is_file())
+                except CaptureBudgetExhausted:
+                    try:
+                        requests.extension('close', 'scene.close', {'session_id': identity, 'delete': False})
+                    except Exception:
+                        logging.getLogger(__name__).warning('Could not close budget-blocked native scene %s',
+                                                            identity, exc_info=True)
+                    raise
             # The service batches up to 32 cameras per request; retain every
             # authored view, split without reducing the user's camera count.
             for start in range(0, len(views), 32):

@@ -12,6 +12,8 @@ import {ApiError, assertSessionDirectory, exists, inside, matchesSession, readJs
   scopeParams, token, workspaceRoots} from '../host/session_scope.mjs';
 import {createDatasetReader, createPublicArtifactProjector, PUBLIC_FIELDS, QUALITY_FIELDS} from './projections/public_artifacts.mjs';
 import {createWorkbenchReadRoutes} from './projections/routes.mjs';
+import {createWorkbenchReviewReader} from './sessions/stage_review.mjs';
+import {createStageReviewReader} from '../production/reviews.mjs';
 import {createProductionProgress} from './projections/progress.mjs';
 import {createRunReader, operationRunEntries, pipelineSceneIds} from './projections/run_queries.mjs';
 import {WorkbenchRemote} from '../remote/lib/types/index.js';
@@ -316,7 +318,8 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
     const evidence = readEvidence && parentScope.session_id && !parentScope.history
       ? await readEvidence(parentScope.session_id, related, request.signal) : [];
     const available = registered([parentScope.session_id, ...related.map(row => row.id)]);
-    const roots = evidence.length
+    // 阶段审核属于当前会话。产物列表可包含子会话根目录，不能据此改变审核归属。
+    const roots = evidence.length && view !== 'stage_review'
       ? await resolveArtifactRoots(limits, available, url.searchParams.get('workspace_path') || '', evidence)
       : await workspaceRoots(limits, available, url.searchParams.get('workspace_path') || '');
     const sessions = related.map((row) => row.id);
@@ -406,9 +409,14 @@ function createWorkbenchDispatcher(config, registered, family, synthesisFactory,
       if (value.error) throw new ApiError(value.error,value.status_code || 400);
     }
     else if (view === 'stage_review') {
-      if (roots.length !== 1 || !scope.session_id) throw new ApiError('A current workspace and conversation are required',400);
+      if (roots.length !== 1 || !scope.session_id || scope.history) throw new ApiError('A current workspace and conversation are required',400);
       if (request.headers.get('sec-fetch-site') === 'cross-site') throw new ApiError('Cross-site stage review is not allowed',403);
-      const body = request.method === 'POST' ? await request.text() : '{}';
+      if (request.method === 'GET') {
+        if (!limits._readStageReview) throw new ApiError('Stage review service is unavailable',503);
+        return limits._readStageReview(roots[0].path, scope.session_id, request.signal);
+      }
+      if (request.method !== 'POST') throw new ApiError('Stage review requires GET or POST',405);
+      const body = await request.text();
       if (body.length > 16000) throw new ApiError('Stage instruction is too large',413);
       const helper = 'server.stage_review_cli';
       const args=['-B','-m',helper,'--workspace',roots[0].path,'--session',scope.session_id,'--request',body];
@@ -468,10 +476,13 @@ export function createWorkbenchHandler(config, registered = () => [], family = a
 
 /** 装配宿主工作台、原生远程入口、资源投影和受管 Python 生命周期。 */
 export async function apply(ctx, config) {
-  const environment = await databaseEnvironment(config.productionConfig, launchEnvironmentOf(ctx));
+  const launch = launchEnvironmentOf(ctx);
+  const environment = await databaseEnvironment(config.productionConfig, launch);
+  const reviews = createStageReviewReader({...config, getEnvironmentValue: name => launch.get(name)?.value});
   const processes = createPythonProcessScope();
   ctx.effect(() => () => processes.dispose(), 'benchforge-workbench: Python process lifecycle');
   config = {...config, productionConfig: config.productionConfig ? path.resolve(config.productionConfig) : '',
+    _readStageReview: createWorkbenchReviewReader(ctx.sessionQuery, ctx.benchforgeAccess, reviews),
     /** 把数据库环境与请求环境合并后，通过当前宿主持有的进程作用域执行 Python。 */
     _executePython: (python, args, options = {}) => processes.execute(python, args,
       {...options, env: {...environment, ...options.env}})};

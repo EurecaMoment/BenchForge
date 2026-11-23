@@ -109,6 +109,26 @@ test('capture submissions and terminal notices project distinct production state
   assert.equal(h.view().state,'blocked');
 });
 
+test('a synchronous retry budget rejection blocks only its current S2 capture',async t=>{
+  const h=harness(),runtime=h.create();t.after(()=>runtime.dispose());h.plan();
+  h.receipt('benchforge_capture',{run_id:'sf_scene',state:'submitted'});
+  const code='S2_CAPTURE_BUDGET_EXHAUSTED';
+  const budget={scene_id:'room',scene_key:'frozen-room',limit:10,used:81,remaining:0,
+    evidence:[{task_id:'sf_scene.scene0',revision:0,token:'room-token',accepted:false,captured:true}]};
+  const reject=()=>h.event('tool/ptc-dispatch',{name:'benchforge_retry',subCallId:'retry',isError:true,
+    content:[{type:'text',text:'Error: '+JSON.stringify({code,issues:[{code,capture_budget:budget}]})}]});
+  reject();assert.equal(h.view().state,'blocked');assert.deepEqual(h.view().capture_budget,budget);
+  await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal((await h.preStep(runtime)).messages.length,0);
+  assert.deepEqual(h.sent,[]);
+
+  h.receipt('benchforge_capture',{run_id:'sf_other',state:'submitted'});
+  reject();
+  assert.equal(h.view().state,'waiting_capture');assert.equal(h.view().capture_budget,null);
+  h.event('user/message',{source:{kind:'user'},content:[{type:'text',text:'请检查另一个场景'}]});
+  assert.equal((await h.preStep(runtime)).kind,'enter');
+});
+
 const productionRequest={source:{kind:'user'},content:[{type:'text',text:
   '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段。\nexecution_mode=production；quantity_contract=minimum。\n生产100条机器狗轨迹数据。'}]};
 const emptyReply={message:{role:'assistant',content:[]}};

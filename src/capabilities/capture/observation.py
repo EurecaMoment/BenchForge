@@ -64,6 +64,21 @@ def capture_result(folder, result):
     return {**result,'report':summary,'views':views}
 
 
+def capture_scene_identity(task):
+    from storage.scene_jobs.capture_budget import admitted_scene_key, scene_fingerprint
+
+    unit = task['unit']
+    if unit.get('workflow', 'scene') != 'scene' or unit.get('intent', {}).get('execution_mode') == 'exploration':
+        return {}
+    budget = (task.get('failure') or {}).get('capture_budget') or unit.get('capture_budget')
+    if budget and budget.get('scene_key'):
+        return {'capture_scene_key': budget['scene_key']}
+    review = (task.get('failure') or {}).get('scene_review') or (task.get('result') or {}).get('scene_review') or {}
+    acceptance = review.get('production_acceptance') or {}
+    key = admitted_scene_key(acceptance, acceptance)
+    return {'capture_scene_key': scene_fingerprint(key)} if key else {}
+
+
 # 读取采集运行及其子任务状态，形成带游标的统一观察结果。
 def observe(store, run_id):
     snap=store.snapshot(run_id);rows=[]
@@ -82,6 +97,10 @@ def observe(store, run_id):
         row={'id':task['id'],'state':task['state'],'phase':unit['phase'],'revision':unit['revision'],
              'progress':progress,'failure':failure,
              'next_action':('retry_with_feedback' if unit['phase']=='plan' else 'retry_failed_stage') if task['state']=='FAILED_FINAL' else ('inspect_products' if task['state']=='SUCCEEDED' else 'wait')}
+        capture_budget = (failure or {}).get('capture_budget') or unit.get('capture_budget')
+        if capture_budget:
+            row['capture_budget'] = capture_budget
+        row.update(capture_scene_identity(task))
         captured=[]
         for prior in sorted(folder.parent.glob('revision_*'),key=lambda p:int(p.name.split('_')[-1])):
             views=len(list((prior/'capture').glob('view_*.png')))

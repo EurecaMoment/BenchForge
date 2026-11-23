@@ -1,4 +1,4 @@
-"""Check the configuration paths actually recorded in a DSH preset before startup."""
+"""Check a DSH preset and prepare the local bundles it loads before startup."""
 import argparse
 import json
 from pathlib import Path
@@ -27,9 +27,10 @@ def service_config_paths(value):
 
 
 # 以不执行自定义标签的 YAML 读取器解析预设，并去重校验引用服务配置。
-def check_preset(preset):
-    # BaseLoader treats !!js and all other scalar tags as text; it executes nothing.
-    profile = yaml.load(Path(preset).read_text(encoding='utf-8'), Loader=yaml.BaseLoader)
+def check_preset(preset, profile=None):
+    if profile is None:
+        # BaseLoader reads tagged values such as !!js as text.
+        profile = yaml.load(Path(preset).read_text(encoding='utf-8'), Loader=yaml.BaseLoader)
     checked = set()
     for value in service_config_paths(profile):
         if not isinstance(value, str) or not value.strip():
@@ -54,10 +55,20 @@ def check_preset(preset):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preset', required=True, type=Path)
+    parser.add_argument('--node', default='node', help='Node executable used to launch DSH')
+    parser.add_argument('--config-only', action='store_true', help='Validate service configuration without building')
     args = parser.parse_args()
     try:
-        checked = check_preset(args.preset)
-    except (OSError, ValueError, yaml.YAMLError) as error:
+        profile = yaml.load(args.preset.read_text(encoding='utf-8'), Loader=yaml.BaseLoader)
+        checked = check_preset(args.preset, profile)
+        dsh = Path(__file__).resolve().parent
+        if not args.config_only and (dsh / 'build.mjs').is_file():
+            from dsh.local_bundles import ensure_local_bundles, local_bundle_entries
+
+            entries = local_bundle_entries(profile, args.preset, dsh)
+            if entries:
+                ensure_local_bundles(dsh, args.node, entries)
+    except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
         parser.error(str(error))
     print(f'Checked {len(checked)} BenchForge configuration file(s).')
 

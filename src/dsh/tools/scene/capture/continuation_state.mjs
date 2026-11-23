@@ -1,17 +1,16 @@
 import {canonicalToolName} from '../../invocation/identifiers.mjs';
-
-const producers = new Set(['benchforge_capture','benchforge_refine','benchforge_run','benchforge_extend','benchforge_retry']);
+import {budgetRejection, captureProducers} from './budget.mjs';
 /** 合并消息中的文本块，供识别生产请求与通知内容使用。 */
 const body = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n');
 /** 容错解析工具事件中的 JSON 文本，忽略无法解析的内容。 */
 const json = text => {try {return JSON.parse(text);} catch {return null;}};
 
 /** 创建空的采集历史归约状态，初始化轮次、调用、任务代际和中断标记。 */
-const initial = () => ({calls:new Map(),captures:new Map(),turn:0,production:false,completed:false,
+const initial = () => ({calls:new Map(),captures:new Map(),budgets:new Map(),turn:0,production:false,completed:false,
   interrupted:false,disposalSeq:0,workflowSeq:0,activitySeq:0,activeTurn:false,taskSeq:0,taskKey:'',seq:-1});
 /** 按事件序号增量归约原生历史，追踪生产任务、采集提交、停止及交付状态。 */
 function consume(state, events) {
-  const {calls,captures} = state;
+  const {calls,captures,budgets} = state;
   for (const event of events) {
     if (event.seq != null && event.seq <= state.seq) continue;
     state.seq = event.seq ?? state.seq;
@@ -30,14 +29,19 @@ function consume(state, events) {
     const callId = ptc ? data.subCallId : message?.source?.callId || message?.toolCallId;
     const call = ptc ? {...data,turn:state.turn} : calls.get(callId);
     calls.delete(callId);
-    if (!call || message?.isError || data.error) continue;
+    if (!call) continue;
     const name = canonicalToolName(data.meta?.benchforgeInvocation?.resolved?.name || call.name);
-    const receipt = json(body(message));
+    const text = body(message);
+    const budget = captureProducers.has(name) && budgetRejection(text);
+    if (budget) budgets.set(budget.scene_key || budget.scene_id, {budget,seq:event.seq});
+    if (message?.isError || data.error || budget) continue;
+    const receipt = json(text);
     if (!receipt) continue;
     if (name === 'benchforge_pipeline_plan' && receipt.production_contract === 'benchforge.production-stages/v1') {
       const key = String(receipt.stage_review?.review_id || receipt.plan || event.seq);
       if ((receipt.review_revision?.kind === 'new_task' || state.completed || !state.production) && key !== state.taskKey) {
         captures.clear();
+        budgets.clear();
         state.taskSeq = event.seq;
         state.taskKey = key;
         state.workflowSeq = 0;
@@ -56,14 +60,14 @@ function consume(state, events) {
     if (receipt.production_contract === 'benchforge.production-stages/v1') state.production = true;
     if (name === 'benchforge_pipeline_run' && receipt.state === 'completed') state.completed = true;
     const run = receipt.run_id || (name === 'benchforge_retry' ? receipt.task_id?.split('.')[0] : '');
-    if (!producers.has(name) || !/^sf_[A-Za-z0-9_-]+$/.test(run || '')) continue;
+    if (!captureProducers.has(name) || !/^sf_[A-Za-z0-9_-]+$/.test(run || '')) continue;
     captures.delete(run);
     captures.set(run, {run_id:run,call_id:callId,seq:event.seq,retry:name === 'benchforge_retry',
       submitted_at:event.time || 0,turn:call.turn,production:state.production,task_seq:state.taskSeq});
     state.activeTurn = true;
   }
   const {calls:ignored,...value} = state;
-  return {...value,captures:[...captures.values()]};
+  return {...value,captures:[...captures.values()],budgets:[...budgets.values()]};
 }
 
 /** Recover ownership and obligations from standard DSH events, including PTC. */
@@ -111,4 +115,18 @@ export function failureIdentity(value) {
   const stable = value => value && typeof value === 'object' ? Array.isArray(value) ? value.map(stable) :
     Object.fromEntries(Object.keys(value).sort().map(key => [key,stable(value[key])])) : value;
   return failures.length ? JSON.stringify([...new Set(failures.map(value=>JSON.stringify(stable(value))))].sort()) : '';
+}
+
+/** 由服务端对同一基线的两份回执确认未推进，评审的自由文本可以改变措辞。 */
+export function repeatedRepairFailure(previous, current) {
+  const progress = observation => observation?.tasks?.length === 1 ?
+    observation.tasks[0].failure?.scene_review?.repair_progress : undefined;
+  const before = progress(previous), after = progress(current);
+  const base = after?.next_base, old = before?.next_base;
+  const stalled = new Set(['rollback','keep_baseline','uncompared']);
+  if (base?.task_id && base.token && Number.isInteger(base.revision) && old?.task_id === base.task_id &&
+      old.revision === base.revision && old.token === base.token && stalled.has(before.decision) &&
+      stalled.has(after.decision) && Number.isInteger(before.round) && after.round === before.round + 1) return true;
+  const same = failureIdentity(previous);
+  return Boolean(same && same === failureIdentity(current));
 }

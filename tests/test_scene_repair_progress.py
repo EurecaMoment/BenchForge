@@ -38,6 +38,15 @@ class SceneRepairProgressTests(unittest.TestCase):
         self.assertEqual(progress['next_base'], self.ref)
         self.assertEqual(len(progress['native']['fixed']), 2)
 
+    def test_static_support_advice_is_not_a_native_regression(self):
+        current = receipt({'a': True, 'b': False, 'c': False})
+        current['native_relation_checks'][2]['advisory'] = True
+        comparison = {'baseline_token': 'a', 'complete': True, 'findings': []}
+        result = repair_decision(self.base, self.candidate, current,
+                                 {'passed': False, 'repair_comparison': comparison}, {'view_1.png'})
+        self.assertEqual(result['decision'], 'advance')
+        self.assertEqual(result['native']['regressed'], [])
+
     def test_reordering_and_round_budget_do_not_change_verdict(self):
         self.assertEqual(self.decision({'c':True,'b':False,'a':False})['decision'], 'keep_baseline')
         self.assertEqual(self.decision({'b':False,'a':True,'c':True})['decision'], 'advance')

@@ -1,3 +1,9 @@
+type CaptureBudget = {
+  scene_id: string; scene_design_id?: string; scene_key?: string;
+  limit: number; used: number; remaining: number;
+  evidence: {task_id: string; revision: number; token: string; accepted: boolean; captured: boolean}[];
+};
+
 /** Browser-safe wire contract; storage and timers remain in the Host. */
 export interface ProductionView {
   revision: number;
@@ -23,6 +29,7 @@ export interface ProductionView {
   completed: number;
   total: number;
   delivered: boolean;
+  capture_budget?: CaptureBudget | null;
 }
 
 type ProductionNotice<K extends string> = {
@@ -32,7 +39,7 @@ type ProductionNotice<K extends string> = {
   previousReviewId?: number;
 };
 type CaptureNotice = ProductionNotice<'benchforge/capture-watch'> & {
-  capture: {run_id: string; state: string; failed: boolean; blocked?: boolean};
+  capture: {run_id: string; state: string; failed: boolean; blocked?: boolean; capture_budget?: CaptureBudget};
 };
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

@@ -2,8 +2,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {compactCaptureObservation, captureRunId} from './capture_watch.mjs';
-import {createCaptureHistory, captureFailure, failureIdentity, noticeDelivered, terminalCapture} from './continuation_state.mjs';
+import {createCaptureHistory, captureFailure, repeatedRepairFailure, noticeDelivered, terminalCapture} from './continuation_state.mjs';
 import {captureNotice} from './notice.mjs';
+import {budgetMatches, captureBudgetCode} from './budget.mjs';
 
 /** 组合会话所有者与采集运行标识，生成持久化续接记录键。 */
 const keyOf = (owner, run) => `${owner}:${run}`;
@@ -14,6 +15,10 @@ const reviewUnavailable = Symbol('review temporarily unavailable');
 const observable = record => ['watching','terminal','observer_failed','delivered'].includes(record?.state);
 /** 把采集终态和诊断转换为用于通知的结果类别。 */
 const outcome = record => record.error ? 'observer_failed' : record.observation?.state || record.state;
+/** 最后一次已拍的场景仍要正常验收，只有已失败且用完预算才结束自动修图。 */
+const exhausted = record => record?.observation?.tasks?.length === 1 && record.observation.tasks.find(task =>
+  task.state === 'FAILED_FINAL' && (task.failure?.stage === 'capture_budget' || task.failure?.code === captureBudgetCode ||
+   (task.failure?.scene_review?.passed === false && task.capture_budget?.remaining === 0)))?.capture_budget;
 /** 根据运行、代际和任务上下文生成稳定通知键，避免旧结果重复续接新任务。 */
 const noticeKey = (record,context) => `capture:${record.owner}:${record.run_id}:${record.generation}:${outcome(record)}` +
   (context.activeTurn && context.disposalSeq ? `:disposal:${context.disposalSeq}` : '');
@@ -22,10 +27,11 @@ const text = record => {
   const state = outcome(record);
   const notice=captureNotice({...record.observation,run_id:record.run_id},record.error);
   const recovery=notice.tasks.some(task=>task.recovery);
-  return `采集结果通知：${state}。${recovery ?
+  return `采集结果通知：${state}。${exhausted(record) ?
+    '本场景的正式采集预算已用完。展示现有实拍和已验收结果；若旧图可以按当前任务标准复核，复用原作业。仍影响使用的缺项据实报告，结束本场景的自动重拍。' : recovery ?
     '采集执行中断。对需要恢复的工作项直接使用下方 recovery 中的工具及原样参数。它会在原作业上续接已保存的原生回执。其他正在运行的作业由宿主分别跟踪。' :
     (record.observation?.tasks || []).some(task=>task.failure?.scene_review || task.quality?.scene_quality_passed === false) ?
-    '本次采集验收失败。读取完整审查文件，保留原始硬要求。从 repair_progress.next_base 指向的 task_id 和 revision 读取 program.json；用该版实拍和原生回执核实本轮修好、退化及尚未解决的项。回归时回到基线，单独复用有证据的改进；无进展时换一种修法。若缺少可比历史，先建立参照。以十轮批量修复为预算，优先解决共同根因；每轮预检后统一采集，超出预算说明剩余问题与策略，整体验收通过才推进。' :
+    '场景尚未通过。保留原始硬要求。先看本通知的实拍，按 repair_evidence 用 benchforge_scene_evidence 读完整报告和起点程序。仅修妨碍原任务的问题，将同一原因的缺陷一并处理。回退时从指定 program 重做，切换失效的资产或摆放方式。先查能复用的已验收场景。每个场景最多十次正式尝试，通过就推进；到限时展示真实结果和具体缺项。' :
     record.error ? '后台查询失败，保留原作业，先用 benchforge_wait(background=true) 恢复跟踪。不要重复提交仍在运行的作业。' :
     captureFailure(record.observation) ? '读取对应工作项的 detail 与失败阶段，按服务回执恢复原任务。' :
     '提交受理、采集完成和场景验收是不同状态。读取实际回执，验收通过后续跑原评测；单次采集结束不等于整项任务交付。'}
@@ -35,7 +41,7 @@ ${JSON.stringify(notice)}
 
 /** Durable host-owned observations. Only the service decides task outcomes. */
 /** 创建由宿主持有的持久化采集观察器，协调重载恢复、暂停、去重投递和任务归属。 */
-export function createCaptureContinuation({table, artifacts, read, resolveAgent, createMessage,
+export function createCaptureContinuation({table, artifacts, read, resolveAgent, createMessage, repairImages,
   readReview = () => null, signal, onError = () => {}, now = Date.now,
   delay = (ms,signal) => sleep(ms,undefined,{signal,ref:false})}) {
   const active = new Map(), registration = new Map(), agents = new Map();
@@ -56,6 +62,22 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
       instruction:'The host owns this wait and restores it after reload. Terminal success or failure returns to this session.'}});
   /** 列出指定会话拥有的全部持久化采集续接记录。 */
   const records = owner => [...table.entries()].map(([,row])=>row).filter(row=>row.owner === owner);
+  function exhaustedBudget(record, context) {
+    if (!record || record.task_seq !== context.taskSeq) return;
+    const tasks = record.observation?.tasks || [];
+    if (record.observation?.state === 'SUCCEEDED' || tasks.some(task =>
+      ['capture_transport','capture_execution','capture_service_contract'].includes(task.failure?.stage))) return;
+    const submission = context.captures.find(capture => capture.run_id === record.run_id);
+    return exhausted(record) || context.budgets.find(({budget,seq}) =>
+      seq > (submission?.seq || 0) && budgetMatches(budget, record.run_id, tasks))?.budget;
+  }
+  function currentBudget(agent) {
+    const context = history(agent.session);
+    const latest = context.captures.at(-1);
+    if (!latest || context.completed || context.interrupted || waitingForCapture(agent)) return;
+    const record = table.get(keyOf(agent.id, latest.run_id));
+    return exhaustedBudget(record || {run_id:latest.run_id,task_seq:latest.task_seq}, context);
+  }
   /** 只有本轮生产提交已由活跃观察器接管，才能在等待采集时正常收尾。 */
   function waitingForCapture(agent) {
     const context = history(agent.session);
@@ -103,11 +125,31 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     const latest = table.get(keyOf(record.owner,record.run_id));
     if (closed || latest?.generation !== record.generation || record.error && latest.error !== record.error ||
         ['blocked','paused','settled'].includes(latest?.state)) return latest;
+    const budget = exhaustedBudget(record, context);
+    // The synchronous rejection already told the agent about this scene.
+    if (budget && !exhausted(record)) return save({...record,state:'settled'});
     const key = noticeKey(record,context);
     if (!noticeDelivered(agent,key)) {
+      let images = [];
+      if (repairImages && record.observation?.tasks.some(task => task.failure?.scene_review?.passed === false)) {
+        try {
+          images = await repairImages(record.observation.tasks,agent,signal);
+        } catch (error) {
+          signal.throwIfAborted();
+          onError(error);
+        }
+        // 读图期间会话可能已停止、换任务或由另一观察器投递。
+        const after = history(agent.session);
+        const stored = table.get(keyOf(record.owner,record.run_id));
+        if (after.interrupted || after.completed || after.taskSeq > (record.task_seq || 0) ||
+          stored?.generation !== record.generation || ['blocked','paused','settled'].includes(stored?.state) ||
+          noticeDelivered(agent,key) || !await allowed(agent,signal)) return stored;
+        if (!exhausted(record) && exhaustedBudget(record, history(agent.session)))
+          return save({...record,state:'settled'});
+      }
       const message = createMessage({source:{kind:'benchforge/capture-watch',noticeKey:key,form:'notice',summary:`采集状态：${outcome(record)}`,
-        capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation)}},
-        content:[{type:'text',text:text(record)}]});
+        capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation),...(budget && {capture_budget:budget})}},
+        content:[{type:'text',text:text(record)},...images]});
       // steer wakes a driver even if it is crossing the final-response boundary.
       if (agent.status === 'running') agent.steer(message); else agent.followup(message);
     }
@@ -215,7 +257,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     if (context.interrupted || context.completed || recover && !context.production) return;
     const latest = context.captures.at(-1);
     if (!latest) return;
-    if (waitingForCapture(agent)) return;
+    if (waitingForCapture(agent) || currentBudget(agent)) return;
     // Upgrade old production sessions only at their latest capture. Never replay
     // historical failed attempts or acquire an unrelated ordinary conversation.
     const review = await currentReview(agent,signal);
@@ -234,7 +276,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     if (context.interrupted || context.completed || !context.activeTurn) return;
     const latest = context.captures.at(-1);
     if (!latest || latest.turn !== context.turn && !context.production) return;
-    if (waitingForCapture(agent)) return;
+    if (waitingForCapture(agent) || currentBudget(agent)) return;
     const review = await currentReview(agent,signal);
     signal.throwIfAborted();
     if (review===reviewUnavailable) return;
@@ -243,7 +285,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     if (suspendedReview(review)||review?.state==='waiting_user') return;
     await register(agent,latest);
     const record = table.get(keyOf(agent.id,latest.run_id));
-    if (['watching','paused','blocked','cancelled'].includes(record.state)) return;
+    if (['watching','paused','blocked','cancelled'].includes(record.state) || exhaustedBudget(record, updated)) return;
     // A saved failure still requires repair after a notification has been read.
     // Successful production captures require the pipeline's next stage receipt.
     if (!captureFailure(record.observation) && !record.error && (!context.production || context.workflowSeq > latest.seq)) return;
@@ -284,9 +326,11 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
         throw Error('Blocker evidence must belong to this service capture');
     }
     if (kind === 'no_progress') {
-      const identity = failureIdentity(record.observation);
-      const previous = records(agent.id).filter(row=>row.run_id!==record.run_id && row.submitted_at<record.submitted_at).sort((a,b)=>b.submitted_at-a.submitted_at)[0];
-      if (!identity || !record.scene_id || record.scene_id !== previous?.scene_id || identity !== failureIdentity(previous?.observation)) throw Error('Two consecutive captures of this scene with the same actual failure are required for a no-progress blocker');
+      const previous = records(agent.id).filter(row=>row.run_id!==record.run_id &&
+        row.scene_id===record.scene_id && row.task_seq===record.task_seq && row.submitted_at<record.submitted_at)
+        .sort((a,b)=>b.submitted_at-a.submitted_at)[0];
+      if (!record.scene_id || !previous || !repeatedRepairFailure(previous.observation,record.observation))
+        throw Error('Two consecutive captures of this scene must document the same unresolved failure or retain the same repair baseline');
     } else if (kind === 'external') {
       if (!record.error && !(record.observation.tasks || []).some(task=>task.failure && !task.failure.scene_review))
         throw Error('A repairable scene-quality failure is not evidence of an external blocker; repair it or document consecutive unchanged failures');
@@ -312,5 +356,5 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
   }
   /** 禁止新增观察、取消整个续接寿命，并等待已持有任务退出。 */
   async function dispose() {closed = true;lifecycle.abort();await settled();}
-  return {register,reconcile,stopping,block,restore,resume,dispose,settled,records,waitingForCapture};
+  return {register,reconcile,stopping,block,restore,resume,dispose,settled,records,waitingForCapture,currentBudget};
 }

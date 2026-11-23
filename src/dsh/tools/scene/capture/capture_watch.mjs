@@ -20,6 +20,8 @@ function diagnostics(value, source) {
   function visit(value, location) {
     if (!value || typeof value !== 'object') return;
     if (Array.isArray(value)) {value.forEach((item, index) => visit(item, location + '[' + index + ']'));return;}
+    // 可选建议及仅由包围盒得出的提示，仍可查完整回执，不能投影成修复失败。
+    if (value.advisory === true) return;
     const row = {source:location};
     for (const [key, item] of Object.entries(value)) {
       if (diagnosticKeys.has(key) && item != null && item !== '' && (!Array.isArray(item) || item.length)) row[key] = item;
@@ -45,18 +47,20 @@ export function compactCaptureObservation(value, {artifacts} = {}) {
   summary.detail_available ??= {tool:'benchforge_scene_status',...fields(value,['run_id']),detail:true};
   summary.tasks = (value.tasks || []).map(task => {
     const row = fields(task, ['id','state','phase','revision','workflow','tool','next_action','failure','queue','evidence',
-      'summary','downloads','asset_files','design_reference_ready','records','diagnostics']);
+      'summary','downloads','asset_files','design_reference_ready','records','diagnostics','capture_scene_key']);
     // Observe packages can have no unit at all. Assigning an absent optional
     // field creates undefined, which the native tool transport rejects before
     // the caller can see the otherwise valid task status.
     for (const key of ['phase','revision','workflow']) {
       if (row[key] == null && task.unit?.[key] !== undefined) row[key] = task.unit[key];
     }
+    const budget = task.failure?.capture_budget ?? task.unit?.capture_budget ?? task.capture_budget;
+    if (budget) row.capture_budget = fields(budget,['scene_id','scene_design_id','scene_key','limit','used','remaining','evidence']);
     // Quality failures contain the same complete scene review in failure and
     // result. Keep failure identity and actions, project its known review
     // wrapper, and retain every diagnostic below. Full evidence stays on disk.
     if (task.failure?.scene_review) row.failure = {...task.failure,
-      scene_review:fields(task.failure.scene_review,['passed','acceptable','assessed','status','issues','errors','repair_suggestions','publication_status','repair_progress'])};
+      scene_review:fields(task.failure.scene_review,['passed','acceptable','assessed','status','issues','errors','repair_suggestions','publication_status','repair_progress','renderable'])};
     if (task.progress) {
       row.progress = fields(task.progress, ['stage','phase','state','status','percent','percentage','progress_percent',
         'completed','total','current','frames_done','frames_total','objects_done','objects_total','updated_ns',

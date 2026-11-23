@@ -2,8 +2,7 @@
 import math
 from itertools import product
 
-from capabilities.scene_authoring.geometry.parts import part_bounds
-from capabilities.scene_authoring.geometry.parts import horizontal_box_top
+from capabilities.scene_authoring.geometry.parts import horizontal_box_top, part_extents, rotation_matrix
 
 
 # 从已执行部件及原生世界变换计算部件边界，可只保留可支撑顶面。
@@ -23,11 +22,16 @@ def native_part_bounds(entity, *, support_only=False):
             if support_only and (part.get('shape') != 'box' or horizontal_box_top(part) is None or
                                  any(abs(matrix[i][2]) > 1e-6 or abs(matrix[2][i]) > 1e-6 for i in (0, 1))):
                 continue
-            lo, hi = part_bounds(part)
-            points = [[sum(point[i] * matrix[i][axis] for i in range(3)) + matrix[3][axis]
-                       for axis in range(3)] for point in product(*zip(lo, hi))]
-            boxes.append(([min(p[i] for p in points) for i in range(3)],
-                          [max(p[i] for p in points) for i in range(3)]))
+            rotation = rotation_matrix(part.get('rotation_deg_xyz', [0, 0, 0]))
+            # Compose actual part and entity transforms before making an AABB.
+            # Bounding each rotation separately inflates diagonal parts.
+            axes = [[sum(matrix[k][i] * rotation[k][j] for k in range(3))
+                     for j in range(3)] for i in range(3)]
+            half = part_extents(part, axes)
+            center = [sum(part['offset'][k] * matrix[k][i] for k in range(3)) + matrix[3][i]
+                      for i in range(3)]
+            boxes.append(([center[i] - half[i] for i in range(3)],
+                          [center[i] + half[i] for i in range(3)]))
     except (ValueError, KeyError, TypeError, IndexError):return []
     return boxes
 

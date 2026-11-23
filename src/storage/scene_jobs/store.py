@@ -11,9 +11,12 @@ from storage.scene_jobs.metadata import runs
 from storage.scene_jobs.metadata import tasks
 from storage.scene_jobs.active_capture import capture_identity, find_active_capture
 from storage.files import safe_path
-from service_access.request_context import RunContext
+from service_access.request_context import RunCancelled, RunContext
 from service_access.access_scope import current_access
 from service_access.runtime_config import resolve_database_url
+from storage.scene_jobs.capture_budget import (
+    RESERVATION_EVENT, CaptureBudgetExhausted, admitted_scene_key, capture_budget, scene_key,
+)
 
 
 # 生成带业务前缀的随机短编号，区分不同实体类型。
@@ -88,6 +91,16 @@ class Store:
                 if existing:
                     c.execute(self.keys.insert().values(id=key, run_id=existing))
                     return existing
+            if (workflow == 'scene' and len(intents) == 1 and submitted_programs and submitted_programs[0]
+                    and intents[0].get('execution_mode') == 'production' and not parent_runs
+                    and intents[0].get('layout', {}).get('mode') not in ('generate', 'edit')
+                    and (intents[0].get('capture_options') or {}).get('view_indices') != []):
+                candidate = scene_key(submitted_programs[0]['program'], design)
+                if candidate:
+                    _, budget = capture_budget(c, self.root, external_context.workspace_id,
+                                               external_context.session_id, candidate)
+                    if budget['remaining'] == 0:
+                        raise CaptureBudgetExhausted(budget)
             rid=uid('sf')
             run_context = external_context.for_run(rid)
             plan={'schema':'benchforge.pipeline/v1','intents':intents,'workflow':workflow,'created':time.time(),'code_version':'0.3.0'}
@@ -96,6 +109,7 @@ class Store:
             scope_fields = {}
             if identity:
                 plan['capture_identity'] = identity
+            if access is not None and workflow == 'scene':
                 scope_fields = {'session_id': access.scope.session_id, 'workspace_id': access.scope.workspace_id}
             c.execute(runs.insert().values(id=rid,state='PENDING',plan=plan,created_at=str(time.time()),code_revision='benchforge-0.2.0',**scope_fields))
             for i,intent in enumerate(intents):
@@ -218,27 +232,75 @@ class Store:
             )
             return result.rowcount == 1
 
+    def _review_retry_snapshot(self, tid):
+        with self.repo.engine.connect() as connection:
+            task = connection.execute(select(tasks).where(tasks.c.id == tid)).mappings().one()
+            run = connection.execute(select(runs).where(runs.c.id == task['run_id'])).mappings().one()
+        return task, run
+
+    def _review_retry_response(self, task):
+        unit = task['unit']
+        return {'task_id': task['id'], 'revision': unit['revision'], 'phase': unit['phase'],
+                'capture_recovery_mode': 'review_only', 'state': task['state']}
+
+    def _require_retryable(self, task, run):
+        if task['unit'].get('phase') == 'dataset':
+            raise ValueError('Legacy dataset jobs are retired. Use data.capability or submit a scene with target_items.')
+        if run['state'] in {'CANCELED', 'SUCCEEDED'}:
+            raise ValueError('cannot retry a canceled or successful run')
+        if task['state'] != 'FAILED_FINAL':
+            raise ValueError('only failed tasks need retry')
+        failure = task.get('failure') or {}
+        if failure.get('code') == CaptureBudgetExhausted.code:
+            raise CaptureBudgetExhausted(failure['capture_budget'])
+
+    def _same_review_retry(self, current, original):
+        unit, expected = current['unit'], original['unit']
+        return (current['run_id'] == original['run_id'] and self.lifecycle.review_only_requested(unit)
+                and all(unit.get(key) == expected.get(key) for key in ('revision', 'capture_token')))
+
     # 保留历史尝试并重试失败阶段，按指定模式恢复或重启采集，保留成功产物。
     def retry(self,tid,feedback=None,capture_mode='auto'):
         """Retain old attempts and retry the failed stage; never mutate successful products."""
-        if capture_mode not in {'auto','resume','restart'}:
-            raise ValueError('capture_mode must be auto, resume or restart')
+        if capture_mode not in {'auto','resume','restart','review_only'}:
+            raise ValueError('capture_mode must be auto, resume, restart or review_only')
         if feedback is not None and (not isinstance(feedback,str) or not 1<=len(feedback)<=12000):
             raise ValueError('retry feedback must be 1..12000 characters')
+        original = None
+        if capture_mode == 'review_only':
+            if feedback is not None:
+                raise ValueError('Review-only retry uses frozen evidence and accepts no repair feedback')
+            original, original_run = self._review_retry_snapshot(tid)
+            if self.lifecycle.review_only_requested(original['unit']):
+                return self._review_retry_response(original)
+            self._require_retryable(original, original_run)
+            # Filesystem validation and plan admission can be slow. The worker
+            # also binds this capture's evidence before reviewing and publishing.
+            try:
+                unit = self.lifecycle.review_only(original)
+            except (ValueError, OSError):
+                current, _ = self._review_retry_snapshot(tid)
+                if self._same_review_retry(current, original):
+                    return self._review_retry_response(current)
+                raise
         with self.repo.transaction() as c:
             task=c.execute(select(tasks).where(tasks.c.id==tid).with_for_update()).mappings().one()
             run=c.execute(select(runs).where(runs.c.id==task['run_id']).with_for_update()).mappings().one()
-            if task['unit'].get('phase') == 'dataset':
-                raise ValueError('Legacy dataset jobs are retired. Use data.capability or submit a scene with target_items.')
-            if run['state'] in {'CANCELED','SUCCEEDED'}:raise ValueError('cannot retry a canceled or successful run')
-            if task['state']!='FAILED_FINAL':raise ValueError('only failed tasks need retry')
-            unit = self.lifecycle.retry(task, feedback, capture_mode, self.directory)
+            if original is not None and self._same_review_retry(task, original):
+                return self._review_retry_response(task)
+            self._require_retryable(task, run)
+            if original is None:
+                unit = self.lifecycle.retry(task, feedback, capture_mode, self.directory)
+            elif (run['code_revision'] != original_run['code_revision'] or any(
+                    task[key] != original[key] for key in ('run_id', 'unit', 'attempt', 'failure'))):
+                raise ValueError('Scene task changed during review-only validation; retry the current task')
             phase = task['unit']['phase']
             c.execute(runs.update().where(runs.c.id==run['id']).values(state='PENDING'))
             c.execute(tasks.update().where(tasks.c.id==tid).values(state='READY',unit=unit,failure=None,result=None,ready_at=0,lease_owner=None,lease_expires_at=None))
-            self.repo.event(c,run['id'],tid,'benchforge.retry',{'phase':unit['phase'],'revision':unit['revision'],'operator_feedback':feedback})
+            self.repo.event(c,run['id'],tid,'benchforge.retry',{'phase':unit['phase'],'revision':unit['revision'],'operator_feedback':feedback,'capture_mode':capture_mode})
         return {'task_id':tid,'revision':unit['revision'],'phase':unit['phase'],
-                **({'capture_recovery_mode':unit['capture_recovery_mode']} if phase=='capture' and 'capture_recovery_mode' in unit else {})}
+                **({'capture_recovery_mode':unit['capture_recovery_mode']} if phase=='capture' and 'capture_recovery_mode' in unit else {}),
+                **({'capture_recovery_mode':'review_only','state':'READY'} if capture_mode=='review_only' else {})}
 
     # 查询当前代码协议下未终结运行的所有工作项，可复用调用方事务。
     def all_work(self, connection=None):
@@ -253,6 +315,46 @@ class Store:
         directory=safe_path(self.root,f'{tid}/revision_{revision}')
         directory.mkdir(parents=True,exist_ok=True)
         return directory
+
+    def reserve_capture(self, tid, token, program, *, expected_owner, retained=False):
+        """Claim one native capture for this token before issuing its first view request."""
+        with self.repo.transaction() as connection:
+            task = connection.execute(select(tasks).where(tasks.c.id == tid).with_for_update()).mappings().one()
+            run = connection.execute(select(runs).where(runs.c.id == task['run_id']).with_for_update()).mappings().one()
+            unit = task['unit']
+            if (task['lease_owner'] != expected_owner or task['state'] != 'RUNNING'
+                    or unit.get('phase') != 'capture' or (task['lease_expires_at'] or 0) <= time.time()
+                    or run['state'] == 'CANCELED'):
+                raise RunCancelled('Capture lease changed before native submission')
+            if unit.get('workflow', 'scene') != 'scene' or unit['intent'].get('execution_mode') == 'exploration':
+                return
+            revision = unit['revision']
+            directory = self.directory(tid, revision)
+            admission = directory / 'scene_admission.json'
+            if not admission.is_file() and revision > 0:
+                # Protocol migration copies the frozen program to a new revision.
+                previous = directory.with_name(f'revision_{revision - 1}')
+                if (previous / 'program.json').is_file() and json.loads((previous / 'program.json').read_text(encoding='utf-8')) == program:
+                    admission = previous / admission.name
+            if not admission.is_file():
+                return
+            key = admitted_scene_key(json.loads(admission.read_text(encoding='utf-8')), program)
+            if key is None:
+                return
+            reservation = {'token': token, 'task_id': tid, 'revision': revision}
+            context = run['plan'].get('context') or {}
+            workspace = run['workspace_id'] or context.get('workspace_id')
+            session = run['session_id'] or context.get('session_id')
+            attempts, budget = capture_budget(connection, self.root, workspace, session, key,
+                                              reservation=reservation, retained=retained)
+            if token not in attempts:
+                raise CaptureBudgetExhausted(budget)
+            if attempts[token]['event_id'] is None and not attempts[token]['captured']:
+                self.repo.event(connection, run['id'], tid, RESERVATION_EVENT,
+                                {'token': token, 'revision': revision, 'scene_key': list(key)})
+            if (task['lease_expires_at'] or 0) <= time.time():
+                raise RunCancelled('Capture lease expired before native submission')
+            connection.execute(tasks.update().where(tasks.c.id == tid).values(unit={**unit, 'capture_budget': budget}))
 
     # 在有效任务租约保护下发布采集文件并推进阶段，防止过期执行者覆盖结果。
     def publish_capture(self, tid, token, incoming, *, expected_owner):

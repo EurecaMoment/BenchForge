@@ -54,11 +54,12 @@ def request_error_payload(exc, status):
     """Preserve complete domain diagnostics beside the bounded error summary."""
     from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError
     from capabilities.scene_authoring.validation.contract_diagnostics import ProgramValidationError
+    from storage.scene_jobs.capture_budget import CaptureBudgetExhausted
     payload = {'error': type(exc).__name__,
                'detail': str(exc)[:1000] if status < 500 else 'Internal server error'}
     if isinstance(exc, ScenePreflightError):
         payload.update(code=exc.code, preflight=exc.report)
-    elif isinstance(exc, ProgramValidationError):
+    elif isinstance(exc, (ProgramValidationError, CaptureBudgetExhausted)):
         payload.update(code=exc.code, issues=exc.issues)
     return payload
 
@@ -311,8 +312,10 @@ def main():
                     if file.suffix not in {'.zip','.json','.jsonl','.usda','.usdc','.usdz','.glb','.png','.jpg','.jpeg','.npy','.npz','.ply','.obj','.gltf','.bin','.mp4'}:raise ValueError('unsupported artifact download')
                     self.binary(file.read_bytes(),'application/octet-stream')
                 elif self.path=='/inspect':
+                    from capabilities.capture.observation import capture_scene_identity
+
                     state=store.snapshot(value['run_id'])
-                    self.reply({'run_id':value['run_id'],'state':state['state'],'gallery_url':gallery_path(value['run_id']),'tasks':[{**{k:t.get(k) for k in ('id','state','unit','result','failure')},'downloads':[p.relative_to(store.directory(t['id'],t['unit']['revision'])).as_posix() for p in store.directory(t['id'],t['unit']['revision']).glob('release/*.zip')]} for t in state['tasks']]})
+                    self.reply({'run_id':value['run_id'],'state':state['state'],'gallery_url':gallery_path(value['run_id']),'tasks':[{**{k:t.get(k) for k in ('id','state','unit','result','failure')},**capture_scene_identity(t),'downloads':[p.relative_to(store.directory(t['id'],t['unit']['revision'])).as_posix() for p in store.directory(t['id'],t['unit']['revision']).glob('release/*.zip')]} for t in state['tasks']]})
                 elif self.path=='/cancel':store.cancel(value['run_id']);self.reply({'cancel_requested':True})
                 else:self.reply({'error':'unknown operation'},404)
             except Exception as exc:self.fail(exc)

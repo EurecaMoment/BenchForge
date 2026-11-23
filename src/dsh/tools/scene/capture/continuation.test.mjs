@@ -6,9 +6,11 @@ import os from 'node:os';
 import {setImmediate as nextTick} from 'node:timers/promises';
 import {createStageReviewReader} from '../../../production/reviews.mjs';
 import {createCaptureContinuation} from './continuation.mjs';
-import {captureContinuations,createCaptureHistory} from './continuation_state.mjs';
+import {captureContinuations,createCaptureHistory,repeatedRepairFailure} from './continuation_state.mjs';
+import {repairEvidence,repairImageContent} from './repair_evidence.mjs';
 import {trackCaptureSubmission} from './submission.mjs';
 import {captureNotice} from './notice.mjs';
+import {createDeliveryReview} from './quality_review.mjs';
 
 /** 构造带场景质量诊断的最终失败观察结果，允许指定运行和具体问题。 */
 const failure = (run='sf_scene', issue='dog_go2 has no recognizable asset', scene='apartment') => ({
@@ -82,6 +84,49 @@ test('concurrent registrations observe one run once and preserve independent run
   await h.dispose();
 });
 
+test('a rejected eleventh capture stops older prompts for the same frozen scene',async t=>{
+  const budget={scene_id:'apartment',scene_design_id:'design',scene_key:'frozen-one',used:81,limit:10,remaining:0,
+    evidence:[{task_id:'sf_historical.scene0',revision:0,token:'old-token',captured:true,accepted:true}]};
+  const code='S2_CAPTURE_BUDGET_EXHAUSTED';
+  const rejection={code,issues:[{code,capture_budget:budget}]};
+  const h=harness({read:async(_route,{run_id})=>{
+    const raw=failure(run_id);
+    raw.tasks[0].capture_scene_key=run_id==='sf_scene'?'frozen-one':'frozen-two';
+    return raw;
+  }});
+  t.after(()=>h.dispose());h.plan();h.capture();
+  await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
+  h.append('tool/ptc-dispatch',{name:'benchforge_capture',subCallId:'blocked',isError:true,
+    content:[{type:'text',text:'Error: '+JSON.stringify(rejection)}]});
+  assert.deepEqual(h.runtime.currentBudget(h.agent),budget);
+  await h.stop();await h.runtime.reconcile(h.agent);await h.runtime.settled();
+  assert.equal(h.sent.length,1);
+
+  h.capture('sf_independent');
+  await h.runtime.reconcile(h.agent);await h.runtime.settled();h.consume();
+  assert.equal(h.runtime.currentBudget(h.agent),undefined);
+  await h.stop();
+  assert.equal(h.sent.at(-1).source.kind,'benchforge/capture-continuation');
+  assert.match(h.sent.at(-1).content[0].text,/sf_independent/);
+});
+
+test('delivery review uses retained evidence after the matching scene is exhausted',async t=>{
+  const code='S2_CAPTURE_BUDGET_EXHAUSTED';
+  const capture_budget={scene_id:'apartment',scene_key:'frozen-one',used:10,limit:10,remaining:0,evidence:[]};
+  const h=harness();t.after(()=>h.dispose());h.plan();h.capture();
+  h.append('tool/ptc-dispatch',{name:'benchforge_capture',subCallId:'refused',isError:true,
+    content:[{type:'text',text:'Error: '+JSON.stringify({code,capture_budget})}]});
+  const task={id:'sf_scene.scene0',state:'SUCCEEDED',capture_scene_key:'frozen-one',unit:{intent:{},revision:0},
+    result:{operation:'capture_only',directory:'/artifacts/sf_scene.scene0/revision_0',report:{status:'captured'}}};
+  const review=createDeliveryReview({api:async()=>({tasks:[task]}),createMessage:value=>value});
+  await review({agent:h.agent,turn:1,signal:h.abort.signal});
+  assert.match(h.sent.at(-1).content[0].text,/capture budget.*exhausted/);
+  assert.doesNotMatch(h.sent.at(-1).content[0].text,/submit one revised capture/);
+  task.capture_scene_key='frozen-two';
+  await review({agent:h.agent,turn:1,signal:h.abort.signal});
+  assert.match(h.sent.at(-1).content[0].text,/submit one revised capture/);
+});
+
 test('capture reconciliation and stopping can be cancelled during a stalled backend read',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：capture reconciliation and stopping can be cancelled during a stalled backend read。 */ async t=>{
   const reader=createStageReviewReader({/** 提供用例控制的服务响应，覆盖正常返回、超时和取消等读取边界。 */ service:()=>new Promise(()=>{})});
   const h=harness({review:reader.latest});h.plan();h.capture();
@@ -132,6 +177,43 @@ test('failed repair notification identifies the preserved baseline across runs',
   h.plan();h.capture();await h.runtime.reconcile(h.agent);await h.runtime.settled();
   assert.match(h.sent[0].content[0].text,/"next_base":\{"task_id":"sf_previous.scene0","revision":2/);
   await h.dispose();
+});
+
+test('failed scene media comes from scoped evidence and retains the exact before/after revisions',async()=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'scene-repair-evidence-'));
+  try {
+    const image=path.join(root,'view_4.png');
+    await fs.writeFile(image,Buffer.from('89504e470d0a1a0a','hex'));
+    const base={task_id:'sf_base.scene0',revision:2,token:'base'};
+    const progress={baseline:base,next_base:base,decision:'rollback',round:4,
+      findings:[{kind:'regressed',after_view:'view_4.png',before_view:'view_1.png'}]};
+    const task={id:'sf_current.scene0',revision:0,failure:{scene_review:{passed:false,repair_progress:progress}}};
+    const evidence=repairEvidence(task);
+    assert.deepEqual(evidence.program,{task_id:base.task_id,revision:2,file:'program.json'});
+    const scope={session_id:'owner'};
+    const ctx={llm:{resolveModelInfo:async()=>({inputModalities:['image']})},
+      attachments:{saveImage:async({data})=>({size:data.length})}};
+    const agent={ctx:{get:key=>ctx[key]},session:{requestHeader:()=>({config:{model:'vision',provider:'local'}})},options:{}};
+    const requests=[];
+    const blocks=await repairImageContent([task],agent,new AbortController().signal,{
+      access:{scope:()=>scope},service:async(route,args,signal,options)=>{
+        assert.equal(route,'/evidence');assert.equal(options.scope,scope);requests.push(args);return {image_path:image};
+      }});
+    assert.deepEqual(requests.map(x=>x.file),['capture/view_4.png','capture/view_1.png']);
+    assert.deepEqual(requests.map(x=>x.revision),[0,2]);
+    assert.deepEqual(blocks.map(x=>x.type),['text','image','text','image']);
+    assert.equal(repairEvidence({state:'SUCCEEDED'}),undefined);
+  } finally {await fs.rm(root,{recursive:true,force:true});}
+});
+
+test('consecutive failures are compared per scene and by the retained evidence, not reviewer wording',()=>{
+  const base={task_id:'sf_origin.scene0',revision:0,token:'frozen'};
+  const sample=(round,token,description)=>({tasks:[{
+    failure:{scene_review:{repair_progress:{decision:'rollback',round,next_base:{...base,token}}}},
+    diagnostics:[{issues:[description]}]}]});
+  assert.equal(repeatedRepairFailure(sample(3,'a','placement'),sample(4,'a','contact')),true);
+  assert.equal(repeatedRepairFailure(sample(3,'a','placement'),sample(4,'b','contact')),false);
+  assert.equal(repeatedRepairFailure(sample(3,'a','placement'),sample(5,'a','contact')),false);
 });
 
 test('a transport failure offers only the original failed task for retry, without repair feedback',async()=>{

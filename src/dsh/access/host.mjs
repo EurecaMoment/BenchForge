@@ -81,6 +81,11 @@ export async function apply(ctx, config) {
     rootsFor: (sessionIds, configuredPaths) => lookupWorkspaceRoots(store, ctx.workspaceRegistry, sessionIds, configuredPaths),
     /** 按会话标识读取受管工作区绑定。 */
     get: id => store.get(id), /** 从已激活的会话工作区构造可信访问作用域。 */ scope: session => store.scope(session),
+    /** 用 DSH 的原生会话头核对预留绑定，供第一次发送前的工作台查询使用。 */
+    scopeForHeader: async header => {
+      await store.activate(header);
+      return store.scope({header});
+    },
     /** 为会话预留工作区，并记录可选的父会话归属。 */
     reserve: (id, parentId) => store.reserve(id, parentId),
     /** 把父工作区中的已授权输入制作成供子会话读取的不可变快照。 */

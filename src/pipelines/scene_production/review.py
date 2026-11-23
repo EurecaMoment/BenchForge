@@ -6,7 +6,10 @@ from capabilities.dataset_authoring.scene_capture.products import produce
 from capabilities.scene_authoring.validation.quality import audit_scene
 from service_access.progress import record_progress
 from capabilities.scene_authoring.geometry.preview import compact_preview
-from capabilities.scene_authoring.validation.acceptance import capture_acceptance
+from capabilities.scene_authoring.validation.support_relations import visual_relation_indices
+from capabilities.scene_authoring.validation.acceptance import (
+    SCENE_ACCEPTANCE_POLICY_VERSION, capture_acceptance, verify_capture_versions,
+)
 from capabilities.scene_authoring.validation.review_reference import review_spatial_context
 from capabilities.scene_authoring.validation.review_reference import GUIDANCE as REFERENCE_GUIDANCE
 from capabilities.scene_authoring.validation.review_reference import FACING_GUIDANCE
@@ -14,6 +17,7 @@ from capabilities.scene_authoring.contracts.requirements import scene_requiremen
 
 
 
+from pipelines.scene_production.lifecycle import review_retry_evidence
 from pipelines.scene_production.planning import _strict_policy
 from pipelines.scene_production.repair_progress import capture_ref, comparison_prompt, load_baseline, repair_decision
 
@@ -25,6 +29,16 @@ def review_scene(store,task,stop,*,capture_only=False):
         return
     unit=task['unit'];directory=store.directory(task['id'],unit['revision']);capture=directory/'capture'
     execution_mode=unit.get('intent',{}).get('execution_mode')
+    review_only = unit.get('scene_review_policy_version') == SCENE_ACCEPTANCE_POLICY_VERSION
+    if review_only:
+        archive = directory/'previous_scene_review'/f'before_policy_{SCENE_ACCEPTANCE_POLICY_VERSION}'
+        archived_receipt = archive/'scene_acceptance.json'
+        old_acceptance = review_retry_evidence(directory, unit, archived=archived_receipt.is_file())
+        if not archived_receipt.is_file():
+            for name in ('scene_review.json', 'scene_brief_alignment.json', 'scene_spatial_context.json'):
+                if (directory/name).is_file():
+                    write_json(archive/name, json.loads((directory/name).read_text(encoding='utf-8')))
+            write_json(archived_receipt, old_acceptance)
     record_progress(directory,'scene_review')
     report=json.loads((capture/'report.json').read_text())
     program=json.loads((directory/'program.json').read_text())
@@ -32,12 +46,12 @@ def review_scene(store,task,stop,*,capture_only=False):
     strict_policy = _strict_policy(store.root, execution_mode)
     physical_precheck=capture_acceptance(store.root,program,report,evidence,{},capture,execution_mode) if strict_policy else {}
     physical_issues=physical_precheck.get('physical_issues',[])
-    repair_base=load_baseline(store,task,physical_precheck)
+    repair_base=load_baseline(store,task,physical_precheck) if not review_only else None
     spatial_context=None
     if report['status']=='captured' and any(capture.glob('view_*.png')):
         prompt='检查实际 Isaac 视图和执行证据是否满足原始场景需求：'+json.dumps(unit['intent'],ensure_ascii=False)+'''。
 返回 JSON：{"acceptable":boolean,"visual_quality":1到5,"semantic_fidelity":1到5,"issues":[string],"repair_suggestions":[string],"visual_realism":{"status":"needs_improvement"|"visually_plausible"|"matches_declared_geometry"|"not_requested","issues":[string],"prioritized_repairs":[string],"basis":"rendered_views_only"}}。
-依据任务判断物体身份、尺度、支撑、功能分区、材质、采光和机位。逼真室内要求还应检查建筑围合、连接细节、间接光、接触阴影及亮部纹理；明确可见的实质缺陷应影响 acceptable。每项问题标出对应视图或执行记录，建议具体的资产、程序或采集调整。
+依据原始任务判断物体身份、尺度、支撑、功能分区、材质、采光和机位。每项阻塞问题标出对应视图或执行记录、受影响的任务或要求，以及可执行的修改。
 执行回执说明实际使用的资产、尺寸、姿态和材质；视觉评价说明是否可辨识且符合任务，两者分别陈述。采用最终世界姿态和实际尺寸；组合体的 size 是整体布局包络，geometry_parts 记录执行器实际创建的局部零件及 USD 类型，零件尺寸和偏移来自执行程序。区分几何构成与图片中的可辨识程度。AABB 是保守包围盒，预览警告不能单独证明穿透。材质 applied/skipped、纹理 fallback、未校准参数按回执解释。
 physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动作结束后的视图，动作前后另有独立图片。建议采用已支持的程序字段；能力缺口直接说明。
 当前是采集后的场景审查，数据生成和打包尚未执行，将在本阶段之后进行。target_items 是后续题目导出目标，不是当前物体或标注数量；最终包和导出计数此时缺失不能作为场景不合格理由。可据当前图像、分割和动作证据指出影响后续数据可用性的具体问题；导出是否成功由后续实际产物验证。
@@ -50,7 +64,8 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                  '每项单独判断，不能因一个物体失败而把其它物体也判失败。'
                  '物理回执、静态包围盒疑点和视觉意见分开报告；建议将有关联的问题成组修复后统一采集。')
         if strict_policy:
-            prompt+='''\n严格生产验收：默认要求真实可辨识的场景资产和符合生活常识的布局。简化几何只有保存计划明确声明的实验范围才可合格，不能以几何形状冒充真实家具。逐一检查物体身份、正常尺度、支撑与安装、房间用途与物品关系、通行与操作空间、材质与照明。任何不确定、缺图或问题必须 passed=false；不得仅凭名字、设计图或全静态 stable=true 宣称物理合理。额外返回 life_review:{checks:[{check:object_identity|realistic_scale|support_and_attachment|functional_layout|access_and_clearance|materials_and_lighting,passed:boolean,evidence:[{view:"view_0.png",observation:"该实际视图中的具体可见现象"}]}]}。六项分别恰好一条，每条给出真实已附图片文件名和具体观察；不合格给出可执行修改。visual_realism.status 必须根据实拍作出判断。模型意见不是物理测量或GT。'''
+            prompt += '\n待用实拍或动作证据核查的物理提示：' + json.dumps(physical_precheck.get('physical_advisories', []), ensure_ascii=False)
+            prompt+='''\n生产验收目标是场景可用于原始任务。保留用户要求、S2明确硬要求、关键物体身份与功能、可信支撑与动态稳定、可通行可操作及必要的观测和真值证据。任何仍无法验证的关键要求都必须失败。不要把计划中自行加的具体摆位、装饰风格或措辞提升为新硬要求。把不影响任务、物体辨识、物理稳定或使用的普通噪点、轻微材质光泽或阴影差异、静态布景小缝隙和装饰细节放在 optional_suggestions:[string]，可留空。它们不进入 issues、repair_suggestions、visual_realism 的 issues/prioritized_repairs 或 unresolved。用户明确要求的材质、光照、参考图成分或测量精度仍要逐项验收。包围盒交叠及部分支撑测量对任何物体均只用于定位，不能单独判穿插、失稳或净空不足。对明确的支撑、接触与净空要求，需要实际视图、真实动作或原生测量的正面证据；动作可通过的最低净空不能代替任务指定的距离测量。明显悬空、严重穿插、阻塞通路或影响真值仍须失败。不得仅凭名字、设计图或全静态 stable=true 宣称物理合理。额外返回 life_review:{checks:[{check:object_identity|realistic_scale|support_and_attachment|functional_layout|access_and_clearance,passed:boolean,evidence:[{view:"view_0.png",observation:"该实际视图中的具体可见现象"}]}]}。五项各一条，均引用实际视图的具体观察；可用场景返回 acceptable=true，普通真实场景的 visual_realism.status 为 visually_plausible。模型意见不是物理测量或GT。'''
         if strict_policy:
             admission = physical_precheck
             if admission.get('scene_brief'):
@@ -61,28 +76,33 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                 spatial_context=review_spatial_context(brief,evidence,physical_precheck.get('native_relation_checks',[]))
                 write_json(directory/'scene_spatial_context.json',spatial_context)
                 prompt+='\n明确参照和本次原生方向/支撑事实（不能代替实际逐图生活检查）：'+json.dumps(spatial_context,ensure_ascii=False)
-                context['visual_relations']=[{'index':i,**r} for i,r in enumerate(brief['relations']) if r['type'] not in {'supported_by','mounted_to'}]
+                native_checks = physical_precheck.get('native_relation_checks', [])
+                context['visual_relations'] = [{**brief['relations'][i], 'index': i}
+                                               for i in sorted(visual_relation_indices(brief, native_checks))]
                 if any(r['type'] == 'facing' for r in context['visual_relations']):
                     prompt += FACING_GUIDANCE
-                prompt += '\n必须对照的场景标题、摘要、角色及空间关系：' + json.dumps(context, ensure_ascii=False)
+                prompt += '\n场景标题、设计摘要、角色、S2硬要求和空间关系：' + json.dumps(context, ensure_ascii=False)
                 prompt += ('\n额外返回 brief_alignment:{passed:boolean,hard_requirements_preserved:boolean,observations:[{view:"view_0.png",observation:"实际可见依据"}],'
                            'unresolved:[string],proposed_summary_revision:{reason:string,summary:string,changes:[string]}}。'
-                           '检查摘要中的每个关键物体角色、支撑、邻接、朝向、取用与通行关系。功能布局须适合人在此实际使用。'
-                           '对照全部机位发现椅子翻倒、柜门冲突、桌面穿物、悬空、失衡、比例扭曲或不合用途摆放均须失败。'
+                           '用原始任务和明确硬要求判断哪些角色和关系决定使用、观测或作业。功能布局须适合预期使用。'
+                           '对照全部机位识别翻倒、严重穿插、悬空、失衡、比例扭曲或影响预期使用的摆放及开门冲突；证据明确时作为阻塞问题。'
                            '摘要有遗漏或自身矛盾时提出具体修订，保留用户硬要求；不能通过改写摘要为已有缺陷开脱。'
                            '修订建议只是待执行设计，未重新采集验收不得把它当成修复证据。')
                 prompt += ('\nbrief_alignment 另须完整返回 requirement_checks 与 relation_checks 数组：'
-                           '分别按 scene_requirements 和 visual_relations 的显式index逐项检查，每条 {index:整数,passed:boolean,view:"view_0.png",observation:"具体可见依据"}。'
+                           '按 scene_requirements 和 visual_relations 的原始 index 逐项检查，每条 {index:整数,passed:boolean,view:"view_0.png",observation:"具体可见依据"}。仅当某条视觉关系是计划自拟的非关键细节且与原始任务、功能、通行、观测和真值无关时，可标记 advisory:true 并说明该关系和当前实际可见事实。明确的 clearance 或任何 S2 硬要求均须有正面证据，不能列为可选。'
                            '当前只验收S2场景。摘要或任务中提到的S3轨迹数量、逐帧关节读数、标注及S4题目、S5打包，留给对应阶段验证；不得因为尚未采集而判场景失败。机器人资产身份、布局和可执行条件仍必须在S2检查。'
-                           '不得遗漏、重复或仅笼统声称全部通过。实际图无法确认的要求应失败并留在unresolved。')
-                prompt += '\n支撑和固定安装已按原生回执逐项校验并单独留证；不重复输出物理relation_checks。仍须检查图中可见的悬空、穿插和姿态缺陷，不能根据物体名字认为合格。'
+                           '不得遗漏、重复或笼统声称全部通过。当前实际证据无法确认的关键要求应失败并留在 unresolved，可选建议单独记录。')
+                prompt += ('\n支撑和固定安装原生核查列出逐跳证据。仅对 visual_relations 中仍待核查的静态支撑或安装，'
+                           '返回对应 index、当前 view_N.png 和具体接触观察。说明物体实际压在哪块表面、该表面是否属于目标组件。'
+                           '同房、共用地面、名称相似、包围盒相邻和 stable=true 都不能确认支撑。'
+                           '遮挡或无法形成正面证据时标记失败并解释。静态视觉观察不能覆盖实测间隙、动态动作或用户要求的量测。')
                 prompt += '\nbrief_alignment.observations 须逐一覆盖本次全部 view_N.png，每个视角写具体观察，不能只挑最好的一张。'
             declaration = admission.get('geometry_exception')
             if declaration:
                 prompt += '\n保存计划声明的简化几何实验：' + json.dumps(declaration, ensure_ascii=False)
                 prompt += ('\n按该声明检查几何身份、测量尺度、支撑与安装、实验布局、通行/操作空间和材质照明；'
                            '生活合理性采用声明的实验设定，不要求实验方块长得像日常家具。'
-                           '六项逐图检查仍须通过，例外不替代物理证据。实拍符合声明时 visual_realism.status=matches_declared_geometry；'
+                           '五项现有检查仍须通过，例外不替代物理证据。实拍符合声明时 visual_realism.status=matches_declared_geometry；'
                            '不符合时 needs_improvement 且 acceptable=false。不得将此实验标为真实生活场景。')
         prompt+='\n渲染执行记录：'+json.dumps(report.get('render_settings',{}),ensure_ascii=False)
         entity_fields={'shadow_settings','render_representation','appearance_scope','id','kind','label','prim_path','size','requested_size','initial_center','settled_center','final_center','current_center','declared_yaw_deg','world_transform','world_transform_convention','spatial_evidence_step','orientation_wxyz','world_aabb','support','dynamic','parameter_origin','physics','collision','appearance','geometry_parts'}
@@ -100,7 +120,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
                      'asset_dependencies':[{k:v for k,v in dependency.items() if k in {'entity_id','asset_id','actual_size_m','orientation_deg_xyz','render_representation','scale_mode'}}
                                            for dependency in evidence.get('asset_dependencies',[])],
                      'scope':'compact visual context; full collider, part, support and material receipts remain in capture/evidence.json and acceptance checks'}
-            prompt+='\n紧凑返回：每条观察只写一个具体可见事实（约20到45个汉字），不重复摘要；不确定仍须失败。只返回规定字段，禁止长篇重述程序。'
+            prompt+='\n紧凑返回：每条观察只写一个具体可见事实（约20到45个汉字），不重复摘要；关键事项不确定仍须失败。只返回规定字段，禁止长篇重述程序。'
         prompt+='\n实体与资产执行记录：'+json.dumps(receipt,ensure_ascii=False)
         geometry_path=directory/'geometry_preview.json'
         changes_path=directory/'repair_changes.json'
@@ -118,22 +138,30 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
         prompt+='\n环境贴图执行记录：'+json.dumps(evidence.get('environment_dependencies',[]),ensure_ascii=False)
         prompt+='\n灯具尺寸执行记录：'+json.dumps(evidence.get('light_receipts',[]),ensure_ascii=False)
         review_images=sorted(capture.glob('view_*.png'))
+        if review_only:
+            review_images = [capture/f'view_{index}.png' for index in range(len(program['cameras']))]
         for action_result in evidence.get('interaction',{}).get('action_results',[]):
             for key in ('before_image','after_image'):
                 name=action_result.get(key)
-                if name and (capture/name).is_file():review_images.append(capture/name)
+                if name and Path(name).name == name and (capture/name).is_file() and (
+                        not review_only or f'capture/{name}' in old_acceptance['evidence_versions']):
+                    review_images.append(capture/name)
         prompt+='\n实际图片顺序：'+json.dumps([image.name for image in review_images],ensure_ascii=False)
         prompt+='\n实拍相机位置、朝向与图片对应：'+json.dumps([{'view':f'view_{i}.png',**c} for i,c in enumerate(program['cameras'])],ensure_ascii=False)
         prompt+='\n关系判断须区分画面坐标、世界坐标及使用者视角；左右前后按摘要明确参照判断，不得随相机换位而改变场景关系。未定义参照时指出文字歧义，不臆造世界方向。相机高度以执行位置为准，不能仅凭俯视构图判断拍摄高度。外观名称须由实际形态和材质支持，禁止把未观察到的颜色或品牌当事实。'
-        prompt+='\n全部机位共同覆盖场景，不要求每张照片同时看见所有物体。单一视角遮挡不能证明物体缺失、穿插或悬空；须检查其它对应机位和原生姿态证据。全部机位仍无法辨认或验证的项目应失败并列为未解；清晰可见的缺陷必须保留，不能由程序名称替代外观。'
+        prompt+='\n全部机位共同覆盖场景，不要求每张照片同时看见所有物体。单一视角遮挡不能证明物体缺失、穿插或悬空；须检查其它对应机位和原生姿态证据。全部机位仍无法验证的关键项目应失败并列为未解；清晰可见且影响任务的缺陷必须保留，不能由程序名称替代外观。'
         prompt+='\n'+REFERENCE_GUIDANCE
         layout_reference=directory/'layout_reference.png'
         if layout_reference.is_file():
             review_images.append(layout_reference)
             prompt+=f'\n第 {len(review_images)} 张是扩散设计参考。额外返回 design_alignment:{{status:"aligned"|"partial"|"diverged",issues:[string]}}，比较功能分区、主要物体、材质、采光和氛围；参考仅用于设计比较，不是仿真成品、GT 或像素匹配目标。'
+        trace_dir = directory/'model_calls'/'scene_review'
+        if strict_policy:
+            trace_dir /= 'policy_' + str(SCENE_ACCEPTANCE_POLICY_VERSION)
+
         def assess(prompt_text, images):
             """沿用当前评审的模型预算、取消信号及恢复记录。"""
-            return completion(prompt_text,directory/'model_calls'/'scene_review',images,
+            return completion(prompt_text,trace_dir,images,
                               10000 if strict_policy.get('require_scene_brief') else 5000,
                               bounded_review=bool(strict_policy),stop=stop,context=unit.get('run_context'))
 
@@ -182,6 +210,10 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
     review['interaction_requested']=bool(requested_actions)
     review['interaction_passed']=interaction_passed
     acceptance=capture_acceptance(store.root,program,report,evidence,review,capture,execution_mode)
+    if review_only:
+        verify_capture_versions(directory, old_acceptance['evidence_versions'])
+        if not acceptance.get('enforced'):
+            raise ValueError('Review-only retry requires an enabled production policy')
     if acceptance.get('enforced'):
         review['production_acceptance']=acceptance
         write_json(directory/'scene_acceptance.json',acceptance)

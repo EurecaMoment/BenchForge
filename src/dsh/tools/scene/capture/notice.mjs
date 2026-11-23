@@ -1,3 +1,5 @@
+import {repairEvidence} from './repair_evidence.mjs';
+
 /** Bounded notifications; complete diagnostics remain in the evidence service. */
 /** 收集采集错误和任务诊断，形成去重的可读状态通知。 */
 export function captureNotice(observation = {}, error) {
@@ -32,7 +34,10 @@ export function captureNotice(observation = {}, error) {
           'ConnectionResetError','ConnectionAbortedError','OSError'].includes(failure?.error));
       const retry=task.state === 'FAILED_FINAL' && recoverable && !failure.scene_review &&
         captureRunMatches(observation.run_id,task.id);
+      const evidence = repairEvidence(task);
       return {id:task.id,state:task.state,records:task.records,...(summary && {repair_progress:summary}),
+        ...(task.capture_budget && {capture_budget:task.capture_budget}),
+        ...(evidence && {repair_evidence:evidence}),
         ...(retry && {recovery:{tool:'benchforge_retry',arguments:{task_id:task.id}}})};
     }),
     detail:{tool:'benchforge_scene_status',run_id:observation.run_id,detail:true},

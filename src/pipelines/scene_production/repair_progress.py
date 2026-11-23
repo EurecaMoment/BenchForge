@@ -73,11 +73,15 @@ def relation_states(receipt):
 def native_changes(before, after):
     """区分明确的状态翻转与仅在本轮首次报告的问题。"""
     old, new = relation_states(before), relation_states(after)
+    advisory_keys = {(row['type'], row['source'], row['target'])
+                     for receipt in (before, after) for row in receipt.get('native_relation_checks', [])
+                     if row.get('advisory') is True}
+    comparable_keys = (old.keys() & new.keys()) - advisory_keys
     previous_issues = set(before.get('physical_issues', []))
     return {
-        'fixed': sorted(key for key in old.keys() & new.keys() if not old[key] and new[key]),
-        'regressed': sorted(key for key in old.keys() & new.keys() if old[key] and not new[key]),
-        'coverage_changed': old.keys() != new.keys(),
+        'fixed': sorted(key for key in comparable_keys if not old[key] and new[key]),
+        'regressed': sorted(key for key in comparable_keys if old[key] and not new[key]),
+        'coverage_changed': old.keys() - advisory_keys != new.keys() - advisory_keys,
         'first_reported': [issue for issue in dict.fromkeys(after.get('physical_issues', [])) if issue not in previous_issues],
     }
 
@@ -95,7 +99,8 @@ def comparison_prompt(base, acceptance):
             '，complete（已检查改动及受影响区域），findings 数组。每项含 kind（fixed/regressed/preexisting/uncertain）、'
             'before_view、after_view（各自实际视图文件名）、observation（具体前后事实）。'
             'first_reported 中的每一项如果基线已可见同一缺陷，用 preexisting 并附 first_reported_index（从0开始）。'
-            '视角或遮挡使结论不可靠时用 uncertain。逐项辨别新发现与新引入，保留独立改进。'
+            '只比较影响当前任务的修复及回归。装饰、普通噪点和布景轻微瑕疵放入可选建议。仅凭保守交叠或部分支撑测量无法确认真实回归。'
+            '视角或遮挡使有实际影响的问题仍无法可靠判断时用 uncertain。逐项辨别新发现与新引入，保留独立改进。'
             '当前实拍中可确认且影响任务的缺陷也须体现在当前场景的 acceptable 和 issues 中。')
 
 

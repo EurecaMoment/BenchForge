@@ -2,14 +2,42 @@
 
 import json
 from pathlib import Path
-from storage.files import write_json
+from storage.files import safe_path, write_json
 from capabilities.scene_authoring.program_submission import submission_identity
-from capabilities.scene_authoring.validation.acceptance import admit_program, require_accepted
+from capabilities.scene_authoring.validation.acceptance import (
+    SCENE_ACCEPTANCE_POLICY_VERSION, admit_program, require_accepted, verify_capture_versions,
+)
 from capabilities.scene_authoring.validation.policy import policy_for, check_references
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
 from pipelines.scene_production.service_failures import (
     is_service_failure, verify_capture_service_recovery,
 )
+
+
+def review_retry_evidence(directory, unit, *, archived):
+    """Bind a re-review to the same admitted native capture and every planned view."""
+    relative = (f'previous_scene_review/before_policy_{SCENE_ACCEPTANCE_POLICY_VERSION}/scene_acceptance.json'
+                if archived else 'scene_acceptance.json')
+    receipt_path = safe_path(directory, relative)
+    if not receipt_path.is_file():
+        raise ValueError('Review-only retry requires a saved failed scene acceptance')
+    receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+    versions = receipt.get('evidence_versions')
+    verify_capture_versions(directory, versions)
+    report = json.loads((directory / 'capture/report.json').read_text(encoding='utf-8'))
+    evidence = json.loads((directory / 'capture/evidence.json').read_text(encoding='utf-8'))
+    program = json.loads((directory / 'program.json').read_text(encoding='utf-8'))
+    token = unit.get('capture_token')
+    camera_count = len(program.get('cameras', []))
+    frame_ids = {row.get('frame_id') for row in evidence.get('frames', []) if isinstance(row, dict)}
+    if (not token or any(row.get(key) != token for row, key in (
+            (receipt, 'capture_token'), (report, 'token'), (evidence, 'token')))
+            or report.get('status') != 'captured' or report.get('renderable') is not True
+            or evidence.get('origin') != 'isaac_native' or not camera_count
+            or any(f'capture/view_{index}.png' not in versions or f'view_{index}' not in frame_ids
+                   for index in range(camera_count))):
+        raise ValueError('Review-only retry needs the original native capture token and all frozen camera views')
+    return receipt
 
 
 class SceneLifecycle:
@@ -48,9 +76,9 @@ class SceneLifecycle:
                     admission = admit_program(
                         self.root, submission["program"], allow_generated=True, execution_mode=mode
                     )
-                    if len(intents) == 1 and intent.get('capture_only'):
+                    if len(intents) == 1:
                         declaration = admission.get('scene_brief') or admission.get('geometry_exception') or {}
-                        frozen_design = {k: declaration[k] for k in ('id','plan_path','plan_version') if k in declaration}
+                        frozen_design = {k: declaration[k] for k in ('id','scene_design_id','plan_path','plan_version') if k in declaration}
                     lineage_task_id = intent.get("refine_task_id") or intent.get("extend_task_id")
                     if lineage_task_id:
                         from capabilities.scene_authoring.contracts.scene_design import (
@@ -76,8 +104,31 @@ class SceneLifecycle:
         if unit.get("workflow", "scene") == "scene":
             require_accepted(self.root, directory, unit.get("intent", {}).get("execution_mode"))
 
+    def review_only_requested(self, unit):
+        return unit.get('scene_review_policy_version') == SCENE_ACCEPTANCE_POLICY_VERSION
+
+    def review_only(self, task):
+        unit = task['unit']
+        mode = unit['intent'].get('execution_mode')
+        if unit.get('workflow', 'scene') != 'scene' or unit['phase'] != 'review' or not policy_for(self.root, mode):
+            raise ValueError('Review-only retry requires a production scene in the review phase')
+        from capabilities.scene_authoring.contracts.scene_design import capture_retry_directory
+
+        directory = capture_retry_directory(self.root, task['id'], unit['revision'])
+        receipt = review_retry_evidence(directory, unit, archived=False)
+        old_policy = receipt.get('policy_version', 1)
+        if (receipt.get('enforced') is not True or receipt.get('passed') is not False
+                or type(old_policy) is not int or old_policy >= SCENE_ACCEPTANCE_POLICY_VERSION):
+            raise ValueError('Review-only retry requires a failed acceptance under an older scene policy')
+        admit_program(self.root, json.loads((directory / 'program.json').read_text(encoding='utf-8')), execution_mode=mode)
+        return {**unit, 'scene_review_policy_version': SCENE_ACCEPTANCE_POLICY_VERSION}
+
     # 依据失败阶段、操作反馈和恢复模式构造下一次尝试，同时保留既有成功产物。
     def retry(self, task, feedback, capture_mode, directory_for):
+        if capture_mode == 'review_only':
+            if feedback is not None:
+                raise ValueError('Review-only retry uses frozen evidence and accepts no repair feedback')
+            return self.review_only(task)
         tid = task["id"]
         recovery_id = None
         service_recovery = is_service_failure(task.get('failure') or {})

@@ -1,27 +1,29 @@
 """Fail-closed operator admission for realistic, physically plausible scene production.
 
-Native measurements and visual opinions remain separate. Conservative bound
-overlaps are unresolved, not proof of penetration; unresolved scenes cannot ship.
+Native measurements and visual opinions remain separate. Conservative bounds
+flag potential contact for review. Critical unresolved contact blocks acceptance.
 """
 import json
 import hashlib
 import math
 from pathlib import Path
-import re
 
 from capabilities.scene_authoring.geometry.relations import native_part_bounds
-from capabilities.scene_authoring.geometry.relations import supported_by_parts
-from capabilities.scene_authoring.geometry.relations import supported_by_native_parts
 from capabilities.scene_authoring.geometry.relations import overlap_unresolved
 from capabilities.scene_authoring.geometry.relations import transported_mesh_bounds
-from capabilities.scene_authoring.validation.policy import check_references
 from capabilities.scene_authoring.validation.policy import policy_for, structure, attachment
 from capabilities.scene_authoring.validation.preflight import inspect_program
 from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError, format_issue
 from capabilities.scene_authoring.validation.review_reference import facing_observation_issue
+from capabilities.scene_authoring.validation.support_relations import (
+    native_support, relation_requires_measurement, support_check, support_path, visual_relation_indices,
+)
+from storage.files import safe_path
+
+SCENE_ACCEPTANCE_POLICY_VERSION = 3
 
 VISUAL_CHECKS = {'object_identity', 'realistic_scale', 'support_and_attachment',
-                 'functional_layout', 'access_and_clearance', 'materials_and_lighting'}
+                 'functional_layout', 'access_and_clearance'}
 
 
 # 按显式执行模式或既有配置读取场景验收策略。
@@ -65,6 +67,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             'execution_mode': execution_mode or 'exploration',
         }
     issues = []
+    physical_advisories = []
     admission={}
     try:admission=admit_program(root, program, execution_mode=execution_mode)
     except ScenePreflightError as error:
@@ -114,11 +117,18 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
                     mesh_bound_checks.append({'object_id':obj['id'],'min':tight[0],'max':tight[1],
                         'basis':'all transported source vertices under final native world transform; overlap exclusion only'})
             except (OSError,ValueError,TypeError,KeyError):pass
-    props = [obj for obj in program['objects'] if not structure(obj)]
     by_id = {obj['id']: obj for obj in program['objects']}
+    brief = admission.get('scene_brief')
+    brief_relations = (brief or {}).get('relations', [])
+    support_hops = {child for relation in brief_relations if relation['type'] == 'supported_by'
+                    for child in support_path(by_id, relation['source'], relation['target'])[:-1]}
+    mount_sources = {row['source'] for row in brief_relations if row['type'] == 'mounted_to'}
     verified_mounts = set()
-    for obj in props:
-        if obj['id'] not in boxes:continue
+    support_states = {}
+    unresolved_relations = set()
+    for obj in program['objects']:
+        if obj['id'] not in boxes or (structure(obj) and obj['id'] not in support_hops | mount_sources):
+            continue
         lo,hi = boxes[obj['id']]
         try:mount = attachment(obj, by_id)
         except ValueError as error:issues.append(str(error));mount = None
@@ -131,26 +141,61 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
                 touching = abs(face[axis] - target_face[axis]) <= .04
                 inside = all(min(hi[i], target[1][i]) - max(lo[i], target[0][i]) > .005 for i in range(3) if i != axis)
                 if touching and inside:
-                    verified_mounts.add(frozenset((obj['id'], mount['target'])));continue
-            issues.append(obj['id'] + ': static mount has no native connection to its declared target');continue
+                    verified_mounts.add((obj['id'], mount['target']));continue
+            pair = (obj['id'], mount['target'])
+            if not target:
+                issues.append('/'.join(pair) + ': native mount target evidence is missing')
+            elif any(max(lo[i], target[0][i]) - min(hi[i], target[1][i]) > .04 for i in range(3)):
+                issues.append('/'.join(pair) + ': a measured gap separates the mount from its declared target')
+            else:
+                unresolved_relations.add(pair)
+                physical_advisories.append('/'.join(pair) + ': static mounting is unverified by bounds. Check native or visible attachment')
+            continue
         support = obj['support']
-        if support == 'ground':
-            if abs(lo[2]) > .04:issues.append(obj['id'] + ': native geometry floats above or penetrates ground')
-        elif support in boxes:
-            a,b = boxes[support]
-            supported = supported_by_native_parts((lo,hi),entities[support]) if executed_parts.get(support) else supported_by_parts((lo,hi),[(a,b)])
-            if not supported:
-                issues.append(obj['id'] + ': native support gap or overhang is unresolved')
-        else:issues.append(obj['id'] + ': native support evidence missing')
+        pair = (obj['id'], support)
+        passed, detail = native_support(*pair, boxes, entities, executed_parts)
+        if passed is False or (support != 'ground' and support not in boxes):
+            issues.append('/'.join(pair) + ': ' + detail)
+        elif passed is None:
+            physical_advisories.append('/'.join(pair) + ': ' + detail)
+        support_states[pair] = passed
     for i, left in enumerate(program['objects']):
         for right in program['objects'][i+1:]:
             if left['id'] not in boxes or right['id'] not in boxes:continue
             if structure(left) and structure(right):continue
-            if frozenset((left['id'], right['id'])) in verified_mounts:continue
+            pair = (left['id'], right['id'])
+            if pair in verified_mounts or pair[::-1] in verified_mounts:continue
             left_parts = executed_parts.get(left['id']) or [boxes[left['id']]]
             right_parts = executed_parts.get(right['id']) or [boxes[right['id']]]
             if overlap_unresolved(left_parts, right_parts):
-                issues.append(left['id'] + '/' + right['id'] + ': overlapping native bounds leave mesh intersection unresolved; inspect native geometry/contact evidence before deciding a layout repair')
+                label = left['id'] + '/' + right['id']
+                physical_advisories.append(label + ': conservative bounds overlap. Check actual contact, clearance or obstruction where the task depends on it')
+    native_relation_checks = []
+    action_objects = {row.get('object_id') for row in actions}
+    for index, relation in enumerate(brief_relations):
+        kind = relation['type']
+        if kind not in {'supported_by', 'mounted_to'}:
+            continue
+        source, target = relation['source'], relation['target']
+        if kind == 'supported_by':
+            passed, hops = support_check(by_id, source, target, support_states)
+        else:
+            pair = (source, target)
+            passed = None if pair in unresolved_relations else pair in verified_mounts
+            hops = []
+        affected = {source, target} | {obj for hop in hops for obj in (hop['source'], hop['target'])}
+        needs_native = relation_requires_measurement(relation) or any(
+            obj in action_objects or by_id.get(obj, {}).get('dynamic') is True for obj in affected)
+        visual_required = passed is None and not needs_native
+        if passed is False or (passed is None and needs_native):
+            issues.append(f'Scene brief {kind} relation lacks required native evidence: {source} -> {target}')
+        native_relation_checks.append({
+            'index': index, 'type': kind, 'source': source, 'target': target, 'passed': passed,
+            'evidence': 'capture/evidence.json', 'support_hops': hops,
+            **({'advisory': True, 'visual_check_required': True} if visual_required else {}),
+            'basis': 'native world bounds, support surfaces and directed static mounts',
+        })
+    visual_indices = visual_relation_indices(brief, native_relation_checks) if brief else set()
     physical_issues=list(issues)
     frames = {row.get('frame_id') + '.png' for row in evidence.get('frames', []) if isinstance(row.get('frame_id'), str)}
     frames = {name for name in frames if (Path(capture)/name).is_file()}
@@ -175,46 +220,6 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             issues.append('Life check lacks a concrete captured-view observation: ' + name)
     style=admission.get('scene_style','realistic_assets')
     brief = admission.get('scene_brief')
-    native_relation_checks=[]
-    if brief:
-        # 仅根据当前关系的原生证据判断是否通过，避免无关缺陷污染逐关系反馈。
-        def relation_passed(relation):
-            """Evaluate only the native evidence for this relation.
-
-            A separate physical defect must not make unrelated relations look
-            failed in the report. The overall receipt still fails when any
-            physical issue remains; this only keeps the per-relation evidence
-            honest and actionable.
-            """
-            source, target = relation['source'], relation['target']
-            if source not in boxes:
-                return False
-            obj = by_id.get(source)
-            if not obj:
-                return False
-            if relation['type'] == 'mounted_to':
-                mount = obj.get('metadata', {}).get('spatial_attachment')
-                return (isinstance(mount, dict) and mount.get('target') == target and
-                        frozenset((source, target)) in verified_mounts)
-            if relation['type'] != 'supported_by' or obj.get('support') != target:
-                return False
-            lo, hi = boxes[source]
-            if target == 'ground':
-                return abs(lo[2]) <= .04
-            if target not in boxes:
-                return False
-            support_entity = entities.get(target, {})
-            if executed_parts.get(target):
-                return supported_by_native_parts((lo, hi), support_entity)
-            return supported_by_parts((lo, hi), [(boxes[target][0], boxes[target][1])])
-
-        for index,relation in enumerate(brief['relations']):
-            if relation['type'] not in {'supported_by','mounted_to'}:continue
-            source,target=relation['source'],relation['target']
-            passed=relation_passed(relation)
-            native_relation_checks.append({'index':index,'type':relation['type'],'source':source,'target':target,
-                'passed':passed,'evidence':'capture/evidence.json',
-                'basis':'native world bounds, executed support parts or verified static mount; not visual opinion'})
     frozen_file = Path(capture).parent / 'scene_admission.json'
     if brief and frozen_file.is_file():
         frozen = json.loads(frozen_file.read_text(encoding='utf-8')).get('scene_brief')
@@ -233,20 +238,30 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             issues.append('Scene brief has unresolved spatial or functional contradictions')
         from capabilities.scene_authoring.contracts.requirements import scene_requirements
         for key, expected_indices in (('requirement_checks', {row['index'] for row in scene_requirements(brief)}),
-                                     ('relation_checks', {i for i,r in enumerate(brief['relations']) if r['type'] not in {'supported_by','mounted_to'}})):
+                                     ('relation_checks', visual_indices)):
             checks = alignment.get(key, [])
-            # Physical relations are already measured above. Visual opinions
-            # about hidden shelf bottoms must not replace those native checks.
+            # Native support and attachment findings are recorded separately.
+            # A brief requirement for actual contact still needs positive evidence here.
             relevant=[row for row in checks if isinstance(row,dict) and type(row.get('index')) is int and
                       row['index'] in expected_indices] if isinstance(checks,list) else []
+            # A checked incidental layout detail can be advisory. Hard requirements
+            # and declared clearance must have positive task evidence.
+            def advisory_relation(row):
+                return (key == 'relation_checks' and row.get('advisory') is True
+                        and brief['relations'][row['index']]['type'] not in {'clearance', 'supported_by', 'mounted_to'}
+                        and not brief['relations'][row['index']].get('expected_direction'))
+
             if (not isinstance(checks, list) or len(relevant) != len(expected_indices) or
                     {row.get('index') for row in relevant} != expected_indices or
-                    any(row.get('passed') is not True or not captured_observation(row,frames) for row in relevant)):
+                    any((row.get('passed') is not True and not advisory_relation(row))
+                        or not captured_observation(row, frames) for row in relevant)):
                 issues.append('Scene brief needs complete captured evidence for ' + key)
             if key == 'relation_checks':
                 for row in relevant:
                     relation = brief['relations'][row['index']]
-                    if relation['type'] == 'facing':
+                    if relation['type'] in {'supported_by', 'mounted_to'} and row.get('view') not in expected:
+                        issues.append(f"Scene brief relation {row['index']} needs a current planned camera view")
+                    if relation['type'] == 'facing' and not advisory_relation(row):
                         issue = facing_observation_issue(relation, row, evidence.get('frames', []))
                         if issue:
                             issues.append(issue)
@@ -283,15 +298,32 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
             if isinstance(name, str) and Path(name).name == name:
                 files.append(Path(capture) / name)
     versions = {file.relative_to(Path(capture).parent).as_posix():[file.stat().st_size,file.stat().st_mtime_ns] for file in files if file.is_file()}
-    return {'schema':'benchforge.scene-acceptance/v1','enforced':True,'passed':not issues,'issues':issues,
-            'physical_issues':physical_issues,'visual_status':'not_assessed' if visual_pending else 'assessed',
+    return {'schema':'benchforge.scene-acceptance/v1','policy_version':SCENE_ACCEPTANCE_POLICY_VERSION,
+            'enforced':True,'passed':not issues,'issues':issues,
+            'physical_issues':physical_issues,'physical_advisories':physical_advisories,'visual_status':'not_assessed' if visual_pending else 'assessed',
             'native_relation_checks':native_relation_checks,
             'mesh_bound_checks':mesh_bound_checks,'mesh_versions':mesh_versions,
             'scene_id':program.get('scene_id'),'capture_token':report.get('token'),'evidence_versions':versions,
             'scene_style':style,'geometry_exception':admission.get('geometry_exception'),'scene_brief':brief,
-            'physical_scope':'native settling, conservative world bounds, support gap and collider receipts; uncalibrated material parameters',
+            'physical_scope':'native settling and collider receipts; conservative contact, support and clearance leads are evaluated using capture evidence',
             'life_scope':'per-view model visual judgment, not measured truth or human certification',
             'on_failure':'retain all failed evidence; gather independent physical and visual issues, batch-preflight a complete repair candidate, then recapture within budget; never export or mark complete'}
+
+
+# 校验复评绑定的原有证据版本，在发布复评结果前再次核对。
+def verify_capture_versions(directory, versions):
+    if not isinstance(versions, dict) or not {
+        'program.json', 'capture/report.json', 'capture/evidence.json'
+    } <= versions.keys():
+        raise ValueError('Scene acceptance is missing a required native evidence version')
+    for relative, version in versions.items():
+        try:
+            path = safe_path(directory, relative, must_exist=True)
+            stat = path.stat()
+        except OSError as error:
+            raise ValueError('Frozen scene evidence is missing: ' + relative) from error
+        if version != [stat.st_size, stat.st_mtime_ns]:
+            raise ValueError('Scene changed since acceptance; review the original frozen native evidence')
 
 
 # 要求场景已有通过的生产验收，并检查简报和冻结证据版本仍然有效。
@@ -305,14 +337,7 @@ def require_accepted(root, directory, execution_mode=None):
         raise ValueError('Scene has no passing physical and life acceptance; do not export, select or mark complete')
     if policy.get('require_scene_brief') and not receipt.get('scene_brief'):
         raise ValueError('Scene has no saved brief and capture alignment acceptance')
-    for relative, version in receipt.get('evidence_versions', {}).items():
-        path = directory / relative
-        if (Path(relative).is_absolute() or '..' in Path(relative).parts or path.is_symlink()
-                or not path.is_file() or path.resolve() != path
-                or version != [path.stat().st_size,path.stat().st_mtime_ns]):
-            raise ValueError('Scene changed since acceptance; recapture and review before production')
-    if not {'program.json', 'capture/report.json', 'capture/evidence.json'} <= set(receipt.get('evidence_versions', {})):
-        raise ValueError('Scene acceptance is missing a required native evidence version')
+    verify_capture_versions(directory, receipt.get('evidence_versions'))
     for declaration in (receipt.get('geometry_exception'), receipt.get('scene_brief')):
         if not declaration:continue
         plan=Path(declaration['plan_path'])

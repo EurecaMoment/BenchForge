@@ -40,7 +40,9 @@ class FacingReviewTests(unittest.TestCase):
                     ('facing', {**cue, 'front_to_target': 'unclear'}, True, False),
                     ('facing', {**cue, 'front_to_target': 'toward'}, False, False),
                     ('facing', {**cue, 'front_to_target': 'toward'}, True, True),
-                    ('near', {}, True, True)]:
+                    ('near', {}, True, True),
+                    ('near', {'advisory': True, 'passed': False}, True, True),
+                    ('clearance', {'advisory': True, 'passed': False}, True, False)]:
                 with self.subTest(kind=kind, fields=fields, visible=visible):
                     relation['type'] = kind
                     frame['objects'] = [{'object_id': 'sofa' if visible else 'tv'}]

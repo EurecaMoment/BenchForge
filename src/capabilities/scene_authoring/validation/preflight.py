@@ -11,6 +11,7 @@ from capabilities.scene_authoring.catalog.native_reference import native_size_z_
 from capabilities.scene_authoring.contracts.scene_program import SCENE_V2_MAX_OBJECTS
 from capabilities.scene_authoring.validation.program import program_contract_issues
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry, initial_bounds_overlaps
+from capabilities.scene_authoring.validation.support_relations import support_path
 from capabilities.scene_authoring.contracts.scene_design import geometry_exception, scene_brief, saved_design
 from capabilities.scene_authoring.validation.diagnostics import SceneDiagnostics, ScenePreflightError
 from capabilities.scene_authoring.validation.policy import attachment, check_references, detailed_construction, policy_for, structure
@@ -189,9 +190,8 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
                     object_ids=[key], ratios=ratios)
         if ok and not mount and obj['support'] == 'ground' and abs(obj['base_z']) > .03:
             diagnostics.add('ground_offset', path + '/base_z',
-                'Declared initial geometry floats above or penetrates ground; model actual support/attachment. '
-                'This is an initial placement check, not an observed contact or settling result.',
-                basis='declared_support', object_ids=[key], base_z_m=obj['base_z'])
+                'Declared initial bounds differ from nominal ground Z=0. Inspect actual floor contact or attachment in capture.',
+                basis='declared_support', severity='warning', object_ids=[key], base_z_m=obj['base_z'])
         if obj['dynamic'] and isinstance(obj.get('physics', {}), dict):
             required = {'static_friction', 'dynamic_friction', 'restitution', 'mass_source'}
             missing = sorted(required - set(obj.get('physics', {})))
@@ -218,13 +218,27 @@ def _object_admission(program, objects, indexes, policy, declaration, brief, dec
                                  'source object contract or support component is invalid')
                 continue
             expected = relation['target']
-            actual = obj['support'] if relation['type'] == 'supported_by' else (
-                mounts.get(obj['id']) or {}).get('target') if relation['type'] == 'mounted_to' else expected
-            if actual != expected:
-                diagnostics.add('scene_brief_relation_mismatch', f'/objects/{indexes[obj["id"]]}',
-                    obj['id'] + ': support or mounting contradicts saved scene brief',
-                    basis='saved_scene_plan', object_ids=[obj['id']] + ([expected] if expected in by_id else []),
-                    relation_index=index, expected_target=expected, declared_target=actual)
+            kind = relation['type']
+            path = f'/objects/{indexes[obj["id"]]}'
+            if kind == 'supported_by':
+                declared_path = support_path(by_id, obj['id'], expected)
+                if len(declared_path) > 1 and declared_path[-1] == expected:
+                    continue
+                diagnostics.add('scene_brief_relation_mismatch', path + '/support',
+                    f"{obj['id']}: the declared support path does not establish '{expected}'. "
+                    'Review the actual support surface and assembly in captured views.',
+                    basis='saved_scene_plan', severity='warning',
+                    object_ids=[obj['id']] + ([expected] if expected in by_id else []),
+                    relation_index=index, expected_target=expected, declared_target=obj['support'],
+                    mismatch_kind='support_path_unconfirmed', support_path=declared_path,
+                    review_required='captured_view_and_native_relation_check')
+            elif kind == 'mounted_to':
+                actual = (mounts.get(obj['id']) or {}).get('target')
+                if actual != expected:
+                    diagnostics.add('scene_brief_relation_mismatch', path + '/metadata/spatial_attachment',
+                        obj['id'] + ': mounting contradicts saved scene brief',
+                        basis='saved_scene_plan', object_ids=[obj['id']] + ([expected] if expected in by_id else []),
+                        relation_index=index, expected_target=expected, declared_target=actual)
     return mounts, simplified
 
 

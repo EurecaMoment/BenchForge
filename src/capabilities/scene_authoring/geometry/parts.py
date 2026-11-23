@@ -17,18 +17,24 @@ def rotation_matrix(angles):
 def part_bounds(part):
     """Exact AABB of a rotated box, ellipsoid or elliptical Z-cylinder."""
     rotation=rotation_matrix(part.get('rotation_deg_xyz',[0,0,0]))
+    extents=part_extents(part, rotation)
+    return ([part['offset'][i]-extents[i] for i in range(3)],
+            [part['offset'][i]+extents[i] for i in range(3)])
+
+
+def part_extents(part, axes):
+    """Return primitive half-extents under a column-vector linear transform."""
     radii=[v/2 for v in part['size']]
     shape=part.get('shape')
     extents=[]
-    for row in rotation:
+    for row in axes:
         scaled=[row[i]*radii[i] for i in range(3)]
         if shape=='box':extent=sum(abs(v) for v in scaled)
         elif shape=='sphere':extent=math.sqrt(sum(v*v for v in scaled))
         elif shape=='cylinder':extent=math.hypot(*scaled[:2])+abs(scaled[2])
         else:raise ValueError('unsupported part shape')
         extents.append(extent)
-    return ([part['offset'][i]-extents[i] for i in range(3)],
-            [part['offset'][i]+extents[i] for i in range(3)])
+    return extents
 
 
 # 提取盒体实际存在的水平顶面，倾斜到无水平面时返回空。

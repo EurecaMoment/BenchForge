@@ -119,6 +119,21 @@ class SceneDiagnosticsTests(unittest.TestCase):
         self.assertEqual([row['object_id'] for row in report['geometry_preview']['objects']], ['independent'])
         self.assertTrue(any(row['path'] == '/objects/5' for row in report['skipped_checks']))
 
+    def test_preflight_accepts_transitive_support_and_leaves_component_identity_to_capture(self):
+        self.program['objects'] = [object_record('leg'), object_record('seat', support='leg'),
+                                   object_record('shelf'), object_record('box', support='shelf')]
+        brief = {'object_roles': [], 'relations': [
+            {'type': 'supported_by', 'source': 'seat', 'target': 'ground'},
+            {'type': 'supported_by', 'source': 'box', 'target': 'leg'},
+        ]}
+        with patch('capabilities.scene_authoring.validation.preflight.scene_brief', return_value=brief):
+            report = self.inspect(policy={'enabled': True})
+        mismatches = [row for row in report['issues'] if row['code'] == 'scene_brief_relation_mismatch']
+        self.assertEqual(len(mismatches), 1)
+        self.assertEqual(mismatches[0]['evidence']['relation_index'], 1)
+        self.assertEqual(mismatches[0]['evidence']['support_path'], ['box', 'shelf', 'ground'])
+        self.assertFalse(mismatches[0]['blocking'])
+
     # 验证待生成对象不因尚无网格误失败，也不妨碍检查其他几何。
     def test_pending_generated_object_does_not_hide_other_geometry_or_fail_by_itself(self):
         self.program['objects'] = [
