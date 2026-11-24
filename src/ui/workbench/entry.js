@@ -66,12 +66,6 @@ function createClient(React, defineStore, ui) {
     return h(Component, {...props, t, canSubmit: canStartProduction(permissions)});
   }
 
-  function ConversationProductionStatus({useProjection,t}) {
-    const value=useProjection('benchforgeProduction');
-    if (!value?.active || !(value.pendingCaptures?.length || value.stopReason || ['blocked','incomplete','capture_error','interrupted','failed'].includes(value.state))) return null;
-    return h(progress.ProductionActivity,{value,t});
-  }
-
   /** 挂载原生远程接口和资源提供器，注册会话存储、输入配置与工作台界面插槽。 */
   async function apply(ctx) {
     await ctx.remote.$mount(workbenchRemote);
@@ -123,9 +117,7 @@ function createClient(React, defineStore, ui) {
           const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
           const hero = slot === 'conversation.input.dock';
           if (preset !== PRESET_ID || (hero && !blank)) return null;
-          return h(React.Fragment,null,
-            !hero && h(ConversationProductionStatus,{useProjection:props.useProjection,t}),
-            h(ProductionEnvironment, {...props, key: props.sessionId, t, hero, component: composer.ProductionComposer}));
+          return h(ProductionEnvironment, {...props, key: props.sessionId, t, hero, component: composer.ProductionComposer});
         }));
       }
       /** 根据右侧面板当前展开状态切换工作台的显示与隐藏。 */

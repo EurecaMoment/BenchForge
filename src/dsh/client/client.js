@@ -4931,11 +4931,6 @@ var benchforgeClient = (() => {
       const permissions = props.useProjection("permissions");
       return h(Component, { ...props, t, canSubmit: canStartProduction(permissions) });
     }
-    function ConversationProductionStatus({ useProjection, t }) {
-      const value = useProjection("benchforgeProduction");
-      if (!value?.active || !(value.pendingCaptures?.length || value.stopReason || ["blocked", "incomplete", "capture_error", "interrupted", "failed"].includes(value.state))) return null;
-      return h(progress.ProductionActivity, { value, t });
-    }
     async function apply(ctx) {
       await ctx.remote.$mount(typert_remote_client_default);
       ctx.effect(() => ctx.locale.register(NS, dictionaries));
@@ -5024,12 +5019,7 @@ var benchforgeClient = (() => {
                   const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
                   const hero = slot === "conversation.input.dock";
                   if (preset !== PRESET_ID || hero && !blank) return null;
-                  return h(
-                    React.Fragment,
-                    null,
-                    !hero && h(ConversationProductionStatus, { useProjection: props.useProjection, t }),
-                    h(ProductionEnvironment, { ...props, key: props.sessionId, t, hero, component: composer.ProductionComposer })
-                  );
+                  return h(ProductionEnvironment, { ...props, key: props.sessionId, t, hero, component: composer.ProductionComposer });
                 }
               )
             );
