@@ -8,6 +8,27 @@ from dsh.presets.build_preset import model_patches
 
 
 class DshRetryPolicyTests(unittest.TestCase):
+    def test_declared_model_reasoning_efforts_reach_the_dsh_catalog(self):
+        efforts = {
+            'off': None,
+            'minimal': 'minimal',
+            'low': 'low',
+            'medium': 'medium',
+            'high': 'high',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'benchforge.json'
+            config.write_text(json.dumps({'providers': {'FastQwen': {
+                'model': 'qwen-flash-next', 'url': 'http://127.0.0.1:18041/v1',
+                'reasoning_efforts': efforts,
+            }}}), encoding='utf-8')
+
+            patches = model_patches(config)
+
+        provider = next(row for row in patches if row['id'] == 'llm-pi-ai')
+        descriptor = provider['config']['providers']['benchforge-models']['models'][0]
+        self.assertEqual(descriptor['reasoningEfforts'], efforts)
+
     def test_malformed_responses_get_two_bounded_retries_by_default(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / 'benchforge.json'

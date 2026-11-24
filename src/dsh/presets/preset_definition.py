@@ -250,6 +250,16 @@ def build(standard, python, service_config, *, config_path=None,
     base.set_identity(preset, base.BENCHFORGE_ID)
     config = preset['config']
     plugins = config['plugins']
+    # BenchForge data production starts with the shared task board enabled.
+    # Keep this declaration inside the preset so the standard coding preset
+    # retains its upstream default of disabled Team mode.
+    plugins.extend([
+        {'id': 'agent-team',
+         'name': '@deepseek-ai/dsh-agent-team',
+         'config': {'defaultEnabled': True}},
+        {'id': 'tool-agent-team',
+         'name': '@deepseek-ai/dsh-tool-agent-team'},
+    ])
     # 插件安装和配置属于宿主管理，生产执行者通过业务目录发现工具。
     for row in plugins:
         if row.get('name') == '@deepseek-ai/dsh-plugin-manager/tools':

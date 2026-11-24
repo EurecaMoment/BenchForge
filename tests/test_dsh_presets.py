@@ -50,6 +50,19 @@ class DshPresetTests(unittest.TestCase):
             self.assertFalse(by_id['tool-bash'].get('disabled'))
         self.assertNotIn('disabled', rows[-2])
 
+    def test_agent_team_default_is_scoped_to_benchforge(self):
+        """Enable Team mode for BenchForge sessions without changing Standard."""
+        source = standard()
+        standard_plugins = source[0]['insert'][0]['config']['plugins']
+        generated = build(source, 'python3', Path('/missing/config.json'),
+                          Path('/missing/service.json'), package_imports=True)
+        team_plugins = {row['id']: row for row in plugins(generated)}
+        self.assertEqual(team_plugins['agent-team']['name'], '@deepseek-ai/dsh-agent-team')
+        self.assertIs(team_plugins['agent-team']['config']['defaultEnabled'], True)
+        self.assertEqual(team_plugins['tool-agent-team']['name'], '@deepseek-ai/dsh-tool-agent-team')
+        self.assertNotIn('agent-team', {row['id'] for row in standard_plugins})
+        self.assertNotIn('tool-agent-team', {row['id'] for row in standard_plugins})
+
     # 验证组件指南在 profile 合并后仍唯一存在，且只作用于自有预设。
     def test_component_skills_survive_profile_merge_and_remain_preset_scoped(self):
         for portable in (False, True):

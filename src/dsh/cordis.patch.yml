@@ -490,8 +490,18 @@
       - id: tool-plugin-market
         name: '@deepseek-ai/dsh-plugin-market/tools'
         disabled: true
+      - id: agent-team
+        name: '@deepseek-ai/dsh-agent-team'
+        config:
+          defaultEnabled: true
+      - id: tool-agent-team
+        name: '@deepseek-ai/dsh-tool-agent-team'
       - id: benchforge-skill-files
         name: '@eurecamoment/benchforge-dsh/component-skills'
+      - id: benchforge-summary-policy
+        name: '@eurecamoment/benchforge-dsh/summary-policy'
+        config:
+          targetTokens: 4000
       - id: benchforge-invocation
         name: '@eurecamoment/benchforge-dsh/invocation'
       - id: benchforge-review-policy

@@ -49,6 +49,18 @@
       "token_env": null,
       "timeout_seconds": 1800
     },
+    "FastQwen": {
+      "url": null,
+      "model": null,
+      "token_env": null,
+      "reasoning_efforts": {
+        "off": null,
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high"
+      }
+    },
     "IsaacSim4A100": {
       "grpc": {
         "host": null,
