@@ -53,6 +53,8 @@
       "url": null,
       "model": null,
       "token_env": null,
+      "context_window": 262144,
+      "max_tokens": 32768,
       "reasoning_efforts": {
         "off": null,
         "minimal": "minimal",
