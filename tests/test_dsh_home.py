@@ -24,6 +24,12 @@ class DshHomeTests(unittest.TestCase):
         with patch.dict(os.environ, {'BENCHFORGE_DSH_HOME': str(requested)}, clear=True):
             self.assertEqual(LAUNCHER.configured_dsh_home(), requested.resolve())
 
+    def test_configured_temp_paths_override_inherited_values(self):
+        environment = {name: '/old/workspace/tmp' for name in ('TMPDIR', 'TMP', 'TEMP')}
+        configured = {name: '/outside/workspace/tmp' for name in ('TMPDIR', 'TMP', 'TEMP')}
+        LAUNCHER.apply_configured_temp_environment(environment, configured)
+        self.assertEqual(environment, configured)
+
 
 if __name__ == '__main__':
     unittest.main()
