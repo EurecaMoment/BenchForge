@@ -29,6 +29,8 @@ export interface ProductionView {
   completed: number;
   total: number;
   delivered: boolean;
+  pendingCaptures: {run: string; name: string}[];
+  stopReason: string;
   capture_budget?: CaptureBudget | null;
 }
 
@@ -39,7 +41,7 @@ type ProductionNotice<K extends string> = {
   previousReviewId?: number;
 };
 type CaptureNotice = ProductionNotice<'benchforge/capture-watch'> & {
-  capture: {run_id: string; state: string; failed: boolean; blocked?: boolean; capture_budget?: CaptureBudget};
+  capture: {run_id: string; state: string; failed: boolean; blocked?: boolean; error?: string; workflow?: string; capture_budget?: CaptureBudget};
 };
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

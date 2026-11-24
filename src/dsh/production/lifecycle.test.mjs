@@ -362,7 +362,7 @@ test('equivalent released plan repairs preserve collection progress after the ac
     productionProjection.stateSchema.parse(replayed);
     assert.deepEqual(replayed.view,after);
     assert.equal(replayed.planReview.review_id,1);assert.equal(replayed.planReview.revision,9);
-    assert.equal(productionProjection.stateVersion,15);
+    assert.equal(productionProjection.stateVersion,16);
   }
 });
 
@@ -774,4 +774,28 @@ test('older tool receipts cannot downgrade a committed review notice or a newer 
   assert.equal(h.view().review.review_id,2);assert.equal(h.view().state,'waiting_user');assert.equal(h.view().stage,'S2');
   h.receipt('benchforge_stage_review',{review_id:2,revision:2,state:'check_failed',stage:'S2',artifact:'/workspace/scene.json',deadline:800});
   assert.equal(h.view().review.state,'check_failed');assert.equal(h.view().completed,0);
+});
+
+test('accepted parallel scene submissions remain visible until their individual outcomes arrive',()=>{
+  const h=harness();h.plan();
+  for (const name of ['A','B','C']) {
+    const run='sf_'+name;
+    h.event('tool/call',{callId:run,name:'benchforge_capture',arguments:JSON.stringify({name})});
+    h.event('tool/result',{message:{toolCallId:run,content:[{type:'text',text:JSON.stringify({
+      run_id:run,state:'submitted',submission_accepted:true,watch:{accepted:true,background:true}
+    })}]}});
+  }
+  h.event('turn/end',{reason:{kind:'completed'}});
+  assert.equal(h.view().state,'waiting_capture');
+  assert.deepEqual(h.view().pendingCaptures.map(row=>row.name),['A','B','C']);
+  h.event('turn/start',{turn:2});
+  for (const [name,remaining] of [['A',['B','C']],['C',['B']],['B',[]]]) {
+    h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_'+name,state:'SUCCEEDED'}}});
+    assert.deepEqual(h.view().pendingCaptures.map(row=>row.name),remaining);
+    assert.equal(h.view().stage,'S2');assert.equal(h.view().workflowTurn,2);
+  }
+  h.event('turn/end',{reason:{kind:'max-tokens'}});
+  assert.equal(h.view().stopReason,'max-tokens');
+  h.event('turn/start',{turn:3});
+  assert.equal(h.view().stopReason,'');
 });

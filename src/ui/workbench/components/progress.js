@@ -144,7 +144,13 @@ export function createProgressComponents({React, helpers}) {
     return h('div',{className:'bfw-muted','data-production-activity':value.state,role:'status','aria-live':'polite'},
       t('productionSystemStatus')+' · '+t(phase)+(value.stage?' · '+value.stage:''),
       silent?' · '+t('productionAwaitingUpdate'):'',
-      value.error?h('span',null,' · '+t('productionRecentFailure')):null);
+      value.pendingCaptures?.length>0 && h('div',{'data-pending-captures':true},
+        t('productionPendingCaptures'),h('ul',null,value.pendingCaptures.map(({run,name})=>
+          h('li',{key:run},name===run?run:name+' · '+run)))),
+      value.stopReason && h('div',{'data-stop-reason':true},t('productionStopReason')+' · '+
+        ({'max-tokens':t('productionTokenLimit'),user:t('productionUserStopped'),disposed:t('productionHostStopped'),
+          interrupted:t('productionHostStopped'),error:value.error || t('sessionFailed')}[value.stopReason] || value.stopReason)),
+      value.error && value.stopReason!=='error' && h('div',{className:'bfw-error'},value.error));
   }
   /** 展示五阶段导航、各阶段状态及当前执行位置。 */
   function StageProgress({stage, pipeline, scene, record, activity, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t}) {
@@ -273,5 +279,5 @@ export function createProgressComponents({React, helpers}) {
         progress: row.progress, public_artifacts: artifacts.filter((file) => file.task_id === row.id && file.url),
       }))}));
   }
-  return {TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress, StageProgress};
+  return {ProductionActivity, TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress, StageProgress};
 }

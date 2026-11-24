@@ -10,6 +10,11 @@ export function pendingRunObservation(value) {
     value.terminal !== true && ['PENDING','READY','RUNNING'].includes(value.state);
 }
 
+export function trackedSubmission(receipt) {
+  return receipt?.submission_accepted === true && receipt.watch?.background === true &&
+    receipt.watch.accepted === true && typeof receipt.run_id === 'string';
+}
+
 export function backgroundWaitRun(value) {
   return value?.watch?.background === true && value.watch.accepted === true && pendingRunObservation(value)
     ? value.run_id : '';

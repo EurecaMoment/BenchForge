@@ -205,7 +205,16 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     signal?.throwIfAborted();
     const state=projection.stateOf(agent.session);
     let view=state.view;
-    if(!view.active||view.workflowTurn!==view.turn||hasPendingWait(agent))return;
+    if(!view.active||view.workflowTurn!==view.turn)return;
+    const ownedWait=hasPendingWait(agent)||waitingForCapture(agent);
+    if (ownedWait && (view.pendingCaptures?.length || view.state==='waiting_capture')) {
+      if (state.lastResponse?.visible) return;
+      const runs=(view.pendingCaptures || []).map(row=>row.name===row.run?row.run:row.name+' ('+row.run+')');
+      const key=agent.id+':'+turn+':waiting:'+JSON.stringify(runs);
+      if (!state.notices.includes(key) && !pendingNotice(agent,key))
+        agent.steer(notice('benchforge/production-continue',key,'后台正在跟踪'+(runs.length?'：'+runs.join('、'):'采集任务')+'。结果返回后会在本会话自动继续。向用户说明等待状态。'));
+      return;
+    }
     if(exhaustedCapture(agent,view))return;
     const observed=await observe(agent,signal);
     signal?.throwIfAborted();
@@ -225,13 +234,13 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const delivered=view.state==='completed'&&view.delivered;
     const visible=state.lastResponse?.visible ?? view.lastTextSeq>=0;
     if((waiting||blocked||delivered)&&visible)return;
-    if(visible && view.state==='waiting_capture' && waitingForCapture(agent))return;
+
     // A new tool step breaks a streak of text-only stops, even within one stage.
     const key=`${agent.id}:${turn}:${view.state}:${view.plan}:${view.run}:${view.completed}:${review?.review_id||0}:${review?.state||''}:tools:${view.tools}`;
     const last=reminders.get(agent.id);
     if(last?.stop===key&&last.response===state.lastResponse?.seq)return;
     const attempts=Math.max(state.notices.filter(value=>value.startsWith(key+':recovery:')).length,last?.stop===key?last.attempts||0:0);
-    if(attempts>=maxStopRecoveries)throw new ProductionIncompleteError();
+    if(attempts>=maxStopRecoveries)throw new ProductionIncompleteError(view.pendingCaptures?.length && !ownedWait ? '后台跟踪未接管剩余运行：'+view.pendingCaptures.map(row=>row.run).join('、')+'。请按原编号恢复跟踪。' : undefined);
     reminders.set(agent.id,{...last,stop:key,response:state.lastResponse?.seq,attempts:attempts+1});
     const action=waiting?'当前审核仍需等待或处理用户指令，向用户说明当前状态。':blocked?'如实说明当前阻塞、已保存产物和所需输入。':
       !view.plan?'使用已读合同保存计划草稿并调用 benchforge_pipeline_plan。':

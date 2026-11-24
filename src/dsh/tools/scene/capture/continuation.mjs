@@ -155,7 +155,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
           return save({...record,state:'settled'});
       }
       const message = createMessage({source:{kind:'benchforge/capture-watch',noticeKey:key,form:'notice',summary:`采集状态：${outcome(record)}`,
-        capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation),workflow:workflowOf(record),...(budget && {capture_budget:budget})}},
+        capture:{run_id:record.run_id,state:outcome(record),failed:captureFailure(record.observation),...(record.error && {error:String(record.error)}),workflow:workflowOf(record),...(budget && {capture_budget:budget})}},
         content:[{type:'text',text:text(record)},...images]});
       // steer wakes a driver even if it is crossing the final-response boundary.
       if (agent.status === 'running') agent.steer(message); else agent.followup(message);
@@ -264,14 +264,14 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     return {...observation,...registered,watch:{...registered.watch,accepted:registered.watch.state === 'watching'}};
   }
 
-  // Only explicit wait receipts for the current task and accepted service observations can park a turn.
+  // Only host-owned waits with a live observer for the current task can park a turn.
   function hasPendingWait(agent) {
     const context = history(agent.session);
     if (closed || context.interrupted || context.completed) return false;
     return context.waits.some(run=>{
       const key = keyOf(agent.id,run), row = table.get(key);
-      return row?.state === 'watching' && row.task_seq === context.taskSeq && row.observation?.run_id === run &&
-        pendingRunObservation(row.observation) && active.get(key)?.generation === row.generation;
+      return row?.state === 'watching' && row.task_seq === context.taskSeq &&
+        active.get(key)?.generation === row.generation;
     });
   }
   /** 从最新原生采集事件协调续接记录，只恢复仍属于当前任务的运行。 */

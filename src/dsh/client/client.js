@@ -114,6 +114,11 @@ var benchforgeClient = (() => {
       productionCompleted: "\u6D41\u6C34\u7EBF\u5DF2\u5B8C\u6210",
       productionAwaitingUpdate: "\u6B63\u5728\u7B49\u5F85\u8FDB\u5C55\u8BF4\u660E",
       productionRecentFailure: "\u6700\u8FD1\u4E00\u6B21\u8C03\u7528\u5931\u8D25\uFF0C\u7B49\u5F85\u5904\u7406",
+      productionPendingCaptures: "\u7B49\u5F85\u8FD4\u56DE\u7684\u540E\u53F0\u4EFB\u52A1",
+      productionStopReason: "\u672C\u8F6E\u505C\u6B62\u539F\u56E0",
+      productionTokenLimit: "\u6A21\u578B\u8F93\u51FA\u8FBE\u5230 token \u4E0A\u9650",
+      productionUserStopped: "\u7528\u6237\u505C\u6B62\u4E86\u672C\u8F6E",
+      productionHostStopped: "\u5BBF\u4E3B\u4E2D\u65AD\u4E86\u672C\u8F6E",
       productionWaitingCapture: "\u7B49\u5F85\u540E\u53F0\u4F5C\u4E1A\u7ED3\u679C",
       productionNeedsRepair: "\u4F5C\u4E1A\u6216\u9A8C\u6536\u5931\u8D25\uFF0C\u5F85\u4FEE\u590D",
       productionSceneReady: "\u91C7\u96C6\u5DF2\u5B8C\u6210\uFF0C\u7EE7\u7EED\u751F\u4EA7\u6D41\u7A0B",
@@ -591,6 +596,11 @@ var benchforgeClient = (() => {
       productionCompleted: "Pipeline completed",
       productionAwaitingUpdate: "Awaiting a progress update",
       productionRecentFailure: "Recent tool failure awaiting resolution",
+      productionPendingCaptures: "Awaiting background results",
+      productionStopReason: "Turn stopped",
+      productionTokenLimit: "Model output reached its token limit",
+      productionUserStopped: "Stopped by the user",
+      productionHostStopped: "Host interrupted the turn",
       productionWaitingCapture: "Awaiting background job results",
       productionNeedsRepair: "Job or acceptance failed, repair required",
       productionSceneReady: "Capture complete, production continues",
@@ -2032,7 +2042,20 @@ var benchforgeClient = (() => {
         { className: "bfw-muted", "data-production-activity": value.state, role: "status", "aria-live": "polite" },
         t("productionSystemStatus") + " \xB7 " + t(phase) + (value.stage ? " \xB7 " + value.stage : ""),
         silent ? " \xB7 " + t("productionAwaitingUpdate") : "",
-        value.error ? h("span", null, " \xB7 " + t("productionRecentFailure")) : null
+        value.pendingCaptures?.length > 0 && h(
+          "div",
+          { "data-pending-captures": true },
+          t("productionPendingCaptures"),
+          h("ul", null, value.pendingCaptures.map(({ run, name }) => h("li", { key: run }, name === run ? run : name + " \xB7 " + run)))
+        ),
+        value.stopReason && h("div", { "data-stop-reason": true }, t("productionStopReason") + " \xB7 " + ({
+          "max-tokens": t("productionTokenLimit"),
+          user: t("productionUserStopped"),
+          disposed: t("productionHostStopped"),
+          interrupted: t("productionHostStopped"),
+          error: value.error || t("sessionFailed")
+        }[value.stopReason] || value.stopReason)),
+        value.error && value.stopReason !== "error" && h("div", { className: "bfw-error" }, value.error)
       );
     }
     function StageProgress({ stage, pipeline, scene, record, activity, planReceipt, collectionPlan, artifacts = [], conversationRunning = false, completedStages = 0, t }) {
@@ -2217,7 +2240,7 @@ var benchforgeClient = (() => {
         })) })
       );
     }
-    return { TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress, StageProgress };
+    return { ProductionActivity, TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress, StageProgress };
   }
 
   // src/ui/workbench/components/gallery.js
@@ -4908,6 +4931,11 @@ var benchforgeClient = (() => {
       const permissions = props.useProjection("permissions");
       return h(Component, { ...props, t, canSubmit: canStartProduction(permissions) });
     }
+    function ConversationProductionStatus({ useProjection, t }) {
+      const value = useProjection("benchforgeProduction");
+      if (!value?.active || !(value.pendingCaptures?.length || value.stopReason || ["blocked", "incomplete", "capture_error", "interrupted", "failed"].includes(value.state))) return null;
+      return h(progress.ProductionActivity, { value, t });
+    }
     async function apply(ctx) {
       await ctx.remote.$mount(typert_remote_client_default);
       ctx.effect(() => ctx.locale.register(NS, dictionaries));
@@ -4996,7 +5024,12 @@ var benchforgeClient = (() => {
                   const blank = props.useSessions((sessions) => sessions.byId[props.sessionId]?.blank);
                   const hero = slot === "conversation.input.dock";
                   if (preset !== PRESET_ID || hero && !blank) return null;
-                  return h(ProductionEnvironment, { ...props, key: props.sessionId, t, hero, component: composer.ProductionComposer });
+                  return h(
+                    React.Fragment,
+                    null,
+                    !hero && h(ConversationProductionStatus, { useProjection: props.useProjection, t }),
+                    h(ProductionEnvironment, { ...props, key: props.sessionId, t, hero, component: composer.ProductionComposer })
+                  );
                 }
               )
             );
