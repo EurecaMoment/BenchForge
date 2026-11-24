@@ -41,7 +41,7 @@ function retainsExecution(state,call,receipt,snapshot) {
 }
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:14, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:15, stateSchema:State,
   /** 根据会话头建立空生产状态，初始化工具追踪、通知和阶段进度字段。 */
   init:header => ({calls:{},planReview:null,progressNotice:null,errorTool:'',errorCallSeq:0,notices:[],waits:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
@@ -164,6 +164,11 @@ export const productionProjection = {
     if(retained) return patch({...next,planReview:snapshot},event,{...changes,workflowTurn:view.turn,plan:receipt.plan});
     const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review';
     if(!workflow) {
+      if (view.active && view.stage==='S1' && view.review?.stage==='S1' &&
+          ['elapsed','continued'].includes(view.review.state) && call.name==='benchforge_scene_preflight' &&
+          receipt.schema==='benchforge.scene-diagnostics/v1') {
+        Object.assign(changes,{stage:'S2',state:'running',workflowTurn:view.turn,review:null});
+      }
       if(view.active && call.name==='benchforge_wait' && backgroundWaitRun(receipt)) {
         if(!state.waits.includes(receipt.run_id)) next.waits=[...state.waits,receipt.run_id];
         changes.workflowTurn=view.turn;
