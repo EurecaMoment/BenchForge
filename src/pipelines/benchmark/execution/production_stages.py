@@ -50,7 +50,11 @@ def scene_acceptance(arguments, directory, environment, client):
                 or len(scene_plan.get('designs', [])) or 1)
     scene_count = len({row['scene_group_id'] for row in accepted})
     if scene_count < expected:
-        return {'state': 'needs_evidence', 'stage': 'S2', 'accepted': scene_count, 'required': expected,
+        progress = [{key: row[key] for key in ('state', 'authority', 'task_id', 'revision', 'run_id', 'scene_id')
+                     if key in row} | {'scene_design': {'id': (row.get('scene_design') or {}).get('id')}}
+                    for row in accepted]
+        return {'schema': 'benchforge.scene-stage/v1', 'state': 'needs_evidence', 'stage': 'S2',
+                'scenes': progress, 'accepted': scene_count, 'required': expected,
                 'next': 'Select or create and accept the remaining planned scenes before S3 collection, including annotations.'}
     reference = [{'task_id': row['task_id'], 'revision': row['revision']} for row in accepted]
     receipt = {'schema': 'benchforge.scene-stage/v1', 'state': 'completed', 'stage': 'S2',

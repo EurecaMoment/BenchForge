@@ -10,12 +10,14 @@ from urllib.error import HTTPError
 import sys
 
 
+from server.database_scope import command_database
 from capabilities.benchmark_design.contracts import PIPELINE_SCHEMAS
 from service_access.scene_service import load_workbench_config
 from service_access.scene_service import service_read
 from service_access.scene_service import session_runs
 from service_access.scene_service import production_observation
 from capabilities.scene_library.observations import saved_scene_identity
+from storage.pipeline_queries import latest_production_execution
 
 
 # 在指定字节上限内读取并解析进度 JSON，超出上限时报错。
@@ -225,6 +227,19 @@ def current_production_progress(config, workspace, session):
             except (OSError, ValueError, TypeError, KeyError):
                 continue
             accepted.setdefault(row['scene_design_id'], row)
+        # The production runner records scene.acceptance before any optional library registration.
+        execution = latest_production_execution(root, session, plan=plan) if len(accepted) < total else None
+        if execution:
+            steps = execution['state'].get('steps', {})
+            for step in plan.get('steps', []):
+                if step.get('uses') != 'scene.acceptance':
+                    continue
+                result = steps.get(step['id'], {}).get('result', {})
+                for row in result.get('accepted_scenes', []):
+                    design_id = row.get('design_id')
+                    if (design_id in target_ids and row.get('task_id') and row.get('run_id')
+                            and type(row.get('revision')) is int and row['revision'] >= 0):
+                        accepted.setdefault(design_id, row)
         rows = []
         for target in targets:
             row = accepted.get(target['id'])
@@ -297,7 +312,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         config = load_workbench_config(args.config)
-        result = observe(config, args.session, json.loads(args.run_ids), json.loads(args.sessions), args.workspace)
+        with command_database(args.config):
+            result = observe(config, args.session, json.loads(args.run_ids), json.loads(args.sessions), args.workspace)
     except Exception as error:
         # Never serialize connection strings, tokens, or exception text from database drivers.
         result = {'status': 'unavailable', 'error': type(error).__name__, 'runs': []}

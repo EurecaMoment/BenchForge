@@ -37,6 +37,16 @@ def _summary_document():
                 'run_id', step.value#>'{result,run_id}', 'dataset', step.value#>'{result,dataset}',
                 'schema', step.value#>'{result,schema}', 'state', step.value#>'{result,state}',
                 'items', step.value#>'{result,items}', 'required_items', step.value#>'{result,required_items}',
+                'accepted_scenes', CASE WHEN step.value#>>'{result,schema}' = 'benchforge.scene-stage/v1'
+                  AND step.value->>'state' IN ('completed', 'needs_evidence')
+                  AND step.value->>'state' = step.value#>>'{result,state}' THEN (
+                  SELECT jsonb_agg(jsonb_build_object(
+                    'design_id', scene#>'{scene_design,id}', 'logical_scene_id', scene->'scene_id',
+                    'task_id', scene->'task_id', 'run_id', scene->'run_id', 'revision', scene->'revision'))
+                  FROM jsonb_array_elements(CASE WHEN jsonb_typeof(step.value#>'{result,scenes}') = 'array'
+                    THEN step.value#>'{result,scenes}' ELSE '[]'::jsonb END) AS scene
+                  WHERE scene->>'state' = 'accepted' AND scene->>'authority' = 'production-service-task-record'
+                ) END,
                 'annotations', jsonb_build_object('items', step.value#>'{result,annotations,items}'),
                 'collection', jsonb_build_object(
                   'records', step.value#>'{result,collection,records}', 'scenes', step.value#>'{result,collection,scenes}',
@@ -110,7 +120,7 @@ def query_pipeline_runs(workspace, runs, *, sessions=(), history=False, database
     return [record for record in records.values() if 'state' in record]
 
 
-def latest_production_execution(workspace, session):
+def latest_production_execution(workspace, session, *, plan=None):
     """读取同会话最近的顶层生产执行，排除嵌套运行和可被编辑的文件投影。"""
     root = Path(workspace).resolve()
     engine = engine_for(resolve_workspace_url(root))
@@ -121,7 +131,11 @@ def latest_production_execution(workspace, session):
                    pipeline_documents.c.document['steps'].label('steps')).where(
                        pipeline_documents.c.name == 'plan.json',
                        pipeline_documents.c.document['production_contract'].as_string() ==
-                       'benchforge.production-stages/v1').subquery('plans')
+                       'benchforge.production-stages/v1')
+    if plan is not None:
+        # Revisions can share a review key while authorizing different scenes or source bindings.
+        plans = plans.where(pipeline_documents.c.document == plan)
+    plans = plans.subquery('plans')
     query = select(pipeline_documents.c.run_id, _summary_document().label('state'),
                    plans.c.plan_key, plans.c.steps).join(plans,
         (plans.c.workspace_id == pipeline_documents.c.workspace_id) &

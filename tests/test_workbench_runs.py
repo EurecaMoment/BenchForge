@@ -67,6 +67,51 @@ class WorkbenchRunQueryTests(unittest.TestCase):
             documents.save('state.json', {'state': state, 'steps': {'collect': {'state': 'running'}}})
         return directory
 
+    def test_scene_progress_uses_current_plan_acceptance_without_catalog_registration(self):
+        """Current-plan receipts update individual designs and cannot carry over to edited plans."""
+        from pipelines.benchmark.progress.production_observer import current_production_progress
+        from storage.plan_versions import activate
+
+        access = self.scopes['a']
+        root = Path(access.root_path)
+        session = 'session-a'
+        path = root / 'plan.json'
+        run = root / 'operations' / 'review' / 'pipeline_run'
+        targets = [{'id': 'desk', 'scene_id': 'desk-room'}, {'id': 'hall', 'scene_id': 'hall-room'}]
+        plan = {'schema': 'benchforge.pipeline/v1', 'version': 1,
+                'production_contract': 'benchforge.production-stages/v1', 'stage_review_key': str(path),
+                'assessment': {'scenes': {'target_scene_count': 2, 'designs': targets}},
+                'steps': [{'id': 'accepted', 'uses': 'scene.acceptance'}]}
+        path.write_text(json.dumps(plan))
+        activate(root, session, path)
+        config = {'artifacts': str(root / 'runtime')}
+
+        def accepted(target):
+            return {'state': 'accepted', 'authority': 'production-service-task-record',
+                    'scene_design': target, 'scene_id': target['scene_id'], 'revision': 0,
+                    'run_id': 'sf_' + target['id'], 'task_id': 'sf_' + target['id'] + '.scene0'}
+
+        def record(rows, state):
+            with access_context(access):
+                docs = RunDocuments(run)
+                docs.save('plan.json', plan)
+                receipt = {'schema': 'benchforge.scene-stage/v1', 'stage': 'S2', 'state': state, 'scenes': rows}
+                docs.save('state.json', {'state': state, 'run_path': str(run),
+                          'steps': {'accepted': {'state': state, 'result': receipt}}})
+
+        def progress():
+            return current_production_progress(config, root, session)['current_collection']
+
+        record([accepted(targets[0]), dict(accepted(targets[1]), authority='preview')], 'needs_evidence')
+        partial = progress()
+        self.assertEqual(partial['accepted'], 1)
+        self.assertEqual([row['state'] for row in partial['rows']], ['completed', 'waiting'])
+        record([accepted(target) for target in targets], 'completed')
+        self.assertTrue(progress()['complete'])
+        revised = dict(plan, inputs={'scene_sources': []})
+        path.write_text(json.dumps(revised))
+        self.assertEqual(progress()['accepted'], 0)
+
     def test_database_state_survives_modified_and_missing_file_projections(self):
         """篡改完成状态并删除计划副本后，右栏查询仍返回执行器保存的计划和进度。"""
         directory = self.save_run('a')
