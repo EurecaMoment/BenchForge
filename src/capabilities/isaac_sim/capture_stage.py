@@ -86,7 +86,8 @@ def execute_capture(store, task, stop, *, config, client=None):
             store.update(task['id'], state='READY', unit={**unit, 'phase': 'review', 'capture_token': token})
             return
         program = json.loads((directory / 'program.json').read_text())
-        settings = isaac_config(config)
+        settings = dict(isaac_config(config))
+        preview_settings = settings.pop('interactive_preview', None)
         scope = capture_scope(program, unit['intent'].get('capture_options'))
         validate_scene_requirements(program, settings=settings)
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
@@ -119,6 +120,10 @@ def execute_capture(store, task, stop, *, config, client=None):
             steps, dt = 180, 1 / 60
             physics_job, physics_result = requests.extension('settle', 'physics.step',
                 {'session_id': identity, 'steps': steps, 'dt': dt})
+            if preview_settings and scope['view_indices']:
+                from capabilities.isaac_sim.interactive_preview import start_preview
+                start_preview(preview_settings, identity, compiled['cameras'][scope['view_indices'][0]],
+                              directory, generation)
             body_paths = [item['prim_path'] for item in compiled['entities'].values()
                           if item['dynamic'] and not item.get('articulation_roots')]
             _, observed = requests.extension('observe', 'world.observe',

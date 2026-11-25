@@ -41,3 +41,11 @@ BenchForge 预设按已配置模型的窗口和回答预算生成压缩策略。
 进度通知使用 `progressSilenceMs=60000`、`progressReminderIntervalMs=300000`；无新业务状态且未回应的同一提醒不再重复注入。
 场景工具的 `reportMaxChars=6000` 为原生结果裁剪预留空间，支持 `json_pointer`、`offset`、`limit` 和 `detail=true`；
 原始证据始终完整保留，概览和分页都明确标记未读部分，不能作为验收通过的依据。
+
+### Isaac Sim 场景预览
+
+在运行预览服务的部署上，可在私有配置的 `providers.IsaacSim4A100` 中设置 `interactive_preview`。node1 使用以下配置。物理稳定后，采集器在后台获取同一场景版本的首个机位预览。正式采集的分辨率、采样和标注仍由采集配置控制。
+
+```json
+{"url": "http://127.0.0.1:18325", "size": 1024, "spp": 4}
+```

@@ -2395,6 +2395,7 @@ var benchforgeClient = (() => {
         if (!groups.has(id)) groups.set(id, { id, title: item.scene_name || id, frames: [], video: null, kind: "scene" });
         const project = groups.get(id);
         project.title = sceneName(project.title, groups.size - 1);
+        if (item.purpose === "interactive_preview") project.interactivePreview = true;
         if (item.kind === "video" && (!project.video || item.purpose === "scene_tour")) project.video = item;
         else project.frames.push(item);
       }
@@ -2434,7 +2435,7 @@ var benchforgeClient = (() => {
             h("span", { className: "bfw-scene-play", "aria-hidden": true }, project.video ? "\u25B6" : "\u2194")
           ),
           h("strong", null, t("sceneProject") + " " + (index + 1)),
-          h("span", { className: "bfw-muted" }, t(project.video ? "sceneTour" : "sceneViews") + " \xB7 " + t("recordedViews") + ": " + project.frames.length)
+          h("span", { className: "bfw-muted" }, project.interactivePreview ? "\u4EA4\u4E92\u9884\u89C8 \xB7 \u4EC5\u4F9B\u67E5\u770B" : t(project.video ? "sceneTour" : "sceneViews") + " \xB7 " + t("recordedViews") + ": " + project.frames.length)
         ),
         h("p", { className: "bfw-code" }, displayRef(project.title))
       )));
@@ -2491,7 +2492,7 @@ var benchforgeClient = (() => {
           /** 记录巡览加载失败，使组件展示可用帧及重试入口。 */
           onError: () => setError(t("artifactReadFailed"))
         }) : frameViews,
-        h("p", { className: "bfw-muted" }, t(project.video ? "sceneTour" : "sceneViews") + " \xB7 " + t("recordedViews") + ": " + project.frames.length)
+        h("p", { className: "bfw-muted" }, project.interactivePreview ? "\u4EA4\u4E92\u9884\u89C8 \xB7 \u4EC5\u4F9B\u67E5\u770B" : t(project.video ? "sceneTour" : "sceneViews") + " \xB7 " + t("recordedViews") + ": " + project.frames.length)
       );
     }
     function SceneLibrary({ record, selection, saving, error, choose, query, search, origin, filter, page, refresh, preview, t }) {

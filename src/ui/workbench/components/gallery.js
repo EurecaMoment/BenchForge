@@ -76,6 +76,7 @@ export function createGalleryComponents({React, helpers}) {
       if (!groups.has(id)) groups.set(id, {id, title: item.scene_name || id, frames: [], video: null, kind: 'scene'});
       const project = groups.get(id);
       project.title=sceneName(project.title,groups.size-1);
+      if (item.purpose === 'interactive_preview') project.interactivePreview = true;
       if (item.kind === 'video' && (!project.video || item.purpose === 'scene_tour')) project.video = item;
       else project.frames.push(item);
     }
@@ -95,7 +96,7 @@ export function createGalleryComponents({React, helpers}) {
           h('img', {src: project.frames[0].url, alt: project.title}),
           h('span', {className: 'bfw-scene-play', 'aria-hidden': true}, project.video ? '▶' : '↔')),
         h('strong', null, t('sceneProject') + ' ' + (index + 1)),
-        h('span', {className: 'bfw-muted'}, t(project.video ? 'sceneTour' : 'sceneViews') + ' · ' + t('recordedViews') + ': ' + project.frames.length)),
+        h('span', {className: 'bfw-muted'}, project.interactivePreview ? '交互预览 · 仅供查看' : t(project.video ? 'sceneTour' : 'sceneViews') + ' · ' + t('recordedViews') + ': ' + project.frames.length)),
       h('p', {className: 'bfw-code'}, displayRef(project.title)))));
   }
   /** 展示场景巡览视频及逐帧回退预览，切换项目时重置视图和错误状态。 */
@@ -118,7 +119,7 @@ export function createGalleryComponents({React, helpers}) {
       hasVideo ? h('video', {key: videoUrl + ':' + attempt, src: videoUrl, poster: project.frames[0]?.url, preload: 'auto',
         controls: true, autoPlay: true, loop: true, muted: true, playsInline: true,
         'aria-label': t('sceneTour'), /** 视频成功加载后清除旧的媒体错误。 */ onLoadedData: () => setError(''), /** 记录巡览加载失败，使组件展示可用帧及重试入口。 */ onError: () => setError(t('artifactReadFailed'))}) : frameViews,
-      h('p', {className: 'bfw-muted'}, t(project.video ? 'sceneTour' : 'sceneViews') + ' · ' + t('recordedViews') + ': ' + project.frames.length));
+      h('p', {className: 'bfw-muted'}, project.interactivePreview ? '交互预览 · 仅供查看' : t(project.video ? 'sceneTour' : 'sceneViews') + ' · ' + t('recordedViews') + ': ' + project.frames.length));
   }
   /** 展示可筛选分页的场景库，管理已选场景修订和是否允许新增场景。 */
   function SceneLibrary({record, selection, saving, error, choose, query, search, origin, filter, page, refresh, preview, t}) {

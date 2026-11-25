@@ -2,6 +2,7 @@
 import json
 import re
 from pathlib import Path
+from capabilities.isaac_sim.interactive_preview import PREVIEW_NAME, current_preview_file
 from urllib.error import HTTPError
 from service_access.scene_service import service_read
 from service_access.scene_service import session_runs
@@ -42,6 +43,8 @@ def saved_scene_identity(config, task):
 # 只允许已经产出的场景图像和面向操作者的标注摘要进入预览。
 def preview_kind(name):
     """Only produced scene imagery and operator-visible annotation summaries."""
+    if PREVIEW_NAME.fullmatch(name):
+        return 'S2', 'image', 'image/png'
     if name == 'preview/scene.mp4':
         return 'S2', 'video', 'video/mp4'
     if re.fullmatch(r'capture/(?:view_\d+|interaction_\d+_(?:before|after))\.png', name):
@@ -91,6 +94,17 @@ def stage_artifacts(config, session, scene, task_id=None, revision=None, file=No
     if file:
         if not task_id or not task_id.startswith(scene + '.') or not preview_kind(file):
             return {'error': 'File is not a public stage preview', 'status_code': 403}
+        if PREVIEW_NAME.fullmatch(file):
+            observed = service_read(config, '/inspect', {'run_id': scene})
+            task = next((row for row in observed['tasks'] if row['id'] == task_id), None)
+            if not task or task['unit']['revision'] != revision:
+                return {'error': 'Preview revision is stale', 'status_code': 409}
+            base = Path(config['artifacts']) / task_id
+            folder = base / f'revision_{revision}'
+            path = current_preview_file(folder)
+            if base.is_symlink() or path is None or path.relative_to(folder).as_posix() != file:
+                return {'error': 'Preview is unavailable for this attempt', 'status_code': 404}
+            return {'source_path': str(path), 'content_type': 'image/png'}
         if file == 'preview/scene.mp4':
             from capabilities.scene_library.preview_manifest import cached_preview
             observed = service_read(config, '/inspect', {'run_id': scene})
@@ -140,6 +154,15 @@ def stage_artifacts(config, session, scene, task_id=None, revision=None, file=No
             stage, kind, _ = preview_kind(row['file'])
             items.append({**row, 'stage': stage, 'kind': kind, 'title': Path(row['file']).name,
                           'task_id': task['id'], 'revision': rev})
+        if not any(re.fullmatch(r'capture/view_\d+\.png', row['file']) for row in names):
+            base = Path(config.get('artifacts', '')) / task['id']
+            folder = base / f'revision_{rev}'
+            preview = current_preview_file(folder) if config.get('artifacts') and not base.is_symlink() else None
+            if preview:
+                items.append({'file': preview.relative_to(folder).as_posix(), 'stage': 'S2', 'kind': 'image',
+                              'purpose': 'interactive_preview', 'non_production': True,
+                              'title': '交互预览（正式采集中）', 'task_id': task['id'], 'revision': rev,
+                              'scene_name': task['unit'].get('intent', {}).get('name')})
         from capabilities.scene_library.preview_manifest import cached_preview
         saved = cached_preview(config, task['id'], rev)
         if saved:
