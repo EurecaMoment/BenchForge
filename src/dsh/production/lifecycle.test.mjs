@@ -362,7 +362,7 @@ test('equivalent released plan repairs preserve collection progress after the ac
     productionProjection.stateSchema.parse(replayed);
     assert.deepEqual(replayed.view,after);
     assert.equal(replayed.planReview.review_id,1);assert.equal(replayed.planReview.revision,9);
-    assert.equal(productionProjection.stateVersion,16);
+    assert.equal(productionProjection.stateVersion,17);
   }
 });
 
@@ -798,4 +798,93 @@ test('accepted parallel scene submissions remain visible until their individual 
   assert.equal(h.view().stopReason,'max-tokens');
   h.event('turn/start',{turn:3});
   assert.equal(h.view().stopReason,'');
+});
+
+test('a truncated run receipt completes production from compact metadata and stops after delivery',async()=>{
+  const h=harness(),runtime=h.create();h.plan();
+  h.receipt('benchforge_stage_review',{stage:'S1',review_id:1,state:'elapsed',artifact:'/workspace/plan.json',deadline:400});
+  h.event('tool/call',{name:'benchforge_pipeline_artifacts',callId:'call-read-error',arguments:'{"workspace":"/workspace"}'});
+  h.event('tool/result',{message:{source:{callId:'call-read-error'},isError:true,content:[{type:'text',text:'only listed evidence and public export files may be read'}]}});
+  assert.match(h.view().error,/only listed/);
+  const steps={package:{state:'completed',result:{}},questions:{state:'completed',result:{}},
+    collection:{state:'completed',result:{stage:'S3'}},accepted_scenes:{state:'completed',result:{stage:'S2'}}};
+  const full={run:'/workspace/pipeline_run',state:'completed',steps,total_steps:4,production_contract:'benchforge.production-stages/v1'};
+  h.event('tool/call',{name:'benchforge_pipeline_run',callId:'call-truncated',arguments:'{"workspace":"/workspace"}'});
+  h.event('tool/result',{meta:{benchforgeReceipt:full},message:{source:{callId:'call-truncated'},
+    content:[{type:'text',text:JSON.stringify(full).slice(0,60)+' [...] (Omitted 102924 bytes.)'}]}});
+  assert.equal(h.view().state,'completed');
+  assert.equal(h.view().completed,4);
+  assert.equal(h.view().error,'');
+  h.event('assistant/message',{message:{content:[{type:'text',text:'数据集已生成。'}]}});
+  await runtime.stopping({agent:h.agent,turn:1});
+  assert.match(h.sent.at(-1).content[0].text,/present/);
+  h.event('user/message',h.sent.at(-1));h.agent.inbox.nextStep=[];
+  h.receipt('benchforge_pipeline_status',{run:'/workspace/pipeline_run',state:'completed',steps});
+  h.event('assistant/message',{message:{content:[{type:'text',text:'已复核状态。'}]}});
+  const sent=h.sent.length;
+  await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,sent);
+  h.event('deliverables/presented',{});
+  await runtime.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,sent);
+  await runtime.dispose();
+});
+
+test('stops that keep calling tools without business progress end after a bounded number of reminders',async()=>{
+  const h=harness(),runtime=h.create();h.plan();
+  h.receipt('benchforge_stage_review',{stage:'S1',review_id:1,state:'elapsed',artifact:'/workspace/plan.json',deadline:400});
+  const diagnostic={schema:'benchforge.scene-diagnostics/v1',passed:true,blocking_total:0};
+  let failure;
+  for(let i=0;i<12&&!failure;i++){
+    h.receipt('benchforge_scene_preflight',diagnostic);
+    h.event('assistant/message',{message:{content:[{type:'text',text:'继续检查场景。'}]}});
+    try{await runtime.stopping({agent:h.agent,turn:1});}catch(error){failure=error;break;}
+    h.event('user/message',h.sent.at(-1));h.agent.inbox.nextStep=[];
+  }
+  assert.equal(failure?.code,'BENCHFORGE_PRODUCTION_INCOMPLETE');
+  assert.match(failure.message,/连续收尾 8 次/);
+  await runtime.dispose();
+});
+
+/** 构造已通过 S5 审核并由运行回执确认完成的生产会话。 */
+function completeRun(h) {
+  h.plan();
+  h.receipt('benchforge_stage_review',{stage:'S1',review_id:1,state:'elapsed',artifact:'/workspace/plan.json',deadline:400});
+  h.receipt('benchforge_stage_review',{stage:'S5',review_id:5,state:'elapsed',artifact:'/workspace/package',deadline:900});
+  const steps={package:{state:'completed',result:{}},questions:{state:'completed',result:{}},
+    collection:{state:'completed',result:{}},accepted_scenes:{state:'completed',result:{}}};
+  h.receipt('benchforge_pipeline_run',{run:'/workspace/pipeline_run',state:'completed',steps,total_steps:4,production_contract:'benchforge.production-stages/v1'});
+  assert.equal(h.view().state,'completed');assert.equal(h.view().stage,'S5');
+}
+
+test('reading released reviews or running extra captures after completion keeps the run completed',()=>{
+  const h=harness();completeRun(h);
+  h.receipt('benchforge_stage_review',{stage:'S5',review_id:5,state:'elapsed',artifact:'/workspace/package',deadline:900});
+  assert.equal(h.view().state,'completed');
+  h.receipt('benchforge_capture',{run_id:'sf_extra',state:'submitted'});
+  assert.equal(h.view().state,'completed');assert.equal(h.view().stage,'S5');
+  h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_extra',state:'SUCCEEDED',workflow:'scene',failed:false}}});
+  assert.equal(h.view().state,'completed');assert.equal(h.view().error,'');
+});
+
+test('a completed run accepts a new plan for the next batch',()=>{
+  const h=harness();completeRun(h);
+  h.receipt('benchforge_pipeline_plan',{state:'planned',production_contract:'benchforge.production-stages/v1',plan:'/workspace/plan-2.json',total_steps:4,
+    review_revision:{kind:'new_task'},stage_review:{review_id:6,stage:'S1',artifact:'/workspace/plan-2.json',deadline:1200,state:'waiting_user'}});
+  assert.equal(h.view().state,'planned');assert.equal(h.view().stage,'S1');assert.equal(h.view().plan,'/workspace/plan-2.json');
+  assert.equal(h.view().run,'');assert.equal(h.view().completed,0);assert.equal(h.view().delivered,false);
+});
+
+test('a delivered run receives no progress reminder or further work instruction',async()=>{
+  const h=harness(),runtime=h.create();completeRun(h);
+  h.event('assistant/message',{message:{content:[]}});
+  await runtime.stopping({agent:h.agent,turn:1});
+  assert.match(h.sent.at(-1).content[0].text,/present/);
+  assert.doesNotMatch(h.sent.at(-1).content[0].text,/尚未执行的动作/);
+  h.event('user/message',h.sent.at(-1));h.agent.inbox.nextStep=[];
+  h.event('deliverables/presented',{});
+  h.setTime(400000);
+  const result=await h.preStep(runtime);
+  assert.equal(result.messages.some(message=>message.source?.kind==='benchforge/production-progress'),false);
+  await runtime.dispose();
 });

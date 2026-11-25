@@ -7,7 +7,7 @@ import {progressReminder} from './progress_reminders.mjs';
 /** Conversation policy; all facts come from the projection and domain receipts. */
 /** 创建生产任务生命周期控制器，按会话协调复核、停止恢复、通知去重和宿主卸载。 */
 export function createProductionLifecycle({projection,table,agents,readReview,advanceReview=readReview,createMessage,restoreAgent=async()=>undefined,reconcileCaptures=async()=>{},hasPendingWait=()=>false,waitingForCapture=()=>false,captureBudget=()=>null,now=Date.now,
-  schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2,
+  schedule=(fn,delay)=>setTimeout(fn,delay),unschedule=clearTimeout,onError=()=>{},maxStopRecoveries=2,maxStopsWithoutProgress=8,
   progressSilenceMs=60000,progressReminderIntervalMs=300000}) {
   const timers=new Map(), queues=new Map(), reminders=new Map(), checks=new Map();
   const lifetime=new AbortController();
@@ -174,7 +174,8 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     if(observed?.reviewUnavailable)return decision;
     // 本步消息尚未提交到投影；真实采集通知已带状态与动作，避免再用旧视图追加矛盾提醒。
     if(decision.messages.some(message=>message.source?.kind==='benchforge/capture-watch'&&message.source.capture))return decision;
-    if(view.active&&view.workflowTurn===view.turn&&agent.status==='running') {
+    // 运行完成后只由收尾检查提醒交付，进度提醒会要求模型继续执行下一步。
+    if(view.active&&view.state!=='completed'&&view.workflowTurn===view.turn&&agent.status==='running') {
       const facts=reviewNotice(observed?.review,view.review);
       const reviewChanged=facts.review && JSON.stringify(facts.review)!==JSON.stringify(view.review);
       const previous=reminders.get(agent.id);
@@ -235,19 +236,27 @@ export function createProductionLifecycle({projection,table,agents,readReview,ad
     const visible=state.lastResponse?.visible ?? view.lastTextSeq>=0;
     if((waiting||blocked||delivered)&&visible)return;
 
-    // A new tool step breaks a streak of text-only stops, even within one stage.
-    const key=`${agent.id}:${turn}:${view.state}:${view.plan}:${view.run}:${view.completed}:${review?.review_id||0}:${review?.state||''}:tools:${view.tools}`;
+    // 进度键只含业务进展。已完成的运行不随工具调用重置，只提醒一次交付。
+    const pendingRuns=(view.pendingCaptures || []).map(row=>row.run).join(',');
+    const progressKey=`${agent.id}:${turn}:${view.state}:${view.stage}:${view.plan}:${view.run}:${view.completed}:${review?.review_id||0}:${review?.state||''}:${state.captureRun||''}:${pendingRuns}`;
+    // 未完成时，新的工具调用开启新的空转计数，同一进度的提醒总数另设上限。
+    const key=view.state==='completed' ? progressKey : `${progressKey}:tools:${view.tools}`;
     const last=reminders.get(agent.id);
     if(last?.stop===key&&last.response===state.lastResponse?.seq)return;
     const attempts=Math.max(state.notices.filter(value=>value.startsWith(key+':recovery:')).length,last?.stop===key?last.attempts||0:0);
-    if(attempts>=maxStopRecoveries)throw new ProductionIncompleteError(view.pendingCaptures?.length && !ownedWait ? '后台跟踪未接管剩余运行：'+view.pendingCaptures.map(row=>row.run).join('、')+'。请按原编号恢复跟踪。' : undefined);
+    if(view.state==='completed' && attempts>=1)return;
+    const stalled=state.notices.filter(value=>value.startsWith(progressKey+':') && value.includes(':recovery:')).length;
+    const untracked=view.pendingCaptures?.length && !ownedWait;
+    if(attempts>=maxStopRecoveries || stalled>=maxStopsWithoutProgress)throw new ProductionIncompleteError(
+      untracked ? '后台跟踪未接管剩余运行：'+view.pendingCaptures.map(row=>row.run).join('、')+'。请按原编号恢复跟踪。' :
+        stalled>=maxStopsWithoutProgress ? `同一生产进度已连续收尾 ${stalled} 次，计划、运行、阶段和完成步数都没有变化。已保留任务和产物，请查看实际缺项后继续。` : undefined);
     reminders.set(agent.id,{...last,stop:key,response:state.lastResponse?.seq,attempts:attempts+1});
     const action=waiting?'当前审核仍需等待或处理用户指令，向用户说明当前状态。':blocked?'如实说明当前阻塞、已保存产物和所需输入。':
       !view.plan?'使用已读合同保存计划草稿并调用 benchforge_pipeline_plan。':
-        view.state==='completed'?'已完成交付使用 present，并向用户给出真实产物链接。':'沿已保存计划继续执行下一项未完成工作；不要重做已完成阶段。';
+        view.state==='completed'?(view.delivered?'运行已完成并已交付。向用户简短总结已交付的产物，然后结束本轮，不要开始新的生产工作。':'运行已完成。调用 present 交付真实产物并给出链接，然后结束本轮，不要开始新的生产工作。'):'沿已保存计划继续执行下一项未完成工作；不要重做已完成阶段。';
     agent.steer(notice('benchforge/production-continue',`${key}:recovery:${attempts+1}`,
       `本轮收尾检查：当前生产状态=${view.state}。${action}`+
-      (waiting||blocked?'':`本步直接发出真实工具调用，拿到结果后再汇报。沿用计划 ${view.plan || '（待保存）'}。`+
+      (waiting||blocked||view.state==='completed'?'':`本步直接发出真实工具调用，拿到结果后再汇报。沿用计划 ${view.plan || '（待保存）'}。`+
         (review && ['elapsed','continued'].includes(review.state)?`${review.stage} 审核已经放行，沿用原回执。 `:'')+
         '执行上一条进展中尚未执行的动作。若缺少参数，先用读取工具取得参数。非阻断警告按任务验收标准处理。'),
       reviewNotice(review,view.review)));

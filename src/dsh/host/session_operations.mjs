@@ -22,6 +22,7 @@ export const Config = Schema.object({
   cleanupTimeoutMs: Schema.number().min(1).default(5000),
   reviewTimeoutMs: Schema.number().min(1).default(15000),
   maxStopRecoveries: Schema.number().min(1).default(2),
+  maxStopsWithoutProgress: Schema.number().min(1).default(8),
   progressSilenceMs: Schema.number().min(1000).default(60000),
   progressReminderIntervalMs: Schema.number().min(1000).default(300000),
 });
@@ -43,7 +44,7 @@ export async function apply(ctx, config) {
   const production=createProductionLifecycle({projection,table:domain.table('sessions'),agents:ctx.agents,
     progressSilenceMs:config.progressSilenceMs,progressReminderIntervalMs:config.progressReminderIntervalMs,
     readReview:createStageReviewReader({...config,/** 从启动环境快照解析阶段复核服务所需的配置值。 */ getEnvironmentValue:name=>launchEnvironmentOf(ctx).get(name)?.value}).byId,
-    advanceReview:reviews.advance,createMessage:createUserMessage,/** 记录后台生产生命周期中的异常，保留宿主故障线索。 */ onError:error=>logger.error(error),maxStopRecoveries:config.maxStopRecoveries,
+    advanceReview:reviews.advance,createMessage:createUserMessage,/** 记录后台生产生命周期中的异常，保留宿主故障线索。 */ onError:error=>logger.error(error),maxStopRecoveries:config.maxStopRecoveries,maxStopsWithoutProgress:config.maxStopsWithoutProgress,
     /** 在恢复生产前协调该会话仍在进行的采集续接任务。 */
     reconcileCaptures:(agent,signal)=>ctx.get('benchforgeCapture')?.continuation.reconcile(agent,{signal}),
     hasPendingWait:agent=>ctx.get('benchforgeCapture')?.continuation.hasPendingWait?.(agent),

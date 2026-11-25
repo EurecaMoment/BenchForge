@@ -28,6 +28,9 @@ const visible = message => (message?.content || []).filter(block => block.type =
 const parse = text => {try {return JSON.parse(text);} catch {return null;}};
 const modelTools = new Set(['benchforge_diffusion','benchforge_scene_sam3','benchforge_depth','benchforge_trellis','benchforge_isaac_sim']);
 const executionStages = new Set(STAGES.slice(1).map(stage=>stage.id));
+/** 计划的全部步骤都已完成；用户重新发起生产后状态会变化，但步数仍能证明上一次运行已结束。 */
+const runFinished = view => view.total>0 && view.completed>=view.total;
+const workflowReceipts = new Set(['benchforge_pipeline_plan','benchforge_pipeline_run','benchforge_pipeline_status','benchforge_stage_review']);
 /** 合并生产视图变化，并保留 S1 复核回执供后续阶段判断同一计划的执行修补。 */
 const patch = (state, event, changes) => ({...state,planReview:changes.review?.stage==='S1'?changes.review:state.planReview,
   view:{...state.view, revision:event.seq, lastEventAt:event.time || 0, ...changes}});
@@ -42,7 +45,7 @@ function retainsExecution(state,call,receipt,snapshot) {
 }
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:16, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:17, stateSchema:State,
   /** 根据会话头建立空生产状态，初始化工具追踪、通知和阶段进度字段。 */
   init:header => ({calls:{},planReview:null,progressNotice:null,errorTool:'',errorCallSeq:0,notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
@@ -75,6 +78,8 @@ export const productionProjection = {
     if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/capture-watch' && view.active) {
       const capture = event.data.source.capture;
       const pendingCaptures=view.pendingCaptures.filter(row=>row.run!==capture?.run_id);
+      // 运行完成后的采集不属于该次生产，只更新待返回列表。
+      if (view.state==='completed') return patch(state,event,{pendingCaptures});
       const otherScene = state.captureRun && capture?.run_id !== state.captureRun;
       if (capture && ((otherScene && capture.capture_budget) || (view.capture_budget && otherScene)))
         return pendingCaptures.length === view.pendingCaptures.length ? state : patch(state,event,{pendingCaptures});
@@ -115,7 +120,9 @@ export const productionProjection = {
     const calls = {...state.calls}; delete calls[callId];
     const next = {...state,calls};
     if(!call.name.startsWith('benchforge_')) return next;
-    const text = visible(message), receipt = parse(text);
+    // 大回执的可见文本会被宿主截断，流程工具另在 meta 中附带精简回执。
+    const text = visible(message);
+    const receipt = parse(text) ?? (workflowReceipts.has(call.name) ? event.data.meta?.benchforgeReceipt : null) ?? null;
     const budget = captureProducers.has(call.name) && budgetRejection(receipt || text);
     if (budget && view.active && ['S1','S2'].includes(view.stage)) {
       if (!state.captureRun || budgetMatches(budget, state.captureRun))
@@ -145,10 +152,14 @@ export const productionProjection = {
     if(call.name==='benchforge_stage_review' && executionStages.has(view.stage) &&
         snapshot?.stage==='S1' && snapshot.review_id===state.planReview?.review_id &&
         ['elapsed','continued'].includes(snapshot.state)) return {...next,planReview:snapshot};
+    // 运行完成后读取已放行的审核属于查询，不能让已完成的生产退回执行中。
+    if(call.name==='benchforge_stage_review' && view.state==='completed' &&
+        snapshot && ['elapsed','continued'].includes(snapshot.state)) return next;
     const retained=retainsExecution(state,call,receipt,snapshot);
     if(call.name==='benchforge_pipeline_plan' && receipt.state==='planned' &&
         executionStages.has(view.stage) && receipt.production_contract==='benchforge.production-stages/v1' &&
-        !retained && receipt.review_revision?.kind!=='user_edit') {
+        !retained && receipt.review_revision?.kind!=='user_edit' && !runFinished(view)) {
+      // 上一次运行全部完成后，新计划可以开始下一批生产。
       // 已进入 S2–S5 的历史执行不能被普通计划回执或伪造 new_task 倒退到 S1。
       return patch(next,event,{state:'needs_repair',error:'已有生产阶段不可由新计划回执重置；修复当前阶段并续跑原运行。',
         ...(view.review?.stage==='S1'?{review:null}:{})});
@@ -164,7 +175,9 @@ export const productionProjection = {
       next.errorTool='';changes.error='';
     }
     if(retained) return patch({...next,planReview:snapshot},event,{...changes,workflowTurn:view.turn,plan:receipt.plan});
-    const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review';
+    // 同一运行的状态查询确认完成时，与续跑回执同样推进到已完成。
+    const runCompleted = call.name==='benchforge_pipeline_status' && view.state!=='completed' && receipt.state==='completed' && Boolean(view.run) && receipt.run===view.run;
+    const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review'||runCompleted;
     if(!workflow) {
       if (view.active && view.stage==='S1' && view.review?.stage==='S1' &&
           ['elapsed','continued'].includes(view.review.state) && call.name==='benchforge_scene_preflight' &&
@@ -182,7 +195,7 @@ export const productionProjection = {
         changes.pendingCaptures=view.pendingCaptures.filter(row=>row.run!==receipt.run_id);
         if(changes.pendingCaptures.length!==view.pendingCaptures.length)changes.workflowTurn=view.turn;
       }
-      if(view.active && captureProducers.has(call.name) && receipt.run_id) {
+      if(view.active && view.state!=='completed' && captureProducers.has(call.name) && receipt.run_id) {
         next.captureRun=receipt.run_id;
         Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,review:null,capture_budget:null});
         if(receipt.watch?.accepted===false) Object.assign(changes,{state:'capture_error',error:receipt.watch.error || '后台跟踪尚未登记，请用运行编号恢复跟踪。'});
@@ -207,13 +220,17 @@ export const productionProjection = {
       if(snapshot){changes.review=snapshot;changes.stage=snapshot.stage;
         if(call.name==='benchforge_stage_review' && ['elapsed','continued'].includes(snapshot.state))changes.state='running';}
     }
+    // 运行完成或进入新阶段后，旧阶段的报错不再代表当前缺项。
+    if(!receipt.error && (changes.state==='completed' || (changes.stage && changes.stage!==view.stage))) {
+      next.errorTool='';changes.error='';
+    }
     if(activated && receipt.state==='planned') {
       next.planReview=null;
       delete next.captureRun;
       if(receipt.review_revision?.kind==='new_task') changes.pendingCaptures=[];
       Object.assign(changes,{run:'',completed:0,total:receipt.total_steps || 4,delivered:false,capture_budget:null});
     }
-    if(call.name==='benchforge_pipeline_run' && receipt.state==='completed') changes.pendingCaptures=[];
+    if((call.name==='benchforge_pipeline_run' || runCompleted) && receipt.state==='completed') changes.pendingCaptures=[];
     if (/^S[3-5]$/.test(changes.stage || '')) changes.capture_budget=null;
     return patch(next,event,changes);
   },

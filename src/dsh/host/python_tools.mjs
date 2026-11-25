@@ -62,6 +62,21 @@ export async function invoke(subprocess, python, workspace, configPath, tool, re
 }
 
 /** 注册 Python 工具定义、可信环境和会话访问凭据，并把取消及进程清理绑定到插件寿命。 */
+/** 保留顶层标量、步骤状态和审核快照标量，供生产投影在回执文本被截断时读取。 */
+function compactReceipt(value) {
+  const scalars = object => Object.fromEntries(Object.entries(object || {})
+    .filter(([, item]) => item === null || ['string','number','boolean'].includes(typeof item))
+    .map(([key, item]) => [key, typeof item === 'string' ? item.slice(0, 700) : item]));
+  const receipt = scalars(value);
+  for (const key of ['stage_review','review_revision'])
+    if (value?.[key] && typeof value[key] === 'object') receipt[key] = scalars(value[key]);
+  if (Array.isArray(value?.issues)) receipt.issues = value.issues.slice(0, 20).map(String);
+  if (value?.steps && typeof value.steps === 'object')
+    receipt.steps = Object.fromEntries(Object.entries(value.steps).map(([name, step]) => [name,
+      {state: String(step?.state || ''), result: typeof step?.result?.stage === 'string' ? {stage: step.result.stage} : {}}]));
+  return receipt;
+}
+
 export async function registerPythonTools(ctx, config, {definitions, schemas, module}) {
   const active = new Set();
   const lifetime = new AbortController();
@@ -81,7 +96,9 @@ export async function registerPythonTools(ctx, config, {definitions, schemas, mo
   const output = {schema:{type:'object',properties:{},additionalProperties:true},
     /** 将工具返回值序列化为模型可读取的文本结果。 */
     render:(_args,value)=>[{type:'text',text:JSON.stringify(value)}]};
-  const operationOutput = {...output,schema:{type:'object',properties:{operation_id:{type:'string',required:true},artifact_dir:{type:'string',required:true}},additionalProperties:true}};
+  const operationOutput = {...output,schema:{type:'object',properties:{operation_id:{type:'string',required:true},artifact_dir:{type:'string',required:true}},additionalProperties:true},
+    /** 在结果元数据中附带精简回执，宿主截断可见文本后生产投影仍能读取状态。 */
+    presentationMeta:(_args,value)=>({benchforgeReceipt:compactReceipt(value)})};
   const statusOutput = {...output,schema:{type:'object',properties:{operations:{type:'array',required:true,items:{type:'object',properties:{id:{type:'string',required:true},tool:{type:'string',required:true},state:{type:'string',required:true}},additionalProperties:true}}},additionalProperties:true}};
   const providers = await configuredProviders(config.configPath);
   const annotation = modelRole(providers, 'annotation');
