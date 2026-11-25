@@ -466,6 +466,43 @@ class SceneDiagnosticsTests(unittest.TestCase):
         self.assertTrue(report['passed'])
         self.assertEqual(report['geometry_preview']['mesh_assets_read'], 1)
 
+    def test_production_rejects_separated_static_support_before_capture(self):
+        floor = object_record('floor', label='Floor slab', size=[6, 5, .1])
+        ceiling = object_record('ceiling', label='Ceiling', size=[6, 5, .1], support='floor', base_z=2.8)
+        mug = object_record('mug_fixture', kind='mug', size=[.0924, .1272, .091])
+        self.program['objects'] = [floor, ceiling, mug]
+        report = self.inspect(policy={'enabled': True})
+        errors = [row for row in report['issues'] if row['blocking']]
+        self.assertEqual([(row['code'], row['object_ids']) for row in errors],
+                         [('static_support_gap', ['ceiling', 'floor'])])
+        self.assertAlmostEqual(errors[0]['evidence']['gap_m'], 2.8)
+
+        wall = object_record('wall', label='Wall', size=[6, .1, 2.8], support='floor')
+        self.program['objects'].append(wall)
+        ceiling.update(support='wall', base_z=0)
+        self.assertTrue(self.inspect(policy={'enabled': True})['passed'])
+
+    def test_geometry_warnings_are_linked_to_task_relations_without_blocking(self):
+        self.program['objects'] = [
+            object_record('ledge'), object_record('tray', support='ledge', xy=[.3, 0]),
+            object_record('chair', xy=[2, 0]), object_record('bin_obj', xy=[2.2, 0]),
+            object_record('background', xy=[3, 0]),
+        ]
+        brief = {'object_roles': [], 'relations': [
+            {'type': 'supported_by', 'source': 'tray', 'target': 'ground'},
+            {'type': 'clearance', 'source': 'chair', 'target': 'bin_obj'},
+            {'type': 'near', 'source': 'bin_obj', 'target': 'chair', 'requires_measurement': True},
+        ]}
+        with patch('capabilities.scene_authoring.validation.preflight.scene_brief', return_value=brief):
+            report = self.inspect(policy={'enabled': True})
+        issues = {row['id']: row for row in report['issues']}
+        reviews = report['task_geometry_reviews']
+        self.assertEqual([group['relation_index'] for group in reviews], [0, 1, 2])
+        self.assertEqual([[issues[i]['code'] for i in group['issue_ids']] for group in reviews],
+                         [['support_contact_unverified'], ['initial_bounds_overlap'], ['initial_bounds_overlap']])
+        self.assertTrue(any('background' in row.get('object_ids', []) for row in issues.values()))
+        self.assertTrue(report['passed'], report['issues'])
+
     # 验证超预算支撑图明确报错，不触发递归几何爆炸或错误成功。
     def test_over_budget_graph_is_reported_without_recursive_geometry_or_false_success(self):
         self.program['objects'] = [object_record(f'obj_{i}', support=f'obj_{i-1}' if i else 'ground')

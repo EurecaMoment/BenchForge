@@ -29,6 +29,14 @@ def relation_requires_measurement(relation):
     )
 
 
+def separated_support_bounds(child, parent):
+    """Return a lower bound on separation when AABBs exceed the contact tolerance."""
+    lo, hi = child
+    other_lo, other_hi = parent
+    gap = max(max(lo[i], other_lo[i]) - min(hi[i], other_hi[i]) for i in range(3))
+    return gap if gap > .04 + 1e-9 else None
+
+
 def native_support(child, parent, boxes, entities, executed_parts):
     """Distinguish native top-face evidence, insufficient bounds, and a measured gap."""
     if child not in boxes or (parent != 'ground' and parent not in boxes):
@@ -41,8 +49,7 @@ def native_support(child, parent, boxes, entities, executed_parts):
     if (supported_by_native_parts((lo, hi), entities[parent]) if executed_parts.get(parent)
             else supported_by_parts((lo, hi), [boxes[parent]])):
         return True, 'native bounds match a support surface'
-    other_lo, other_hi = boxes[parent]
-    if any(max(lo[i], other_lo[i]) - min(hi[i], other_hi[i]) > .04 for i in range(3)):
+    if separated_support_bounds((lo, hi), boxes[parent]) is not None:
         return False, 'a measured gap separates the object from its declared support'
     return None, 'native bounds do not verify this support; inspect actual contact in the captured views'
 

@@ -162,7 +162,7 @@ USD 上传检查复用现有图层解析，在回执的 `warnings` 中列出最�
 | `physics.step` | 场景沉降，保存 CUDA 测得的位姿和速度 | `session_id`、`steps`、`dt`；步数 1–1200，`dt` 为 0.0001–0.02 秒 |
 | `world.observe` | 获取刚体观测，生成物理回执 | `session_id`、可选 `bodies`、`imu=false`、`contacts=false`；必须在最后一次场景修改后完成步进。此实现不提供 `robots` 参数或 IMU/接触观测 |
 | `scene.inspect` | 分页读取 prim、变换和碰撞属性 | `session_id`、`limit`、`cursor`；每页至多 2000 项，无 `path` 过滤。`has_more=true` 时原样传回 `next_cursor` 字符串 |
-| `scene.capture` | 采集已完成物理步进的场景及其标注 | `session_id`、`cameras`、`size`、`spp`、`annotations`；每批 1–32 个已定义相机，64–1024 像素，1–256 spp。BenchForge 对更多机位分批，不丢弃用户的机位 |
+| `scene.capture` | 采集已完成物理步进的场景及其标注 | `session_id`、`cameras`、`size`、`spp`、`annotations`；每批 1–32 个已定义相机，64–2048 像素，1–1024 spp。BenchForge 对更多机位分批，不丢弃用户的机位 |
 | `scene.export` | 获取真实几何、USD 场景及依赖包 | `session_id`、`format=usd|usdz`，没有 `zip` 格式；下载返回作业清单中的文件，不直接读取服务端路径 |
 | `scene.close` | 结束已不用的场景会话 | `session_id`、可选 `delete=false`；保留场景与历史产物，不承诺删除 |
 

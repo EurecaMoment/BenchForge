@@ -34,7 +34,7 @@ def current_preview_file(folder):
 def fetch_preview(settings, identity, camera, directory, generation):
     url = settings['url'].rstrip('/')
     size = settings.get('size', 1024)
-    data = {'session_id': identity, 'camera': camera, 'size': size, 'spp': settings.get('spp', 4)}
+    data = {'session_id': identity, 'camera': camera, 'size': size, 'spp': settings.get('spp', 1)}
     def post(route, values):
         return urlopen(Request(url + route, json.dumps(values).encode(),
                                {'Content-Type': 'application/json'}), timeout=45)

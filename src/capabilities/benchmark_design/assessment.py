@@ -62,7 +62,7 @@ def assessment_template():
         'hard_requirements': ['用户原始硬要求，自动修复不得降低或删去'],
         'requirement_stages': '可选，与hard_requirements逐项对应的S2/S3/S4/S5数组；省略默认S2。场景身份和布局属S2，轨迹数量及同步读数属S3，题目属S4，交付属S5。混合要求应拆成独立条目，不能把场景身份挪到后续阶段。',
         'object_roles': [{'object_id': '实际物体 id', 'role': '物体在场景中的作用与位置'}],
-        'required_asset_identity': '必须保留真实资产的object_roles条目加representation=native_asset；运动采集的机器人加representation=articulated_robot。这些对象不能放入geometry_exceptions；资产加载失败时修复绑定或报告缺口，不能用盒体和metadata替代。普通几何实验无需此字段。',
+        'required_asset_identity': '必须保留真实资产的object_roles条目加representation=native_asset。已登记的生成或导入网格用kind=mesh和登记的asset_id，目录原生资产或已授权USD使用各自的原生入口。运动采集的机器人加representation=articulated_robot并保留原生关节。这些对象不能放入geometry_exceptions；资产加载失败时修复绑定或报告缺口，不能用盒体和metadata替代。普通几何实验无需此字段。',
         'relations': [{'source': '实际物体 id', 'type': 'supported_by|mounted_to|clearance|near|facing|inside',
                        'target': '实际物体 id 或 ground', 'description': '具体空间关系与使用理由'}],
         'directional_relation_example': {'source': 'lamp_c', 'type': 'supported_by', 'target': 'desk_c1', 'description': '台灯底座由桌面支撑，并位于靠使用者的右前区域。', 'reference_frame': 'left_work_surface_user', 'expected_direction': ['right', 'front']},

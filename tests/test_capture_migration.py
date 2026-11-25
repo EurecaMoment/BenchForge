@@ -12,6 +12,7 @@ from unittest.mock import patch
 from sqlalchemy import Column, JSON, MetaData, String, Table, inspect
 
 import deployment_config
+from service_access.configuration import isaac_config, isaac_endpoint
 from capabilities.isaac_sim.recovery import prepare_retry
 from service_access.config_migration import migrate_configuration
 from storage.files import write_json
@@ -135,7 +136,31 @@ class ConfigurationMigrationTests(unittest.TestCase):
         self.assertEqual(result['server'], {'operator_token': 'retained'})
         self.assertEqual(migrate_configuration(result), result)
 
-    # 验证配置同步备份退役文件并复用已有凭据，避免无意轮换密码。
+    def test_sync_projects_isaac_capture_provider_to_server_config(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, generated, state = root / 'config', root / 'config/generated', root / 'state'
+            example = Path(__file__).resolve().parents[1] / 'config/benchforge.example.json'
+            write_json(config / 'benchforge.example.json', json.loads(example.read_text()))
+            binding = {'asset_id': 'native-office-001', 'relative_path': 'Props/SM_Sofa.usd'}
+            write_json(config / 'benchforge.local.json', {
+                'config_version': 5,
+                'providers': {'IsaacSim4A100': {
+                    'grpc': {'host': '127.0.0.1', 'port': 25052, 'timeout_seconds': 60},
+                    'asset_sources': {'office_sofa': binding},
+                }},
+                'server': {'execution_mode': 'exploration'},
+            })
+
+            deployment_config.sync_configuration(
+                config, generated, generated / deployment_config.SERVER_CONFIG, state)
+            runtime = json.loads((generated / deployment_config.SERVER_CONFIG).read_text())
+            settings = isaac_config(runtime)
+
+            self.assertEqual(isaac_endpoint(settings['grpc']), '127.0.0.1:25052')
+            self.assertEqual(settings['asset_sources']['office_sofa'], binding)
+
+    # 验证配置同步保留退役配置备份和既有凭据。
     def test_sync_backs_up_retired_config_and_keeps_credentials(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

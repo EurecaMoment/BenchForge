@@ -133,7 +133,7 @@ def compile_scene(program, assets_root, settings):
     validate_program(program)
     validate_capture_requirements(program, assets_root, settings)
     environment = program.get('render_environment', {})
-    spp = environment.get('samples_per_pixel', settings.get('samples_per_pixel', 32))
+    spp = max(settings.get('samples_per_pixel', 256), environment.get('samples_per_pixel', 256))
     meshes = {}
     # 按资产标识缓存已登记网格记录，避免编译时重复读取。
     def load(identity):

@@ -1,6 +1,5 @@
 """Asset representation guidance and deterministic scene-structure checks."""
 import json
-from pathlib import Path
 import re
 
 
@@ -94,13 +93,16 @@ def layout_representation(item):
     return 'trellis', None
 
 
-def is_generated_asset(root, asset_id):
-    """Read registered asset provenance without loading its mesh."""
-    if not isinstance(asset_id, str):
-        return False
-    path = Path(root) / 'generated_assets' / asset_id / 'asset.json'
+def registered_mesh_status(root, asset_id):
+    """Read the registered identity from the same access scope as its geometry."""
+    from capabilities.asset_generation.asset_access import registered_asset_path
+    from service_access.access_scope import current_access
+
     try:
+        path = registered_asset_path(root, asset_id, access=current_access())
         asset = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError, TypeError):
-        return False
-    return asset.get('status') == 'generated'
+    except (OSError, ValueError):
+        return None
+    if isinstance(asset, dict) and asset.get('asset_id') == asset_id:
+        return asset.get('status')
+    return None

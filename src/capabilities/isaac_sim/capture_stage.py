@@ -7,7 +7,9 @@ import shutil
 
 from capabilities.capture.capture_scope import capture_scope
 from capabilities.isaac_sim.authoring import compile_scene
-from capabilities.isaac_sim.evidence import measured_entities, physics_summary, resolve_artifact, save_frame
+from capabilities.isaac_sim.evidence import (
+    common_render_metadata, measured_entities, physics_summary, render_metadata, resolve_artifact, save_frame,
+)
 from capabilities.isaac_sim.native_geometry import exported_entities
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
 from capabilities.isaac_sim.capture_contract import (
@@ -55,6 +57,11 @@ def _native_imports(requests, identity, compiled):
         requests.extension(f'asset-pose-{index}', 'scene.edit',
             native_edit_arguments(obj, item['path'], identity, center=item['center'], scale=scale))
         compiled['entities'][obj['id']]['articulation_roots'] = imported.get('articulation_roots', [])
+
+
+def _capture_render_arguments(settings, compiled):
+    return {'size': settings.get('image_size', 1024),
+            'spp': compiled['samples_per_pixel'], 'annotations': True}
 
 
 # 恢复队列任务的访问身份后编译场景，确保无HTTP上下文时仍按所有权消费原生句柄。
@@ -163,14 +170,15 @@ def execute_capture(store, task, stop, *, config, client=None):
                 key = f'views-{start}'
                 job, captured = requests.extension(key, 'scene.capture', {
                     'session_id': identity, 'cameras': [compiled['cameras'][i] for i in indices],
-                    'size': settings.get('image_size', 768), 'spp': compiled['samples_per_pixel'], 'annotations': True})
+                    **_capture_render_arguments(settings, compiled)})
                 files = requests.download(key, job)
                 if len(captured.get('frames', [])) != len(indices):
                     raise ValueError('Isaac Sim did not return every requested camera')
                 for index, frame in zip(indices, captured['frames']):
                     if frame['camera'] != compiled['cameras'][index]:
                         raise ValueError('Isaac Sim returned a different camera')
-                    frames.append(save_frame(frame, files, index, program, incoming,
+                    observed_frame = {**render_metadata(frame, captured), **frame}
+                    frames.append(save_frame(observed_frame, files, index, program, incoming,
                         physics_tick=observed.get('physics_tick'), dt=observed.get('dt', dt)))
                     observe_render_sources(rendered_sources, frame)
                 native_jobs.append(job.job_id)
@@ -181,9 +189,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                 shutil.copyfile(resolve_artifact(exported['package'], files), incoming / 'scene.usdz')
                 (incoming / 'scene.usda').write_text('#usda 1.0\n(subLayers = [@scene.usdc@])\n')
                 native_jobs.append(job.job_id)
-            render = {'renderer': 'A100 CUDA path tracer', 'native_rtx': False, 'replicator': False,
-                      'samples_per_pixel': compiled['samples_per_pixel'],
-                      'resolution': [settings.get('image_size', 768)] * 2}
+            render = common_render_metadata(frames)
             evidence = {'schema': 'benchforge.evidence/v1', 'truth_domain': 'synthetic_world',
                 'origin': 'isaac_native', 'token': token, 'protocol': 'a100sim.v1.Simulator',
                 'session_id': identity, 'job_ids': native_jobs, 'physics': physics,

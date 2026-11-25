@@ -211,7 +211,7 @@ export function createProgressComponents({React, helpers}) {
     const measured = total > 0;
     const percent = measured ? Math.min(100, Math.round(done / total * 100)) : null;
     const moving = state === 'running';
-    const metric = measured ? (generation ? t(detail.label) + ' ' : '') + percent + '%' : t(state === 'completed' ? 'stageDone' : moving ? 'progressPending' :
+    const metric = state === 'completed' ? t('stageDone') : measured ? (generation ? t(detail.label) + ' ' : '') + percent + '%' : t(moving ? 'progressPending' :
       ['failed', 'canceled'].includes(state) ? 'progressPaused' : 'progressWaiting');
     const unit = t(collection ? 'scenePassed' : detail?.label || (products.length ? 'progressProducts' : scene ? 'progressTasks' : 'progressSteps'));
     const amount = detail?.bytes ? (done / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB' : done + ' / ' + total;
@@ -269,7 +269,6 @@ export function createProgressComponents({React, helpers}) {
             key === 'records' && collected.required !== null ? collected.records + ' / ' + collected.required : collected[key])))),
       stage.id === 'S3' && products.length > 0 && h('small', {className: 'bfw-hint', 'data-collection-preview': true},
         t('collectionPreviewOnly') + ' · ' + t('progressProducts') + ' ' + products.length),
-      stale && h('p', {className: 'bfw-error'}, t('staleSnapshot')),
       !collection && current?.error && h('p', {className: 'bfw-error', role: 'alert'}, typeof current.error === 'string' ? current.error : JSON.stringify(current.error)),
       current?.queue && h('small', {className: 'bfw-hint'}, t('waiting') + ': ' + current.queue.reason),
       h(ParallelProgress, {tasks: record.value?.parallel_tasks || [], stage, t}),

@@ -377,6 +377,9 @@ var benchforgeClient = (() => {
       generationAccepted: "\u751F\u6210\u63A5\u7EB3\u6570",
       browse: "\u6D4F\u89C8\u6837\u672C",
       chooseDataset: "\u9009\u62E9\u6570\u636E\u96C6\u7248\u672C",
+      datasetLabel: "\u6570\u636E\u96C6",
+      datasetNotSelected: "\u5C1A\u672A\u9009\u62E9\u6570\u636E\u96C6\u7248\u672C",
+      chooseDatasetHint: "\u9009\u62E9\u4E00\u4E2A\u7248\u672C\u540E\uFF0C\u9898\u76EE\u5217\u8868\u4F1A\u663E\u793A\u5728\u8FD9\u91CC\u3002",
       template: "\u6A21\u677F",
       split: "\u5206\u533A",
       search: "\u9898\u76EE\u3001ID \u6216\u4EFB\u52A1",
@@ -859,6 +862,9 @@ var benchforgeClient = (() => {
       generationAccepted: "Generation accepted",
       browse: "Browse samples",
       chooseDataset: "Choose dataset version",
+      datasetLabel: "Dataset",
+      datasetNotSelected: "No dataset version selected",
+      chooseDatasetHint: "Choose a version to see its questions here.",
       template: "Template",
       split: "Split",
       search: "Question, ID or task",
@@ -1109,6 +1115,121 @@ var benchforgeClient = (() => {
 .bfw-library-controls{margin-block:.6rem}.bfw-library-controls>.bfw-input{flex:1 1 24ch;min-inline-size:0}.bfw-library-policy{margin-block:.4rem .2rem}.bfw-scene-select{display:flex;align-items:center;gap:.6rem;padding:.65rem .85rem;border-block-end:1px solid var(--dsw-alias-border-l3);font-size:.8rem}.bfw-scene-select input,.bfw-library-policy input{accent-color:var(--dsw-alias-brand-primary);inline-size:1rem;block-size:1rem;flex:none}.bfw-scene-selected{border-color:var(--dsw-alias-brand-primary)}.bfw-scene-poster video{inline-size:100%;block-size:100%;object-fit:contain}.bfw-scene-project>.bfw-code{font-size:.7rem;padding-inline:.85rem;overflow-wrap:anywhere}.bfw-library-location{margin-block-start:1rem;font-size:.75rem}.bfw-library-location p{overflow-wrap:anywhere}.bfw-demand-scene-summary{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;font-size:.75rem}.bfw-demand-scene-summary>.bfw-button{padding:.3em .65em;margin-inline-start:auto}
 .bfw-question-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,12rem),1fr));gap:.8rem}.bfw-question-grid .bfw-item{padding:.5rem;border-radius:.7rem;gap:.35rem}.bfw-question-grid .bfw-question-preview{font-size:.8rem;line-height:1.45;-webkit-line-clamp:3;margin:.15rem 0}.bfw-question-grid .bfw-muted{font-size:.7rem}.bfw-question-grid .bfw-public-observation{width:100%}.bfw-question-grid .bfw-observation{margin:0;aspect-ratio:16/10;width:100%;object-fit:contain;border-radius:.4rem;background:var(--dsw-alias-bg-layer-2)}.bfw-question-placeholder{display:grid;place-items:center;aspect-ratio:16/10;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);border-radius:.4rem}.bfw-question-dialog{width:min(92vw,60rem)}.bfw-question-dialog .bfw-preview-header{display:flex;position:sticky;top:0;background:var(--dsw-alias-bg-base);z-index:1}.bfw-question-dialog .bfw-observation{max-block-size:none;width:100%;height:auto}
 .bfw-question-section{margin-block:.75rem;font-size:.875rem;line-height:1.6}.bfw-question-section h3{margin:0 0 .25rem;font-size:.75rem;color:var(--dsw-alias-label-secondary);font-weight:500}.bfw-question-section ul{margin:0;padding-inline-start:1.2rem}.bfw-question-section[data-question-section=options] ul{display:flex;flex-wrap:wrap;gap:.4rem;list-style:none;padding:0}.bfw-question-section[data-question-section=options] li{padding:.2rem .65rem;border:1px solid var(--dsw-alias-border-l3);border-radius:.4rem}.bfw-original-image{margin-inline-start:.75rem;font-size:.75rem;color:inherit}.bfw-question-response{font-size:.75rem;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+`;
+  var workbenchPolish = `
+.bfw-root{font-family:Inter,"Segoe UI",system-ui,sans-serif;font-size:.875rem;line-height:1.55}
+.bfw-shell{max-inline-size:88rem;padding:1rem clamp(.85rem,2.4cqi,1.5rem)}
+.bfw-header{padding-block-end:.7rem;border-block-end:1px solid var(--dsw-alias-border-l3)}
+.bfw-title{font-size:1.2rem;font-weight:650;letter-spacing:0}
+.bfw-flow{gap:.25rem;padding:.35rem 0;margin-block:.6rem .75rem;border:0;border-block-end:1px solid var(--dsw-alias-border-l3);border-radius:0;background:var(--dsw-alias-bg-base);box-shadow:none}
+.bfw-stage{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:.35rem;padding:.45rem .35rem;border-radius:.4rem}
+.bfw-stage-index{inline-size:1.45rem;block-size:1.45rem;border-radius:50%;font-size:.67rem}
+.bfw-stage strong{font-size:.73rem;line-height:1.25}
+.bfw-stage-state{font-size:.62rem;margin-block-start:.1rem}
+.bfw-stage[aria-current=step]{border-color:transparent;background:var(--dsw-alias-bg-layer-2);box-shadow:inset 0 -2px var(--dsw-alias-brand-primary)}
+.bfw-stage-progress{padding:.65rem 0;margin:0 0 .75rem;border:0;border-block-end:1px solid var(--dsw-alias-border-l3);border-radius:0;background:transparent}
+.bfw-progress-rail{block-size:.55rem}
+.bfw-stage-progress progress,.bfw-progress-track{height:.5rem}
+.bfw-progress-footer{font-size:.72rem}
+.bfw-stage-heading{align-items:center;margin-block:.75rem}
+.bfw-stage-heading h2{font-size:1.1rem;line-height:1.3}
+.bfw-stage-number{inline-size:1.75rem;block-size:1.75rem;border-radius:.4rem}
+.bfw-product{padding:0;margin:0;border:0;border-radius:0;background:transparent}
+.bfw-card{margin-block:.8rem;border:0;border-block-start:1px solid var(--dsw-alias-border-l3);border-radius:0;background:transparent}
+.bfw-card h2{padding:.65rem 0;border:0;font-size:.9rem}
+.bfw-body{padding:.65rem 0}
+.bfw-button,.bfw-input,.bfw-select{min-block-size:2.25rem;border-radius:.4rem}
+.bfw-item,.bfw-preview-card{border-radius:.5rem}
+.bfw-question-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr));gap:.6rem}
+.bfw-question-grid .bfw-item{border-radius:.45rem}
+.bfw-evaluation-grid{display:grid;grid-template-columns:minmax(13rem,.8fr) minmax(0,2fr);gap:1rem;align-items:start}
+.bfw-evaluation-config,.bfw-evaluation-questions{min-inline-size:0}
+.bfw-evaluation-config h3,.bfw-evaluation-questions h3{margin:0 0 .65rem;font-size:.88rem;font-weight:600}
+.bfw-evaluation-config .bfw-definition{grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:.6rem 1rem;margin-block:.8rem}
+.bfw-evaluation-config .bfw-definition>div{padding-block:.45rem;border-block-end:1px solid var(--dsw-alias-border-l3)}
+.bfw-definition dt{font-size:.72rem}
+.bfw-definition dd{font-size:.82rem;font-weight:550}
+.bfw-stage-footer{align-items:center;padding-block:.8rem;margin-block:1rem;border-block-start:1px solid var(--dsw-alias-border-l3)}
+.bfw-stage-footer .bfw-button{min-inline-size:5.5rem}
+.bfw-error,.bfw-notice,.bfw-callout{border-radius:.45rem}
+.bfw-preview-dialog{border-radius:.5rem}
+.bfw-root :focus-visible{outline-offset:2px}
+.bfw-stage-progress [data-production-activity]{display:grid;gap:.2rem;padding:.6rem .75rem;margin-block-end:.65rem;border-inline-start:3px solid var(--dsw-alias-state-warning-primary,#b86b00);border-radius:.35rem;background:color-mix(in srgb,var(--dsw-alias-state-warning-primary,#b86b00) 9%,var(--dsw-alias-bg-base,#fff));font-size:.78rem;line-height:1.45}
+.bfw-stage-progress [data-stop-reason]{font-size:.74rem;color:var(--dsw-alias-label-secondary)}
+.bfw-stage-progress .bfw-progress-metric{font-size:.92rem;font-weight:600}
+.bfw-stage-progress[data-progress-state=completed] .bfw-progress-metric{color:var(--dsw-alias-state-success-primary)}
+.bfw-stage-progress[data-progress-state=completed] .bfw-progress-rail{max-block-size:.35rem}
+.bfw-progress-details{font-size:.72rem}
+.bfw-progress-details summary{padding:.2rem 0}
+.bfw-review{border-radius:.45rem;background:var(--dsw-alias-bg-layer-2)}
+.bfw-plan-document h3{font-size:1.05rem;line-height:1.4}
+.bfw-plan-toc{gap:.35rem .65rem}
+.bfw-product details>summary{font-size:.8rem;color:var(--dsw-alias-label-secondary)}
+.bfw-plan-summary{max-inline-size:78ch;line-height:1.7;color:var(--dsw-alias-label-secondary)}
+.bfw-plan-section{padding-block:.9rem;border-color:color-mix(in srgb,var(--dsw-alias-border-l3) 75%,transparent)}
+.bfw-plan-section h4{font-size:.92rem;line-height:1.4}
+.bfw-plan-toc a{padding:.2rem .4rem;border-radius:.3rem;background:var(--dsw-alias-bg-layer-2)}
+.bfw-review{gap:.4rem .6rem;padding:.55rem .7rem;font-size:.78rem}
+.bfw-review-actions{gap:.35rem}
+.bfw-review-actions .bfw-button{min-block-size:1.9rem}
+.bfw-stage-progress [data-production-activity]{font-size:.75rem}
+.bfw-stage-progress [data-stop-reason]{line-height:1.45;overflow-wrap:anywhere}
+.bfw-library-controls{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(8.5rem,.9fr) auto auto;align-items:end;gap:.5rem}
+.bfw-library-controls>.bfw-input{width:100%;min-inline-size:0}
+.bfw-library-controls>.bfw-label{min-inline-size:0}
+.bfw-library-controls>.bfw-button{white-space:nowrap;padding-inline:.6rem}
+.bfw-library-policy{margin-block:.55rem .25rem;font-size:.8rem}
+.bfw-scene-projects{grid-template-columns:repeat(auto-fit,minmax(min(100%,27ch),1fr));gap:.7rem}
+.bfw-scene-project{max-inline-size:none;border-radius:.45rem}
+.bfw-scene-project .bfw-scene-select{min-block-size:2.5rem;padding:.5rem .65rem;font-size:.75rem}
+.bfw-scene-project .bfw-scene-poster{aspect-ratio:16/9}
+.bfw-scene-project .bfw-preview-open{gap:.35rem;padding:0 .55rem .6rem}
+.bfw-scene-project .bfw-preview-open>strong{font-size:.84rem;line-height:1.35}
+.bfw-scene-project .bfw-preview-open>.bfw-muted{font-size:.7rem}
+.bfw-scene-project>details{margin-inline:.6rem;font-size:.75rem}
+.bfw-scene-project>details:last-child{margin-block-end:.6rem}
+.bfw-scene-project .bfw-code{font-size:.68rem}
+.bfw-stage-product[data-stage-product="S3"]>.bfw-empty,
+.bfw-evaluation-questions>.bfw-empty,
+.bfw-stage-product[data-stage-product="S5"]>.bfw-empty{display:grid;align-content:center;gap:.3rem;min-block-size:7rem;margin-block:.65rem;padding:1rem 1.1rem;border-inline-start:3px solid var(--dsw-alias-border-l3);border-radius:.35rem;background:var(--dsw-alias-bg-layer-2);text-align:start}
+.bfw-stage-product[data-stage-product="S3"]>.bfw-empty{border-inline-start-color:var(--dsw-alias-brand-primary)}
+.bfw-evaluation-questions>.bfw-empty{min-block-size:8rem}
+.bfw-empty-state strong{font-size:.86rem;font-weight:600;color:var(--dsw-alias-label-primary)}
+.bfw-empty-state span{font-size:.76rem;line-height:1.45}
+.bfw-stage-product[data-stage-product="S5"]>.bfw-empty{border-inline-start-color:var(--dsw-alias-state-warning-primary,#b86b00)}
+.bfw-stage-product[data-stage-product="S5"]>.bfw-unavailable-products{padding:.65rem .8rem;margin-block:.6rem;border-inline-start:3px solid var(--dsw-alias-state-warning-primary,#b86b00);border-radius:.35rem;background:color-mix(in srgb,var(--dsw-alias-state-warning-primary,#b86b00) 9%,var(--dsw-alias-bg-base,#fff));font-size:.78rem}
+.bfw-stage-product[data-stage-product="S5"]>.bfw-report-empty{border-inline-start-color:var(--dsw-alias-state-warning-primary,#b86b00)}
+.bfw-evaluation-grid{gap:.85rem}
+.bfw-evaluation-config,.bfw-evaluation-questions{padding-block:.15rem}
+.bfw-evaluation-config .bfw-select{margin-block:.15rem}
+.bfw-evaluation-config details,.bfw-stage-product details{overflow-wrap:anywhere}
+.bfw-evaluation-config details>summary,.bfw-stage-product details>summary{padding-block:.25rem}
+.bfw-stage-footer{gap:.6rem}
+.bfw-stage-footer .bfw-action{font-weight:600}
+@container (max-width:720px){
+  .bfw-evaluation-grid{grid-template-columns:minmax(0,1fr);gap:.85rem}
+  .bfw-evaluation-config .bfw-definition{grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr))}
+}
+@container (max-width:430px){
+  .bfw-shell{padding:.75rem}
+  .bfw-flow{grid-template-columns:repeat(5,minmax(0,1fr));gap:.1rem}
+  .bfw-stage{grid-template-columns:minmax(0,1fr);justify-items:center;gap:.2rem;padding:.4rem .15rem;text-align:center}
+  .bfw-stage-copy{flex-basis:auto}
+  .bfw-stage strong{font-size:.64rem}
+  .bfw-stage-state{font-size:.57rem}
+  .bfw-stage-footer{flex-wrap:wrap}
+  .bfw-stage-footer .bfw-action{flex-basis:100%;order:-1}
+  .bfw-stage-footer .bfw-button{flex:1 1 6rem}
+  .bfw-library-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .bfw-library-controls>.bfw-input{grid-column:1/-1}
+  .bfw-library-controls>.bfw-label{grid-column:1/-1}
+  .bfw-library-controls>.bfw-button{width:100%;white-space:normal}
+  .bfw-scene-projects{grid-template-columns:minmax(0,1fr)}
+  .bfw-plan-scenes{grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr))}
+  .bfw-stage-product[data-stage-product="S3"]>.bfw-empty,
+  .bfw-evaluation-questions>.bfw-empty,
+  .bfw-stage-product[data-stage-product="S5"]>.bfw-empty{min-block-size:5.5rem;padding:.8rem}
+}
 `;
 
   // src/capabilities/benchmark_design/resources/tool-names.json
@@ -2117,7 +2238,7 @@ var benchforgeClient = (() => {
       const measured = total > 0;
       const percent = measured ? Math.min(100, Math.round(done / total * 100)) : null;
       const moving = state === "running";
-      const metric = measured ? (generation ? t(detail.label) + " " : "") + percent + "%" : t(state === "completed" ? "stageDone" : moving ? "progressPending" : ["failed", "canceled"].includes(state) ? "progressPaused" : "progressWaiting");
+      const metric = state === "completed" ? t("stageDone") : measured ? (generation ? t(detail.label) + " " : "") + percent + "%" : t(moving ? "progressPending" : ["failed", "canceled"].includes(state) ? "progressPaused" : "progressWaiting");
       const unit = t(collection ? "scenePassed" : detail?.label || (products.length ? "progressProducts" : scene ? "progressTasks" : "progressSteps"));
       const amount = detail?.bytes ? (done / 1048576).toFixed(1) + " / " + (total / 1048576).toFixed(1) + " MB" : done + " / " + total;
       return h(
@@ -2226,7 +2347,6 @@ var benchforgeClient = (() => {
           { className: "bfw-hint", "data-collection-preview": true },
           t("collectionPreviewOnly") + " \xB7 " + t("progressProducts") + " " + products.length
         ),
-        stale && h("p", { className: "bfw-error" }, t("staleSnapshot")),
         !collection && current?.error && h("p", { className: "bfw-error", role: "alert" }, typeof current.error === "string" ? current.error : JSON.stringify(current.error)),
         current?.queue && h("small", { className: "bfw-hint" }, t("waiting") + ": " + current.queue.reason),
         h(ParallelProgress, { tasks: record.value?.parallel_tasks || [], stage, t }),
@@ -3021,7 +3141,11 @@ var benchforgeClient = (() => {
         },
         [item?.url, observedAt]
       );
-      if (!item) return empty(t("reportPending"));
+      if (!item) return h(
+        "div",
+        { className: "bfw-empty bfw-empty-state bfw-report-empty", "data-report-pending": true },
+        h("strong", null, t("reportPending"))
+      );
       if (error) return h("p", { className: "bfw-error", role: "alert" }, t("artifactReadFailed") + " " + error);
       if (!data) return empty(t("loading"));
       return h(
@@ -3139,6 +3263,7 @@ var benchforgeClient = (() => {
       PLAN_SECTIONS: PLAN_SECTIONS2,
       PLAN_FIELDS: PLAN_FIELDS2,
       styles: styles2,
+      workbenchPolish: workbenchPolish2,
       dictionaries: dictionaries2
     } = helpers;
     const {
@@ -3779,7 +3904,7 @@ var benchforgeClient = (() => {
           "section",
           { className: "bfw-evaluation-config" },
           h("h3", null, t("evaluationConfig")),
-          select(t("chooseDataset"), route.dataset, changeDataset, versionOptions),
+          select(t("datasetLabel"), route.dataset, changeDataset, versionOptions),
           h(
             "dl",
             { className: "bfw-definition" },
@@ -3800,19 +3925,24 @@ var benchforgeClient = (() => {
           "section",
           { className: "bfw-evaluation-questions" },
           h("h3", null, t("questionTable")),
-          route.dataset ? datasetBrowser : empty(t("chooseDataset"))
+          route.dataset ? datasetBrowser : h(
+            "div",
+            { className: "bfw-empty bfw-empty-state", "data-dataset-unselected": true },
+            h("strong", null, t("datasetNotSelected")),
+            h("span", null, t("chooseDatasetHint"))
+          )
         )
       );
       else product = h(
         React.Fragment,
         null,
-        select(t("chooseDataset"), route.dataset, changeDataset, versionOptions),
+        select(t("datasetLabel"), route.dataset, changeDataset, versionOptions),
         productResource.status === "failed" && !productResource.value && h(
           "p",
           { className: "bfw-error", role: "alert" },
           t("artifactReadFailed") + " " + (productResource.failure?.message || "")
         ),
-        unavailableProductCount > 0 && h("p", { className: "bfw-muted" }, t("unavailableProducts", { count: unavailableProductCount })),
+        unavailableProductCount > 0 && h("p", { className: "bfw-muted bfw-unavailable-products", role: "status" }, t("unavailableProducts", { count: unavailableProductCount })),
         dataset.error && h("p", { className: "bfw-error" }, dataset.error),
         !finalReport && (dataset.value?.report || selectedDataset?.report) && h(Quality, { report: dataset.value?.report || selectedDataset?.report, templateName, t }),
         !finalReport && (sceneArtifacts.loading || run.loading) ? empty(t("loading")) : !finalReport && filesError ? h("p", { className: "bfw-error" }, t("artifactReadFailed") + " " + filesError) : h(ReportProduct, { item: finalReport, observedAt: sourceScene ? sceneArtifacts.updatedAt : run.updatedAt, t }),
@@ -3847,7 +3977,7 @@ var benchforgeClient = (() => {
           button(t("nextStep"), () => update({ stage: STAGES2[STAGES2.indexOf(stage) + 1].id }), { disabled: stage.id === "S5" })
         )
       );
-      return h("div", { ref: panelRef, className: "bfw-root", "data-benchforge-workbench": "true", "data-benchforge-panel": "true" }, h("style", null, styles2), h(
+      return h("div", { ref: panelRef, className: "bfw-root", "data-benchforge-workbench": "true", "data-benchforge-panel": "true" }, h("style", null, styles2), h("style", null, workbenchPolish2), h(
         "div",
         { className: "bfw-shell" },
         h("header", { className: "bfw-header" }, h(
@@ -4922,7 +5052,7 @@ var benchforgeClient = (() => {
     const primitives = createPrimitives({ React, PLAN_FIELDS, PLAN_SECTIONS });
     const state = createWorkbenchState({ STAGES, sceneName: primitives.sceneName });
     const hooks = createApiHooks({ React });
-    const helpers = { ...primitives, ...state, ...hooks, productsResourceAddress, STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries };
+    const helpers = { ...primitives, ...state, ...hooks, productsResourceAddress, STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, workbenchPolish, dictionaries };
     const progress = createProgressComponents({ React, helpers });
     const gallery = createGalleryComponents({ React, helpers });
     const components = { ...progress, ...gallery, ...createProductComponents({ React, helpers, components: { ...progress, ...gallery } }) };

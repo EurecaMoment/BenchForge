@@ -25,7 +25,10 @@ BenchForge capture daemon, device lock, callback endpoint or local Kit runtime i
 Set `providers.IsaacSim4A100.grpc` in `config/benchforge.local.json`, then
 run `python benchforge_app.py sync` and the usual backend/DSH launch scripts.
 Configuration version 4 migrates once to version 5, preserving model settings
-and backing up retired settings. On first backend start, the old queue is
+and backing up retired settings. image_size controls the square capture resolution
+from 64 to 2048 pixels. samples_per_pixel is a quality floor, so the effective
+request uses the larger of that value and the SceneProgram value. The default is
+1024 pixels and 256 spp, with a maximum of 1024 spp. On first backend start, the old queue is
 backed up and unfinished old-protocol captures require an explicit retry.
 That retry creates a new scene revision and leaves previous capture paths intact.
 

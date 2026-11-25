@@ -124,7 +124,8 @@ export function createProductComponents({React, helpers, components}) {
       }).then(setData).catch((reason) => {if (reason.name !== 'AbortError') setError(reason.message);});
       return () => controller.abort();
     }, [item?.url, observedAt]);
-    if (!item) return empty(t('reportPending'));
+    if (!item) return h('div', {className: 'bfw-empty bfw-empty-state bfw-report-empty', 'data-report-pending': true},
+      h('strong', null, t('reportPending')));
     if (error) return h('p', {className: 'bfw-error', role: 'alert'}, t('artifactReadFailed') + ' ' + error);
     if (!data) return empty(t('loading'));
     return h('article', {className: 'bfw-plan-document'}, h('h3', null, item.title),

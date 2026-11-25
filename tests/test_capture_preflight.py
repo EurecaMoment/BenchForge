@@ -175,6 +175,46 @@ class CapturePreflightTests(unittest.TestCase):
         self.assertFalse(report['passed'])
         self.assertTrue(any('each hard requirement' in row['message'] for row in report['issues']))
 
+    def test_asset_role_accepts_available_registered_mesh_but_keeps_native_robot_requirement(self):
+        program = sample()
+        asset_id = 'asset_0123456789abcdef'
+        obj = program['objects'][0]
+        obj.update(kind='mesh', asset_id=asset_id, size=[2, 1, 1])
+        folder = self.root / 'generated_assets' / asset_id
+        folder.mkdir(parents=True)
+        mesh_file = folder / 'mesh.json'
+        vertices = [[x, y, z] for x in (-1, 0, 1) for y in (-.5, .5) for z in (0, 1)]
+        mesh_file.write_text(json.dumps({'vertices': vertices, 'coordinate_frame': 'z_up'}))
+        role = {'object_id': obj['id'], 'role': 'Study desk', 'representation': 'native_asset'}
+        design = {'id': 'study', 'name': 'Study', 'summary': 'A study desk on the ground',
+                  'hard_requirements': ['Use a registered desk model'],
+                  'physical_assumptions': ['Stable ground'], 'object_roles': [role],
+                  'relations': [{'source': obj['id'], 'target': 'ground', 'type': 'supported_by',
+                                 'description': 'Desk legs touch the floor'}]}
+        plan = self.root / 'plan.json'
+        program['provenance'] = {'sources': [{'kind': 'scene_plan', 'path': str(plan),
+                                             'scene_design_id': 'study'}]}
+
+        def inspect():
+            plan.write_text(json.dumps({'schema': 'benchforge.assessment/v1', 'scenes': {'designs': [design]}}))
+            return inspect_capture_program(self.root, program, policy={'enforce_realism': True})
+
+        record = folder / 'asset.json'
+        for status in ('generated', 'imported'):
+            record.write_text(json.dumps({'asset_id': asset_id, 'status': status}))
+            report = inspect()
+            self.assertTrue(report['passed'], report['issues'])
+            self.assertEqual(report['geometry_preview']['objects'][0]['actual_size_m'], [2, 1, 1])
+
+        record.write_text(json.dumps({'asset_id': 'another_asset', 'status': 'generated'}))
+        self.assertIn('required_native_asset', {issue['code'] for issue in inspect()['issues']})
+        record.write_text(json.dumps({'asset_id': asset_id, 'status': 'generated'}))
+        role['representation'] = 'articulated_robot'
+        self.assertIn('required_native_asset', {issue['code'] for issue in inspect()['issues']})
+        role['representation'] = 'native_asset'
+        mesh_file.unlink()
+        self.assertIn('source_geometry_unavailable', {issue['code'] for issue in inspect()['issues']})
+
     # 验证异常计划角色不使预检崩溃，也不遮蔽其他对象的问题。
     def test_malformed_plan_roles_do_not_crash_or_hide_other_objects(self):
         program = sample()

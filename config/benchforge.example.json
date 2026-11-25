@@ -71,8 +71,8 @@
       },
       "capture_timeout_seconds": 1800,
       "max_concurrent_captures": 4,
-      "image_size": 768,
-      "samples_per_pixel": 32,
+      "image_size": 1024,
+      "samples_per_pixel": 256,
       "asset_sources": {}
     }
   }
