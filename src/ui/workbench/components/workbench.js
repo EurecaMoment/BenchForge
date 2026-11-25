@@ -7,7 +7,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
   productionProductsRevision, sceneStage, pipelineForStage, sceneForStage, progressSceneForStage,
   registeredCollectionProgress, currentGeneration, sceneCollectionProgress, annotationProducts,
   stageState, recordedStageState,
-  STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries} = helpers;
+  STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, workbenchPolish, dictionaries} = helpers;
   const {TemplateCatalog, RunDetails, executionStage, reportedProgress, progressAmount, ParallelProgress,
     StageProgress, PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneGallery, SceneVideo,
     SceneLibrary, PreviewDialog, ArtifactGallery, StageReviewPanel, PlanProduct, ReportProduct, Quality} = components;
@@ -370,7 +370,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
           h(stage.id === 'S2' ? SceneGallery : ArtifactGallery, {items: productFiles, preview: setPreview, t}));
       else if (stage.id === 'S4') product = h('div', {className: 'bfw-evaluation-grid'},
         h('section', {className: 'bfw-evaluation-config'}, h('h3', null, t('evaluationConfig')),
-          select(t('chooseDataset'), route.dataset, changeDataset, versionOptions),
+          select(t('datasetLabel'), route.dataset, changeDataset, versionOptions),
           h('dl', {className: 'bfw-definition'},
             h('div', null, h('dt', null, t('version')), h('dd', null, selectedDataset ? '数据集 '+(datasets.indexOf(selectedDataset)+1) : '—')),
             h('div', null, h('dt', null, t('targetItems')), h('dd', null, dataset.value?.report?.requested ?? plannedItems ?? '—')),
@@ -380,12 +380,13 @@ export function createWorkbenchComponent({React, helpers, components}) {
           productFiles.length > 0 && h(ArtifactGallery, {items: productFiles, selected: [], preview: setPreview, t}),
           datasetDirectory),
         h('section', {className: 'bfw-evaluation-questions'}, h('h3', null, t('questionTable')),
-          route.dataset ? datasetBrowser : empty(t('chooseDataset'))));
+          route.dataset ? datasetBrowser : h('div', {className: 'bfw-empty bfw-empty-state', 'data-dataset-unselected': true},
+            h('strong', null, t('datasetNotSelected')), h('span', null, t('chooseDatasetHint')))));
       else product = h(React.Fragment, null,
-        select(t('chooseDataset'), route.dataset, changeDataset, versionOptions),
+        select(t('datasetLabel'), route.dataset, changeDataset, versionOptions),
         productResource.status === 'failed' && !productResource.value && h('p', {className: 'bfw-error', role: 'alert'},
           t('artifactReadFailed') + ' ' + (productResource.failure?.message || '')),
-        unavailableProductCount > 0 && h('p', {className: 'bfw-muted'}, t('unavailableProducts', {count: unavailableProductCount})),
+        unavailableProductCount > 0 && h('p', {className: 'bfw-muted bfw-unavailable-products', role: 'status'}, t('unavailableProducts', {count: unavailableProductCount})),
         dataset.error && h('p', {className: 'bfw-error'}, dataset.error),
         !finalReport && (dataset.value?.report || selectedDataset?.report) && h(Quality, {report: dataset.value?.report || selectedDataset?.report,templateName,t}),
         !finalReport && (sceneArtifacts.loading || run.loading) ? empty(t('loading')) :
@@ -403,7 +404,7 @@ export function createWorkbenchComponent({React, helpers, components}) {
         h('div', {className: 'bfw-stage-footer'},
           button(t('requestChange'), prepare, {className: 'bfw-button bfw-action', 'data-request-stage': stage.id}), button(t('previousStep'), () => update({stage: STAGES[STAGES.indexOf(stage) - 1].id}), {disabled: stage.id === 'S1'}),
           button(t('nextStep'), () => update({stage: STAGES[STAGES.indexOf(stage) + 1].id}), {disabled: stage.id === 'S5'})));
-    return h('div', {ref: panelRef, className: 'bfw-root', 'data-benchforge-workbench': 'true', 'data-benchforge-panel': 'true'}, h('style', null, styles), h('div', {className: 'bfw-shell'},
+    return h('div', {ref: panelRef, className: 'bfw-root', 'data-benchforge-workbench': 'true', 'data-benchforge-panel': 'true'}, h('style', null, styles), h('style', null, workbenchPolish), h('div', {className: 'bfw-shell'},
       h('header', {className: 'bfw-header'}, h('div', null,
         h('div', {className: 'bfw-kicker'}, 'BenchForge'), h('h1', {className: 'bfw-title'}, t('panel'))), button(t('refresh'), () => setRevision((value) => value + 1), {disabled: summary.loading})),
       h('nav', {className: 'bfw-flow', 'aria-label': t('navigation')}, STAGES.map((step) => h('button', {

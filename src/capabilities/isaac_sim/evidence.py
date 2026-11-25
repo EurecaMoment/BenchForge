@@ -95,6 +95,30 @@ def physics_summary(observation, steps, dt):
             'basis': 'native CUDA tensors after settling; static geometry still needs bounds/support acceptance'}
 
 
+def render_metadata(frame, capture=None):
+    """Preserve the renderer's actual backend, including per-frame CPU fallback."""
+    keys = ('renderer', 'render_backend', 'native_rtx', 'cpu_fallback', 'replicator')
+    result = {key: value for source in (capture or {}, frame)
+              for key, value in source.items() if key in keys}
+    if 'spp' in frame:
+        result['samples_per_pixel'] = frame['spp']
+    if 'resolution' in frame:
+        result['resolution'] = frame['resolution']
+    return result
+
+
+def common_render_metadata(frames):
+    """Summarize only settings shared by every retained native frame."""
+    values = [frame.get('render_settings', {}) for frame in frames]
+    if not values:
+        return {}
+    common = {key: value for key, value in values[0].items()
+              if all(key in row and row[key] == value for row in values[1:])}
+    if any(row != values[0] for row in values[1:]):
+        common['varies_by_frame'] = True
+    return common
+
+
 # 保存原生RGB及标注数组，结合相机和对象记录形成单帧采集证据。
 def save_frame(frame, files, index, program, output, *, physics_tick=None, dt=None):
     prefix = output / f'view_{index}'
@@ -146,7 +170,7 @@ def save_frame(frame, files, index, program, output, *, physics_tick=None, dt=No
         'meters_per_scene_unit': 1.0, 'camera_path': frame['camera'],
         'pixel_center_offset_px': [.5, .5],
         'pixel_coordinates': 'upper-left pixel boundary is (0,0); pixel centers are (u+0.5,v+0.5)',
-        'calibration_source': 'same A100 CUDA rendered camera matrix, field of view and readout'}
+        'calibration_source': 'same native rendered camera matrix, field of view and readout'}
     quality = assess_view(rgb, depth, objects)
     result = {'frame_id': f'view_{index}', 'image': f'view_{index}.png',
         'image_size': {'width': width, 'height': height},
@@ -155,6 +179,7 @@ def save_frame(frame, files, index, program, output, *, physics_tick=None, dt=No
         'depth_kind': 'optical_axis_z_m', 'depth_unit': 'meter',
         'semantic_info': {'idToLabels': labels['classes']},
         'instance_info': {'idToLabels': {key: item['prim_path'] for key, item in labels['instances'].items()}},
-        'native_rtx': False, 'annotation_backend': labels['backend']}
+        **({'native_rtx': frame['native_rtx']} if 'native_rtx' in frame else {}),
+        'render_settings': render_metadata(frame), 'annotation_backend': labels['backend']}
     write_json(prefix.with_suffix('.json'), result)
     return result

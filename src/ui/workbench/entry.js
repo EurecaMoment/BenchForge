@@ -1,5 +1,5 @@
 import {dictionaries} from './i18n.js';
-import {styles} from './styles.js';
+import {styles, workbenchPolish} from './styles.js';
 import {createPrimitives} from './primitives.js';
 import {createWorkbenchState} from './state.js';
 import {createApiHooks, createWorkbenchRequest} from './api.js';
@@ -53,7 +53,7 @@ function createClient(React, defineStore, ui) {
   const primitives = createPrimitives({React, PLAN_FIELDS, PLAN_SECTIONS});
   const state = createWorkbenchState({STAGES, sceneName: primitives.sceneName});
   const hooks = createApiHooks({React});
-  const helpers = {...primitives, ...state, ...hooks, productsResourceAddress, STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, dictionaries};
+  const helpers = {...primitives, ...state, ...hooks, productsResourceAddress, STAGES, PLAN_SECTIONS, PLAN_FIELDS, styles, workbenchPolish, dictionaries};
   const progress = createProgressComponents({React, helpers});
   const gallery = createGalleryComponents({React, helpers});
   const components = {...progress, ...gallery, ...createProductComponents({React, helpers, components: {...progress, ...gallery}})};

@@ -159,11 +159,12 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
         if isinstance(environment.get('exposure'), (int, float)) and environment['exposure'] != 0:
             issues.append(_issue('/render_environment/exposure',
                 'A100 scene.capture has no exposure control; do not silently discard exposure'))
-    spp = (environment if isinstance(environment, dict) else {}).get(
-        'samples_per_pixel', (settings or {}).get('samples_per_pixel', 32))
-    if isinstance(spp, (int, float)) and not 1 <= spp <= 256:
+    configured_spp = (settings or {}).get('samples_per_pixel', 256)
+    program_spp = (environment if isinstance(environment, dict) else {}).get('samples_per_pixel', 256)
+    spp_values = [value for value in (configured_spp, program_spp) if type(value) in (int, float)]
+    if spp_values and not 1 <= max(spp_values) <= 1024:
         issues.append(_issue('/render_environment/samples_per_pixel',
-            'The running A100 scene.capture contract accepts samples_per_pixel up to 256'))
+            'The running A100 scene.capture contract accepts samples_per_pixel up to 1024'))
     for index, light in enumerate(_records(program.get('lights'))):
         if not isinstance(light, dict) or light.get('enabled') is False:
             continue

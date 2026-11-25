@@ -13,7 +13,8 @@ from pipelines.scene_production.lifecycle import SceneLifecycle
 from pipelines.scene_production import repair
 from pipelines.scene_production.scheduler import coordinate
 from pipelines.scene_production.service_failures import (
-    SERVICE_OWNER, SERVICE_STAGE, is_execution_diagnosis, is_remote_job_failure,
+    ANNOTATION_BINDING_DEFECT, SERVICE_OWNER, SERVICE_STAGE, capture_service_defect,
+    is_execution_diagnosis, is_remote_job_failure,
     is_service_failure, stage_failure,
 )
 from service_access.scene_service import ScenePreflightRejected
@@ -174,6 +175,110 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
             'wheel', geometry_present=True, colliders_present=False), 'capture')
         with self.assertRaisesRegex(ValueError, 'unchanged capture is blocked'):
             SceneLifecycle(self.root).retry(task, None, 'auto', self.directory)
+
+    def annotation_recovery_fixture(self, *, marker=True):
+        """Retain the real failure shape and a separately verified native annotated job."""
+        failed = {'job_id': 'failed-annotation', 'request_id': 'request-failed',
+                  'operation': 'extension.scene.capture', 'state': 'FAILED',
+                  'failure': {'code': 'FAILED_PRECONDITION',
+                              'message': "Module 'mitsuba' has no attribute 'ShapePtr'"},
+                  'created_at_unix': 100, 'artifacts': []}
+        path = self.root / 'isaac_sim/attempt_0/jobs/views-0/receipt.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(failed))
+        task = deepcopy(self.task)
+        # Existing tasks were persisted before the service-defect classification existed.
+        task['failure'] = {'stage': 'capture_execution', 'repair_owner': 'isaac_sim_execution',
+                           'retry_unchanged': False, 'remote_job_failure': failed}
+        successful = {'job_id': 'verified-annotation', 'operation': 'extension.scene.capture',
+                      'state': 'SUCCEEDED', 'created_at_unix': 200,
+                      'result': {'frames': [{'image': 'artifact://rgb', 'annotations': {
+                          'arrays': 'artifact://arrays', 'labels': 'artifact://labels',
+                          'depth_unit': 'meter', 'valid_pixels': 10,
+                          'instance_count': 2, 'class_count': 2}}]},
+                      'artifacts': [{'artifact_id': key} for key in ('rgb', 'arrays', 'labels')]}
+        if marker:
+            (self.root / 'isaac_sim/service_recovery.json').write_text(json.dumps({
+                'schema': 'benchforge.isaac-service-recovery/v1',
+                'failed_job_id': failed['job_id'], 'verified_job_id': successful['job_id'],
+                'endpoint': 'fixture:50051'}))
+        return task, successful
+
+    def retry_annotation_fixture(self, task, job, mode='auto'):
+        client = Mock(endpoint='fixture:50051')
+        client.get.return_value = job
+        with (patch('pipelines.scene_production.lifecycle.policy_for', return_value={}),
+              patch('pipelines.scene_production.service_failures.current_capture_settings',
+                    return_value=self.settings),
+              patch('capabilities.isaac_sim.capture_contract.inspect_live_capture_service', return_value=[]),
+              patch('capabilities.isaac_sim.capture_contract.capture_service_client', return_value=client),
+              patch('capabilities.isaac_sim.grpc.transport.document', side_effect=lambda value: value)):
+            return SceneLifecycle(self.root).retry(task, None, mode, self.directory)
+
+    def test_annotation_binding_failure_is_service_owned_without_loosening_other_native_failures(self):
+        task, _ = self.annotation_recovery_fixture()
+        error = RuntimeError('annotation binding')
+        error.job = task['failure']['remote_job_failure']
+        failure = stage_failure(error, 'capture')
+        self.assertEqual(capture_service_defect(failure), ANNOTATION_BINDING_DEFECT)
+        self.assertEqual(failure['stage'], SERVICE_STAGE)
+        self.assertEqual(failure['repair_owner'], SERVICE_OWNER)
+        self.assertTrue(is_service_failure(task['failure']))
+        self.assertFalse(is_execution_diagnosis(task['failure']))
+        error.job['failure']['message'] = 'No faithful PBR mapping for native material'
+        self.assertFalse(is_service_failure(stage_failure(error, 'capture')))
+        self.assertTrue(is_execution_diagnosis(stage_failure(error, 'capture')))
+        self.assertFalse(is_service_failure(RuntimeError("Module 'mitsuba' has no attribute 'ShapePtr'")))
+
+    def test_annotation_recovery_needs_verified_job_even_when_live_schema_is_available(self):
+        task, job = self.annotation_recovery_fixture(marker=False)
+        with self.assertRaisesRegex(ValueError, 'service_recovery.json'):
+            self.retry_annotation_fixture(task, job)
+
+    def test_annotated_recovery_restarts_same_revision_and_retains_old_receipt(self):
+        task, job = self.annotation_recovery_fixture()
+        original = deepcopy(task)
+        receipt = self.root / 'isaac_sim/attempt_0/jobs/views-0/receipt.json'
+        before = receipt.read_bytes()
+        unit = self.retry_annotation_fixture(task, job)
+        self.assertEqual(unit['phase'], 'capture')
+        self.assertEqual(unit['revision'], 0)
+        self.assertEqual(unit['capture_generation'], 1)
+        self.assertEqual(unit['capture_recovery_mode'], 'restart')
+        self.assertEqual(task, original)
+        self.assertEqual(receipt.read_bytes(), before)
+        proof = json.loads((self.root / 'isaac_sim/service_recovery/verified_receipt.json').read_text())
+        self.assertEqual(proof['verified_job']['job_id'], job['job_id'])
+        self.assertEqual(proof['failed_job_id'], 'failed-annotation')
+
+    def test_annotation_recovery_rejects_unrelated_failure_or_endpoint(self):
+        task, job = self.annotation_recovery_fixture()
+        marker = self.root / 'isaac_sim/service_recovery.json'
+        original = json.loads(marker.read_text())
+        for changed, message in (({'failed_job_id': 'other'}, 'this failed native job'),
+                                 ({'endpoint': 'other:50051'}, 'another configured Isaac service')):
+            with self.subTest(changed=changed):
+                marker.write_text(json.dumps({**original, **changed}))
+                with self.assertRaisesRegex(ValueError, message):
+                    self.retry_annotation_fixture(task, job)
+
+    def test_annotation_recovery_rejects_old_failed_or_unannotated_success(self):
+        task, job = self.annotation_recovery_fixture()
+        invalid_jobs = [
+            {**job, 'state': 'FAILED'},
+            {**job, 'created_at_unix': 99},
+            {**job, 'result': {'frames': [{'image': 'artifact://rgb'}]}},
+            {**job, 'artifacts': [{'artifact_id': 'rgb'}]},
+        ]
+        for invalid in invalid_jobs:
+            with self.subTest(job=invalid):
+                with self.assertRaisesRegex(ValueError, 'newer SUCCEEDED native capture'):
+                    self.retry_annotation_fixture(task, invalid)
+
+    def test_recovered_terminal_job_still_cannot_resume_failed_receipt(self):
+        task, job = self.annotation_recovery_fixture()
+        with self.assertRaisesRegex(ValueError, 'native job is terminal'):
+            self.retry_annotation_fixture(task, job, mode='resume')
 
     def test_repair_stops_before_model_on_service_preflight_failure(self):
         """基线实时预检发现服务错配时不调用模型，也不修改场景。"""

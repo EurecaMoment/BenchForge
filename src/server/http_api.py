@@ -179,6 +179,12 @@ def main():
                         folder=store.directory(task['id'],task['unit']['revision'])
                         pics=sorted(folder.glob('capture/view_*.png'))
                         images=''.join('<a href="/image/'+p.relative_to(Path(config['artifacts'])).as_posix()+'"><img src="/image/'+p.relative_to(Path(config['artifacts'])).as_posix()+'"></a>' for p in pics)
+                        if not pics:
+                            from capabilities.isaac_sim.interactive_preview import current_preview_file
+                            preview = current_preview_file(folder)
+                            if preview:
+                                src = '/image/' + quote(preview.relative_to(Path(config['artifacts'])).as_posix())
+                                images = '<figure><img src="' + src + '"><figcaption>交互预览 · 仅供查看</figcaption></figure>'
                         result=task.get('result') or task.get('failure') or {'phase':task['unit']['phase']}
                         sections.append('<section><h2>'+html.escape(task['unit']['intent'].get('name',task['id']))+'</h2><p>'+html.escape(task['state'])+' · revision '+str(task['unit']['revision'])+'</p><div class="views">'+images+'</div><pre>'+html.escape(json.dumps(result,ensure_ascii=False,indent=2))+'</pre></section>')
                     body='<html><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>BenchForge</title><style>body{background:#111827;color:#e5e7eb;font:16px system-ui;margin:32px}h1{color:#67e8f9}.views{display:flex;gap:12px;flex-wrap:wrap}.views img{width:400px;border-radius:8px}section{padding:20px;background:#1f2937;margin:16px 0;border-radius:12px}pre{white-space:pre-wrap;font-size:13px}</style><h1>BenchForge · 真实生产产物</h1><p>'+html.escape(rid)+' · '+snap['state']+'</p>'+''.join(sections)+'</html>'

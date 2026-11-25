@@ -14,6 +14,21 @@ import benchforge_app
 ROOT=Path(__file__).resolve().parent
 
 
+# Keep DSH-managed session/resource roots outside the selected project tree.
+def configured_dsh_home():
+    configured = os.environ.get('BENCHFORGE_DSH_HOME')
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (ROOT.parent / f'{ROOT.name}-dsh-home').resolve()
+
+
+# Make the private deployment environment authoritative for DSH temp paths.
+def apply_configured_temp_environment(environment, configured):
+    for name in ('TMPDIR', 'TMP', 'TEMP'):
+        if name in configured:
+            environment[name] = configured[name]
+
+
 # 把路径等参数统一转为字符串后执行命令，非零退出码立即向外报告。
 def run(argv, **kwargs):
     return subprocess.run([str(x) for x in argv],check=True,**kwargs)
@@ -138,7 +153,9 @@ def main():
     if not args.config_synced and (upgrading or (preset.is_file() and uses_local_service(preset))):
         run([python, ROOT/'benchforge_app.py', 'sync'], cwd=ROOT)
     env = benchforge_app.build_environment(database=False)
-    env['DSH_HOME'] = str(state/'dsh-home')
+    env['DSH_HOME'] = str(configured_dsh_home())
+    configured_env = benchforge_app.settings.read_env(ROOT / 'config/dsh.env', shell=True)
+    apply_configured_temp_environment(env, configured_env)
     paths = [str(ROOT / 'src')]
     if env.get('PYTHONPATH'):
         paths.append(env['PYTHONPATH'])

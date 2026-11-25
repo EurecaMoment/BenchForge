@@ -135,7 +135,7 @@ test('production stops while an explicit owned layout wait is live and resumes n
   const terminal=Promise.withResolvers();
   const h=harness({read:()=>terminal.promise});h.plan();
   t.after(async()=>{terminal.resolve(layout('sf_layout','SUCCEEDED'));await h.dispose();});
-  const view={active:true,turn:1,workflowTurn:1,state:'running',plan:'/workspace/plan.json',workspace:'/workspace',run:'',revision:1};
+  const view={active:true,pendingCaptures:[{run:'sf_layout',name:'布局'}],turn:1,workflowTurn:1,state:'running',plan:'/workspace/plan.json',workspace:'/workspace',run:'',revision:1};
   const lifecycle=createProductionLifecycle({projection:{stateOf:()=>({view,notices:[],lastResponse:{seq:h.events.length,visible:false}})},
     table:{get:()=>undefined,put:()=>{}},createMessage:value=>value,hasPendingWait:h.runtime.hasPendingWait});
   t.after(()=>lifecycle.dispose());
@@ -144,17 +144,15 @@ test('production stops while an explicit owned layout wait is live and resumes n
   assert.equal(wait.watch.accepted,true);
   h.call('benchforge_wait',wait);
   await lifecycle.stopping({agent:h.agent,turn:1});
-  assert.equal(h.sent.length,0);
-  for(let attempt=0;attempt<3;attempt++){
-    h.append('assistant/message',{message:{content:[]}});
-    await lifecycle.stopping({agent:h.agent,turn:1});
-  }
-  assert.equal(h.sent.length,0);
-
-  terminal.resolve(layout('sf_layout','SUCCEEDED'));await h.runtime.settled();
   assert.equal(h.sent.length,1);
-  assert.equal(h.sent[0].source.capture.workflow,'layout');
-  assert.equal(h.sent[0].source.capture.state,'SUCCEEDED');
+  assert.match(h.sent[0].source.summary,/布局.*sf_layout/);
+  await lifecycle.stopping({agent:h.agent,turn:1});
+  assert.equal(h.sent.length,1);
+  terminal.resolve(layout('sf_layout','SUCCEEDED'));await h.runtime.settled();
+  assert.equal(h.sent.length,2);
+  assert.equal(h.sent[1].source.capture.workflow,'layout');
+  assert.equal(h.sent[1].source.capture.state,'SUCCEEDED');
+  view.pendingCaptures=[];
   h.consume();
   for(let attempt=0;attempt<2;attempt++){
     h.append('assistant/message',{message:{content:[]}});

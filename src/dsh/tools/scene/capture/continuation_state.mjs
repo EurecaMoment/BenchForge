@@ -1,6 +1,6 @@
 import {canonicalToolName} from '../../invocation/identifiers.mjs';
 import {budgetRejection, captureProducers} from './budget.mjs';
-import {backgroundWaitRun} from './capture_watch.mjs';
+import {backgroundWaitRun, trackedSubmission} from './capture_watch.mjs';
 /** 合并消息中的文本块，供识别生产请求与通知内容使用。 */
 const body = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n');
 /** 容错解析工具事件中的 JSON 文本，忽略无法解析的内容。 */
@@ -60,7 +60,7 @@ function consume(state, events) {
         state.workflowSeq = event.seq;
     }
     if (['benchforge_scene_status','benchforge_scene_evidence','benchforge_wait'].includes(name)) state.activeTurn = true;
-    if (name === 'benchforge_wait' && backgroundWaitRun(receipt)) waits.add(receipt.run_id);
+    if ((name === 'benchforge_wait' && backgroundWaitRun(receipt)) || (captureProducers.has(name) && trackedSubmission(receipt))) waits.add(receipt.run_id);
     if ((['benchforge_scene_status','benchforge_wait'].includes(name) && terminalCapture(receipt)) ||
         (name === 'benchforge_cancel' && receipt.cancel_requested === true)) waits.delete(receipt.run_id);
     if (receipt.production_contract === 'benchforge.production-stages/v1') state.production = true;

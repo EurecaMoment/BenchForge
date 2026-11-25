@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {canonicalToolName} from '../tools/invocation/identifiers.mjs';
-import {backgroundWaitRun} from '../tools/scene/capture/capture_watch.mjs';
+import {backgroundWaitRun, trackedSubmission} from '../tools/scene/capture/capture_watch.mjs';
 import {terminalCapture} from '../tools/scene/capture/continuation_state.mjs';
 import {isProductionRequest} from './request.mjs';
 import {ReviewSnapshot, currentReviewSnapshot, reviewChanges, reviewSnapshot} from './review_snapshot.mjs';
@@ -14,13 +14,14 @@ export const ProductionView = z.object({
   lastTool:z.string(), tools:z.number(), shells:z.number(), models:z.array(z.string()),
   workspace:z.string(), plan:z.string(), run:z.string(), state:z.string(), stage:z.string(),
   error:z.string(), review:ReviewSnapshot.nullable(), completed:z.number(), total:z.number(), delivered:z.boolean(),
+  pendingCaptures:z.array(z.object({run:z.string(),name:z.string()})), stopReason:z.string(),
   capture_budget:z.record(z.string(),z.unknown()).nullable().optional(),
 });
-const State = z.object({view:ProductionView, planReview:ReviewSnapshot.nullable(), errorTool:z.string(), errorCallSeq:z.number(), notices:z.array(z.string()), waits:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
+const State = z.object({view:ProductionView, planReview:ReviewSnapshot.nullable(), errorTool:z.string(), errorCallSeq:z.number(), notices:z.array(z.string()), interruption:z.string(), interruptionSeq:z.number(),
   progressNotice:z.object({fingerprint:z.string(),textSeq:z.number(),at:z.number()}).nullable(),
   captureRun:z.string().optional(),
   lastResponse:z.object({seq:z.number(),visible:z.boolean()}),
-  calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string(), seq:z.number()}))});
+  calls:z.record(z.string(), z.object({name:z.string(), workspace:z.string(), plan:z.string(), scene:z.string(), seq:z.number()}))});
 /** 提取消息中的可见文本块，合并并去掉两端空白。 */
 const visible = message => (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
 /** 尝试解析事件中的 JSON 文本，解析失败时返回空值供投影忽略。 */
@@ -41,11 +42,11 @@ function retainsExecution(state,call,receipt,snapshot) {
 }
 
 export const productionProjection = {
-  key:PRODUCTION_PROJECTION, stateVersion:14, stateSchema:State,
+  key:PRODUCTION_PROJECTION, stateVersion:16, stateSchema:State,
   /** 根据会话头建立空生产状态，初始化工具追踪、通知和阶段进度字段。 */
-  init:header => ({calls:{},planReview:null,progressNotice:null,errorTool:'',errorCallSeq:0,notices:[],waits:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
+  init:header => ({calls:{},planReview:null,progressNotice:null,errorTool:'',errorCallSeq:0,notices:[],interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false},view:{revision:0,active:false,running:false,turn:0,workflowTurn:0,startedAt:0,lastTextAt:0,lastTextSeq:-1,
     lastEventAt:0,lastTool:'',tools:0,shells:0,models:[],workspace:header.cwd || '',plan:'',run:'',state:'idle',stage:'',
-    error:'',review:null,completed:0,total:0,delivered:false}}),
+    error:'',pendingCaptures:[],stopReason:'',review:null,completed:0,total:0,delivered:false}}),
   /** 把原生轮次、工具和通知事件归约为生产状态；批量工具派发沿用标准调用与结果处理。 */
   apply(state,event) {
     if (event.type === 'tool/ptc-dispatch') {
@@ -55,12 +56,13 @@ export const productionProjection = {
         message:{toolCallId:data.subCallId,isError:data.isError,content:data.content}}});
     }
     const {view} = state;
-    if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false}},event,{running:true,turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
+    if(event.type === 'turn/start') return patch({...state,interruption:'',interruptionSeq:0,lastResponse:{seq:-1,visible:false}},event,{running:true,stopReason:'',turn:event.data.turn,startedAt:event.time,lastTextAt:event.time,lastTextSeq:-1,delivered:false});
     if(event.type === 'turn/end') return patch({...state,...(event.data.reason?.kind==='error'?{errorTool:''}:{}),interruption:event.data.reason?.reason?.kind || '',interruptionSeq:event.seq},event,{running:false,
+      stopReason:event.data.reason?.kind==='completed'?'':event.data.reason?.reason?.reason || event.data.reason?.reason?.kind || event.data.reason?.kind || '',
       ...(event.data.reason?.kind==='error'?{error:event.data.reason.error?.message || 'Production turn failed'}:{}),
       ...(event.data.reason?.kind === 'aborted' ? {state:'interrupted'} :
         view.active && view.workflowTurn===view.turn && !['completed','waiting_user','paused','needs_input','needs_evidence','needs_plan_revision','blocked','failed'].includes(view.state)
-          ? {state:event.data.reason?.kind==='completed' && state.waits.length ? 'waiting_capture' : 'incomplete'} : {})});
+          ? {state:event.data.reason?.kind==='completed' && view.pendingCaptures.length ? 'waiting_capture' : 'incomplete'} : {})});
     if(event.type === 'user/message' && isProductionRequest(event.data))
       return patch({...state,errorTool:''},event,{active:true,workflowTurn:view.turn,state:view.plan?'running':'planning',stage:view.stage||'S1',error:'',capture_budget:null});
     if(event.type === 'user/message' && event.data.source?.kind==='benchforge/production-progress')
@@ -72,22 +74,22 @@ export const productionProjection = {
     }
     if(event.type === 'user/message' && event.data.source?.kind === 'benchforge/capture-watch' && view.active) {
       const capture = event.data.source.capture;
-      const waits=state.waits.filter(run=>run!==capture?.run_id);
+      const pendingCaptures=view.pendingCaptures.filter(row=>row.run!==capture?.run_id);
       const otherScene = state.captureRun && capture?.run_id !== state.captureRun;
       if (capture && ((otherScene && capture.capture_budget) || (view.capture_budget && otherScene)))
-        return waits.length === state.waits.length ? state : patch({...state,waits},event,{});
+        return pendingCaptures.length === view.pendingCaptures.length ? state : patch(state,event,{pendingCaptures});
       if(capture?.state==='SUCCEEDED' && capture.workflow && capture.workflow!=='scene' && !capture.failed)
-        return patch({...state,waits},event,{workflowTurn:view.turn,...(view.state==='waiting_capture'?{state:'running'}:{})});
+        return patch(state,event,{pendingCaptures,workflowTurn:view.turn,...(view.state==='waiting_capture'?{state:'running'}:{})});
       // 历史计划曾把展示退回 S1；随后真实采集回执证明已进入场景阶段，重放即可恢复。
       const sceneStage=(!capture?.workflow || capture.workflow==='scene') &&
         view.stage==='S1' && (!view.review || ['elapsed','continued'].includes(view.review.state));
-      if(capture) return patch({...state,errorTool:'',waits},event,
-        {workflowTurn:view.turn,...(sceneStage ? {stage:'S2',review:null} : {}),
+      if(capture) return patch({...state,errorTool:''},event,
+        {pendingCaptures,workflowTurn:view.turn,...(sceneStage ? {stage:'S2',review:null} : {}),
           capture_budget:capture.capture_budget || view.capture_budget || null,
           state:capture.capture_budget||capture.blocked?'blocked':capture.failed?'needs_repair':
           capture.state==='SUCCEEDED'?'scene_ready':'capture_error',
         error:capture.capture_budget?'本场景的正式采集预算已用完。':capture.blocked?(event.data.source.summary || '执行受阻，任务未完成。'):
-          capture.failed?'后台作业或场景验收失败。读取实际报告并修复。':capture.state==='observer_failed'?'后台跟踪暂时失败，等待恢复。':''});
+          capture.state==='observer_failed'?(capture.error || '后台跟踪失败，请恢复原作业跟踪。'):capture.failed?(capture.error || '后台作业或场景验收失败。读取实际报告并修复。'):''});
     }
     if(event.type === 'assistant/message') {
       const hasText=Boolean(visible(event.data.message));
@@ -97,7 +99,7 @@ export const productionProjection = {
     if(event.type === 'tool/call') {
       const {callId} = event.data, name = canonicalToolName(event.data.name), args = parse(event.data.arguments) || {};
       if(!name.startsWith('benchforge_')&&!view.active)return state;
-      const next = {...state,calls:{...state.calls,[callId]:{name,workspace:args.workspace || view.workspace,plan:args.plan || '',seq:event.seq}}};
+      const next = {...state,calls:{...state.calls,[callId]:{name,workspace:args.workspace || view.workspace,plan:args.plan || '',scene:typeof args.name==='string'?args.name:(typeof args.scene_program_path==='string'?args.scene_program_path.split(/[\\/]/).pop():''),seq:event.seq}}};
       const workflow=['benchforge_pipeline_plan','benchforge_pipeline_run'].includes(name);
       return patch(next,event,{...(workflow?{active:true,workflowTurn:view.turn,...(!view.active?{state:'planning',stage:'S1'}:{})}:{}),
         lastTool:name,tools:view.tools+1,shells:view.shells+(name==='bash'?1:0),
@@ -164,18 +166,26 @@ export const productionProjection = {
     if(retained) return patch({...next,planReview:snapshot},event,{...changes,workflowTurn:view.turn,plan:receipt.plan});
     const workflow = call.name==='benchforge_pipeline_plan'||call.name==='benchforge_pipeline_run'||call.name==='benchforge_stage_review';
     if(!workflow) {
-      if(view.active && call.name==='benchforge_wait' && backgroundWaitRun(receipt)) {
-        if(!state.waits.includes(receipt.run_id)) next.waits=[...state.waits,receipt.run_id];
+      if (view.active && view.stage==='S1' && view.review?.stage==='S1' &&
+          ['elapsed','continued'].includes(view.review.state) && call.name==='benchforge_scene_preflight' &&
+          receipt.schema==='benchforge.scene-diagnostics/v1') {
+        Object.assign(changes,{stage:'S2',state:'running',workflowTurn:view.turn,review:null});
+      }
+      const watchedSubmission=captureProducers.has(call.name) && trackedSubmission(receipt);
+      if(view.active && typeof receipt.run_id==='string' && (watchedSubmission || (call.name==='benchforge_wait' && backgroundWaitRun(receipt)))) {
+        if(!view.pendingCaptures.some(row=>row.run===receipt.run_id))
+          changes.pendingCaptures=[...view.pendingCaptures,{run:receipt.run_id,name:call.scene || receipt.task_id || receipt.run_id}];
         changes.workflowTurn=view.turn;
       }
       if((['benchforge_scene_status','benchforge_wait'].includes(call.name) && terminalCapture(receipt)) ||
         (call.name==='benchforge_cancel' && receipt.cancel_requested===true)) {
-        next.waits=state.waits.filter(run=>run!==receipt.run_id);
-        if(next.waits.length!==state.waits.length)changes.workflowTurn=view.turn;
+        changes.pendingCaptures=view.pendingCaptures.filter(row=>row.run!==receipt.run_id);
+        if(changes.pendingCaptures.length!==view.pendingCaptures.length)changes.workflowTurn=view.turn;
       }
       if(view.active && captureProducers.has(call.name) && receipt.run_id) {
         next.captureRun=receipt.run_id;
         Object.assign(changes,{workflowTurn:view.turn,state:'waiting_capture',stage:view.stage==='S1'?'S2':view.stage,review:null,capture_budget:null});
+        if(receipt.watch?.accepted===false) Object.assign(changes,{state:'capture_error',error:receipt.watch.error || '后台跟踪尚未登记，请用运行编号恢复跟踪。'});
       }
       if(view.active && call.name==='benchforge_scene_blocker' && receipt.state==='blocked') {
         next.errorTool=call.name;next.errorCallSeq=call.seq;
@@ -200,10 +210,10 @@ export const productionProjection = {
     if(activated && receipt.state==='planned') {
       next.planReview=null;
       delete next.captureRun;
-      if(receipt.review_revision?.kind==='new_task') next.waits=[];
+      if(receipt.review_revision?.kind==='new_task') changes.pendingCaptures=[];
       Object.assign(changes,{run:'',completed:0,total:receipt.total_steps || 4,delivered:false,capture_budget:null});
     }
-    if(call.name==='benchforge_pipeline_run' && receipt.state==='completed') next.waits=[];
+    if(call.name==='benchforge_pipeline_run' && receipt.state==='completed') changes.pendingCaptures=[];
     if (/^S[3-5]$/.test(changes.stage || '')) changes.capture_budget=null;
     return patch(next,event,changes);
   },

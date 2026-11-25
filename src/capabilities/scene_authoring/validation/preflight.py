@@ -11,12 +11,14 @@ from capabilities.scene_authoring.catalog.native_reference import native_size_z_
 from capabilities.scene_authoring.contracts.scene_program import SCENE_V2_MAX_OBJECTS
 from capabilities.scene_authoring.validation.program import program_contract_issues
 from capabilities.scene_authoring.geometry.preview import preview_scene_geometry, initial_bounds_overlaps
-from capabilities.scene_authoring.validation.support_relations import support_path
+from capabilities.scene_authoring.validation.support_relations import (
+    relation_requires_measurement, separated_support_bounds, support_path,
+)
 from capabilities.scene_authoring.contracts.scene_design import geometry_exception, scene_brief, saved_design
 from capabilities.scene_authoring.validation.diagnostics import SceneDiagnostics, ScenePreflightError
 from capabilities.scene_authoring.contracts.mounting import attachment
 from capabilities.scene_authoring.validation.policy import check_references, detailed_construction, policy_for, structure
-from capabilities.scene_authoring.validation.asset_policy import PROXY_KINDS, is_generated_asset, native_asset_requirement
+from capabilities.scene_authoring.validation.asset_policy import PROXY_KINDS, native_asset_requirement, registered_mesh_status
 
 
 # 判断三维点是否位于给定中心和尺寸的轴对齐范围内。
@@ -151,6 +153,7 @@ def _object_admission(root, program, objects, indexes, policy, declaration, brie
                         if isinstance(obj, dict) and isinstance(obj.get('id'), str)}
     simplified = set(declaration['object_ids']) if declaration else set()
     mounts = {}
+    registered_mesh_objects = set()
     if policy and not any(not structure(obj) for obj in objects) and not diagnostics.skipped:
         diagnostics.add('foreground_missing', '/objects',
                         'Realistic scenes need recognizable foreground assets', basis='scene_policy')
@@ -180,7 +183,10 @@ def _object_admission(root, program, objects, indexes, policy, declaration, brie
         if ok:
             mounts[key] = mount
         kind = obj['kind']
-        generated_mesh = kind == 'mesh' and is_generated_asset(root, obj.get('asset_id'))
+        mesh_status = registered_mesh_status(root, obj.get('asset_id')) if kind == 'mesh' else None
+        generated_mesh = mesh_status == 'generated'
+        if mesh_status in ('generated', 'imported') and not native_asset_requirement(obj):
+            registered_mesh_objects.add(key)
         if policy and structure(obj) and (kind == 'generated' or generated_mesh):
             diagnostics.add('architectural_asset_required', path + '/kind',
                 'Architectural structure and exact openings require native construction or an authored architectural asset',
@@ -232,10 +238,13 @@ def _object_admission(root, program, objects, indexes, policy, declaration, brie
                     diagnostics.skip('required_native_asset', '/scene_brief/object_roles',
                                      'object contract or support component is invalid')
                 elif obj['kind'] not in ASSETS and obj['kind'] != 'native':
+                    if role['representation'] == 'native_asset' and obj['id'] in registered_mesh_objects:
+                        continue
+                    message = ('Use a catalog asset or an authorized native upload for this role.'
+                               if role['representation'] == 'articulated_robot' or native_asset_requirement(obj)
+                               else 'Use a catalog asset, an authorized native upload, or kind=mesh with a registered generated or imported asset_id.')
                     diagnostics.add('required_native_asset', f'/objects/{indexes[obj["id"]]}/kind',
-                        'Requires a registered native asset or an authorized uploaded native handle; primitive geometry and metadata '
-                        'cannot substitute for asset identity', basis='saved_scene_plan',
-                        object_ids=[obj['id']])
+                        message, basis='saved_scene_plan', object_ids=[obj['id']])
         for index, relation in enumerate(brief['relations']):
             obj = by_id.get(relation['source'])
             if obj is None:
@@ -324,6 +333,12 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
     preview = preview_scene_geometry({'scene_id': program.get('scene_id'), 'objects': objects},
                                      mesh_loader=mesh)
     by_id = {obj['id']: obj for obj in objects}
+    # Imported USD dimensions are estimates. Only compare fixed geometry authored by this adapter.
+    static_bounds = {row['object_id']: (bounds['min'], bounds['max'])
+                     for row in preview['objects']
+                     if (bounds := row.get('initial_world_bounds_m'))
+                     and not by_id[row['object_id']]['dynamic']
+                     and row['kind'] in {'box', 'sphere', 'cylinder', 'container', 'composite', 'mesh'}}
     for row in preview['objects']:
         key = row['object_id']
         row['path'] = f'/objects/{indexes[key]}'
@@ -337,7 +352,16 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
         if row['initial_bottom_z_m'] is None:
             diagnostics.skip('initial_placement', row['path'], 'support geometry is unavailable')
         faces = row.get('support_face_options', [])
-        if not structure(obj) and not mounts.get(key) and faces and not any(
+        support = obj['support']
+        gap = None
+        if policy and key in mounts and not mounts[key] and key in static_bounds and support in static_bounds:
+            gap = separated_support_bounds(static_bounds[key], static_bounds[support])
+        if gap is not None:
+            diagnostics.add('static_support_gap', row['path'] + '/support',
+                f"The authored static bounds are separated by at least {gap:.3f} m. "
+                "Check the declared support, placement or intended mounting.",
+                basis='initial_source_geometry', object_ids=[key, support], gap_m=gap)
+        elif not structure(obj) and not mounts.get(key) and faces and not any(
                 face['footprint_within_face'] and abs(face['geometry_bottom_gap_m']) <= .03 for face in faces):
             diagnostics.add('support_contact_unverified', row['path'] + '/support',
                 'Initial bounds do not match a full horizontal support face. Inspect the reported '
@@ -361,6 +385,27 @@ def _geometry_diagnostics(root, program, objects, indexes, mounts, simplified,
             basis=overlap['basis'], severity='warning', object_ids=[left, right],
             overlap_extent_m=overlap['overlap_extent_m'])
     return preview
+
+
+def _task_geometry_reviews(issues, objects, brief):
+    """Link geometry issues to the declared support, clearance or measurement they concern."""
+    issues_by_pair = {}
+    for issue in issues:
+        if issue['code'] in {'static_support_gap', 'support_contact_unverified', 'initial_bounds_overlap'}:
+            issues_by_pair.setdefault(frozenset(issue['object_ids']), []).append(issue['id'])
+    by_id = {obj['id']: obj for obj in objects}
+    groups = []
+    for index, relation in enumerate((brief or {}).get('relations', [])):
+        kind, source, target = relation['type'], relation['source'], relation['target']
+        if kind not in {'supported_by', 'clearance'} and not relation_requires_measurement(relation):
+            continue
+        path = support_path(by_id, source, target) if kind == 'supported_by' else [source, target]
+        matches = [issue_id for pair in zip(path, path[1:])
+                   for issue_id in issues_by_pair.get(frozenset(pair), ())]
+        if matches:
+            groups.append({'relation_index': index, 'type': kind, 'source': source, 'target': target,
+                           'issue_ids': matches})
+    return groups
 
 
 # 批量诊断所有可安全检查的独立组件，不启动采集、生成或修改提交。
@@ -417,10 +462,12 @@ def inspect_program(root, program, *, policy=None, execution_mode=None, allow_ge
                 basis='declared_room_bounds', severity='warning',
                 camera_id=camera.get('id', index), position_z_m=warning['position_z_m'],
                 vertical_range_m=warning['vertical_range_m'])
-    return diagnostics.finish(program, enforced=bool(policy),
+    report = diagnostics.finish(program, enforced=bool(policy),
         scene_id=program.get('scene_id'),
         scene_style='simplified_geometry' if declaration else 'realistic_assets' if policy else 'unconstrained',
         scene_style_basis='saved declaration or production policy; not verified appearance',
         geometry_exception=declaration, scene_brief=brief, geometry_preview=geometry,
         cameras=camera_checks,
         scope='contracts, declared plans, source assets and initial geometry; capture validation still required')
+    report['task_geometry_reviews'] = _task_geometry_reviews(report['issues'], objects, brief)
+    return report

@@ -139,12 +139,22 @@ def validate_providers(config):
     isaac = isaac_config(config)
     field = f'providers.{ISAAC_PROVIDER}'
     _validate_fields(isaac, field, {'grpc', 'capture_timeout_seconds', 'max_concurrent_captures',
-                                  'image_size', 'samples_per_pixel', 'asset_sources'})
+                                  'image_size', 'samples_per_pixel', 'asset_sources', 'interactive_preview'})
     for key, low, high, default in (('max_concurrent_captures', 1, 32, 4),
-                                   ('image_size', 64, 1024, 768), ('samples_per_pixel', 1, 256, 32)):
+                                   ('image_size', 64, 2048, 1024), ('samples_per_pixel', 1, 1024, 256)):
         value = isaac.get(key, default)
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f'{field}.{key} must be an integer in {low}..{high}')
+    preview = isaac.get('interactive_preview')
+    if preview is not None:
+        if not isinstance(preview, dict):
+            raise ValueError(f'{field}.interactive_preview must be an object')
+        _validate_fields(preview, field + '.interactive_preview', {'url', 'size', 'spp'})
+        _configured_url(preview.get('url'), field + '.interactive_preview.url')
+        for key, low, high, default in (('size', 64, 1024, 1024), ('spp', 1, 4, 1)):
+            value = preview.get(key, default)
+            if type(value) is not int or not low <= value <= high:
+                raise ValueError(f'{field}.interactive_preview.{key} must be an integer in {low}..{high}')
     bindings = isaac.get('asset_sources', {})
     if not isinstance(bindings, dict):
         raise ValueError(f'{field}.asset_sources must map native catalog IDs to uploaded A100 assets')

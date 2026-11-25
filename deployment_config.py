@@ -371,6 +371,11 @@ def sync_configuration(config, generated, server_path, state, *, overrides=None)
                     if scope != 'server' and not value[scope].get(field + '_env'):
                         value[scope][field + '_env'] = 'BENCHFORGE_' + key.upper()
         server = dict(value['server'])
+        isaac = value.get('providers', {}).get('IsaacSim4A100')
+        if isinstance(isaac, dict) and isaac:
+            server['providers'] = {'IsaacSim4A100': deepcopy(isaac)}
+        else:
+            server.pop('providers', None)
         if server.get('scene_policy_path') is None and server['execution_mode'] == 'production':
             raise ValueError('server.scene_policy_path is required in production mode')
         _resolve_paths(server, SERVER_PATHS, config, environment)

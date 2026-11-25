@@ -314,7 +314,7 @@ def _validate_scene_extensions(p, checks):
                 require(render_environment['renderer'] in RENDERERS, 'unsupported renderer')
             if 'samples_per_pixel' in render_environment:
                 spp = render_environment['samples_per_pixel']
-                require(type(spp) is int and 16 <= spp <= 512, 'samples_per_pixel must be 16..512')
+                require(type(spp) is int and 16 <= spp <= 1024, 'samples_per_pixel must be 16..1024')
             if 'exposure' in render_environment:
                 exposure = render_environment['exposure']
                 require(type(exposure) in (int, float) and math.isfinite(exposure) and -10 <= exposure <= 10, 'exposure must be -10..10')

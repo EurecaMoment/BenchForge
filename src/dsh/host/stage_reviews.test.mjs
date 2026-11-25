@@ -55,9 +55,14 @@ test('review deadline covers both a stalled subprocess and its stale systemd sco
   const reports=[];
   const subprocess={/** 返回固定的测试 Python 路径，避免访问真实解释器发现服务。 */ resolveExecutable:async()=>'/python',/** 提供该用例控制的进程句柄，记录启动并模拟输出、终止和退出等待。 */ spawn:()=>({done:new Promise(()=>{}),/** 模拟终止请求；具有计数器的用例同时记录请求次数。 */ terminate(){},/** 按用例设定确认或延迟进程退出，覆盖回收成功与超时边界。 */ waitForExit:()=>new Promise(()=>{})})};
   const client=createStageReviewClient(subprocess,{reviewTimeoutMs:15,cleanupTimeoutMs:15,/** 收集子进程清理错误，供宿主卸载与回收断言。 */ onCleanupError:error=>reports.push(error)});
-  await assert.rejects(client.advance('/workspace','session-test',1),{name:'TimeoutError'});
-  assert.equal(reports[0].code,'BENCHFORGE_PROCESS_CLEANUP_PENDING');
-  await assert.rejects(client.dispose(),AggregateError);
+  const keepAlive=setInterval(()=>{},1_000);
+  try {
+    await assert.rejects(client.advance('/workspace','session-test',1),{name:'TimeoutError'});
+    assert.equal(reports[0].code,'BENCHFORGE_PROCESS_CLEANUP_PENDING');
+    await assert.rejects(client.dispose(),AggregateError);
+  } finally {
+    clearInterval(keepAlive);
+  }
 });
 
 test('user cancellation is propagated to a running background review',/** 验证宿主进程、取消信号和资源清理在该用例中的具体边界，完成准备、调用和结果断言。用例：user cancellation is propagated to a running background review。 */ async()=>{

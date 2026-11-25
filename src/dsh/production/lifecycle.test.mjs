@@ -178,6 +178,26 @@ const productionRequest={source:{kind:'user'},content:[{type:'text',text:
   '请实际执行一次 BenchForge 评测数据集生产任务，完整完成五阶段。\nexecution_mode=production；quantity_contract=minimum。\n生产100条机器狗轨迹数据。'}]};
 const emptyReply={message:{role:'assistant',content:[]}};
 
+test('released plan resumes scene preparation and only consecutive text-only stops share a retry budget',async t=>{
+  const h=harness(),runtime=h.create();t.after(()=>runtime.dispose());h.plan();
+  const diagnostic={schema:'benchforge.scene-diagnostics/v1',passed:true,blocking_total:0};
+  h.receipt('benchforge_scene_preflight',diagnostic);
+  assert.equal(h.view().stage,'S1');
+  h.receipt('benchforge_stage_review',{stage:'S1',review_id:1,state:'elapsed',artifact:'/workspace/plan.json',deadline:400});
+  h.receipt('benchforge_scene_preflight',diagnostic);
+  assert.equal(h.view().stage,'S2');
+  assert.equal(h.view().plan,'/workspace/plan.json');
+  for(let i=0;i<3;i++){
+    if(i===2)h.receipt('benchforge_scene_preflight',diagnostic);
+    h.event('assistant/message',{message:{content:[{type:'text',text:'现在开始执行。'}]}});
+    await runtime.stopping({agent:h.agent,turn:1});
+    const notice=h.sent.at(-1);
+    assert.match(notice.content[0].text,/直接发出真实工具调用/);
+    assert.ok(notice.source.noticeKey.endsWith(':recovery:'+(i===1?2:1)));
+    h.event('user/message',notice);h.agent.inbox.nextStep=[];
+  }
+});
+
 test('a visible progress report can finish its turn while the host owns the wait',async()=>{
   let watching=true;
   const h=harness(()=>watching),runtime=h.create();
@@ -342,7 +362,7 @@ test('equivalent released plan repairs preserve collection progress after the ac
     productionProjection.stateSchema.parse(replayed);
     assert.deepEqual(replayed.view,after);
     assert.equal(replayed.planReview.review_id,1);assert.equal(replayed.planReview.revision,9);
-    assert.equal(productionProjection.stateVersion,14);
+    assert.equal(productionProjection.stateVersion,16);
   }
 });
 
@@ -754,4 +774,28 @@ test('older tool receipts cannot downgrade a committed review notice or a newer 
   assert.equal(h.view().review.review_id,2);assert.equal(h.view().state,'waiting_user');assert.equal(h.view().stage,'S2');
   h.receipt('benchforge_stage_review',{review_id:2,revision:2,state:'check_failed',stage:'S2',artifact:'/workspace/scene.json',deadline:800});
   assert.equal(h.view().review.state,'check_failed');assert.equal(h.view().completed,0);
+});
+
+test('accepted parallel scene submissions remain visible until their individual outcomes arrive',()=>{
+  const h=harness();h.plan();
+  for (const name of ['A','B','C']) {
+    const run='sf_'+name;
+    h.event('tool/call',{callId:run,name:'benchforge_capture',arguments:JSON.stringify({name})});
+    h.event('tool/result',{message:{toolCallId:run,content:[{type:'text',text:JSON.stringify({
+      run_id:run,state:'submitted',submission_accepted:true,watch:{accepted:true,background:true}
+    })}]}});
+  }
+  h.event('turn/end',{reason:{kind:'completed'}});
+  assert.equal(h.view().state,'waiting_capture');
+  assert.deepEqual(h.view().pendingCaptures.map(row=>row.name),['A','B','C']);
+  h.event('turn/start',{turn:2});
+  for (const [name,remaining] of [['A',['B','C']],['C',['B']],['B',[]]]) {
+    h.event('user/message',{source:{kind:'benchforge/capture-watch',capture:{run_id:'sf_'+name,state:'SUCCEEDED'}}});
+    assert.deepEqual(h.view().pendingCaptures.map(row=>row.name),remaining);
+    assert.equal(h.view().stage,'S2');assert.equal(h.view().workflowTurn,2);
+  }
+  h.event('turn/end',{reason:{kind:'max-tokens'}});
+  assert.equal(h.view().stopReason,'max-tokens');
+  h.event('turn/start',{turn:3});
+  assert.equal(h.view().stopReason,'');
 });
