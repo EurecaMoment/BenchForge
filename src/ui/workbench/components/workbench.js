@@ -75,8 +75,10 @@ export function createWorkbenchComponent({React, helpers, components}) {
     const automaticScene = !route.run && !route.production ? sceneForStage('S2', sceneJobs) : null;
     const artifactScene = sourceScene?.run_id || automaticScene?.run_id || run.value?.scene_ids?.[0];
     const artifactRunId = sourceScene || automaticScene ? '' : selectedRunId;
+    const observedScene = sceneJobs.find((row) => row.run_id === artifactScene);
+    const activePreview = route.stage === 'S2' && observedScene && !observedScene.terminal;
     const sceneArtifacts = useRecord(workspacePath && artifactScene ?
-      {view: 'stage_artifacts', scene: artifactScene, run: artifactRunId, session_id: sessionId, workspace_path: workspacePath} : null, receiptsRevision, 10000, visible);
+      {view: 'stage_artifacts', scene: artifactScene, run: artifactRunId, session_id: sessionId, workspace_path: workspacePath} : null, receiptsRevision, activePreview ? 3000 : 10000, visible);
     const catalog = useRecord(route.stage === 'S1'
       ? {view: 'catalog', q: catalogQuery, capability, page: catalogPage, page_size: 12} : null, revision);
     const dataset = useRecord(workspacePath && ['S4', 'S5'].includes(route.stage) && selectedDataset ?
@@ -396,6 +398,16 @@ export function createWorkbenchComponent({React, helpers, components}) {
           h(ArtifactGallery, {items: productFiles, selected: [], preview: setPreview, t})),
         unassignedProductItems.length > 0 && h('details', null, h('summary', null, t('artifactFiles')),
           h(ArtifactGallery, {items: unassignedProductItems, selected: [], preview: setPreview, t})));
+      if (!example && stage.id === 'S2' && sceneArtifacts.value?.scene === artifactScene && observedScene &&
+          (activePreview || route.production || route.run)) {
+        const currentRevision = (row) => observedScene.tasks.some((task) => task.id === row.task_id && task.revision === row.revision);
+        const layouts = (sceneArtifacts.value.layouts || []).filter(currentRevision);
+        const media = (sceneArtifacts.value.items || []).filter((row) => currentRevision(row) && ['image', 'video'].includes(row.kind));
+        const showingLibrary = sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading;
+        if (layouts.length || (showingLibrary && media.length)) product = h(React.Fragment, null,
+          layouts.map((layout) => h(components.SceneLayout, {key: layout.task_id, layout, t})),
+          showingLibrary && media.length > 0 && h(SceneGallery, {items: media, preview: setPreview, t}), product);
+      }
     const body = h(React.Fragment, null,
 
         h('section', {className: 'bfw-product', 'data-stage-product': stage.id, 'aria-label': t('keyProduct') + ' · ' + t(stage.key)}, product),

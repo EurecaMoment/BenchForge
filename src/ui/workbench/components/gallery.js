@@ -83,6 +83,17 @@ export function createGalleryComponents({React, helpers}) {
     for (const project of groups.values()) project.frames.sort((a, b) => (a.file || a.title || '').localeCompare(b.file || b.title || '', undefined, {numeric: true}));
     return [...groups.values()];
   }
+  function SceneLayout({layout, t}) {
+    const title = t('sceneLayout') + ' · ' + layout.name;
+    return h('figure', {className: 'bfw-preview-card', 'data-task-layout': layout.task_id,
+      'data-revision': layout.revision, style: {margin: '0 0 12px', padding: '12px'}},
+      h('figcaption', null, h('strong', null, title), h('p', {className: 'bfw-muted'}, t('sceneLayoutSource'))),
+      h('svg', {role: 'img', 'aria-label': title, width: '100%', height: 220,
+        viewBox: layout.view_box.join(' '), style: {background: '#f4f7f6'}},
+        layout.footprints.map((row, index) => h('polygon', {key: index, points: row.points.join(' '),
+          fill: '#a8c8c2', fillOpacity: 0.45, stroke: '#38665f', strokeWidth: 1.3, vectorEffect: 'non-scaling-stroke'},
+          h('title', null, row.label)))));
+  }
   /** 将场景项目显示为可打开预览的缩略卡片。 */
   function SceneGallery({items, preview, t}) {
     const projects = sceneProjects(items);
@@ -239,5 +250,5 @@ export function createGalleryComponents({React, helpers}) {
         h('strong', null, item.title), h('span', {className: 'bfw-muted'}, t('preview'))),
       item.task_id && h('details',null,h('summary',null,'技术详情'),h('div', {className: 'bfw-code bfw-muted'}, item.task_id + (item.revision === undefined ? '' : ' · r' + item.revision))));}));
   }
-  return {PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneGallery, SceneVideo, SceneLibrary, PreviewDialog, ArtifactGallery};
+  return {PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneLayout, SceneGallery, SceneVideo, SceneLibrary, PreviewDialog, ArtifactGallery};
 }

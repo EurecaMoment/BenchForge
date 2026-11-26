@@ -1,5 +1,6 @@
 """Scene evidence queries and public artifact projections."""
 import json
+import math
 import re
 from pathlib import Path
 from capabilities.isaac_sim.interactive_preview import PREVIEW_NAME, current_preview_file
@@ -56,6 +57,54 @@ def preview_kind(name):
     if name in {'scene_review.json', 'capture/report.json', 'release/complete.json', 'release/collection_report.json'}:
         return 'S5', 'json', 'application/json'
     return None
+
+
+def program_layout(config, task):
+    """Project only declared XY footprints from this task's current revision."""
+    unit = task['unit']
+    revision = unit['revision']
+    if unit.get('workflow', 'scene') != 'scene':
+        return None
+    program = None
+    if config.get('artifacts'):
+        if not re.fullmatch(r'sf_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', task['id']) or type(revision) is not int or revision < 0:
+            return None
+        base = Path(config['artifacts']) / task['id']
+        folder = base / f'revision_{revision}'
+        path = folder / 'program.json'
+        if not any(item.is_symlink() for item in (base, folder, path)) and path.is_file():
+            try:
+                program = bounded_json(path)
+            except (ValueError, OSError):
+                return None
+    # A retry can retain its original submission even after changing geometry.
+    # Use that snapshot only before revision zero has a prepared program.
+    if program is None and revision == 0:
+        program = (unit.get('submitted_program') or {}).get('program')
+    if not isinstance(program, dict):
+        return None
+    footprints = []
+    for obj in program.get('objects', []):
+        try:
+            x, y = obj['xy']
+            width, depth = obj['size'][:2]
+            angle = math.radians(obj.get('yaw_deg', 0))
+            if not all(math.isfinite(v) for v in (x, y, width, depth, angle)) or min(width, depth) <= 0:
+                continue
+            c, s = math.cos(angle), math.sin(angle)
+            points = [[x + dx*c - dy*s, -(y + dx*s + dy*c)] for dx, dy in
+                      ((-width/2, -depth/2), (width/2, -depth/2), (width/2, depth/2), (-width/2, depth/2))]
+            footprints.append((width*depth, {'label': str(obj.get('label') or obj['id'])[:100], 'points': points}))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+    if not footprints:
+        return None
+    shapes = [row for _, row in sorted(footprints, key=lambda pair: -pair[0])]
+    xs, ys = zip(*(point for row in shapes for point in row['points']))
+    width, height = max(xs)-min(xs), max(ys)-min(ys)
+    pad = max(width, height) * 0.04
+    return {'task_id': task['id'], 'revision': revision, 'name': program.get('title') or task['id'],
+            'view_box': [min(xs)-pad, min(ys)-pad, width+2*pad, height+2*pad], 'footprints': shapes}
 
 
 # 为视图或阶段报告提取公开预览字段，排除私有答案和完整对象真值。
@@ -124,6 +173,7 @@ def stage_artifacts(config, session, scene, task_id=None, revision=None, file=No
         return result
     observed = service_read(config, '/inspect', {'run_id': scene})
     items = []
+    layouts = []
     tasks = observed['tasks'][:8]
     truncated = len(observed['tasks']) > len(tasks)
     briefs = [{**{key: task['unit'].get('intent', {}).get(key) for key in ('name', 'description', 'split', 'target_items')},
@@ -163,12 +213,16 @@ def stage_artifacts(config, session, scene, task_id=None, revision=None, file=No
                               'purpose': 'interactive_preview', 'non_production': True,
                               'title': '交互预览（正式采集中）', 'task_id': task['id'], 'revision': rev,
                               'scene_name': task['unit'].get('intent', {}).get('name')})
+            elif not any(row.get('kind') in {'image', 'video'} and row['task_id'] == task['id'] for row in items):
+                layout = program_layout(config, task)
+                if layout:
+                    layouts.append(layout)
         from capabilities.scene_library.preview_manifest import cached_preview
         saved = cached_preview(config, task['id'], rev)
         if saved:
             items.append({key: saved[key] for key in ('file', 'task_id', 'revision', 'bytes', 'frame_count', 'purpose', 'source_path', 'content_type')})
             items[-1].update(stage='S2', kind='video', title='scene.mp4', scene_name=task['unit'].get('intent', {}).get('name'))
-    return {'scene': scene, 'state': observed['state'], 'items': items, 'truncated': truncated,
+    return {'scene': scene, 'state': observed['state'], 'items': items, 'layouts': layouts, 'truncated': truncated,
             'plan': {'title': '场景生产计划', 'objective': '\n'.join(row['description'] or row['name'] or '' for row in briefs),
                      'scenes': briefs, 'source': 'saved_scene_intents'},
             'config': {'scenes': [{key: row[key] for key in ('task_id', 'split', 'target_items')} for row in briefs],

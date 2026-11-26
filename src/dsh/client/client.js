@@ -264,6 +264,8 @@ var benchforgeClient = (() => {
       stopExecution: "\u505C\u6B62\u5F53\u524D\u52A9\u624B\u8F6E\u6B21",
       stopping: "\u6B63\u5728\u505C\u6B62\u2026",
       stopNote: "\u53EA\u505C\u6B62\u5F53\u524D\u52A9\u624B\u8F6E\u6B21\uFF1B\u5DF2\u63D0\u4EA4\u7684\u540E\u53F0\u4EFB\u52A1\u4E0D\u4F1A\u56E0\u6B64\u53D6\u6D88\u3002",
+      sceneLayout: "\u4FEF\u89C6\u5E03\u5C40\u56FE",
+      sceneLayoutSource: "\u6839\u636E\u5F53\u524D\u573A\u666F\u7A0B\u5E8F\u7684\u7269\u4F53\u4F4D\u7F6E\u3001\u5C3A\u5BF8\u548C\u671D\u5411\u7ED8\u5236\u3002",
       productionMonitor: "\u751F\u4EA7\u5B9E\u51B5",
       autoRefresh: "\u81EA\u52A8\u66F4\u65B0 \xB7 \u7EA6 3 \u79D2",
       staleSnapshot: "\u89C2\u6D4B\u5F02\u5E38 \xB7 \u975E\u6700\u65B0\u72B6\u6001",
@@ -749,6 +751,8 @@ var benchforgeClient = (() => {
       stopExecution: "Stop current assistant turn",
       stopping: "Stopping\u2026",
       stopNote: "Stops only the current assistant turn. Submitted background jobs are not canceled.",
+      sceneLayout: "Top-down layout",
+      sceneLayoutSource: "Drawn from the object positions, sizes and orientations in this scene program.",
       productionMonitor: "Live production",
       autoRefresh: "Auto update \xB7 about 3 s",
       staleSnapshot: "Observation issue \xB7 not current",
@@ -2522,6 +2526,43 @@ var benchforgeClient = (() => {
       for (const project of groups.values()) project.frames.sort((a, b) => (a.file || a.title || "").localeCompare(b.file || b.title || "", void 0, { numeric: true }));
       return [...groups.values()];
     }
+    function SceneLayout({ layout, t }) {
+      const title = t("sceneLayout") + " \xB7 " + layout.name;
+      return h(
+        "figure",
+        {
+          className: "bfw-preview-card",
+          "data-task-layout": layout.task_id,
+          "data-revision": layout.revision,
+          style: { margin: "0 0 12px", padding: "12px" }
+        },
+        h("figcaption", null, h("strong", null, title), h("p", { className: "bfw-muted" }, t("sceneLayoutSource"))),
+        h(
+          "svg",
+          {
+            role: "img",
+            "aria-label": title,
+            width: "100%",
+            height: 220,
+            viewBox: layout.view_box.join(" "),
+            style: { background: "#f4f7f6" }
+          },
+          layout.footprints.map((row, index) => h(
+            "polygon",
+            {
+              key: index,
+              points: row.points.join(" "),
+              fill: "#a8c8c2",
+              fillOpacity: 0.45,
+              stroke: "#38665f",
+              strokeWidth: 1.3,
+              vectorEffect: "non-scaling-stroke"
+            },
+            h("title", null, row.label)
+          ))
+        )
+      );
+    }
     function SceneGallery({ items, preview, t }) {
       const projects = sceneProjects(items);
       if (!projects.length) return empty(t("artifactPending"));
@@ -2858,7 +2899,7 @@ var benchforgeClient = (() => {
         );
       }));
     }
-    return { PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneGallery, SceneVideo, SceneLibrary, PreviewDialog, ArtifactGallery };
+    return { PublicObservation, QuestionDialog, firstImage, sceneProjects, SceneLayout, SceneGallery, SceneVideo, SceneLibrary, PreviewDialog, ArtifactGallery };
   }
 
   // src/ui/workbench/components/products.js
@@ -3360,7 +3401,9 @@ var benchforgeClient = (() => {
       const automaticScene = !route.run && !route.production ? sceneForStage("S2", sceneJobs) : null;
       const artifactScene = sourceScene?.run_id || automaticScene?.run_id || run.value?.scene_ids?.[0];
       const artifactRunId = sourceScene || automaticScene ? "" : selectedRunId;
-      const sceneArtifacts = useRecord(workspacePath && artifactScene ? { view: "stage_artifacts", scene: artifactScene, run: artifactRunId, session_id: sessionId, workspace_path: workspacePath } : null, receiptsRevision, 1e4, visible);
+      const observedScene = sceneJobs.find((row) => row.run_id === artifactScene);
+      const activePreview = route.stage === "S2" && observedScene && !observedScene.terminal;
+      const sceneArtifacts = useRecord(workspacePath && artifactScene ? { view: "stage_artifacts", scene: artifactScene, run: artifactRunId, session_id: sessionId, workspace_path: workspacePath } : null, receiptsRevision, activePreview ? 3e3 : 1e4, visible);
       const catalog = useRecord(route.stage === "S1" ? { view: "catalog", q: catalogQuery, capability, page: catalogPage, page_size: 12 } : null, revision);
       const dataset = useRecord(workspacePath && ["S4", "S5"].includes(route.stage) && selectedDataset ? { view: "dataset", dataset: route.dataset, template: route.template, split: route.split, q: route.q, page: route.page, page_size: route.size, workspace_path: workspacePath, session_id: sessionId } : null, receiptsRevision, 3e4, visible);
       const sceneLibrary = useRecord(workspacePath ? {
@@ -3959,6 +4002,19 @@ var benchforgeClient = (() => {
           h(ArtifactGallery, { items: unassignedProductItems, selected: [], preview: setPreview, t })
         )
       );
+      if (!example && stage.id === "S2" && sceneArtifacts.value?.scene === artifactScene && observedScene && (activePreview || route.production || route.run)) {
+        const currentRevision = (row) => observedScene.tasks.some((task) => task.id === row.task_id && task.revision === row.revision);
+        const layouts = (sceneArtifacts.value.layouts || []).filter(currentRevision);
+        const media = (sceneArtifacts.value.items || []).filter((row) => currentRevision(row) && ["image", "video"].includes(row.kind));
+        const showingLibrary = sceneLibraryView.value || sceneLibraryView.error || sceneLibraryView.loading;
+        if (layouts.length || showingLibrary && media.length) product = h(
+          React.Fragment,
+          null,
+          layouts.map((layout) => h(components.SceneLayout, { key: layout.task_id, layout, t })),
+          showingLibrary && media.length > 0 && h(SceneGallery, { items: media, preview: setPreview, t }),
+          product
+        );
+      }
       const body = h(
         React.Fragment,
         null,
