@@ -378,22 +378,23 @@ docker ps --filter "label=com.docker.compose.project=$project" --filter 'label=c
 `config/dsh.env` 读取。可在 `request_defaults` 中设置提供方 API 参数，例如
 FLUX 的 `num_inference_steps` 或 DA3 的 `process_res`。
 
-Isaac Sim 使用 [A100 分支原生协议](src/capabilities/isaac_sim/grpc/simulator.proto)，服务名为
-`a100sim.v1.Simulator`。在 `providers.IsaacSim4A100.grpc` 填写 `host`、`port` 和
+Isaac Sim 使用 [SimulationService v2 协议](src/capabilities/isaac_sim/grpc/simulation.proto)，服务名为
+`isaacsim_rpc.v1.SimulationService`。在 `providers.IsaacSim4A100.grpc` 填写 `host`、`port` 和
 `timeout_seconds`；可选 `token_env`、`tls_ca_file`。`capture_timeout_seconds` 是观察期限，
-超时保留远端作业；`max_concurrent_captures` 控制后端并发场景数，默认 4。
+超时保留远端作业；`max_concurrent_captures` 控制后端并发场景数，默认 4。`simulation` 配置
+步数/步长/重力/目标帧数，`render` 配置分辨率/采样数/视场/种子，`artifacts` 控制下载分块与并发，
+`mesh_assets` 把会话内 asset_id 绑定到服务端存放 mesh.npz 的绝对目录。
 
-启动 A100 仓库的 `serve-grpc.sh` 后，运行 `python benchforge_app.py sync` 并重启后端及 DSH。
-无需额外采集进程。DSH 原生工具 `benchforge_isaac_sim` 通过公共工具注册和执行器提供
-capabilities、catalog、assets、upload、submit、invoke、status、wait、cancel、download。
-先读取在线 catalog，再按其 schema 提交；返回 job_id 表示受理，只有 SUCCEEDED 和真实产物才能证明执行完成。
-CancelJob 只能取消服务尚未执行的作业，不能把断开观察当作 GPU 已停止。
+启动远端仿真服务并建立 SSH 隧道后，运行 `python benchforge_app.py sync` 并重启后端及 DSH。
+无需额外采集进程。DSH 原生工具 `benchforge_isaac_sim` 提供 guide、health、submit、simulation、
+status、wait、cancel、download、ack；`submit` 接受 SimulateRequest，`request_id` 保证幂等重放，
+返回 job 只表示受理，只有成功状态和通过 sha256 校验的产物才能证明执行完成。
 
-`benchforge_capture` 将已保存的 SceneProgram 转换为 USD，通过同一 gRPC 接口导入、物理步进、
-多相机采集和下载；每批最多 32 个相机，更多机位分批保留。RGB、深度、法向和语义/实例 ID
-来自 A100 CUDA 输出，保持原有场景与数据验收。原生资产必须显式配置 `asset_sources` 的
-asset_id/relative_path，不能自动以简化几何代替机器人。A100 没有 RTX：纹理、RTX 专属字段或
-尚未映射的 SceneProgram 交互会明确拒绝；机器人控制和并行采集通过原生 session/world 接口使用。
+`benchforge_capture` 将已保存的 SceneProgram 映射为 SimulateRequest，逐相机提交、物理步进并下载
+帧产物；最终帧命名为 `view_{i}`，过程帧命名为 `process_view_{i}_step_{step}`，复核时每相机保留
+最终帧加最多 3 张过程帧。v2 只支持 box、sphere、container、composite 以及绑定 `mesh_assets` 的
+mesh；圆柱、native、generated 和内建原生资产在预检阶段明确拒绝，不会用简化几何代替。BodySpec
+只表达基色，roughness、metallic、纹理等外观字段同样拒绝；不支持的要求必须修改，不能静默丢弃。
 
 版本 4 的本地配置由 `sync` 迁移到版本 5，先保存旧配置副本再统一提供方拼写，移除旧采集连接配置。
 数据库历史、会话和产物保留。旧的设备租约需运行一次

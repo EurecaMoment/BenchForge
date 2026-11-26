@@ -77,7 +77,8 @@ class CaptureStoreTests(unittest.TestCase):
     # 验证已使用当前原生协议的采集回执不被迁移误作废。
     def test_existing_native_receipt_is_not_retired(self):
         task = self.capture('native')
-        write_json(self.store.directory(task, 0) / 'isaac_sim/attempt_0/capture.json', {'protocol': 'a100sim.v1.Simulator'})
+        write_json(self.store.directory(task, 0) / 'isaac_sim/attempt_0/capture.json',
+                   {'protocol': 'isaacsim_rpc.v1.SimulationService'})
         self.assertEqual(migrate_capture(self.store)['retired_tasks'], 0)
         self.assertEqual(self.store.snapshot(task.split('.')[0])['tasks'][0]['state'], 'READY')
 

@@ -14,6 +14,40 @@ from capabilities.scene_authoring.contracts.requirements import scene_requiremen
 
 from pipelines.scene_production.planning import _strict_policy
 
+
+# 复核提示词只取每相机最终帧和至多三张均匀过程帧，数据帧仍保留在 evidence。
+def _review_frames(frames, per_view=3):
+    grouped = {}
+    for frame in frames:
+        if not isinstance(frame, dict) or not isinstance(frame.get('frame_id'), str):
+            continue
+        name = frame['frame_id']
+        prefix = ('process_view_' if name.startswith('process_view_')
+                  else 'view_' if name.startswith('view_') else None)
+        if prefix is None:
+            continue
+        index = name[len(prefix):].split('_', 1)[0]
+        if index.isdigit():
+            grouped.setdefault(int(index), []).append(frame)
+    selected = []
+    for index in sorted(grouped):
+        rows = grouped[index]
+        canonical = next((row for row in rows
+                          if row.get('frame_id') == f'view_{index}'), None)
+        process = sorted((row for row in rows if row is not canonical),
+                         key=lambda row: row.get('step_id') or 0)
+        if len(process) <= per_view:
+            picks = process
+        elif per_view > 1:
+            picks = list({id(row): row for row in
+                          (process[round(position * (len(process) - 1) / (per_view - 1))]
+                           for position in range(per_view))}.values())
+        else:
+            picks = [process[0]]
+        selected.extend(([canonical] if canonical else []) + picks)
+    return selected
+
+
 # 检查采集报告、真实证据与场景质量，保存验收回执或修复反馈并响应取消。
 def review_scene(store,task,stop,*,capture_only=False):
     if stop.is_set():
@@ -106,7 +140,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
         if geometry_path.is_file() and not strict_policy:
             prompt+='\n仿真前的程序几何建议：'+json.dumps(compact_preview(
                 json.loads(geometry_path.read_text()), full_report=str(geometry_path)),ensure_ascii=False)
-        camera_receipts=[{'frame_id':frame.get('frame_id'),'image':frame.get('image'),'camera':frame.get('camera'),'step_id':frame.get('step_id')} for frame in evidence.get('frames',[])]
+        camera_receipts=[{'frame_id':frame.get('frame_id'),'image':frame.get('image'),'camera':frame.get('camera'),'step_id':frame.get('step_id')} for frame in _review_frames(evidence.get('frames',[]))]
         prompt+='\n相机执行记录：'+json.dumps(camera_receipts,ensure_ascii=False)
         prompt+='\n实际外力动作证据：'+json.dumps(evidence.get('interaction',{}),ensure_ascii=False)
         prompt+='\n环境贴图执行记录：'+json.dumps(evidence.get('environment_dependencies',[]),ensure_ascii=False)

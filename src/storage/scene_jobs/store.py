@@ -257,7 +257,7 @@ class Store:
             connection.execute(tasks.update().where(tasks.c.id == tid).values(
                 state='READY', unit=unit, lease_owner=None, lease_expires_at=None))
             self.repo.event(connection, task['run_id'], tid, 'benchforge.capture_committed',
-                            {'report': report, 'protocol': 'a100sim.v1.Simulator'})
+                            {'report': report, 'protocol': 'isaacsim_rpc.v1.SimulationService'})
 
     # 逐个锁定并汇总运行内工作项状态，更新终态且避免丢失并发重试。
     def settle_runs(self):

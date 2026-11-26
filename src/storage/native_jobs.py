@@ -25,15 +25,17 @@ class NativeJobs:
         self.workspace_id = workspace_namespace(self.engine, self.root)
 
     # 幂等登记远端任务与会话、请求的绑定，拒绝与已有归属不一致的回执。
-    def remember(self, endpoint, job, session):
-        values = {"workspace_id": self.workspace_id, "endpoint": endpoint, "job_id": job.job_id,
-                  "session_id": session, "request_id": job.request_id}
+    def remember(self, endpoint, job, session, request_id=None):
+        job_id = getattr(job, "job_id", None) or getattr(job, "id")
+        identity = request_id if request_id is not None else getattr(job, "request_id", "")
+        values = {"workspace_id": self.workspace_id, "endpoint": endpoint, "job_id": job_id,
+                  "session_id": session, "request_id": identity}
         with transaction(self.engine) as connection:
             insert_missing(connection, native_jobs, values, ["workspace_id", "endpoint", "job_id"])
             row = connection.execute(select(native_jobs.c.session_id, native_jobs.c.request_id).where(
                 native_jobs.c.workspace_id == self.workspace_id, native_jobs.c.endpoint == endpoint,
-                native_jobs.c.job_id == job.job_id)).first()
-            if row != (session, job.request_id):
+                native_jobs.c.job_id == job_id)).first()
+            if row != (session, identity):
                 raise PermissionError("Native job is already associated with another session or request")
 
     # 确认远端任务属于指定会话，必要时仅从可验证的历史回执恢复归属。

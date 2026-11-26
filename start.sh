@@ -17,16 +17,110 @@ LEGACY_PID_FILE="$RUN_DIR/spatialforge.pid"
 DSH_PID_FILE="$RUN_DIR/dsh.pid"
 DB_PROJECT_FILE="$RUN_DIR/database-project"
 
+# 首次安装使用的 pip 源与临时目录：本机默认源较慢，家目录在 CephFS 上，改用阿里云源和本地临时盘。
+INSTALL_ENV=(
+  "TMPDIR=${BENCHFORGE_INSTALL_TMPDIR:-/tmp}"
+  "PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}"
+  "PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.aliyun.com}"
+)
+
 mkdir -p "$RUN_DIR" "$LOG_DIR"
+
+# 加载实例私有凭据：README 约定密钥值从启动环境或 config/dsh.env 读取，
+# 否则重启后端后模型提供方会因 *_API_KEY 未设置而报错或 401。
+if [[ -f "$ROOT/config/dsh.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$ROOT/config/dsh.env"
+  set +a
+fi
 
 # 向标准错误输出启动失败原因，并以失败状态终止脚本。
 die() { echo "错误: $*" >&2; exit 1; }
 
-for path in "$PY" "$PRESET" "$STATE/runtime.json"; do
-  [ -e "$path" ] || die "缺少 $path，请先按 README 的安装步骤准备环境"
-done
+# 比较两个点分版本号，前者不低于后者时返回成功。
+version_ge() {
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]
+}
+
+# 读取配置中锁定的 DSH 字段，避免在脚本里重复常量。
+locked_dsh() {
+  "$PY" -c "import json;print(json.load(open('$ROOT/config/benchforge.example.json'))['dsh']['$1'])"
+}
+
+# 选择满足最低版本的 Node；当前 PATH 不满足时切换到已安装的 nvm 版本。
+select_node() {
+  local required current candidate
+  required="$(locked_dsh node)"
+  required="${required#>=}"
+  if command -v node > /dev/null 2>&1 && version_ge "$(node -v | sed 's/^v//')" "$required"; then
+    return 0
+  fi
+  while read -r candidate; do
+    if version_ge "$("$candidate/node" -v | sed 's/^v//')" "$required"; then
+      PATH="$candidate:$PATH"
+      export PATH
+      echo "  使用 Node $("$candidate/node" -v) ($candidate)"
+      return 0
+    fi
+  done < <(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V -r)
+  return 1
+}
+
+# 核对 DSH 预设与运行记录是否齐全，且版本和提交与当前锁定的子模块一致。
+dsh_ready() {
+  [ -f "$PRESET" ] && [ -f "$STATE/runtime.json" ] || return 1
+  "$PY" - "$ROOT/config/benchforge.example.json" "$STATE/runtime.json" "$ROOT" <<'PY'
+import json, subprocess, sys
+from pathlib import Path
+
+example, runtime, root = (Path(item) for item in sys.argv[1:4])
+lock = json.loads(example.read_text(encoding='utf-8'))['dsh']
+state = json.loads(runtime.read_text(encoding='utf-8'))
+tree = subprocess.run(['git', 'ls-tree', 'HEAD', '--', lock['path']], cwd=root,
+                      capture_output=True, text=True).stdout.split()
+revision = tree[2] if tree else None
+cli = Path(state.get('dsh_root', '')) / 'apps/cli/lib/bin.js'
+ready = (state.get('dsh_version') == lock['version'] and cli.is_file()
+         and state.get('dsh_revision', revision) == revision)
+raise SystemExit(0 if ready else 1)
+PY
+}
+
+# 首次运行时自动补齐项目环境、后端依赖与锁定版本的 DSH，后续启动直接跳过。
+bootstrap() {
+  local service_py
+  if [ ! -x "$PY" ]; then
+    echo "[0/3] 创建项目 Python 环境 .venv"
+    python3 -m venv "$ROOT/.venv" || die "无法创建 $ROOT/.venv，请先安装 Python 3.11-3.13"
+  fi
+  service_py="$("$PY" benchforge_app.py setting backend.python)"
+  # 用真实依赖导入判断环境是否装完，避免把只创建了解释器的半成品当成可用。
+  if [ ! -x "$service_py" ] || ! "$service_py" -c 'import yaml, numpy, PIL, sqlalchemy, psycopg, trimesh, pycocotools, grpc, pxr' > /dev/null 2>&1; then
+    echo "[0/3] 安装后端依赖到 $service_py"
+    env "${INSTALL_ENV[@]}" "$PY" benchforge_app.py setup || die "后端依赖安装失败，见上方输出"
+  fi
+  # BenchForge DSH 插件要先由 npm ci 编译出 src/dsh/dist，预设才能加载。
+  if [ ! -f "$ROOT/src/dsh/dist/benchmark-tools.mjs" ]; then
+    echo "[0/3] 构建 BenchForge DSH 插件（src/dsh）"
+    select_node || die "DSH 需要 Node $(locked_dsh node)，请安装后重试"
+    ( cd "$ROOT" && env "${INSTALL_ENV[@]}" npm ci --prefix src/dsh ) || die "DSH 插件构建失败，见上方输出"
+  fi
+  if dsh_ready && "$PY" -c 'import yaml' > /dev/null 2>&1; then
+    return 0
+  fi
+  echo "[0/3] 初始化 DSH $(locked_dsh version)（首次运行需要下载并构建，耗时较长）"
+  select_node || die "DSH 需要 Node $(locked_dsh node)，请安装后重试"
+  # BENCHFORGE_DSH_ROOT 可复用同版本已构建好的 DSH，跳过下载与前端构建。
+  if [ -n "${BENCHFORGE_DSH_ROOT:-}" ]; then
+    env "${INSTALL_ENV[@]}" "$PY" benchforge_app.py dsh-setup --dsh-root "$BENCHFORGE_DSH_ROOT" || die "DSH 初始化失败，见上方输出"
+  else
+    env "${INSTALL_ENV[@]}" "$PY" benchforge_app.py dsh-setup || die "DSH 初始化失败，见上方输出"
+  fi
+}
+
+bootstrap
 SERVICE_PY="$("$PY" benchforge_app.py setting backend.python)"
-[ -x "$SERVICE_PY" ] || die "缺少 $SERVICE_PY，请先运行 python benchforge_app.py setup"
 
 # 检查指定TCP端口是否正在监听，供启动和健康等待流程判断。
 port_open() { ss -ltn 2>/dev/null | grep ":$1 " > /dev/null; }
@@ -163,10 +257,11 @@ else
     fail_start "$DSH_PID_FILE"
     die "DSH 在 240 秒内未监听 $WEB_PORT，见 $LOG_DIR/dsh.log"
   fi
-  # 端口监听不等于启动完成：必须等到本次新生成的 token 行。
-  if ! wait_new_token "$TOKEN_BEFORE" 180; then
+  # 端口监听不等于启动完成：首次启动还要导入约 2100 个示例文件，CephFS 上很慢。
+  echo "  等待 DSH 完成初始化（首次会导入示例资产，可能需要数分钟）..."
+  if ! wait_new_token "$TOKEN_BEFORE" 1200; then
     tail -n 20 "$LOG_DIR/dsh.log" >&2 || true
-    echo "诊断: DSH 端口已监听，但 180 秒内没有输出新的 token，服务仍卡在启动阶段。" >&2
+    echo "诊断: DSH 端口已监听，但 1200 秒内没有输出新的 token，服务仍卡在启动阶段。" >&2
     echo "  inotify watches 上限=$(cat /proc/sys/fs/inotify/max_user_watches 2>/dev/null || echo unknown)" >&2
     echo "  hmr 拿不到文件监视器会导致永不完成启动，请提高上限后重试：" >&2
     echo "    sudo sysctl -w fs.inotify.max_user_watches=524288" >&2

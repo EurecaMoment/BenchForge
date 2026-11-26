@@ -12,20 +12,21 @@ from capabilities.asset_generation.mesh_input import validate_mesh_input
 
 
 class AssetDiscoveryTests(unittest.TestCase):
-    # 验证目录仅把部署已绑定的原生资源标为可用，避免将内置名称当成安装证明。
-    def test_catalog_does_not_claim_unbound_assets_are_installed(self):
+    # 验证内建原生资产在 v2 明确标为不支持，并指向 mesh 离线转换路径。
+    def test_catalog_marks_builtin_native_assets_unsupported(self):
         request = {'section': 'native_assets', 'item_id': 'mug'}
         store = SimpleNamespace(root=Path('.'))
-        missing = catalog_response(store, request, settings={})['items'][0]['value']
-        self.assertEqual(missing['availability'], 'unconfigured')
-        self.assertIn('kind=native', missing['next_action'])
-        self.assertNotIn('path', missing)
-        unknown = catalog_response(store, request)['items'][0]['value']
-        self.assertEqual(unknown['availability'], 'unknown')
-        bound = catalog_response(store, request, settings={'asset_sources': {
-            'mug': {'asset_id': 'mug-pack', 'relative_path': 'mug.usdc'}}})['items'][0]['value']
-        self.assertEqual(bound['availability'], 'configured')
-        self.assertIn('require native evidence', bound['availability_basis'])
+        for settings in ({}, None):
+            with self.subTest(settings=settings):
+                if settings is None:
+                    value = catalog_response(store, request)['items'][0]['value']
+                else:
+                    value = catalog_response(store, request, settings=settings)['items'][0]['value']
+                self.assertEqual(value['availability'], 'unsupported')
+                self.assertIn('mesh_assets', value['next_action'])
+                self.assertIn('kind="mesh"', value['next_action'])
+                self.assertNotIn('path', value)
+                self.assertNotIn('asset_sources', value['availability_basis'])
 
     # 验证静态网格导入在快照和转换前拒绝可能丢失关节语义的 USD 输入。
     def test_usd_rejected_before_input_snapshot_or_conversion(self):

@@ -1,0 +1,332 @@
+syntax = "proto3";
+
+package isaacsim_rpc.v1;
+
+// Isaac Sim RTX gRPC facade used by BenchForge.
+//
+// The service owns simulation and rendering on the remote machine. BenchForge
+// submits a SimulateRequest, polls GetJob, downloads artifacts over the SSH
+// tunnel, verifies size/sha256 locally and finally calls AckJob so the service
+// can reclaim disk space.
+
+service SimulationService {
+  // Service health and runtime metadata.
+  rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Idempotent submission: the same request_id and payload return the original job.
+  rpc SubmitJob(SubmitJobRequest) returns (JobHandle);
+
+  // Job state, progress and the complete artifact manifest once succeeded.
+  rpc GetJob(GetJobRequest) returns (Job);
+
+  // Stream one artifact, resumable from any byte offset.
+  rpc DownloadArtifact(DownloadArtifactRequest) returns (stream DownloadChunk);
+
+  // Confirm that every artifact was verified locally; the service may reclaim it.
+  rpc AckJob(AckJobRequest) returns (AckJobResponse);
+
+  // Cancel a queued or running job; terminal jobs are returned unchanged.
+  rpc CancelJob(GetJobRequest) returns (Job);
+
+  // Optional server push. Clients keep GetJob polling as the fallback.
+  rpc WatchJob(GetJobRequest) returns (stream Job);
+}
+
+// ---------------------------------------------------------------------------
+// Basic types
+// ---------------------------------------------------------------------------
+
+message Vec3 {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message QuatXYZW {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double w = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Scene description
+// ---------------------------------------------------------------------------
+
+message BodySpec {
+  // Unique within the request; also used as the semantic label.
+  string id = 1;
+
+  // cube | sphere | mesh
+  string shape = 2;
+
+  // World position in meters.
+  Vec3 position = 3;
+
+  // World orientation, xyzw order.
+  QuatXYZW orientation_xyzw = 4;
+
+  // cube only: axis sizes in meters.
+  Vec3 size = 5;
+
+  // sphere only: radius in meters.
+  optional double radius = 6;
+
+  // Mass in kilograms. Omitted means the service default (static body).
+  optional double mass = 7;
+
+  // Display color, RGB, 0..1.
+  Vec3 color = 8;
+
+  // mesh only: server-side absolute directory containing mesh.npz.
+  optional string asset = 9;
+}
+
+message LightSpec {
+  Vec3 color = 1;
+  optional double intensity = 2;
+  optional double exposure = 3;
+  optional double width = 4;
+  optional double height = 5;
+  Vec3 origin = 6;
+  Vec3 target = 7;
+}
+
+message LightingSpec {
+  LightSpec dome = 1;
+  LightSpec key = 2;
+  repeated LightSpec fills = 3;
+}
+
+message RenderSpec {
+  // RTX backend only supports mesh.
+  optional string kind = 1;
+
+  // Image edge in pixels; the upstream service allows 64..1024.
+  optional uint32 size = 2;
+
+  // RTX subframes; the upstream service allows 1..256.
+  optional uint32 spp = 3;
+
+  optional uint32 seed = 4;
+  optional double azimuth = 5;
+  optional double elevation = 6;
+  optional double distance = 7;
+  Vec3 target = 8;
+  optional double gaussian_gain = 9;
+  LightingSpec lighting = 10;
+}
+
+message CaptureSpec {
+  // Record every N steps (1..steps); unioned with frames when both are set.
+  optional uint32 every = 1;
+
+  // Explicit step numbers (1..steps), deduplicated and sorted, at most 1200.
+  repeated uint32 frames = 2;
+
+  // Presence forces per-step rendering (RGB + depth + semantic + state).
+  // Frames are written under frames/frame_XXXXXX/ on the service.
+}
+
+message SimulateRequest {
+  // Empty means the upstream default scene.
+  repeated BodySpec bodies = 1;
+
+  optional uint32 steps = 2;
+  optional double dt = 3;
+  optional double gravity = 4;
+  optional bool ground = 5;
+  RenderSpec render = 6;
+
+  // Intermediate frame sampling; without it only the final state.npz is written.
+  CaptureSpec capture = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Jobs and results
+// ---------------------------------------------------------------------------
+
+message SubmitJobRequest {
+  // Stable client identity (recommended 32+ hex characters).
+  string request_id = 1;
+  SimulateRequest simulation = 2;
+}
+
+message JobHandle {
+  string id = 1;
+  string state = 2;
+  double queued_at = 3;
+}
+
+message GetJobRequest {
+  // 32 lower-case hexadecimal characters.
+  string job_id = 1;
+}
+
+message BodyState {
+  string id = 1;
+  string prim_path = 2;
+
+  // [x, y, z, qx, qy, qz, qw]
+  repeated double pose_xyzw = 3;
+
+  // [vx, vy, vz, wx, wy, wz]
+  repeated double velocity = 4;
+}
+
+// Per-frame state snapshot (written while the simulation runs).
+message FrameArtifact {
+  uint32 frame = 1;
+  string state_npz = 2;
+
+  // Populated only when capture.render=true.
+  string image = 3;
+  string depth_m = 4;
+  string semantic_ids = 5;
+  string semantic_labels = 6;
+}
+
+// Legacy absolute-path outputs. Kept for wire compatibility; BenchForge reads
+// the verified repeated Artifact manifest instead.
+message Artifacts {
+  string state_npz = 1;
+  string scene = 2;
+  string simulation_json = 3;
+  string image = 4;
+  string depth_m = 5;
+  string semantic_ids = 6;
+  string semantic_labels = 7;
+  repeated FrameArtifact frames = 8;
+}
+
+message RenderInfo {
+  string backend = 1;
+  string renderer = 2;
+  bool native_rtx = 3;
+  uint32 size = 4;
+  uint32 requested_spp = 5;
+  uint32 rt_subframes = 6;
+  string sampling = 7;
+  string image = 8;
+  string depth_m = 9;
+  string depth_convention = 10;
+  string semantic_ids = 11;
+  string semantic_labels = 12;
+  double rgb_mean = 13;
+  double seconds = 14;
+}
+
+// One downloadable file. relative_path is relative to the service artifact
+// root; clients never see or construct absolute server paths from it.
+message Artifact {
+  string artifact_id = 1;
+  string name = 2;
+  string relative_path = 3;
+  uint64 size_bytes = 4;
+  string sha256 = 5;
+  string media_type = 6;
+}
+
+message Job {
+  string id = 1;
+
+  // queued | running | succeeded | failed | interrupted
+  string state = 2;
+
+  double queued_at = 3;
+  double started_at = 4;
+  double finished_at = 5;
+  double queue_seconds = 6;
+  double execution_seconds = 7;
+  string error = 8;
+
+  // ---- simulation result (filled on success) ----
+  string isaac_sim = 9;
+  string physics_device = 10;
+  int32 physical_gpu = 11;
+  bool native_rtx = 12;
+  bool cpu_fallback = 13;
+  uint32 rigid_bodies = 14;
+  uint32 steps = 15;
+  double dt = 16;
+  double simulation_seconds = 17;
+  double setup_seconds = 18;
+  double physics_seconds = 19;
+  string collision = 20;
+  repeated BodyState bodies = 21;
+
+  // Legacy absolute-path outputs. Superseded by artifacts below.
+  Artifacts outputs = 22;
+  RenderInfo render = 23;
+
+  // Complete artifact manifest; only populated for succeeded jobs.
+  repeated Artifact artifacts = 24;
+
+  // queued | loading_scene | simulating | rendering | writing_artifacts
+  string phase = 25;
+  uint32 frames_done = 26;
+  uint32 frames_total = 27;
+}
+
+// ---------------------------------------------------------------------------
+// Download
+// ---------------------------------------------------------------------------
+
+message DownloadArtifactRequest {
+  string job_id = 1;
+  string artifact_id = 2;
+  uint64 offset = 3;
+  uint32 chunk_bytes = 4;
+}
+
+message DownloadChunk {
+  uint64 offset = 1;
+  bytes data = 2;
+}
+
+message AckJobRequest {
+  string job_id = 1;
+}
+
+message AckJobResponse {
+  bool released = 1;
+  uint64 freed_bytes = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+message HealthRequest {}
+
+message HealthResponse {
+  // ready | initializing | failed
+  string status = 1;
+  string engine = 2;
+  int32 physical_gpu = 3;
+  bool cuda_required = 4;
+  bool cpu_fallback = 5;
+  bool native_rtx = 6;
+  string render_backend = 7;
+  string gpu_model = 8;
+  string gpu_uuid = 9;
+  string isaac_sim = 10;
+  string renderer = 11;
+  repeated string supported_shapes = 12;
+  repeated string annotators = 13;
+  double uptime_seconds = 14;
+  uint32 queue_depth = 15;
+  uint32 queue_capacity = 16;
+  string active_job = 17;
+  uint32 completed = 18;
+  uint32 failed = 19;
+
+  // Only set when status=failed.
+  string error = 20;
+
+  // Contract version, artifact root (diagnostics only), free disk and retention.
+  string api_version = 21;
+  string artifacts_root = 22;
+  uint64 artifacts_free_bytes = 23;
+  uint32 retention_seconds = 24;
+}

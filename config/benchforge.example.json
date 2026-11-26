@@ -52,14 +52,30 @@
     "IsaacSim4A100": {
       "grpc": {
         "host": null,
-        "port": 50051,
+        "port": 60051,
         "timeout_seconds": 60
       },
       "capture_timeout_seconds": 1800,
       "max_concurrent_captures": 4,
-      "image_size": 768,
-      "samples_per_pixel": 32,
-      "asset_sources": {}
+      "simulation": {
+        "steps": 180,
+        "dt": 0.0166666667,
+        "gravity": 9.81,
+        "ground": true,
+        "capture_target_frames": 24,
+        "capture_every_steps": null
+      },
+      "render": {
+        "image_size": 768,
+        "samples_per_pixel": 32,
+        "fov_degrees": 50,
+        "seed": null
+      },
+      "artifacts": {
+        "chunk_bytes": 2097152,
+        "concurrency": 4
+      },
+      "mesh_assets": {}
     }
   }
 }

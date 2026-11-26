@@ -88,15 +88,14 @@ def _load_rows(store, section, item_id, settings=None):
         values = {'native_assets': ASSETS, 'materials': NATIVE_MATERIALS, 'environments': ENVIRONMENTS}[section]
         records = {key: {k: v for k, v in value.items() if k not in {'path', 'textures', 'preview_file'}} for key, value in values.items()}
         if section == 'native_assets':
-            sources = (settings or {}).get('asset_sources', {})
-            for key, record in records.items():
-                binding = sources.get(key)
-                bound = isinstance(binding, dict) and all(binding.get(field) for field in ('asset_id', 'relative_path'))
-                record['availability'] = 'configured' if bound else 'unconfigured' if settings is not None else 'unknown'
-                record['availability_basis'] = 'capture provider binding; existence, rendering and articulation require native evidence'
-                record['next_action'] = ('Preflight the complete scene, then inspect native capture evidence.' if bound else
-                    'Use an owned uploaded asset with kind=native and native_asset; do not edit source catalogs or deployment directories. '
-                    'If no suitable source is available, report the missing asset rather than substituting a box or static mesh.')
+            # v2 BodySpec 只有 cube/sphere/mesh，既无上传通道也无原生 USD 导入语义。
+            for record in records.values():
+                record['availability'] = 'unsupported'
+                record['availability_basis'] = ('isaacsim_rpc.v1 BodySpec accepts only cube, sphere and mesh; '
+                                                'there is no asset upload or native USD import')
+                record['next_action'] = ('Convert the asset offline to mesh.npz on the service and bind its directory '
+                                         'in providers.IsaacSim4A100.mesh_assets, then request it with kind="mesh" and '
+                                         'asset_id. Do not request kind="native" or substitute an unlabelled box.')
         if section == 'materials':
             for key, value in values.items():
                 if value.get('preview_file'):

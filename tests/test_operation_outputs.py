@@ -157,13 +157,13 @@ class ScopedOperationOutputTests(unittest.TestCase):
     # 验证真实 Isaac 查询工具经私有输出上下文发布回执。
     def test_real_isaac_query_publishes_its_receipt(self):
         from capabilities.isaac_sim.tool_api import execute
-        from capabilities.isaac_sim.grpc import simulator_pb2 as pb
+        from capabilities.isaac_sim.grpc import simulation_pb2 as pb
         with (access_context(self.access), operation_outputs(self.workspace, 'isaac', scoped=True) as directory,
-              patch('capabilities.isaac_sim.tool_api.A100Client') as factory,
-              patch('capabilities.isaac_sim.tool_api.NativeResources')):
-            factory.return_value.call.return_value = pb.Capabilities(api_version='fixture')
-            result = logical_value(execute({'action': 'capabilities'}, directory, {}))
-        self.assertEqual(read(result['receipt_path'])['api_version'], 'fixture')
+              patch('capabilities.isaac_sim.tool_api.SimulationClient') as factory):
+            factory.return_value.health.return_value = pb.HealthResponse(
+                status='ready', api_version='isaacsim_rpc.v1')
+            result = logical_value(execute({'action': 'health'}, directory, {}))
+        self.assertEqual(read(result['receipt_path'])['status'], 'ready')
         self.assertTrue(Path(result['receipt_path']).is_relative_to(self.workspace / 'operations/isaac'))
 
     # 验证采集器分派把输出位置指向私有暂存目录。

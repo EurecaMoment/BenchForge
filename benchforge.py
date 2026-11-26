@@ -137,7 +137,7 @@ def main():
     ) != benchforge_app.settings.CONFIG_VERSION
     if not args.config_synced and (upgrading or (preset.is_file() and uses_local_service(preset))):
         run([python, ROOT/'benchforge_app.py', 'sync'], cwd=ROOT)
-    env = benchforge_app.build_environment(database=False)
+    env = benchforge_app.build_environment(database=True)
     env['DSH_HOME'] = str(state/'dsh-home')
     paths = [str(ROOT / 'src')]
     if env.get('PYTHONPATH'):

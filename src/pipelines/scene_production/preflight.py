@@ -34,7 +34,7 @@ def inspect_capture_program(root, program, *, settings=None, **options):
             diagnostics.checked = report['checked']
             report.update(diagnostics.finish(program, enforced=report['enforced']))
         report['service_contract'] = {'status': 'incompatible' if live else 'compatible',
-                                      'source': 'live GetCapabilities', 'simulation_executed': False}
+                                      'source': 'service Health probe', 'simulation_executed': False}
     return report
 
 

@@ -18,9 +18,13 @@ def pipeline_files():
     return [json.loads(path.read_text(encoding='utf-8')) for path in files]
 
 
+SECTION_ALIASES = {'plans': 'pipelines'}
+
+
 # 按查询分区返回计划模板、协议、流水线或能力模板目录及执行契约。
 def catalog(args, directory=None, config=None):
     section = args.get('section', 'pipelines')
+    section = SECTION_ALIASES.get(section, section)
     if section == 'plan_template':
         return {**assessment_template(), 'execution_contract': execution_contract()}
     if section == 'protocol':

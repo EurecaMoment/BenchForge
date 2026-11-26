@@ -1,88 +1,42 @@
-"""Scene capture as an ordinary leased backend stage using native A100 jobs."""
+"""Scene capture through the isaacsim_rpc.v1 SimulationService."""
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
-import uuid
+import time
+
+import grpc
 
 from capabilities.capture.capture_scope import capture_scope
-from capabilities.isaac_sim.authoring import compile_scene
-from capabilities.isaac_sim.evidence import measured_entities, physics_summary, resolve_artifact, save_frame
-from capabilities.isaac_sim.native_geometry import exported_entities
-from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
 from capabilities.isaac_sim.capture_contract import (
-    capture_capabilities, capture_service_client, native_edit_arguments, native_import_arguments, require_capture_service,
+    capture_service_client, health_issues, require_capture_service,
 )
-from capabilities.scene_authoring.catalog.native_reference import native_references
+from capabilities.isaac_sim.evidence import entities_from_job, frame_evidence, physics_summary
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
-from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
-from capabilities.isaac_sim.grpc.transport import document
+from capabilities.isaac_sim.grpc.tasks import DurableJobs, request_id
+from capabilities.isaac_sim.grpc.transport import PROTOCOL, document, job_state
+from capabilities.isaac_sim.scene_mapping import simulation_plan, simulation_request
+from capabilities.isaac_sim.scene_requirements import UnsupportedScene, validate_scene_requirements
 from service_access.configuration import isaac_config
 from service_access.progress import record_progress
 from service_access.request_context import check_cancelled
 from storage.files import write_json
 
 
-# 按摘要冻结场景上传输入，复用已验证上传回执或登记新的不可变资产。
-def _asset(client, source, directory):
-    receipt = directory / 'asset.json'
-    with source.open('rb') as stream:
-        digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-    if receipt.exists():
-        value = json.loads(receipt.read_text())
-        if value['sha256'] != digest:
-            raise ValueError('Frozen scene asset changed after upload')
-        return {key: value[key] for key in ('asset_id', 'relative_path')}
-    # Upload has no deduplication RPC. A lost upload reply may leave an unused
-    # immutable file; only a verified receipt becomes part of a submitted job.
-    value = client.upload(source, asset_id='benchforge-' + uuid.uuid4().hex)
-    write_json(receipt, value)
-    return {key: value[key] for key in ('asset_id', 'relative_path')}
+# 校验多个相机任务的物理结果一致，防止不同渲染请求产生分歧的仿真。
+def _require_same_physics(first, job):
+    reference = {body.id: tuple(body.pose_xyzw) for body in first.bodies}
+    current = {body.id: tuple(body.pose_xyzw) for body in job.bodies}
+    if set(reference) != set(current):
+        raise ValueError('Isaac Sim camera jobs returned different rigid bodies')
+    for identity, pose in reference.items():
+        other = current[identity]
+        if len(pose) != len(other) or any(abs(left - right) > 1e-4
+                                          for left, right in zip(pose, other)):
+            raise ValueError('Isaac Sim camera jobs diverged; retry with one camera per scene')
 
 
-# 分页读取原生场景节点，限制总量并拒绝不前进的游标。
-def _inspect(requests, identity):
-    prims, cursor = [], None
-    for page in range(100):
-        _, result = requests.extension(f'inspect-{page}', 'scene.inspect',
-            {'session_id': identity, 'limit': 2000, **({'cursor': cursor} if cursor else {})})
-        prims.extend(result['prims'])
-        if not result.get('has_more'):
-            return prims
-        next_cursor = result.get('next_cursor')
-        if not next_cursor or next_cursor == cursor:
-            raise ValueError('Isaac Sim returned a nonadvancing scene inspection cursor')
-        cursor = next_cursor
-    raise ValueError('Native scene inspection exceeds 200000 prims')
-
-
-# 依据编译清单导入原生资产，并通过显式编辑恢复场景尺寸、姿态和物理设置。
-def _native_imports(requests, identity, compiled):
-    for index, item in enumerate(compiled['imports']):
-        obj = item['object']
-        _, imported = requests.extension(f'asset-{index}', 'asset.import',
-                                         native_import_arguments(item, identity))
-        # Admission checks either a configured source or an owned upload handle.
-        scale = [obj['size'][i] / item['catalog']['size'][i] for i in range(3)]
-        requests.extension(f'asset-pose-{index}', 'scene.edit',
-            native_edit_arguments(obj, item['path'], identity, center=item['center'], scale=scale))
-        compiled['entities'][obj['id']]['articulation_roots'] = imported.get('articulation_roots', [])
-
-
-# 恢复队列任务的访问身份后编译场景，确保无HTTP上下文时仍按所有权消费原生句柄。
-def _compile_for_task(store, task, program, settings):
-    """Restore queued ownership before consuming native handles without HTTP context."""
-    if not native_references(program):
-        return compile_scene(program, store.root / 'generated_assets', settings)
-    from service_access.task_access import task_access
-    from service_access.access_scope import access_context
-    access = task_access(store.repo.engine, task['id'])
-    with access_context(access):
-        return compile_scene(program, store.root / 'generated_assets', settings)
-
-
-# 以持久回执组织原生场景创建、仿真、渲染和下载，支持取消及中断后恢复。
+# 在物理仿真与多相机渲染后，逐帧生成证据、清单并发布本地采集。
 def execute_capture(store, task, stop, *, config, client=None):
     unit = task['unit']
     directory = store.directory(task['id'], unit['revision'])
@@ -96,113 +50,126 @@ def execute_capture(store, task, stop, *, config, client=None):
             report = json.loads((destination / 'report.json').read_text())
             if report.get('token') != token:
                 raise ValueError('An immutable capture already exists for a different attempt')
-            store.update(task['id'], state='READY', unit={**unit, 'phase': 'review', 'capture_token': token})
+            store.update(task['id'], state='READY',
+                         unit={**unit, 'phase': 'review', 'capture_token': token})
             return
         program = json.loads((directory / 'program.json').read_text())
         settings = isaac_config(config)
         scope = capture_scope(program, unit['intent'].get('capture_options'))
         validate_scene_requirements(program, settings=settings)
+        plan = simulation_plan(program, settings, scope)
+        if not plan['views']:
+            raise UnsupportedScene('capture requires at least one camera view')
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
-                  'protocol': 'a100sim.v1.Simulator', 'capture_token': token}
+                  'protocol': PROTOCOL, 'capture_token': token, 'plan': plan}
         frozen_path = attempt / 'capture.json'
         if frozen_path.exists() and json.loads(frozen_path.read_text()) != frozen:
             raise ValueError('Frozen capture inputs/configuration changed; an explicit new attempt is required')
         write_json(frozen_path, frozen)
-        record_progress(directory, 'isaac_sim_preparing', protocol='a100sim.v1.Simulator')
-        compiled = _compile_for_task(store, task, program, settings)
-        source = attempt / 'scene.usda'
-        source.write_text(compiled['usd'], encoding='utf-8')
+        record_progress(directory, 'isaac_sim_preparing', protocol=PROTOCOL,
+                        every=plan['capture']['every'], frames=plan['capture']['frames'])
         own_client = client is None
         client = client or capture_service_client(config)
-        requests = DurableTasks(client, attempt / 'jobs', token, stop=stop,
+        jobs = DurableJobs(client, attempt / 'jobs', token, stop=stop,
             on_status=lambda job: record_progress(directory, 'isaac_sim_capture',
-                job_id=job.job_id, operation=job.operation, remote_state=document(job)['state'],
+                job_id=job.id, phase=job.phase, remote_state=job_state(job),
+                frames_done=job.frames_done, frames_total=job.frames_total,
                 receipt=str(attempt / 'jobs')))
         try:
-            capability = capture_capabilities(client)
-            require_capture_service(capability, compiled, scope)
-            source_ref = _asset(client, source, attempt)
-            _, imported = requests.extension('import', 'asset.import', {'source': source_ref, 'path': '/World/Scene'})
-            identity = imported['session_id']
-            write_json(attempt / 'session.json', {'session_id': identity, 'capture_token': token})
-            _native_imports(requests, identity, compiled)
-            steps, dt = 180, 1 / 60
-            physics_job, physics_result = requests.extension('settle', 'physics.step',
-                {'session_id': identity, 'steps': steps, 'dt': dt})
-            body_paths = [item['prim_path'] for item in compiled['entities'].values()
-                          if item['dynamic'] and not item.get('articulation_roots')]
-            _, observed = requests.extension('observe', 'world.observe',
-                {'session_id': identity, 'bodies': body_paths, 'imu': False, 'contacts': False})
-            physics = physics_summary(observed, steps, dt)
-            prims = _inspect(requests, identity)
+            require_capture_service(program, settings, scope)
+            health = document(client.health())
+            issues = health_issues(health)
+            if issues:
+                raise UnsupportedScene('\n'.join(row['message'] for row in issues), issues=issues)
             incoming = attempt / 'capture'
-            incoming.mkdir(exist_ok=True)
-            frames, native_jobs = [], [physics_job.job_id]
-            entities = measured_entities(compiled, prims)
-            native = {key: value for key, value in compiled['entities'].items() if not value.get('geometry_parts')}
-            if native:
-                job, exported = requests.extension('geometry', 'scene.export', {'session_id': identity, 'format': 'usd'})
-                files = requests.download('geometry', job)
-                source_geometry = incoming / 'native_geometry.usdc'
-                shutil.copyfile(resolve_artifact(exported['scene'], files), source_geometry)
-                entities.update(exported_entities(source_geometry, native))
-                native_jobs.append(job.job_id)
-            views = scope['view_indices']
-            # The service batches up to 32 cameras per request; retain every
-            # authored view, split without reducing the user's camera count.
-            for start in range(0, len(views), 32):
-                indices = views[start:start + 32]
-                key = f'views-{start}'
-                job, captured = requests.extension(key, 'scene.capture', {
-                    'session_id': identity, 'cameras': [compiled['cameras'][i] for i in indices],
-                    'size': settings.get('image_size', 768), 'spp': compiled['samples_per_pixel'], 'annotations': True})
-                files = requests.download(key, job)
-                if len(captured.get('frames', [])) != len(indices):
-                    raise ValueError('Isaac Sim did not return every requested camera')
-                for index, frame in zip(indices, captured['frames']):
-                    if frame['camera'] != compiled['cameras'][index]:
-                        raise ValueError('Isaac Sim returned a different camera')
-                    frames.append(save_frame(frame, files, index, program, incoming,
-                        physics_tick=observed.get('physics_tick'), dt=observed.get('dt', dt)))
-                native_jobs.append(job.job_id)
-            if scope['scene_export_requested']:
-                job, exported = requests.extension('export', 'scene.export', {'session_id': identity, 'format': 'usdz'})
-                files = requests.download('export', job)
-                shutil.copyfile(resolve_artifact(exported['scene'], files), incoming / 'scene.usdc')
-                shutil.copyfile(resolve_artifact(exported['package'], files), incoming / 'scene.usdz')
-                (incoming / 'scene.usda').write_text('#usda 1.0\n(subLayers = [@scene.usdc@])\n')
-                native_jobs.append(job.job_id)
-            render = {'renderer': 'A100 CUDA path tracer', 'native_rtx': False, 'replicator': False,
-                      'samples_per_pixel': compiled['samples_per_pixel'],
-                      'resolution': [settings.get('image_size', 768)] * 2}
+            if incoming.exists():
+                shutil.rmtree(incoming)
+            incoming.mkdir(parents=True)
+            frames, receipts, job_ids, completed = [], [], [], []
+            first_job = None
+            for view in plan['views']:
+                key = f"view-{view['index']}"
+                request = simulation_request(plan, view)
+                job = jobs.submit(key, request)
+                job = jobs.wait(key, job)
+                files = jobs.download(key, job)
+                if first_job is None:
+                    first_job = job
+                else:
+                    _require_same_physics(first_job, job)
+                captured = sorted(job.outputs.frames, key=lambda frame: frame.frame)
+                if not captured:
+                    raise ValueError('Isaac Sim succeeded job did not return frame artifacts')
+                canonical_step = captured[-1].frame
+                for frame in captured:
+                    frames.append(frame_evidence(frame, files, view['index'], view['camera'],
+                        program, plan, incoming, canonical=frame.frame == canonical_step,
+                        physics_tick=frame.frame, dt=plan['dt'], job=job))
+                receipts.append({'job_id': job.id, 'request_id': request_id(token, key),
+                                 'camera_index': view['index'], 'state': job_state(job),
+                                 'artifacts': files, 'fetched_at': _timestamp()})
+                job_ids.append(job.id)
+                completed.append(job)
+            physics = physics_summary(first_job, plan['steps'], plan['dt'], plan)
+            entities = entities_from_job(program, first_job, plan)
+            render = {'renderer': first_job.render.renderer or 'Isaac Sim RTX',
+                      'backend': first_job.render.backend or 'isaacsim_rpc.v1',
+                      'native_rtx': bool(first_job.native_rtx), 'replicator': True,
+                      'samples_per_pixel': plan['render']['spp'],
+                      'resolution': [plan['render']['size']] * 2,
+                      'fov_degrees': plan['render']['fov_degrees'],
+                      'fov_source': 'configured_default'}
             evidence = {'schema': 'benchforge.evidence/v1', 'truth_domain': 'synthetic_world',
-                'origin': 'isaac_native', 'token': token, 'protocol': 'a100sim.v1.Simulator',
-                'session_id': identity, 'job_ids': native_jobs, 'physics': physics,
-                'entities': entities, 'frames': frames, 'render_settings': render, 'capture_scope': scope,
-                'asset_dependencies': [], 'material_dependencies': [],
-                'realism': {'mass_and_contact_properties': 'uncalibrated synthetic priors',
-                            'sim2real_gap': 'not measured'},
-                'interaction': {'validated': False, 'reason': 'no executable interaction requested', 'action_results': []}}
+                'origin': 'isaacsim_rpc', 'token': token, 'protocol': PROTOCOL,
+                'job_ids': job_ids, 'physics': physics, 'entities': entities, 'frames': frames,
+                'render_settings': render, 'capture_scope': scope,
+                'capture_plan': plan['capture'], 'asset_dependencies': [],
+                'material_dependencies': [], 'realism': {
+                    'mass_and_contact_properties': 'uncalibrated synthetic priors',
+                    'static_body_semantics': 'upstream_default',
+                    'material_semantics': 'base_color_only',
+                    'sim2real_gap': 'not measured'},
+                'interaction': {'validated': False,
+                    'reason': 'no executable interaction requested', 'action_results': []}}
+            views = len(plan['views'])
             report = {'token': token, 'status': 'captured',
                 'renderable': all(frame['quality']['passed'] for frame in frames) if frames else None,
-                'frames': len(frames), 'physics': physics, 'errors': [], 'render_settings': render,
+                'frames': len(frames), 'views': views, 'process_frames': len(frames) - views,
+                'physics': physics, 'errors': [], 'render_settings': render,
                 'interaction': evidence['interaction'],
                 'render_qa': {'assessed': bool(frames),
                     'passed': all(frame['quality']['passed'] for frame in frames) if frames else None,
                     'failed_views': [{'frame_id': frame['frame_id'], 'reasons': frame['quality']['reasons']}
                                      for frame in frames if not frame['quality']['passed']]},
-                'capture_scope': scope, 'scene_format': 'usdc', 'scene_resources': [],
-                'native_receipts': str(attempt / 'jobs'), 'session_id': identity}
+                'capture_scope': scope, 'capture_plan': plan['capture'],
+                'protocol': PROTOCOL, 'job_ids': job_ids, 'manifest': 'manifest.json',
+                'scene_format': None, 'scene_resources': [],
+                'native_receipts': str(attempt / 'jobs')}
+            manifest = {'schema': 'benchforge.isaacsim_manifest/v1', 'protocol': PROTOCOL,
+                        'capture_token': token, 'capture_plan': plan['capture'],
+                        'jobs': receipts}
             write_json(incoming / 'evidence.json', evidence)
             write_json(incoming / 'report.json', report)
             write_json(incoming / 'program.json', program)
+            write_json(incoming / 'manifest.json', manifest)
             check_cancelled(stop, 'capture publication')
-            # Release the CUDA world before publishing. On reload the same
-            # retained close request and immutable capture files are reused.
-            requests.extension('close', 'scene.close', {'session_id': identity, 'delete': False})
             store.publish_capture(task['id'], token, incoming)
-            record_progress(directory, 'isaac_sim_captured', views=len(frames),
-                            capture_directory=str(destination), session_id=identity)
+            # Local publish is authoritative. Ack only after the immutable capture
+            # exists so a failed acknowledgement cannot strand unverified bytes.
+            for job_id in job_ids:
+                try:
+                    client.ack(job_id)
+                except grpc.RpcError as error:
+                    record_progress(directory, 'isaac_sim_ack_failed', job_id=job_id,
+                                    detail=error.details() or error.code().name)
+            record_progress(directory, 'isaac_sim_captured', views=views,
+                            frames=len(frames), capture_directory=str(destination),
+                            job_ids=job_ids)
         finally:
             if own_client:
                 client.close()
+
+
+# 使用 UTC 秒级时间戳记录产物拉取时刻，保证清单可比较。
+def _timestamp():
+    return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
