@@ -35,15 +35,12 @@ def fetch_preview(settings, identity, camera, directory, generation):
     url = settings['url'].rstrip('/')
     size = settings.get('size', 1024)
     data = {'session_id': identity, 'camera': camera, 'size': size, 'spp': settings.get('spp', 1)}
-    def post(route, values):
-        return urlopen(Request(url + route, json.dumps(values).encode(),
-                               {'Content-Type': 'application/json'}), timeout=45)
-
-    with post('/v1/prepare', {**data, 'views': [{'camera': camera}]}) as response:
-        version = json.loads(response.read(4096))['version']
-    with post('/v1/preview', {**data, 'version': version}) as response:
-        if response.headers.get_content_type() != 'image/png' or response.headers.get('X-Scene-Version') != version:
-            raise ValueError('Preview returned mismatched media or scene version')
+    # The preview endpoint prepares a cold stage and checks its version again
+    # after rendering. Request the first PNG directly, including on a cache miss.
+    request = Request(url + '/v1/preview', json.dumps(data).encode(), {'Content-Type': 'application/json'})
+    with urlopen(request, timeout=120) as response:
+        if response.headers.get_content_type() != 'image/png' or not response.headers.get('X-Scene-Version'):
+            raise ValueError('Preview returned an unversioned image or unexpected media')
         image = response.read(16 * 1024 * 1024 + 1)
     if (len(image) > 16 * 1024 * 1024 or image[:8] != b'\x89PNG\r\n\x1a\n' or
             len(image) < 33 or struct.unpack('>II', image[16:24]) != (size, size) or image[-8:-4] != b'IEND'):
