@@ -123,7 +123,7 @@ def capture_capabilities(client):
         raise UnsupportedScene(issue['message'], issues=[issue]) from error
 
 
-def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None, delays=(2, 4, 8, 12)):
+def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None, delays=(2, 4, 8, 12, 20, 20, 20)):
     """Recheck transient worker readiness before any mutation. Schema errors return immediately."""
     for delay in (*delays, None):
         check_cancelled(stop, 'Isaac readiness')

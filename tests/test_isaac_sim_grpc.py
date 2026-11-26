@@ -211,8 +211,6 @@ class GrpcContractTests(unittest.TestCase):
             pb.Artifact(artifact_id=key, name='camera.png', size_bytes=len(data))
             for key, data in self.simulator.blobs.items()])
         self.simulator.drop_download = True
-        with self.assertRaises(grpc.RpcError):
-            self.client.download(job, self.root / 'downloads')
         files = self.client.download(job, self.root / 'downloads')
         self.assertIn(3, self.simulator.offsets)
         self.assertEqual([Path(row['source_path']).read_bytes() for row in files], [b'abcdef', b'ghijkl'])

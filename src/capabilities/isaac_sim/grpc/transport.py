@@ -163,6 +163,45 @@ class A100Client:
         with receipt_lock(directory):
             return self._download(job, directory, stop=stop)
 
+    def _download_file(self, job, item, target, partial, stop):
+        """Reconnect read-only streams at their committed local offset."""
+        deadline = None
+        delay = .25
+        while not target.exists():
+            if stop is not None and stop.is_set():
+                raise RunCancelled('Isaac Sim download paused; partial bytes retained')
+            offset = partial.stat().st_size if partial.exists() else 0
+            if offset > item.size_bytes:
+                raise ValueError('Partial artifact exceeds its immutable manifest size')
+            stream = self.stub.DownloadArtifact(pb.DownloadRequest(job_id=job.job_id,
+                artifact_id=item.artifact_id, offset=offset),
+                timeout=self.timeout, metadata=self.metadata)
+            try:
+                with partial.open('ab') as output:
+                    for block in stream:
+                        if stop is not None and stop.is_set():
+                            raise RunCancelled('Isaac Sim download paused; partial bytes retained')
+                        if block.offset != offset or offset + len(block.data) > item.size_bytes:
+                            raise ValueError('Isaac Sim artifact stream has an invalid offset/size')
+                        offset += output.write(block.data)
+                    output.flush()
+                    os.fsync(output.fileno())
+                if offset != item.size_bytes:
+                    raise ValueError('Isaac Sim artifact stream ended before its manifest size')
+                partial.replace(target)
+            except grpc.RpcError as error:
+                if error.code() not in TRANSIENT:
+                    raise
+                if deadline is None:
+                    deadline = time.monotonic() + self.timeout
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                time.sleep(min(delay, remaining))
+                delay = min(delay * 2, 2)
+            finally:
+                stream.cancel()
+
     # 校验不可变产物清单，逐项验证身份、流偏移和摘要并保存下载回执。
     def _download(self, job, directory, *, stop=None):
         directory = Path(directory)
@@ -185,28 +224,7 @@ class A100Client:
             target = safe_path(safe_path(directory, item.artifact_id), item.name)
             target.parent.mkdir(parents=True, exist_ok=True)
             partial = safe_path(target.parent, '.' + target.name + '.partial')
-            if not target.exists():
-                offset = partial.stat().st_size if partial.exists() else 0
-                if offset > item.size_bytes:
-                    raise ValueError('Partial artifact exceeds its immutable manifest size')
-                stream = self.stub.DownloadArtifact(pb.DownloadRequest(job_id=job.job_id,
-                    artifact_id=item.artifact_id, offset=offset),
-                    timeout=self.timeout, metadata=self.metadata)
-                try:
-                    with partial.open('ab') as output:
-                        for block in stream:
-                            if stop is not None and stop.is_set():
-                                raise RunCancelled('Isaac Sim download paused; partial bytes retained')
-                            if block.offset != offset or offset + len(block.data) > item.size_bytes:
-                                raise ValueError('Isaac Sim artifact stream has an invalid offset/size')
-                            offset += output.write(block.data)
-                        output.flush()
-                        os.fsync(output.fileno())
-                    if offset != item.size_bytes:
-                        raise ValueError('Isaac Sim artifact stream ended before its manifest size')
-                    partial.replace(target)
-                finally:
-                    stream.cancel()
+            self._download_file(job, item, target, partial, stop)
             if target.stat().st_size != item.size_bytes:
                 raise ValueError('Downloaded Isaac Sim artifact size changed')
             with target.open('rb') as stream:
