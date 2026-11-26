@@ -16,7 +16,7 @@ from capabilities.isaac_sim.capture_contract import (
     checked_service_issues, capture_service_client, native_edit_arguments, native_import_arguments,
 )
 from capabilities.isaac_sim.asset_bundle import (
-    export_binary_usd, stage_texture_dependencies, upload_asset_bundle,
+    export_binary_usd, stage_texture_dependencies, upload_asset_bundle, write_mesh_layer,
 )
 from capabilities.isaac_sim.appearance_evidence import appearance_evidence, observe_render_sources
 from capabilities.scene_authoring.catalog.native_reference import native_references
@@ -65,15 +65,15 @@ def _capture_render_arguments(settings, compiled):
 
 
 # 恢复队列任务的访问身份后编译场景，确保无HTTP上下文时仍按所有权消费原生句柄。
-def _compile_for_task(store, task, program, settings):
+def _compile_for_task(store, task, program, settings, *, packed_meshes=None):
     """Restore queued ownership before consuming native handles without HTTP context."""
     if not native_references(program):
-        return compile_scene(program, store.root / 'generated_assets', settings)
+        return compile_scene(program, store.root / 'generated_assets', settings, packed_meshes=packed_meshes)
     from service_access.task_access import task_access
     from service_access.access_scope import access_context
     access = task_access(store.repo.engine, task['id'])
     with access_context(access):
-        return compile_scene(program, store.root / 'generated_assets', settings)
+        return compile_scene(program, store.root / 'generated_assets', settings, packed_meshes=packed_meshes)
 
 
 # 以持久回执组织原生场景创建、仿真、渲染和下载，支持取消及中断后恢复。
@@ -100,14 +100,23 @@ def execute_capture(store, task, stop, *, config, client=None):
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
                   'protocol': 'a100sim.v1.Simulator', 'capture_token': token}
         frozen_path = attempt / 'capture.json'
-        if frozen_path.exists() and json.loads(frozen_path.read_text()) != frozen:
+        previous = json.loads(frozen_path.read_text()) if frozen_path.exists() else None
+        if previous is None or previous.get('mesh_encoding') == 'typed_usdc':
+            frozen['mesh_encoding'] = 'typed_usdc'
+        if previous is not None and previous != frozen:
             raise ValueError('Frozen capture inputs/configuration changed; an explicit new attempt is required')
         write_json(frozen_path, frozen)
         record_progress(directory, 'isaac_sim_preparing', protocol='a100sim.v1.Simulator')
-        compiled = _compile_for_task(store, task, program, settings)
-        source = attempt / 'scene.usda'
-        source.write_text(compiled['usd'], encoding='utf-8')
-        upload_source = export_binary_usd(source, attempt / 'scene.usdc')
+        packed_meshes = {} if 'mesh_encoding' in frozen else None
+        compiled = _compile_for_task(store, task, program, settings, packed_meshes=packed_meshes)
+        if packed_meshes is None:
+            # Existing attempts retain their original upload identity on resume.
+            source = attempt / 'scene.usda'
+            source.write_text(compiled['usd'], encoding='utf-8')
+            upload_source = export_binary_usd(source, attempt / 'scene.usdc')
+        else:
+            upload_source = write_mesh_layer(compiled['usd'], packed_meshes, attempt / 'scene.usdc')
+            packed_meshes.clear()
         texture_files = stage_texture_dependencies(
             compiled.get('texture_dependencies', []), attempt)
         own_client = client is None

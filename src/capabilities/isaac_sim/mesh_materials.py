@@ -7,7 +7,7 @@ import math
 from pathlib import Path, PurePosixPath
 
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
-from capabilities.isaac_sim.usd_materials import array, material_usd, usd
+from capabilities.isaac_sim.usd_materials import mesh_array, material_usd, usd
 from storage.gltf import gltf_document
 
 
@@ -192,7 +192,7 @@ def _omnipbr_material(name, record, factor, roughness, metallic):
 
 
 # 为一个材质分片生成 UV、颜色和材质定义，保留逐角颜色与面的对应关系。
-def author_mesh_materials(mesh, name, fallback):
+def author_mesh_materials(mesh, name, fallback, packed=None):
     records = mesh.get("materials") or []
     colors = mesh.get("vertex_colors", mesh.get("colors"))
     faces = mesh.get("triangles", mesh.get("faces"))
@@ -225,7 +225,7 @@ def author_mesh_materials(mesh, name, fallback):
         if len(texcoords) != len(mesh["vertices"]):
             raise ValueError("Textured mesh UV count must match its vertices")
         attrs = [
-            "texCoord2f[] primvars:st = " + array(texcoords)
+            "texCoord2f[] primvars:st = " + mesh_array("primvars:st", texcoords, packed)
             + ' (interpolation = "vertex")'
         ]
         materials = [_omnipbr_material(name, record, factor, roughness, metallic)]
@@ -264,7 +264,7 @@ def author_mesh_materials(mesh, name, fallback):
         ]
         attrs.append(
             "color3f[] primvars:displayColor = "
-            + array(corner_colors)
+            + mesh_array("primvars:displayColor", corner_colors, packed)
             + ' (interpolation = "faceVarying")'
         )
     return attrs, materials

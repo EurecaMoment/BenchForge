@@ -10,6 +10,7 @@ from PIL import Image
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 import trimesh
 
+from capabilities.isaac_sim.asset_bundle import write_mesh_layer
 from capabilities.isaac_sim.authoring import compile_scene
 from capabilities.isaac_sim.mesh_materials import prepare_mesh_textures
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
@@ -47,6 +48,17 @@ class MeshMaterialTests(unittest.TestCase):
                 compiled = compile_scene(program, self.root, {})
                 stage = Usd.Stage.CreateInMemory()
                 self.assertTrue(stage.GetRootLayer().ImportFromString(compiled['usd']))
+                packed = {}
+                binary = compile_scene(program, self.root, {}, packed_meshes=packed)
+                target = self.root / f'{interpolation}.usdc'
+                write_mesh_layer(binary['usd'], packed, target)
+                binary_stage = Usd.Stage.Open(str(target))
+                for path, attributes in packed.items():
+                    for name in attributes:
+                        expected = stage.GetPrimAtPath(path).GetAttribute(name)
+                        actual = binary_stage.GetPrimAtPath(path).GetAttribute(name)
+                        self.assertEqual(expected.Get(), actual.Get())
+                        self.assertEqual(expected.GetMetadata('interpolation'), actual.GetMetadata('interpolation'))
                 parts = stage.GetPrimAtPath('/World/Objects/cube').GetChildren()
                 collider, colored, textured = parts
                 self.assertTrue(collider.HasAPI(UsdPhysics.CollisionAPI))

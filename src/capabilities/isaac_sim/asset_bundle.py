@@ -26,6 +26,27 @@ def export_binary_usd(source, destination):
     return destination
 
 
+def write_mesh_layer(scene_text, packed_meshes, destination):
+    """Populate typed mesh buffers without formatting and reparsing millions of USDA literals."""
+    import numpy as np
+    from pxr import Sdf
+
+    layer = Sdf.Layer.CreateAnonymous('.usda')
+    if not layer.ImportFromString(scene_text):
+        raise ValueError('Invalid compiled USD layer')
+    for prim_path, attributes in packed_meshes.items():
+        for name, values in attributes.items():
+            spec = layer.GetAttributeAtPath(prim_path + '.' + name)
+            dtype = np.int32 if spec.typeName == Sdf.ValueTypeNames.IntArray else np.float32
+            data = np.asarray(values, dtype=dtype, order='C')
+            if dtype == np.float32 and not np.isfinite(data).all():
+                raise ValueError('USD numbers must be finite')
+            spec.default = type(spec.typeName.defaultValue).FromNumpy(data)
+    if not layer.Export(str(destination)):
+        raise ValueError('OpenUSD could not export the scene as binary USDC')
+    return destination
+
+
 # 按路径稳定暂存贴图依赖，并应用 OmniPBR ORM 粗糙度贴图的金属度因子。
 def stage_texture_dependencies(dependencies, directory):
     staged = []

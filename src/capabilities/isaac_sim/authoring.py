@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from capabilities.isaac_sim.usd_materials import usd, array, material_usd
+from capabilities.isaac_sim.usd_materials import usd, mesh_array, material_usd
 from capabilities.isaac_sim.mesh_materials import author_mesh_materials, prepare_mesh_textures
 from capabilities.isaac_sim.scene_requirements import (
     UnsupportedScene, UNSUPPORTED_MATERIAL_FIELDS, validate_capture_requirements,
@@ -65,7 +65,7 @@ def physics_lines(obj):
 
 
 # 每个可见分片只保留其面实际引用的顶点，并以同一索引同步 UV、法线和颜色。
-def _mesh_parts(mesh, vertices, transform, name, identity, material_settings, materials):
+def _mesh_parts(mesh, vertices, transform, name, identity, material_settings, materials, packed_meshes):
     import numpy as np
 
     faces = np.asarray(mesh.get('triangles', mesh.get('faces')))
@@ -130,13 +130,14 @@ def _mesh_parts(mesh, vertices, transform, name, identity, material_settings, ma
         subset = {'vertices': points, 'faces': part_faces, 'materials': [records[index]] if records[index] else [],
                   'appearance': {'source_visuals': visuals[index:index + 1]}}
         subset.update({key: values[used].tolist() for key, values in vertex_attributes.items()})
-        attrs, definitions = author_mesh_materials(subset, mat_name, material_settings)
+        packed = None if packed_meshes is None else packed_meshes.setdefault(f'/World/Objects/{identity}/{part_name}', {})
+        attrs, definitions = author_mesh_materials(subset, mat_name, material_settings, packed)
         materials.extend(definitions)
         attrs.append('rel material:binding = </World/Materials/' + mat_name + '>')
         if normals is not None:
             sliced = (normals[used] if interpolation == 'vertex'
                       else normals.reshape(-1, 3, 3)[selected].reshape(-1, 3))
-            attrs.append('normal3f[] normals = ' + array(sliced.tolist())
+            attrs.append('normal3f[] normals = ' + mesh_array('normals', sliced, packed)
                          + ' (interpolation = "' + interpolation + '")')
         binding = {'material_index': index, 'material_prim': '/World/Scene/Materials/' + mat_name,
                    'textures': (records[index] or {}).get('textures', {})}
@@ -144,8 +145,10 @@ def _mesh_parts(mesh, vertices, transform, name, identity, material_settings, ma
 
 
 # 将场景程序编译为USD与显式输入清单，真实执行证据仍由后续原生回执提供。
-def compile_scene(program, assets_root, settings):
+def compile_scene(program, assets_root, settings, *, packed_meshes=None):
     """Return USD bytes plus declared inputs; only later native receipts are evidence."""
+    import numpy as np
+
     validate_program(program)
     validate_capture_requirements(program, assets_root, settings)
     environment = program.get('render_environment', {})
@@ -222,14 +225,15 @@ def compile_scene(program, assets_root, settings):
                 mesh_assets[identity] = {'entity_id': identity, 'asset_id': obj['asset_id'],
                     'vertices': len(vertices), 'bindings': [], 'transform': transform}
                 for part_name, points, faces, part_attrs, collision, binding in _mesh_parts(
-                    mesh, vertices, transform, name, identity, mat, materials
+                    mesh, vertices, transform, name, identity, mat, materials, packed_meshes
                 ):
                     if binding:
                         mesh_assets[identity]['bindings'].append({'prim_path': root + '/' + part_name, **binding})
+                    packed = None if packed_meshes is None else packed_meshes.setdefault(f'/World/Objects/{identity}/{part_name}', {})
                     part_attrs += [
-                        'point3f[] points = ' + array(points.tolist()),
-                        'int[] faceVertexCounts = [' + ','.join('3' for _ in faces) + ']',
-                        'int[] faceVertexIndices = [' + ','.join(map(str, faces.ravel().tolist())) + ']',
+                        'point3f[] points = ' + mesh_array('points', points, packed),
+                        'int[] faceVertexCounts = ' + mesh_array('faceVertexCounts', np.full(len(faces), 3, dtype=np.int32), packed),
+                        'int[] faceVertexIndices = ' + mesh_array('faceVertexIndices', faces.ravel(), packed),
                         'uniform token subdivisionScheme = "none"',
                         'double3 xformOp:translate = ' + usd(part.get('offset', [0, 0, 0])),
                         'float3 xformOp:rotateXYZ = ' + usd(part.get('rotation_deg_xyz', [0, 0, 0])),

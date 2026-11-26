@@ -22,6 +22,16 @@ def array(values):
     return "[" + ", ".join(usd(value) for value in values) + "]"
 
 
+def mesh_array(name, values, packed=None):
+    """Write large mesh attributes directly to the binary layer when available."""
+    if packed is not None:
+        packed[name] = values
+        return "[]"
+    if name in ("faceVertexIndices", "faceVertexCounts"):
+        return "[" + ",".join(map(str, values)) + "]"
+    return array(values.tolist() if hasattr(values, "tolist") else values)
+
+
 # 生成标准预览材质USD，可选择读取网格顶点颜色。
 def material_usd(name, settings, *, vertex_color=False):
     color = (
