@@ -74,21 +74,37 @@ def _mesh_parts(mesh, vertices, transform, name, identity, material_settings, ma
         raise ValueError('Registered mesh needs triangles with valid vertex indices')
     records = mesh.get('materials') or [None]
     assignments = mesh.get('material_index', [0] * len(faces))
-    if len(assignments) != len(faces):
+    if len(assignments) != len(faces) or any(type(i) is not int or not 0 <= i < len(records) for i in assignments):
         raise ValueError('Mesh face material indices must match its triangles')
-    groups = {}
-    for face, index in enumerate(assignments):
-        if type(index) is not int or not 0 <= index < len(records):
-            raise ValueError('Mesh face material indices must match its triangles')
-        groups.setdefault(index, []).append(face)
 
     normals = None
     interpolation = mesh.get('normals_interpolation', 'vertex')
     if mesh.get('normals'):
-        normals = transform_mesh_normals(mesh['normals'], transform['T_local_from_source'])
+        normals = np.asarray(mesh['normals'], dtype=np.float64)
         expected = len(vertices) if interpolation == 'vertex' else len(faces) * 3
-        if interpolation not in ('vertex', 'faceVarying') or len(normals) != expected:
+        if interpolation not in ('vertex', 'faceVarying') or normals.shape != (expected, 3):
             raise ValueError('Mesh normals do not match their declared interpolation')
+        valid = np.isfinite(normals).all(axis=1) & (normals != 0).any(axis=1)
+        normals[valid] = transform_mesh_normals(normals[valid], transform['T_local_from_source'])
+        if not valid.all():
+            # 缺失法线用变换后的三角面法线补齐。零面积的面没有可见表面。
+            triangles = vertices[faces]
+            geometric = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
+            lengths = np.linalg.norm(geometric, axis=1)
+            keep = lengths > 0
+            if not keep.any():
+                raise ValueError(f'{identity}: registered mesh has no nondegenerate triangles')
+            corners = normals[faces] if interpolation == 'vertex' else normals.reshape(-1, 3, 3)
+            valid_corners = valid[faces] if interpolation == 'vertex' else valid.reshape(-1, 3)
+            fallback = geometric[keep] / lengths[keep, None]
+            normals = np.where(valid_corners[keep, :, None], corners[keep], fallback[:, None, :]).reshape(-1, 3)
+            interpolation = 'faceVarying'
+            faces = faces[keep]
+            assignments = [i for i, include in zip(assignments, keep) if include]
+
+    groups = {}
+    for face, index in enumerate(assignments):
+        groups.setdefault(index, []).append(face)
     vertex_attributes = {}
     for key in ('texcoords', 'colors', 'vertex_colors'):
         if mesh.get(key):

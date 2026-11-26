@@ -218,6 +218,21 @@ class AssetCaptureContractTests(unittest.TestCase):
         self.assertEqual(mesh.GetNormalsInterpolation(), "faceVarying")
         self.assertEqual(len(mesh.GetNormalsAttr().Get()), 6)
 
+    def test_missing_corner_normals_fall_back_without_degenerate_triangles(self):
+        record = {
+            "vertices": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            "faces": [[0, 1, 2], [0, 1, 1], [0, 1, 3]],
+            "coordinate_frame": "z_up",
+            "normals": [[0, 0, 1]] * 3 + [[0, 0, 0]] * 3 + [[0, -1, 0], [0, 0, 0], [0, -1, 0]],
+            "normals_interpolation": "faceVarying",
+        }
+        stage = Usd.Stage.CreateInMemory()
+        stage.GetRootLayer().ImportFromString(self.compile(record)["usd"])
+        mesh = UsdGeom.Mesh(stage.GetPrimAtPath("/World/Objects/cube/Part0"))
+        self.assertEqual(list(mesh.GetFaceVertexIndicesAttr().Get()), [0, 1, 2, 0, 1, 3])
+        self.assertEqual(mesh.GetNormalsInterpolation(), "faceVarying")
+        np.testing.assert_allclose(mesh.GetNormalsAttr().Get(), [[0, 0, 1]] * 3 + [[0, -1, 0]] * 3)
+
     # 验证原生导出依据真实网格点计算几何，并要求可用碰撞体。
     def test_native_export_measures_actual_points_and_requires_colliders(self):
         file = self.root / "native.usdc"
