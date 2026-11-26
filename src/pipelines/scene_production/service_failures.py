@@ -108,7 +108,8 @@ def stage_failure(error, phase):
             failure.update(execution_diagnosis='isaac_sim_execution',
                            repair_owner='isaac_sim_execution', retry_unchanged=False)
     if is_service_failure(error):
-        failure.update(stage=SERVICE_STAGE, repair_owner=SERVICE_OWNER, retry_unchanged=False)
+        failure.update(stage=SERVICE_STAGE, repair_owner=SERVICE_OWNER,
+                       retry_unchanged=bool(issues) and all(row.get('retry_unchanged') is True for row in issues))
     return failure
 
 

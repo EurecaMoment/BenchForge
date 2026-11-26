@@ -33,7 +33,10 @@ def inspect_capture_program(root, program, *, settings=None, **options):
             diagnostics.skipped = report['skipped_checks']
             diagnostics.checked = report['checked']
             report.update(diagnostics.finish(program, enforced=report['enforced']))
-        report['service_contract'] = {'status': 'incompatible' if live else 'compatible',
+        status = 'compatible'
+        if live:
+            status = 'unavailable' if all(row.get('retry_unchanged') for row in live) else 'incompatible'
+        report['service_contract'] = {'status': status,
                                       'source': 'live GetCapabilities', 'simulation_executed': False}
     return report
 

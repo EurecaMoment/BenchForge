@@ -135,10 +135,9 @@ def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None, 
             return issues
         if on_wait:
             on_wait(issues[0]['message'], delay)
-        if stop is None:
-            time.sleep(delay)
-        else:
-            stop.wait(delay)
+        for _ in range(delay):
+            check_cancelled(stop, 'Isaac readiness')
+            time.sleep(1)
 
 
 def capture_service_client(config):

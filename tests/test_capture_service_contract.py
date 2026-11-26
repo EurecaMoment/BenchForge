@@ -84,8 +84,12 @@ class CaptureServiceContractTests(unittest.TestCase):
         client = Mock()
         client.call.side_effect = [ParseDict(value, pb.Capabilities()) for value in (busy, ready)]
         waiting = Mock()
-        issues = checked_service_issues(client, compiled(), {'view_indices': [0], 'scene_export_requested': True},
-                                       stop=Event(), delays=(0,), on_wait=waiting)
+        stop = Mock(spec=['is_set'])
+        stop.is_set.return_value = False
+        with patch('capabilities.isaac_sim.capture_contract.time.sleep') as pause:
+            issues = checked_service_issues(client, compiled(), {'view_indices': [0], 'scene_export_requested': True},
+                                           stop=stop, delays=(1,), on_wait=waiting)
+            pause.assert_called_once_with(1)
         self.assertEqual(issues, [])
         self.assertEqual(client.call.call_count, 2)
         waiting.assert_called_once()
