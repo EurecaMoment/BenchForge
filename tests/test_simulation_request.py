@@ -1,5 +1,6 @@
 """SceneProgram -> isaacsim_rpc.v1 SimulateRequest mapping contract."""
 import math
+import os
 import unittest
 
 from capabilities.capture.capture_scope import capture_scope
@@ -111,10 +112,11 @@ class SimulationMappingTests(unittest.TestCase):
     def test_mesh_requires_an_absolute_mesh_assets_binding(self):
         value = program([box('sofa', kind='mesh', asset_id='sofa-1')])
         self.assertIn('/objects/0/asset_id', self.rejected(value))
-        plan = simulation_plan(value, settings(mesh_assets={'sofa-1': '/srv/meshes/sofa'}),
+        mesh_dir = os.path.abspath(os.sep + 'srv/meshes/sofa')
+        plan = simulation_plan(value, settings(mesh_assets={'sofa-1': mesh_dir}),
                                capture_scope(value))
         self.assertEqual(plan['bodies'][0]['shape'], 'mesh')
-        self.assertEqual(plan['bodies'][0]['asset'], '/srv/meshes/sofa')
+        self.assertEqual(plan['bodies'][0]['asset'], mesh_dir)
 
     # 相机由世界位姿重建方位角、仰角与距离。
     def test_camera_view_reconstructs_azimuth_elevation_and_distance(self):

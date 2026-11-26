@@ -1,4 +1,5 @@
 """Static admission and live Health checks for the isaacsim_rpc.v1 service."""
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -47,7 +48,8 @@ class StaticCaptureContractTests(unittest.TestCase):
         program['objects'] = [object_record('sofa', kind='mesh', asset_id='sofa-1')]
         self.assertIn('/objects/0/asset_id',
                       {row['path'] for row in capture_service_issues(program, provider_settings(18500))})
-        bound = provider_settings(18500, mesh_assets={'sofa-1': '/srv/meshes/sofa'})
+        bound = provider_settings(
+            18500, mesh_assets={'sofa-1': os.path.abspath(os.sep + 'srv/meshes/sofa')})
         self.assertEqual(capture_service_issues(program, bound), [])
 
     # require_capture_service 在存在阻断问题时抛出带结构化字段的异常。

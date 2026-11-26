@@ -2,6 +2,7 @@
 import copy
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -55,7 +56,8 @@ class CapturePreflightTests(unittest.TestCase):
         missing = capture_requirement_issues(program, self.root, {})
         self.assertIn('/objects/0/asset_id', {row['path'] for row in missing})
         self.assertEqual(capture_requirement_issues(
-            program, self.root, {'mesh_assets': {'mug': '/srv/meshes/mug'}}), [])
+            program, self.root,
+            {'mesh_assets': {'mug': os.path.abspath(os.sep + 'srv/meshes/mug')}}), [])
 
     # 验证无效提交保存两类完整诊断，但不会创建队列任务。
     def test_submission_saves_adapter_and_contract_diagnostics_without_queueing(self):
