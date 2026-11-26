@@ -24,16 +24,19 @@ def prepare_retry(directory, unit, mode, *, retired_protocol=False):
     generation = unit.get('capture_generation', 0)
     receipts = list((directory / 'isaac_sim' / f'attempt_{generation}' / 'jobs').glob('*/receipt.json'))
     values = [json.loads(file.read_text()) for file in receipts]
-    failed = any(value.get('state') in ('FAILED', 'INTERRUPTED', 'CANCELLED') for value in values)
+    failed = any(str(value.get('state', '')).lower() in
+                 ('failed', 'interrupted', 'cancelled', 'canceled') for value in values)
     chosen = ('restart' if failed else 'resume') if mode == 'auto' else mode
     if chosen == 'resume' and failed:
-        raise ValueError('The native job is terminal; an explicit new attempt is required')
+        raise ValueError('The Isaac Sim job is terminal; an explicit new attempt is required')
     if chosen == 'restart':
-        active = [value['job_id'] for value in values if value.get('state') in ('QUEUED', 'RUNNING')]
+        active = [value.get('id') or value.get('job_id') for value in values
+                  if str(value.get('state', '')).lower() in ('queued', 'running')]
         if active:
-            raise ValueError('Resume observation of retained native jobs before restarting: ' + ', '.join(active))
+            raise ValueError('Resume observation of retained Isaac Sim jobs before restarting: '
+                             + ', '.join(str(identity) for identity in active))
         generation += 1
     return {**unit, 'capture_generation': generation, 'capture_recovery_mode': chosen,
             'capture_attempt_history': [*unit.get('capture_attempt_history', []),
                 {'generation': unit.get('capture_generation', 0), 'recovery_mode': chosen,
-                 'jobs': [value['job_id'] for value in values]}]}
+                 'jobs': [value.get('id') or value.get('job_id') for value in values]}]}

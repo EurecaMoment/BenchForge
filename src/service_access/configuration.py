@@ -138,22 +138,72 @@ def validate_providers(config):
                 raise ValueError(f'{field}.input must be a list of text or image modalities')
     isaac = isaac_config(config)
     field = f'providers.{ISAAC_PROVIDER}'
-    _validate_fields(isaac, field, {'grpc', 'capture_timeout_seconds', 'max_concurrent_captures',
-                                  'image_size', 'samples_per_pixel', 'asset_sources'})
-    for key, low, high, default in (('max_concurrent_captures', 1, 32, 4),
-                                   ('image_size', 64, 1024, 768), ('samples_per_pixel', 1, 256, 32)):
+    _validate_fields(isaac, field, {
+        'grpc', 'capture_timeout_seconds', 'max_concurrent_captures',
+        'simulation', 'render', 'artifacts', 'mesh_assets',
+    })
+    for key, low, high, default in (
+            ('max_concurrent_captures', 1, 32, 4),):
         value = isaac.get(key, default)
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f'{field}.{key} must be an integer in {low}..{high}')
-    bindings = isaac.get('asset_sources', {})
-    if not isinstance(bindings, dict):
-        raise ValueError(f'{field}.asset_sources must map native catalog IDs to uploaded A100 assets')
-    for identity, binding in bindings.items():
-        if not isinstance(binding, dict):
-            raise ValueError('Isaac Sim asset binding must be an object')
-        _validate_fields(binding, field + '.asset_sources.' + identity, {'asset_id', 'relative_path', 'fix_base'})
-        if not all(isinstance(binding.get(key), str) and binding[key] for key in ('asset_id', 'relative_path')):
-            raise ValueError('Isaac Sim asset binding needs asset_id and relative_path')
+    simulation = isaac.get('simulation', {})
+    if not isinstance(simulation, dict):
+        raise ValueError(f'{field}.simulation must be a JSON object')
+    _validate_fields(simulation, field + '.simulation',
+                     {'steps', 'dt', 'gravity', 'ground',
+                      'capture_target_frames', 'capture_every_steps'})
+    for key, low, high, default in (
+            ('steps', 1, 1200, 180),
+            ('capture_target_frames', 1, 1200, 24)):
+        value = simulation.get(key, default)
+        if type(value) is not int or not low <= value <= high:
+            raise ValueError(f'{field}.simulation.{key} must be an integer in {low}..{high}')
+    dt = simulation.get('dt', 1.0 / 60.0)
+    if type(dt) not in (int, float) or not 0.0001 <= float(dt) <= 0.02:
+        raise ValueError(f'{field}.simulation.dt must be between 0.0001 and 0.02 seconds')
+    gravity = simulation.get('gravity', 9.81)
+    if type(gravity) not in (int, float) or not -50 <= float(gravity) <= 50:
+        raise ValueError(f'{field}.simulation.gravity is outside a reasonable range (-50..50 m/s^2)')
+    ground = simulation.get('ground', True)
+    if not isinstance(ground, bool):
+        raise ValueError(f'{field}.simulation.ground must be a boolean')
+    every = simulation.get('capture_every_steps')
+    if every is not None and (type(every) is not int or every < 1):
+        raise ValueError(f'{field}.simulation.capture_every_steps must be a positive integer or null')
+    render = isaac.get('render', {})
+    if not isinstance(render, dict):
+        raise ValueError(f'{field}.render must be a JSON object')
+    _validate_fields(render, field + '.render',
+                     {'image_size', 'samples_per_pixel', 'fov_degrees', 'seed'})
+    for key, low, high, default in (
+            ('image_size', 64, 1024, 768),
+            ('samples_per_pixel', 1, 256, 32),
+            ('fov_degrees', 1, 179, 50)):
+        value = render.get(key, default)
+        if type(value) is not int or not low <= value <= high:
+            raise ValueError(f'{field}.render.{key} must be an integer in {low}..{high}')
+    seed = render.get('seed')
+    if seed is not None and type(seed) not in (int, float):
+        raise ValueError(f'{field}.render.seed must be a number or null')
+    artifacts = isaac.get('artifacts', {})
+    if not isinstance(artifacts, dict):
+        raise ValueError(f'{field}.artifacts must be a JSON object')
+    _validate_fields(artifacts, field + '.artifacts', {'chunk_bytes', 'concurrency'})
+    chunk_bytes = artifacts.get('chunk_bytes', 2 * 1024 * 1024)
+    if type(chunk_bytes) is not int or not 1 <= chunk_bytes <= 4 * 1024 * 1024:
+        raise ValueError(f'{field}.artifacts.chunk_bytes must be an integer 1..4194304')
+    concurrency = artifacts.get('concurrency', 4)
+    if type(concurrency) is not int or not 1 <= concurrency <= 32:
+        raise ValueError(f'{field}.artifacts.concurrency must be an integer 1..32')
+    mesh_assets = isaac.get('mesh_assets', {})
+    if not isinstance(mesh_assets, dict):
+        raise ValueError(f'{field}.mesh_assets must map conversation asset_id to absolute server paths')
+    for identity, path in mesh_assets.items():
+        if not isinstance(identity, str) or not identity or not re.fullmatch(r'[A-Za-z0-9_.:-]+', identity):
+            raise ValueError(f'{field}.mesh_assets key {identity!r} must be a valid asset_id string')
+        if not isinstance(path, str) or not path.startswith('/'):
+            raise ValueError(f'{field}.mesh_assets.{identity} must be an absolute server path')
     grpc = isaac.get('grpc', {})
     if not isinstance(grpc, dict):
         raise ValueError(f'providers.{ISAAC_PROVIDER}.grpc must be a JSON object')

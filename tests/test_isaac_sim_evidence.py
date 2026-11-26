@@ -1,3 +1,4 @@
+"""Verified artifact references and evidence frames from the v2 job contract."""
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,126 +7,148 @@ import unittest
 import numpy as np
 from PIL import Image
 
-from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
-from capabilities.isaac_sim.capture_stage import _native_imports
-from capabilities.isaac_sim.evidence import measured_entities, save_frame
-from storage.files import write_json
+from capabilities.isaac_sim.evidence import (
+    entities_from_job, frame_evidence, physics_summary, resolve_artifact,
+)
 
 
-# 构造含双相机、材质与刚体的示例场景，供原生编译和证据适配验证。
-def scene_program(name='contract'):
-    return {'schema': 'benchforge.scene/v1', 'scene_id': name, 'title': 'Two cameras',
-        'assumptions': ['Synthetic test geometry'],
-        'objects': [
-            {'id': 'floor', 'label': 'floor', 'kind': 'box', 'size': [4, 4, .1],
-             'xy': [0, 0], 'base_z': -.1, 'support': 'ground', 'dynamic': False, 'mass_kg': 0,
-             'color': [.4, .4, .4]},
-            {'id': 'cube', 'label': 'red cube', 'kind': 'box', 'size': [.2, .2, .2],
-             'xy': [0, 0], 'base_z': 1, 'support': 'ground', 'dynamic': True, 'mass_kg': 1,
-             'color': [.8, .1, .1]}],
-        'cameras': [{'id': 'a', 'position': [2, -2, 2], 'target': [0, 0, .1]},
-                    {'id': 'b', 'position': [-2, -2, 2], 'target': [0, 0, .1]}]}
+# 构造与下载清单同形的文件引用。
+def file(identity, name, path):
+    return {'artifact_id': identity, 'name': name,
+            'relative_path': 'frames/000001/' + name, 'source_path': str(path)}
 
 
-class EvidenceContractTests(unittest.TestCase):
-    # 验证原生资源导入保留质量、摩擦等物理参数及源坐标轴语义。
-    def test_native_import_keeps_physical_parameters_and_source_axis(self):
-        class Requests:
-            # 初始化模拟原生请求的调用记录。
-            def __init__(self):
-                self.calls = []
+# 构造最小映射计划，含单个盒体实体与渲染视场。
+def plan(dynamic=False):
+    return {'entities': {'cube': {
+                'id': 'cube', 'label': 'red cube', 'kind': 'box', 'dynamic': dynamic,
+                'support': 'ground', 'center': [0.0, 0.0, 0.5], 'size': [1.0, 1.0, 1.0],
+                'mass_kg': 1.0, 'yaw_deg': 0.0, 'body_ids': ['cube']}},
+            'render': {'fov_degrees': 50.0, 'size': 64, 'spp': 8, 'seed': 0}}
 
-            # 记录扩展操作及参数，并返回最小关节根回执以驱动导入测试。
-            def extension(self, key, operation, arguments):
-                self.calls.append((operation, arguments))
-                return None, {'articulation_roots': []}
 
-        requests = Requests()
-        contact = {'static_friction': .6, 'dynamic_friction': .4, 'restitution': 0}
-        compiled = {'imports': [{
-            'object': {'id': 'cup', 'label': 'cup', 'dynamic': True,
-                       'mass_kg': .35, 'physics': contact, 'size': [.2, .2, .3]},
-            'source': {'asset_id': 'native', 'relative_path': 'cup.usd'},
-            'catalog': {'source_up_axis': 'Y', 'size': [2, 2, 3]},
-            'path': '/World/Scene/cup', 'center': [0, 0, .15],
-        }], 'entities': {'cup': {}}}
-        _native_imports(requests, 'scene-session', compiled)
-        operation, imported = requests.calls[0]
-        self.assertEqual(operation, 'asset.import')
-        self.assertEqual(imported['source'], {'asset_id': 'native', 'relative_path': 'cup.usd'})
-        self.assertFalse(imported['fix_base'])
-        self.assertEqual(imported['mass_kg'], .35)
-        self.assertEqual(imported['physics'], contact)
-        self.assertEqual(imported['source_up_axis'], 'Y')
-        self.assertEqual(requests.calls[1][0], 'scene.edit')
+class ArtifactReferenceTests(unittest.TestCase):
+    def setUp(self):
+        temporary = TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
 
-    # 验证可移植场景编译保留相机、材质和真实刚体物理声明。
-    def test_portable_scene_preserves_cameras_materials_and_real_physics(self):
-        compiled = compile_scene(scene_program(), Path('.'), {})
-        self.assertEqual(len(compiled['cameras']), 2)
-        self.assertIn('PhysicsRigidBodyAPI', compiled['usd'])
-        self.assertIn('PhysicsMaterialAPI', compiled['usd'])
-        self.assertIn('a100sim:semanticLabel', compiled['usd'])
-        self.assertNotIn('isaacsim', compiled['usd'])
-        self.assertEqual(compiled['entities']['cube']['initial_center'], [0, 0, 1.1])
-        with self.assertRaises(UnsupportedScene):
-            program = scene_program()
-            program['render_environment'] = {'renderer': 'RaytracedLighting'}
-            compile_scene(program, Path('.'), {})
+    # artifact:// 句柄按身份解析，绝对路径按后缀解析，名称可精确匹配。
+    def test_reference_forms_resolve_to_the_single_downloaded_file(self):
+        path = self.root / 'depth.npy'
+        path.write_bytes(b'depth')
+        files = [file('depth-1', 'depth.npy', path)]
+        self.assertEqual(resolve_artifact('artifact://depth-1', files), path)
+        self.assertEqual(resolve_artifact('/srv/jobs/x/frames/000001/depth.npy', files), path)
+        self.assertEqual(resolve_artifact('depth.npy', files), path)
 
-    # 验证证据读取采用仿真步进后的变换，而非编译时初始位姿。
-    def test_post_step_native_transform_is_used_instead_of_initial_pose(self):
-        compiled = compile_scene(scene_program(), Path('.'), {})
-        compiled['entities'] = {'cube': compiled['entities']['cube']}
-        root = '/World/Scene/Objects/cube'
-        world = np.eye(4)
-        world[3, :3] = [0, 0, .1]
-        part = world.copy()
-        part[:3, :3] *= .2
-        prims = [{'path': root, 'world_matrix': world.tolist()},
-                 {'path': root + '/Part0', 'world_matrix': part.tolist(),
-                  'apis': ['PhysicsCollisionAPI'],
-                  'attributes': {'physics:collisionEnabled': 'True', 'size': '1'}}]
-        measured = measured_entities(compiled, prims)['cube']
-        self.assertEqual(measured['initial_center'], [0, 0, 1.1])
-        np.testing.assert_allclose(measured['world_aabb']['min'], [-.1, -.1, 0], atol=1e-7)
-        self.assertIn('world meters', measured['world_transform_convention'])
+    # 缺失或歧义引用必须报错，不能猜测服务端路径。
+    def test_missing_or_ambiguous_references_are_rejected(self):
+        first = self.root / 'a' / 'depth.npy'
+        second = self.root / 'b' / 'depth.npy'
+        first.parent.mkdir(parents=True)
+        second.parent.mkdir(parents=True)
+        first.write_bytes(b'a')
+        second.write_bytes(b'b')
+        duplicate = [file('a', 'depth.npy', first), file('b', 'depth.npy', second)]
+        with self.assertRaisesRegex(ValueError, 'ambiguous'):
+            resolve_artifact('depth.npy', duplicate)
+        with self.assertRaisesRegex(ValueError, 'absent'):
+            resolve_artifact('artifact://missing', duplicate)
+        with self.assertRaisesRegex(ValueError, 'omitted'):
+            resolve_artifact('', duplicate)
 
-    # 验证原生标注适配继续满足工作台展示与相机标定契约。
-    def test_native_annotations_keep_the_existing_workbench_and_calibration_contract(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            image, arrays, labels = root / 'render.png', root / 'annotations.npz', root / 'labels.json'
-            pixels = np.arange(64 * 64 * 3, dtype=np.uint8).reshape(64, 64, 3)
-            Image.fromarray(pixels).save(image)
-            instances = np.zeros((64, 64), dtype=np.uint32)
-            instances[10:20, 20:30] = 1
-            np.savez(arrays, depth_m=np.ones((64, 64)), instance_id=instances,
-                semantic_id=instances, normal_world=np.zeros((64, 64, 3)),
-                range_m=np.ones((64, 64)), valid=np.ones((64, 64), dtype=bool))
-            write_json(labels, {'depth_convention': 'camera-forward Z', 'backend': 'contract-fixture',
-                'classes': {'1': 'red cube'},
-                'instances': {'1': {'prim_path': '/World/Scene/Objects/cube/Part0'}}})
-            files = [{'artifact_id': key, 'source_path': str(file)} for key, file in
-                     [('rgb', image), ('npz', arrays), ('labels', labels)]]
-            matrix = np.eye(4)
-            matrix[:3, 3] = [1, 2, 3]
-            frame = {'image': 'artifact://rgb', 'annotations': {
-                'arrays': 'artifact://npz', 'labels': 'artifact://labels'},
-                'camera': '/World/Scene/Cameras/View0', 'camera_world': matrix.tolist(),
-                'resolution': [64, 64], 'fov_degrees': 90}
-            output = root / 'capture'
-            output.mkdir()
-            result = save_frame(frame, files, 0, scene_program(), output, physics_tick=180, dt=1 / 60)
-            self.assertEqual(result['image_size'], {'width': 64, 'height': 64})
-            self.assertEqual(result['objects'][0]['bbox_2d']['xyxy'], [20, 10, 30, 20])
-            self.assertEqual(result['objects'][0]['depth_z_median'], 1)
-            self.assertEqual(result['camera']['T_world_camera_usd'][3][:3], [1, 2, 3])
-            self.assertAlmostEqual(result['camera']['K'][0][0], 32)
-            self.assertEqual(result['timestamp_sim'], 3)
-            self.assertTrue(result['quality']['passed'])
-            self.assertEqual(json.loads((output / 'view_0.json').read_text())['frame_id'], 'view_0')
-            self.assertTrue((output / 'view_0_depth.npy').exists())
+
+class EvidenceFrameTests(unittest.TestCase):
+    def setUp(self):
+        temporary = TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.output = self.root / 'capture'
+        self.output.mkdir()
+        self.files, self.frame = self.write_frame(42)
+
+    # 写入一帧 RGB/深度/语义/标签并登记为下载清单。
+    def write_frame(self, step, size=64):
+        directory = self.root / 'download'
+        directory.mkdir(exist_ok=True)
+        pixels = np.random.default_rng(step).integers(24, 232, (size, size, 3), dtype=np.uint8)
+        image, depth, semantic, labels = (directory / 'image.png', directory / 'depth.npy',
+                                          directory / 'semantic.npy', directory / 'labels.json')
+        Image.fromarray(pixels).save(image)
+        values = np.full((size, size), 2.0, dtype=np.float32)
+        ids = np.zeros((size, size), dtype=np.uint32)
+        values[10:30, 10:40] = 1.5
+        ids[10:30, 10:40] = 1
+        np.save(depth, values)
+        np.save(semantic, ids)
+        labels.write_text(json.dumps({'classes': {'1': 'red cube'},
+                                      'instances': {'1': {'prim_path': '/World/Objects/cube'}},
+                                      'depth_convention': 'optical_axis_z_m', 'backend': 'mock'}))
+        files = [file('image', 'image.png', image), file('depth', 'depth.npy', depth),
+                 file('semantic', 'semantic.npy', semantic), file('labels', 'labels.json', labels)]
+        frame = {'frame': step, 'image': 'artifact://image', 'depth_m': 'artifact://depth',
+                 'semantic_ids': 'artifact://semantic', 'semantic_labels': 'artifact://labels'}
+        return files, frame
+
+    # 最终帧使用规范名 view_{i}，过程帧使用 process_view_{i}_step_{step}。
+    def test_canonical_and_process_frames_use_distinct_names(self):
+        camera = {'position': [2, -2, 2], 'target': [0, 0, 1]}
+        canonical = frame_evidence(self.frame, self.files, 0, camera, {}, plan(), self.output,
+                                   canonical=True, physics_tick=42, dt=1 / 60)
+        self.assertEqual(canonical['frame_id'], 'view_0')
+        self.assertTrue((self.output / 'view_0.png').exists())
+        self.assertTrue((self.output / 'view_0_depth.npy').exists())
+        self.assertTrue((self.output / 'view_0_semantic.npy').exists())
+        self.assertTrue((self.output / 'view_0_instance.npy').exists())
+        self.assertEqual(canonical['camera']['fov_source'], 'configured_default')
+        self.assertEqual(canonical['instance_source'], 'semantic_ids')
+        process = frame_evidence(self.frame, self.files, 0, camera, {}, plan(), self.output,
+                                 canonical=False, physics_tick=42, dt=1 / 60)
+        self.assertEqual(process['frame_id'], 'process_view_0_step_000042')
+        self.assertTrue((self.output / 'process_view_0_step_000042.png').exists())
+
+    # 语义区域应生成对象掩码、深度中位数与二维包围盒。
+    def test_semantic_region_produces_object_measurements(self):
+        camera = {'position': [2, -2, 2], 'target': [0, 0, 1]}
+        result = frame_evidence(self.frame, self.files, 0, camera, {}, plan(), self.output,
+                                canonical=True, physics_tick=42, dt=1 / 60)
+        self.assertEqual(len(result['objects']), 1)
+        recorded = result['objects'][0]
+        self.assertEqual(recorded['object_id'], 'cube')
+        self.assertEqual(recorded['bbox_2d']['xyxy'], [10, 10, 40, 30])
+        self.assertAlmostEqual(recorded['depth_z_median'], 1.5)
+
+    # 最终刚体位姿转换为当前中心与世界包围盒。
+    def test_entities_use_the_final_simulated_pose(self):
+        job = {'bodies': [{'id': 'cube', 'pose_xyzw': [0.0, 0.0, 0.75, 0.0, 0.0, 0.0, 1.0]}]}
+        entities = entities_from_job({}, job, plan())
+        record = entities['cube']
+        np.testing.assert_allclose(record['current_center'], [0.0, 0.0, 0.75])
+        np.testing.assert_allclose(record['world_aabb']['min'], [-0.5, -0.5, 0.25])
+        np.testing.assert_allclose(record['world_aabb']['max'], [0.5, 0.5, 1.25])
+        self.assertEqual(record['static_body_semantics'], 'upstream_default')
+
+    # 动态刚体不标注上游静态语义。
+    def test_dynamic_entities_are_not_marked_static(self):
+        job = {'bodies': [{'id': 'cube', 'pose_xyzw': [0, 0, 0.5, 0, 0, 0, 1]}]}
+        self.assertIsNone(entities_from_job({}, job, plan(dynamic=True))['cube']['static_body_semantics'])
+
+    # 缺失最终位姿必须报错，不能静默跳过实体。
+    def test_missing_final_pose_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'omitted the final pose'):
+            entities_from_job({}, {'bodies': []}, plan())
+
+    # 物理摘要依据最终线速度/角速度阈值报告稳定状态。
+    def test_physics_summary_reports_stability_from_velocities(self):
+        still = {'bodies': [{'id': 'cube', 'velocity': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}],
+                 'physics_device': 'cpu', 'simulation_seconds': 3.0}
+        summary = physics_summary(still, 180, 1 / 60, plan(dynamic=True))
+        self.assertTrue(summary['stable'])
+        self.assertEqual(summary['dynamic_bodies'], 1)
+        moving = {'bodies': [{'id': 'cube', 'velocity': [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]}]}
+        self.assertFalse(physics_summary(moving, 180, 1 / 60, plan())['stable'])
+        self.assertEqual(summary['basis'], 'isaacsim_rpc.v1 final BodyState velocities after simulation')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,336 @@
+"""Map a validated SceneProgram onto the isaacsim_rpc.v1 SimulateRequest.
+
+Only geometry the wire contract can express faithfully is submitted. Anything
+else raises UnsupportedScene before any network call; nothing is silently
+substituted or scaled.
+"""
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+from capabilities.isaac_sim.scene_requirements import UnsupportedScene
+from capabilities.scene_authoring.catalog.native import ASSETS
+from capabilities.scene_authoring.geometry.support_graph import objects_in_support_order
+
+
+DEFAULT_SIMULATION = {'steps': 180, 'dt': 1 / 60, 'gravity': 9.81, 'ground': True,
+                      'capture_every_steps': None, 'capture_target_frames': 24}
+DEFAULT_RENDER = {'fov_degrees': 50.0, 'seed': 0, 'image_size': 768, 'samples_per_pixel': 32}
+PROTOCOL = 'isaacsim_rpc.v1.SimulationService'
+
+
+# 构造带字段路径与对象标识的阻断问题。
+def _issue(path, message, object_id=None):
+    return {'code': 'unsupported_capture_requirement', 'path': path, 'message': message,
+            'basis': 'isaacsim_rpc.v1', 'severity': 'error', 'blocking': True,
+            **({'object_ids': [object_id]} if isinstance(object_id, str) else {})}
+
+
+def _vec(values):
+    return {'x': float(values[0]), 'y': float(values[1]), 'z': float(values[2])}
+
+
+def _quaternion_yaw(degrees):
+    half = math.radians(float(degrees)) / 2
+    return {'x': 0.0, 'y': 0.0, 'z': math.sin(half), 'w': math.cos(half)}
+
+
+def _rotate_xy(offset, yaw_deg):
+    angle = math.radians(float(yaw_deg))
+    cosine, sine = math.cos(angle), math.sin(angle)
+    return [offset[0] * cosine - offset[1] * sine,
+            offset[0] * sine + offset[1] * cosine,
+            offset[2]]
+
+
+# 按支撑依赖计算对象声明的世界中心与顶面高度，不读取网格内容。
+def placements(program):
+    by_id = {}
+    for obj in objects_in_support_order(program['objects']):
+        size = [float(value) for value in obj['size']]
+        support_top = 0.0 if obj['support'] == 'ground' else by_id[obj['support']]['top']
+        bottom = support_top + float(obj['base_z'])
+        center = [float(obj['xy'][0]), float(obj['xy'][1]), bottom + size[2] / 2]
+        by_id[obj['id']] = {'center': center, 'size': size, 'bottom': bottom,
+                            'top': bottom + size[2]}
+    return by_id
+
+
+# 解析对象或部件的显示颜色，仅使用协议能表达的基础色。
+def body_color(program, obj, part=None):
+    if isinstance(part, dict) and part.get('color') is not None:
+        return [float(value) for value in part['color']]
+    named_id = (part or {}).get('material_id') or obj.get('material_id')
+    named = next((item for item in program.get('materials', [])
+                  if item.get('id') == named_id), {})
+    if named.get('base_color') is not None:
+        return [float(value) for value in named['base_color']]
+    for source in (part or {}, obj):
+        appearance = source.get('appearance') or {}
+        if appearance.get('base_color') is not None:
+            return [float(value) for value in appearance['base_color']]
+    if obj.get('color') is not None:
+        return [float(value) for value in obj['color']]
+    return [.7, .7, .7]
+
+
+def _body(identity, shape, position, yaw, color, *, size=None, radius=None,
+          asset=None, mass=None):
+    body = {'id': identity, 'shape': shape, 'position': _vec(position),
+            'orientation_xyzw': _quaternion_yaw(yaw), 'color': _vec(color)}
+    if size is not None:
+        body['size'] = _vec(size)
+    if radius is not None:
+        body['radius'] = float(radius)
+    if asset is not None:
+        body['asset'] = asset
+    if mass is not None:
+        body['mass'] = float(mass)
+    return body
+
+
+# 容器外壳按现有拆分规则生成五块盒壁。
+def _container_parts(size, color):
+    x, y, z = size
+    thickness = min(.008, min(size) / 8)
+    return [{'shape': 'box', 'size': dims, 'offset': offset, 'color': color}
+            for dims, offset in [([x, y, thickness], [0, 0, -(z - thickness) / 2]),
+                ([thickness, y, z - thickness], [-(x - thickness) / 2, 0, thickness / 2]),
+                ([thickness, y, z - thickness], [(x - thickness) / 2, 0, thickness / 2]),
+                ([x - 2 * thickness, thickness, z - thickness], [0, -(y - thickness) / 2, thickness / 2]),
+                ([x - 2 * thickness, thickness, z - thickness], [0, (y - thickness) / 2, thickness / 2])]]
+
+
+# 把单个对象（或复合对象的部件）转换为一个或多个 BodySpec。
+def _object_bodies(obj, index, row, program, settings, issues):
+    identity, kind, yaw = obj['id'], obj['kind'], float(obj.get('yaw_deg', 0))
+    path = f'/objects/{index}'
+    color = body_color(program, obj)
+    mass = float(obj.get('mass_kg', 0)) if obj.get('dynamic') else None
+    if kind == 'box':
+        return [_body(identity, 'cube', row['center'], yaw, color,
+                      size=row['size'], mass=mass)]
+    if kind == 'sphere':
+        size = row['size']
+        if max(abs(size[0] - size[1]), abs(size[1] - size[2])) > 1e-6:
+            issues.append(_issue(path + '/size',
+                'sphere requires a uniform declared size so radius can be expressed faithfully',
+                identity))
+            return []
+        return [_body(identity, 'sphere', row['center'], yaw, color,
+                      radius=size[0] / 2, mass=mass)]
+    if kind in ('composite', 'container'):
+        parts = (_container_parts(row['size'], color) if kind == 'container'
+                 else obj.get('parts') or [])
+        if not parts:
+            issues.append(_issue(path + '/parts',
+                                 'composite needs at least one part', identity))
+            return []
+        bodies = []
+        distributed = (mass / len(parts)) if mass is not None else None
+        for part_index, part in enumerate(parts):
+            shape = part.get('shape')
+            if shape not in ('box', 'sphere'):
+                issues.append(_issue(f'{path}/parts/{part_index}/shape',
+                    f'part shape {shape!r} cannot be expressed as cube or sphere; '
+                    'cylinder and other shapes are not supported', identity))
+                continue
+            position = [row['center'][axis] + _rotate_xy(part.get('offset', [0, 0, 0]), yaw)[axis]
+                        for axis in range(3)]
+            part_size = [float(value) for value in part['size']]
+            part_color = body_color(program, obj, part)
+            kwargs = ({'size': part_size} if shape == 'box'
+                      else {'radius': part_size[0] / 2})
+            if shape == 'sphere' and max(abs(part_size[0] - part_size[1]),
+                                         abs(part_size[1] - part_size[2])) > 1e-6:
+                issues.append(_issue(f'{path}/parts/{part_index}/size',
+                    'sphere part requires a uniform declared size', identity))
+                continue
+            bodies.append(_body(f'{identity}__part{part_index}', 'cube' if shape == 'box' else 'sphere',
+                                position, yaw, part_color, mass=distributed, **kwargs))
+        return bodies
+    if kind == 'cylinder':
+        issues.append(_issue(path + '/kind',
+            'cylinder has no BodySpec representation; use box, sphere, composite or mesh', identity))
+        return []
+    if kind == 'mesh':
+        asset_id = obj.get('asset_id')
+        binding = (settings.get('mesh_assets') or {}).get(asset_id)
+        if not isinstance(binding, str) or not Path(binding).is_absolute():
+            issues.append(_issue(path + '/asset_id',
+                f'mesh asset {asset_id!r} needs an absolute providers.IsaacSim4A100.mesh_assets '
+                'binding to a server directory containing mesh.npz', identity))
+            return []
+        return [_body(identity, 'mesh', row['center'], yaw, color, asset=binding, mass=mass)]
+    if kind in ASSETS:
+        issues.append(_issue(path + '/kind',
+            f'built-in native asset {kind!r} is not supported by the v2 body contract; '
+            'pre-stage a mesh.npz and use kind=mesh with mesh_assets', identity))
+        return []
+    if kind in ('native', 'generated'):
+        issues.append(_issue(path + '/kind',
+            f'{kind} objects require upload/native sessions that the v2 contract does not provide',
+            identity))
+        return []
+    issues.append(_issue(path + '/kind',
+                         f'unsupported geometry kind {kind!r}', identity))
+    return []
+
+
+# 把 SceneProgram 光源映射到 LightingSpec；无法表达的灯型明确拒绝。
+def _lighting(program, issues):
+    lights = [light for light in program.get('lights') or [] if light.get('enabled', True)]
+    if not lights:
+        return None
+    dome, areas = None, []
+    for index, light in enumerate(lights):
+        kind, path = light.get('kind'), f'/lights/{index}'
+        if kind == 'environment':
+            if dome is not None:
+                issues.append(_issue(path, 'only one environment light can map to the dome light'))
+                continue
+            dome = {'color': _vec(light.get('color', [1, 1, 1]))}
+            if light.get('intensity') is not None:
+                dome['intensity'] = float(light['intensity'])
+        elif kind == 'area':
+            position = [float(value) for value in light['position']]
+            direction = light.get('direction', [0, 0, -1])
+            size = light.get('size', [1, 1])
+            area = {'color': _vec(light.get('color', [1, 1, 1])),
+                    'origin': _vec(position),
+                    'target': _vec([position[axis] + float(direction[axis]) for axis in range(3)]),
+                    'width': float(size[0]), 'height': float(size[1])}
+            if light.get('intensity') is not None:
+                area['intensity'] = float(light['intensity'])
+            areas.append(area)
+        else:
+            issues.append(_issue(path + '/kind',
+                f'light kind {kind!r} has no LightingSpec mapping; use environment or area lights'))
+    lighting = {}
+    if dome is not None:
+        lighting['dome'] = dome
+    if areas:
+        lighting['key'] = areas[0]
+        if len(areas) > 1:
+            lighting['fills'] = areas[1:]
+    return lighting or None
+
+
+# 由相机世界位姿重建协议可表达的方位角、仰角、距离和目标点。
+def camera_view(index, camera, issues):
+    position = [float(value) for value in camera['position']]
+    target = [float(value) for value in camera['target']]
+    delta = [position[axis] - target[axis] for axis in range(3)]
+    distance = math.sqrt(sum(value * value for value in delta))
+    if distance <= 1e-9:
+        issues.append(_issue(f'/cameras/{index}', 'camera position and target must differ'))
+        return None
+    elevation = math.degrees(math.asin(max(-1.0, min(1.0, delta[2] / distance))))
+    # 服务端摄像机仰角限制为 [-80, 80]（正俯视会算出 90，会被 INVALID_ARGUMENT 拒绝）。
+    elevation = max(-80.0, min(80.0, elevation))
+    azimuth = math.degrees(math.atan2(delta[1], delta[0]))
+    return {'index': index, 'camera': camera, 'target': target,
+            'azimuth': azimuth, 'elevation': elevation, 'distance': distance}
+
+
+# 解析 capture_options 与配置，得到固定/自适应采样间隔与显式帧。
+def capture_sampling(steps, settings, scope, issues):
+    simulation = {**DEFAULT_SIMULATION, **(settings.get('simulation') or {})}
+    options = scope.get('capture_frames') or {}
+    frames = [int(value) for value in options.get('frames') or []]
+    every = options.get('every')
+    if frames:
+        frames = sorted(set(frames))
+        every = None
+        path = '/capture_options/frames'
+    elif every is not None:
+        every = int(every)
+        frames = [steps]
+        path = '/capture_options/every'
+    else:
+        configured = simulation.get('capture_every_steps')
+        every = (int(configured) if configured is not None else
+                 max(1, math.ceil(steps / max(1, int(simulation.get('capture_target_frames', 24))))))
+        frames = [steps]
+        path = '/capture_options'
+    if any(value < 1 or value > steps for value in frames):
+        issues.append(_issue(path, f'explicit frames must be within 1..{steps}'))
+    if len(frames) > 1200:
+        issues.append(_issue(path, 'capture accepts at most 1200 explicit frames'))
+    if every is not None and not 1 <= every <= steps:
+        issues.append(_issue(path, f'capture interval must be within 1..{steps}'))
+    return {'steps': steps, 'every': every, 'frames': frames,
+            'target_frames': int(simulation.get('capture_target_frames', 24))}
+
+
+# 生成完整的仿真计划；任何无法忠实表达的要求汇总后一次性拒绝。
+def simulation_plan(program, settings, scope):
+    issues = []
+    simulation = {**DEFAULT_SIMULATION, **(settings.get('simulation') or {})}
+    render = {**DEFAULT_RENDER, **(settings.get('render') or {})}
+    steps, dt = int(simulation['steps']), float(simulation['dt'])
+    if not 1 <= steps <= 1200:
+        issues.append(_issue('/simulation/steps', 'steps must be within 1..1200'))
+    if not 0.0001 <= dt <= 0.02:
+        issues.append(_issue('/simulation/dt', 'dt must be within 0.0001..0.02'))
+    size = int(render.get('image_size', 768))
+    spp = int(render.get('samples_per_pixel', 32))
+    if not 64 <= size <= 1024:
+        issues.append(_issue('/render/image_size', 'image_size must be within 64..1024'))
+    if not 1 <= spp <= 256:
+        issues.append(_issue('/render/samples_per_pixel', 'samples_per_pixel must be within 1..256'))
+    if scope.get('scene_export_requested'):
+        issues.append(_issue('/capture_options/export_scene',
+            'scene export has no v2 artifact; remove export_scene or keep it false'))
+
+    rows = placements(program)
+    bodies, entities = [], {}
+    for index, obj in enumerate(program['objects']):
+        row = rows[obj['id']]
+        produced = _object_bodies(obj, index, row, program, settings, issues)
+        bodies.extend(produced)
+        entities[obj['id']] = {'id': obj['id'], 'label': obj.get('label'),
+                               'kind': obj['kind'], 'dynamic': bool(obj.get('dynamic')),
+                               'support': obj.get('support'), 'center': row['center'],
+                               'size': row['size'], 'mass_kg': obj.get('mass_kg'),
+                               'yaw_deg': float(obj.get('yaw_deg', 0)),
+                               'body_ids': [body['id'] for body in produced]}
+    views = [view for index in scope.get('view_indices', [])
+             for view in [camera_view(index, program['cameras'][index], issues)] if view]
+    sampling = capture_sampling(steps, settings, scope, issues)
+    lighting = _lighting(program, issues)
+    if issues:
+        raise UnsupportedScene('\n'.join(row['path'] + ': ' + row['message'] for row in issues),
+                               issues=issues)
+    seed_value = render.get('seed')
+    render_payload = {'size': size, 'spp': spp,
+                      'fov_degrees': float(render.get('fov_degrees', 50))}
+    if seed_value is not None:
+        # 配置允许 seed=null（让服务端自动选种子），此时不要写入请求。
+        render_payload['seed'] = int(seed_value)
+    return {'bodies': bodies, 'entities': entities, 'views': views, 'steps': steps, 'dt': dt,
+            'gravity': float(simulation['gravity']), 'ground': bool(simulation['ground']),
+            'capture': sampling, 'lighting': lighting, 'render': render_payload}
+
+
+# 为单台相机构造可提交的 SimulateRequest 字典。
+def simulation_request(plan, view):
+    render = {'size': plan['render']['size'], 'spp': plan['render']['spp'],
+              'azimuth': view['azimuth'],
+              # 兼容早期冻结 plan 里可能存在的 90° 俯视，提交前再夹一次。
+              'elevation': max(-80.0, min(80.0, float(view['elevation']))),
+              'distance': view['distance'],
+              'target': _vec(view['target'])}
+    # seed=null 表示由服务端取默认值；proto3 中缺省 uint32 即 0，
+    # 因此这里不写入 seed 字段，保持请求纯净且与冻结的 capture.json 一致。
+    if 'seed' in plan['render']:
+        render['seed'] = plan['render']['seed']
+    if plan.get('lighting'):
+        render['lighting'] = plan['lighting']
+    capture = {'frames': list(plan['capture']['frames'])}
+    if plan['capture']['every'] is not None:
+        capture['every'] = plan['capture']['every']
+    return {'bodies': plan['bodies'], 'steps': plan['steps'], 'dt': plan['dt'],
+            'gravity': plan['gravity'], 'ground': plan['ground'],
+            'render': render, 'capture': capture}

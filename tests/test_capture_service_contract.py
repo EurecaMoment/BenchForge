@@ -1,127 +1,123 @@
-"""服务兼容性检查覆盖所有本体，在创建远端世界前批量定位参数错配。"""
-
-from copy import deepcopy
-import json
+"""Static admission and live Health checks for the isaacsim_rpc.v1 service."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-from google.protobuf.json_format import ParseDict
 from capabilities.isaac_sim.capture_contract import (
-    capture_service_issues, native_import_arguments, require_capture_service, unsupported_fields,
+    capture_service_issues, health_issues, inspect_live_capture_service,
+    require_capture_service,
 )
-from capabilities.isaac_sim.capture_stage import execute_capture
-from capabilities.isaac_sim.grpc import simulator_pb2 as pb
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
 from pipelines.scene_production.preflight import inspect_capture_program
-from test_scene_diagnostics import sample
+from capabilities.isaac_sim.mock_grpc_service import (
+    MockSimulationService, serve_mock, simulation_config,
+)
+from test_scene_diagnostics import sample, object_record
 
 
-def capabilities():
-    """提供开放字段的协议夹具，单个用例可按真实旧服务收窄导入合同。"""
-    return {'capabilities': [{'name': 'extension.' + name, 'availability': 'AVAILABLE',
-        'details': {'parameter_schema': {'type': 'object', 'additionalProperties': True}}}
-        for name in ('asset.import', 'physics.step', 'world.observe', 'scene.inspect',
-                     'scene.close', 'scene.capture', 'scene.export', 'scene.edit')]}
+# 取 mock 端点的 provider 设置，供只读 Health 检查复用。
+def provider_settings(port, **options):
+    return simulation_config(port, **options)['providers']['IsaacSim4A100']
 
 
-def compiled():
-    """用不同名称和物理需求的本体复现同一接口问题，避免只为无人机特判。"""
-    return {'usd': '#usda 1.0\n', 'imports': [
-        {'object': {'id': name, 'label': name, 'dynamic': True, 'mass_kg': mass,
-                    'physics': {'static_friction': .6, 'dynamic_friction': .5}},
-         'source': {'asset_id': name, 'relative_path': 'robot.usda'},
-         'path': '/World/Scene/Objects/' + name, 'catalog': {'source_up_axis': 'Z'}}
-        for name, mass in (('drone', .25), ('dog', 15), ('arm', 7))]}
+class StaticCaptureContractTests(unittest.TestCase):
+    # 一次收集不支持的对象、灯光、交互和曝光，且不修改原程序。
+    def test_static_issues_are_collected_without_mutation(self):
+        program = sample()
+        program['objects'] = [object_record('tube', kind='cylinder')]
+        program['lights'] = [{'id': 'spot', 'kind': 'point', 'position': [0, 0, 1],
+                              'color': [1, 1, 1], 'intensity': 1}]
+        program['interactions'] = [{'id': 'push', 'action': 'apply_force', 'object_id': 'tube'}]
+        program['render_environment'] = {'exposure': 1}
+        original = {key: list(value) if isinstance(value, list) else value
+                    for key, value in program.items()}
+        issues = capture_service_issues(program, provider_settings(18500))
+        paths = {row['path'] for row in issues}
+        self.assertTrue({'/objects/0/kind', '/lights/0/kind', '/interactions/0',
+                         '/render_environment/exposure'} <= paths)
+        self.assertEqual({row['basis'] for row in issues}, {'isaacsim_rpc.v1'})
+        self.assertTrue(all(row['blocking'] for row in issues))
+        self.assertEqual(program['objects'][0]['kind'], 'cylinder')
+        self.assertNotIn('mutated', program)
+
+    # 网格绑定来自 mesh_assets 的绝对服务端目录，绑定时不再报错。
+    def test_mesh_binding_uses_mesh_assets_settings(self):
+        program = sample()
+        program['objects'] = [object_record('sofa', kind='mesh', asset_id='sofa-1')]
+        self.assertIn('/objects/0/asset_id',
+                      {row['path'] for row in capture_service_issues(program, provider_settings(18500))})
+        bound = provider_settings(18500, mesh_assets={'sofa-1': '/srv/meshes/sofa'})
+        self.assertEqual(capture_service_issues(program, bound), [])
+
+    # require_capture_service 在存在阻断问题时抛出带结构化字段的异常。
+    def test_require_capture_service_raises_with_structured_issues(self):
+        program = sample()
+        program['objects'] = [object_record('tube', kind='cylinder')]
+        with self.assertRaises(UnsupportedScene) as caught:
+            require_capture_service(program, provider_settings(18500))
+        self.assertTrue(caught.exception.issues)
+        self.assertEqual(caught.exception.issues[0]['code'], 'unsupported_capture_requirement')
+
+    # Health 状态非 ready 或契约版本不符都归为服务侧阻断。
+    def test_health_issues_flag_unready_and_contract_mismatch(self):
+        ready = {'status': 'ready', 'api_version': 'isaacsim_rpc.v1.SimulationService'}
+        self.assertEqual(health_issues(ready), [])
+        unready = health_issues({'status': 'initializing', 'api_version': 'isaacsim_rpc.v1'})
+        self.assertEqual([row['code'] for row in unready], ['service_unavailable'])
+        mismatch = health_issues({'status': 'ready', 'api_version': 'a100sim.v1'})
+        self.assertEqual([row['code'] for row in mismatch], ['service_contract_mismatch'])
+        self.assertFalse(mismatch[0]['retry_unchanged'])
 
 
-class CaptureServiceContractTests(unittest.TestCase):
-    def test_old_schema_reports_all_native_objects_and_fields_without_mutation(self):
-        """一次报告旧网关对每个本体拒绝的全部字段，不建议删除硬要求。"""
-        catalog, scene = capabilities(), compiled()
-        catalog['capabilities'][0]['details']['parameter_schema'] = {'additionalProperties': False,
-            'properties': {key: {} for key in ('session_id', 'source', 'path', 'fix_base')}}
-        original = deepcopy(scene)
-        issues = capture_service_issues(catalog, scene, {'view_indices': [0], 'scene_export_requested': True})
-        self.assertEqual(len(issues), 3)
-        self.assertEqual({row['path'] for row in issues}, {'/objects/drone', '/objects/dog', '/objects/arm'})
-        for row in issues:
-            self.assertEqual(set(row['unsupported_fields']), {'/mass_kg', '/physics', '/source_up_axis'})
-            self.assertFalse(row['retry_unchanged'])
-            self.assertEqual(row['repair_owner'], 'service_configuration_or_adapter')
-        self.assertEqual(scene, original)
+class LiveCaptureContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server, cls.port, cls.servicer = serve_mock(MockSimulationService(), port=18500,
+                                                        fallback=True)
 
-    def test_open_metadata_and_unknown_schema_keywords_do_not_add_restrictions(self):
-        """开放的物理元数据继续透传，适配器不擅自收窄服务端声明。"""
-        schema = {'additionalProperties': False, 'properties': {'physics': {'additionalProperties': True}}}
-        self.assertEqual(unsupported_fields(schema, {'physics': {'custom_metadata': {}}}), [])
-        self.assertEqual(unsupported_fields({}, {'future_parameter': {}}), [])
-        self.assertEqual(unsupported_fields({'properties': {'physics': {'additionalProperties': False,
-            'properties': {'mass': {}}}}}, {'physics': {'friction': {}}}), ['/physics/friction'])
-        require_capture_service(capabilities(), compiled(), {'view_indices': [0], 'scene_export_requested': True})
-        request = native_import_arguments(compiled()['imports'][0], 'owned-session')
-        self.assertEqual(request['mass_kg'], .25)
-        self.assertEqual(request['source_up_axis'], 'Z')
-        self.assertEqual(request['physics']['static_friction'], .6)
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.stop(0)
+        cls.servicer.cleanup()
 
-    def test_optional_render_and_export_do_not_block_physics_only_work(self):
-        """未请求的输出能力不构成阻断；实际请求时才逐项报告缺失接口。"""
-        catalog = capabilities()
-        catalog['capabilities'] = [row for row in catalog['capabilities']
-                                   if row['name'] not in ('extension.scene.capture', 'extension.scene.export')]
-        scene = {'imports': []}
-        self.assertEqual(capture_service_issues(catalog, scene,
-            {'view_indices': [], 'scene_export_requested': False}), [])
-        issues = capture_service_issues(catalog, scene, {'view_indices': [0], 'scene_export_requested': True})
-        self.assertEqual({row['operation'] for row in issues}, {'extension.scene.capture', 'extension.scene.export'})
+    def setUp(self):
+        self.servicer.reset()
 
-    def test_closed_edit_items_report_all_fields_without_guessing_union_branches(self):
-        """编辑数组的明确拒绝一次报告，含值域分支的组合合同交由服务校验。"""
-        catalog = capabilities()
-        edit = next(row for row in catalog['capabilities'] if row['name'] == 'extension.scene.edit')
-        edit['details']['parameter_schema'] = {'properties': {'changes': {'items': {
-            'additionalProperties': False, 'properties': {'op': {}, 'path': {}}}}}}
-        issues = capture_service_issues(catalog, compiled(), {'view_indices': [], 'scene_export_requested': False})
-        self.assertEqual(len(issues), 3)
-        self.assertIn('/changes/0/translation', issues[0]['unsupported_fields'])
-        self.assertIn('/changes/1/attribute', issues[0]['unsupported_fields'])
-        edit['details']['parameter_schema']['properties']['changes']['items'] = {
-            'oneOf': [{'additionalProperties': False, 'properties': {'op': {}}}, {}]}
-        self.assertEqual(capture_service_issues(catalog, compiled(),
-            {'view_indices': [], 'scene_export_requested': False}), [])
+    # 合规服务与合法程序返回空问题列表。
+    def test_inspect_live_accepts_a_healthy_v2_service(self):
+        self.assertEqual(inspect_live_capture_service(sample(), provider_settings(self.port)), [])
 
-    def test_incompatible_capture_stops_before_upload_or_remote_submission(self):
-        """实际采集入口必须在上传前完成接口核对，不能留下失败世界或重复作业。"""
-        with TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            (directory / 'program.json').write_text(json.dumps(sample()), encoding='utf-8')
-            store = Mock(root=directory)
-            store.directory.return_value = directory
-            client = Mock()
-            client.call.return_value = ParseDict({'capabilities': []}, pb.Capabilities())
-            task = {'id': 'capture.scene0', 'unit': {'revision': 0, 'intent': {}}}
-            with (patch('capabilities.isaac_sim.capture_stage._compile_for_task', return_value=compiled()),
-                  patch('capabilities.isaac_sim.capture_stage.record_progress'),
-                  self.assertRaises(UnsupportedScene) as rejected):
-                execute_capture(store, task, Event(), config={}, client=client)
-            self.assertGreater(len(rejected.exception.issues), 3)
-            client.upload.assert_not_called()
-            client.submit.assert_not_called()
-            store.publish_capture.assert_not_called()
+    # 服务契约版本不符时报告部署问题而非场景问题。
+    def test_inspect_live_reports_contract_mismatch(self):
+        self.servicer.api_version = 'a100sim.v1.Simulator'
+        issues = inspect_live_capture_service(sample(), provider_settings(self.port))
+        self.assertEqual([row['code'] for row in issues], ['service_contract_mismatch'])
 
-    def test_preflight_reports_live_service_failure_without_claiming_simulation(self):
-        """只读预检把服务错配作为部署问题呈现，同时保留静态几何诊断。"""
-        with TemporaryDirectory() as temporary:
-            issue = {'code': 'service_contract_mismatch', 'path': '', 'message': 'wrong service',
-                     'basis': 'live_isaac_sim_schema', 'severity': 'error', 'blocking': True,
-                     'repair_owner': 'service_configuration_or_adapter'}
-            with patch('capabilities.isaac_sim.capture_contract.inspect_live_capture_service', return_value=[issue]):
-                report = inspect_capture_program(Path(temporary), sample(), policy={},
-                    settings={'grpc': {'host': 'fixture', 'port': 50051}})
-            self.assertFalse(report['passed'])
-            self.assertIn('service_contract_mismatch', [row['code'] for row in report['issues']])
-            self.assertEqual(report['service_contract']['status'], 'incompatible')
-            self.assertFalse(report['service_contract']['simulation_executed'])
-            self.assertIn('geometry_preview', report)
+    # 无法连接端点时报告 service_unavailable 并保留可重试标记。
+    def test_inspect_live_reports_unreachable_service(self):
+        with TemporaryDirectory():
+            issues = inspect_live_capture_service(
+                sample(), provider_settings(18599, timeout_seconds=1))
+        self.assertEqual([row['code'] for row in issues], ['service_unavailable'])
+        self.assertIn('health check failed', issues[0]['message'])
+
+    # 预检把实时服务问题并入完整静态诊断，且不声称执行过仿真。
+    def test_preflight_merges_live_service_issues_without_simulating(self):
+        issue = {'code': 'service_contract_mismatch', 'path': '', 'message': 'wrong service',
+                 'basis': 'isaacsim_rpc.v1', 'severity': 'error', 'blocking': True,
+                 'repair_owner': 'service_configuration_or_adapter', 'retry_unchanged': False}
+        with TemporaryDirectory() as temporary, patch(
+                'capabilities.isaac_sim.capture_contract.inspect_live_capture_service',
+                return_value=[issue]):
+            report = inspect_capture_program(Path(temporary), sample(), policy={},
+                                             settings=provider_settings(18500))
+        self.assertFalse(report['passed'])
+        self.assertIn('service_contract_mismatch', [row['code'] for row in report['issues']])
+        self.assertEqual(report['service_contract']['status'], 'incompatible')
+        self.assertFalse(report['service_contract']['simulation_executed'])
+        self.assertIn('geometry_preview', report)
+
+
+if __name__ == '__main__':
+    unittest.main()

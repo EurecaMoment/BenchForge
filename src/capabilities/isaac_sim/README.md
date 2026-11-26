@@ -1,88 +1,86 @@
-# Isaac Sim A100 integration
+# Isaac Sim SimulationService v2 集成
 
-BenchForge calls the public `a100sim.v1.Simulator` service from
-[IsaacSim4A100, branch A100](https://github.com/EurecaMoment/IsaacSim4A100/tree/A100).
-The backend schedules capture as an ordinary leased stage. No additional
-BenchForge capture daemon, device lock, callback endpoint or local Kit runtime is needed.
+BenchForge 调用远端 `isaacsim_rpc.v1.SimulationService` gRPC 服务完成场景采集。
+服务通过 SSH 隧道暴露到本地 `127.0.0.1:60051`。采集全程无本地 Kit/Omniverse runtime。
 
-| Module | Responsibility |
+## 协议契约（gRPC v2）
+
+```
+service SimulationService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc SubmitJob(SimulateRequest) returns (Job);          // request_id 幂等
+  rpc GetJob(GetJobRequest) returns (Job);                // 轮询 Job.phase
+  rpc WatchJob(GetJobRequest) returns (stream Job);       // 流式状态更新
+  rpc DownloadArtifact(DownloadArtifactRequest)
+      returns (stream ArtifactChunk);                     // 逐 artifact 流式拉取
+  rpc AckJob(AckJobRequest) returns (AckJobResponse);     // 释放远端磁盘
+  rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
+}
+```
+
+Job phase 枚举：`QUEUED → RUNNING → FRAMES_DONE → SIMULATION_DONE → RENDERING_DONE → COMPLETED | FAILED | CANCELED`。
+Job 携带 `frames_done` / `frames_total` 进度字段，GetJob 自适应轮询（初始 1s，最大 30s，按 phase 转移重置）。
+
+## 模块
+
+| 模块 | 职责 |
 | --- | --- |
-| `grpc/simulator.proto`, generated stubs, `protocol.json` | Upstream protocol and provenance |
-| `grpc/transport.py` | RPC, bounded job observation and manifest-based file transfer |
-| `grpc/tasks.py` | Durable request IDs, frozen payloads and job receipts |
-| `grpc/receipts.py` | Per-request and per-download ownership across subprocesses |
-| `tool_api.py` | Workspace operation behind the DSH `benchforge_isaac_sim` tool |
-| `guide.py` | Model-readable usage joined with the live service's discovery responses |
-| `authoring.py` | Portable SceneProgram-to-USD authoring |
-| `mesh_materials.py`, `usd_materials.py` | Untextured PBR factors, face materials and USD literals |
-| `native_geometry.py` | Measured bounds and enabled colliders from the simulator's USD export |
-| `scene_requirements.py` | Adapter capability validation before queue admission |
-| `capture_contract.py` | Compare actual import/edit request fields with live operation schemas before upload |
-| `capture_stage.py` | Import, simulate, inspect, capture and publish |
-| `evidence.py` | Native artifact and annotation conversion |
-| `recovery.py` | Explicit resume or new-attempt policy |
+| `grpc/simulation.proto` + 生成桩 | v2 契约，SimulationService + Job + Artifact |
+| `grpc/transport.py` | `SimulationClient`：keepalive/TLS 可选、32MiB 收包、自适应轮询、流式下载逐 artifact + 偏移校验 + sha256 |
+| `grpc/tasks.py` | `DurableJobs(client, directory, namespace)`：幂等 submit（request_id）、wait（状态回调持久化）、download |
+| `scene_mapping.py` | `simulation_plan(program, settings, scope)`：刚体映射、支撑拓扑、相机方位角/距离、自适应采样、mesh_assets 绑定 |
+| `scene_requirements.py` | 白名单校验：box/sphere/container/composite 支持；cylinder/native/generated/内建资产 → UnsupportedScene；mesh 需 `mesh_assets` 配置 |
+| `capture_stage.py` | `execute_capture()`：Health → 每相机 DurableJobs submit/wait/download → 逐帧 evidence（规范名 view_{i} / 过程名 process_view_{i}_step_XXXXXX） → entities / physics_summary → evidence/report/manifest → store.publish_capture → AckJob（尽力） |
+| `capture_contract.py` | 静态契约校验：`capture_service_issues()` / `health_issues()` / `inspect_live_capture_service()` |
+| `evidence.py` | `frame_evidence()` 逐帧落盘 RGB+depth(.npy)+semantic(.npy)+instance(.npy)；`entities_from_job()` 从 BodyState 计算最终 pose；`physics_summary()` 从 velocity 计算 |
+| `capture_scope.py` | 允许 frames/every 字段；`export_scene` 默认 False |
+| `capture_contract.py` | 静态契约 + live Health 校验 |
+| `tool_api.py` | DSH `benchforge_isaac_sim` 动作：guide / health / submit / simulation / status / wait / cancel / download / ack |
+| `guide.py` | 返回静态契约说明（6 个操作），不再读在线 catalog |
+| `recovery.py` | state 比较小写兼容（'queued'/'running'/'failed'/'interrupted'） |
 
-Set `providers.IsaacSim4A100.grpc` in `config/benchforge.local.json`, then
-run `python benchforge_app.py sync` and the usual backend/DSH launch scripts.
-Configuration version 4 migrates once to version 5, preserving model settings
-and backing up retired settings. On first backend start, the old queue is
-backed up and unfinished old-protocol captures require an explicit retry.
-That retry creates a new scene revision and leaves previous capture paths intact.
+## 配置
 
-The unused local Kit collector (`data_acquisition/collectors/isaac.py`) and legacy
-`capture_requests/` recorder helpers have been removed. Repository references and
-the maintained deployment launchers used neither path. External scripts that
-previously imported those paths must use the public gRPC capture entry points;
-historical implementations remain recoverable from Git.
+`config/benchforge.local.json` → `providers.IsaacSim4A100`：
 
-Start with `benchforge_isaac_sim({"action":"guide"})`; use
-`{"action":"guide","operation":"extension.asset.import"}` to read one operation's
-published scope and schema, or `feature_id` for one catalog feature. These are
-live service reads, not Git version checks or deployment-directory discovery.
-A generic object schema does not describe supported fields. `AVAILABLE` means
-current readiness, not task acceptance; the actual job result and artifacts remain
-necessary. See [DSH–Isaac Sim interface map](../../../docs/DSH-IsaacSim-接口对照.md)
-for calls, source locations and the separate deployment acceptance record.
+```json
+{
+  "grpc": {"host": "127.0.0.1", "port": 60051},
+  "simulation": {"steps": 180, "dt": 0.0166666667, "gravity": 9.81, "ground": true,
+                 "capture_target_frames": 24},
+  "render": {"fov_degrees": 50, "seed": null},
+  "artifacts": {"chunk_bytes": 2097152, "concurrency": 4},
+  "mesh_assets": {}
+}
+```
 
-The DSH tool reads the live catalog and uses native submit/invoke, status/wait,
-cancel, upload and download operations. Submission is not completion. Reusing
-a request identity requires the same payload. Disconnecting a wait does not
-cancel the simulator job; cancellation must be confirmed by the service.
-Job ownership is persisted by workspace, session and simulator endpoint in
-`storage/native_jobs.py`. Status, wait, cancel and download verify that ownership
-before contacting the simulator. Historical jobs require matching session
-operation records and frozen receipts.
+## 采集流程
 
-Native asset bounds use the CPU-only `usd-core` reader from the production extra.
-The adapter measures exported points/transforms and enabled colliders, records
-the export digest, and keeps that file with the capture evidence. Catalog sizes
-do not certify the native bounds. This does not replace contact/support checks
-or visual acceptance on the actual simulator.
+```
+SceneProgram
+  → simulation_plan(program, settings, scope)    # 刚体/支撑/相机/采样
+  → simulation_request(plan, view)               # 单相机 SimulateRequest
+  → Health() probe                                # api_version / retention / free_disk
+  → DurableJobs.submit(request_id 幂等)          # SubmitJob
+  → DurableJobs.wait(自适应轮询)                 # GetJob / WatchJob
+  → DurableJobs.download(job, directory)          # 逐 artifact 流式 + 偏移校验 + sha256
+  → frame_evidence(每帧)                          # 规范名 + 过程名
+  → entities_from_job / physics_summary
+  → store.publish_capture                          # evidence.json / report.json / manifest.json
+  → AckJob (尽力)                                  # 释放远端磁盘
+```
 
-Independent scenes support concurrent submission and observation, with
-configurable bounded capture admission. Actual simulation and rendering
-parallelism depends on the selected backend. Multiple cameras use native batches
-of up to 32; additional authored views are split into further batches without
-dropping views. The simulator owns synchronization inside each world.
+## 多帧采样
 
-SceneProgram capture supports portable geometry and the A100 renderer's
-supported materials, lights and annotations. Read the capability catalog for
-adapter limits and use the live gRPC catalog for native robot/world operations.
-Unsupported requirements fail explicitly; no proxy robot, fabricated motion,
-RTX claim or synthetic acceptance is substituted.
+默认 `capture_target_frames=24`，采集间隔 `every = max(1, ceil(steps / target_frames))`：
+- 最终帧强制包含，命名 `view_{i}.*`（规范名）
+- 过程帧命名 `process_view_{i}_step_{step:06d}.*`（前缀刻意不用 `view_` 避免复核提示词爆炸）
 
-Request journals and native artifacts stay under the task attempt directory.
-Publication checks the current stage owner and preserves previous captures.
-UI modules consume ordinary operation receipts and scene artifacts; they do not
-import gRPC, SQL or simulator code.
+复核抽样：每相机保留最终帧 + 最多 3 张均匀抽样的过程帧（见 `src/pipelines/scene_production/review.py::_review_frames()`）。
 
-DSH registration remains in the preset through `defineTool` and
-`ctx.tools.register`. `src/dsh/host/python_tools.mjs` owns subprocess lifetime,
-cancellation and cleanup; the ordinary tool pipeline retains validation,
-permissions and logging. `src/dsh/workbench/artifacts/` projects the returned
-artifact references. Native operation metadata assigns their stage, including
-S3 for `world.collect`, without a simulator-specific frontend protocol.
+## 引用约定
 
-Use **Isaac Sim** in displayed text, **IsaacSim4A100** for the repository and
-provider, and **isaac_sim** for the integration module and tool suffix. The old
-provider spelling appears only in one-way configuration migration and its tests.
+- `providers.IsaacSim4A100`：配置节
+- `isaacsim_rpc.v1.SimulationService`：协议全名，所有 event / receipt / report 里用这个值
+- `capabilities.isaac_sim`：Python 模块路径
+- `benchforge_isaac_sim`：DSH 工具名

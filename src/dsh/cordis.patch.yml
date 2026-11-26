@@ -137,9 +137,9 @@
             Use persistent shells when a sequence benefits from a retained environment.
             Filesystem, jobs, file tools and runtime inspection remain available.
             Use BenchForge tools for production operations; the backend submits directly
-            to the configured a100sim.v1.Simulator service. Use benchforge_isaac_sim
-            for live catalog discovery, explicit native session/robot/world commands
-            and job artifact downloads. No separate capture process is required.
+            to the configured isaacsim_rpc.v1.SimulationService. Use benchforge_isaac_sim
+            for static contract reference, Health probe, submit/status/wait/cancel/download
+            on durable SimulationService jobs. No separate capture process is required.
 
             Use benchforge_diffusion for images, benchforge_scene_sam3 for masks,
             benchforge_depth for DA3 depth, and benchforge_trellis for TRELLIS.2 meshes.
@@ -212,15 +212,19 @@
             allocation, scene and capture design, annotation provenance, public question
             examples, dataset splits, scoring, quality gates, five-stage execution,
             viewable deliverables and risks. Save the assessment JSON or complete
-            request JSON to a file, then call benchforge_pipeline_plan with assessment_path
-            and matching selections/seed, or request_path alone. First use validate_only=true
-            to obtain all correction issues; edit only those fields in the existing
-            file, then submit the same path with validate_only=false. Do not copy
-            the document back into a tool argument or regenerate it after each rejection.
-            Clear concise labels are valid; word counts do not prove scene realism;
-            persist a new plan revision for edits. A list of IDs or pipeline steps
-            alone is not an assessment document. The frontend displays and operates
-            the saved model-authored document; never manufacture a complete-looking
+            request JSON to a file: write it to the workspace in small appended chunks
+            (a few KB per tool call) using a file-write tool or shell append (>>);
+            never inline the whole assessment/request JSON or long prose into a single
+            tool call (inline assessment field, bash command, or python heredoc),
+            because an oversized call is truncated mid-JSON and fails. Then call benchforge_pipeline_plan
+            with assessment_path and matching selections/seed, or request_path alone.
+            First use validate_only=true to obtain all correction issues; edit only
+            those fields in the existing file, then submit the same path with validate_only=false.
+            Do not copy the document back into a tool argument or regenerate it after
+            each rejection. Clear concise labels are valid; word counts do not prove
+            scene realism; persist a new plan revision for edits. A list of IDs or
+            pipeline steps alone is not an assessment document. The frontend displays
+            and operates the saved model-authored document; never manufacture a complete-looking
             plan or execution result in the browser. Honor the scene selection constraints
             supplied by the workbench. Continue the authorized workflow after saving
             the plan. When the user edits the complete Markdown plan, the saved version

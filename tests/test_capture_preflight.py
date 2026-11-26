@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from capabilities.isaac_sim.authoring import compile_scene, UnsupportedScene
 from capabilities.isaac_sim.scene_requirements import capture_requirement_issues
 from capabilities.scene_authoring.validation.diagnostics import ScenePreflightError
 from pipelines.scene_production.preflight import inspect_capture_program, read_capture_submission
@@ -42,32 +41,21 @@ class CapturePreflightTests(unittest.TestCase):
         paths = {row['path'] for row in report['issues']}
         self.assertTrue({'/objects/0/size', '/objects/0/appearance/ior', '/objects/1/kind',
                          '/objects/1/cast_shadows', '/objects/2/appearance/specular',
-                         '/render_environment/renderer', '/render_environment/exposure',
+                         '/render_environment/exposure',
                          '/lights/0/kind', '/interactions/0', '/interactions/1'} <= paths)
         self.assertFalse(report['passed'])
         self.assertEqual(program, original)
         self.assertEqual(report['runtime_checks']['status'], 'not_evaluated')
 
-    # 验证原生资源绑定和别名检查采用本次部署设置。
-    def test_native_binding_and_alias_check_use_deployment_settings(self):
+    # 验证网格绑定来自 mesh_assets 的绝对服务端目录，且沿用本次部署设置。
+    def test_mesh_binding_uses_deployment_mesh_assets(self):
         program = sample()
         program['objects'] = [object_record('cup', kind='mesh', asset_id='mug',
                                             size=[.0924, .1272, .091])]
         missing = capture_requirement_issues(program, self.root, {})
-        self.assertIn('/objects/0/kind', {row['path'] for row in missing})
+        self.assertIn('/objects/0/asset_id', {row['path'] for row in missing})
         self.assertEqual(capture_requirement_issues(
-            program, self.root, {'asset_sources': {'mug': {'asset_id': 'native-cup'}}}), [])
-
-    # 验证编译器沿用同一批适配器约束，不放宽被预检拒绝的字段。
-    def test_compiler_uses_the_same_adapter_batch_and_does_not_relax_it(self):
-        program = sample()
-        program['objects'][0]['appearance'] = {'ior': 1.5, 'specular': .5}
-        program['render_environment'] = {'renderer': 'RaytracedLighting', 'exposure': 1}
-        expected = capture_requirement_issues(program, self.root, {})
-        with self.assertRaises(UnsupportedScene) as caught:
-            compile_scene(program, self.root, {})
-        self.assertEqual(caught.exception.issues, expected)
-        self.assertEqual(len(expected), 4)
+            program, self.root, {'mesh_assets': {'mug': '/srv/meshes/mug'}}), [])
 
     # 验证无效提交保存两类完整诊断，但不会创建队列任务。
     def test_submission_saves_adapter_and_contract_diagnostics_without_queueing(self):
@@ -75,12 +63,12 @@ class CapturePreflightTests(unittest.TestCase):
         workspace.mkdir(parents=True)
         source = workspace / 'scene.json'
         program = sample()
-        program['objects'][0].update(size=[0, 1, 1], cast_shadows=False)
+        program['objects'][0].update(size=[0, 1, 1], appearance={'ior': 1.5})
         source.write_text(json.dumps(program), encoding='utf-8')
         with self.assertRaises(ScenePreflightError) as caught:
             read_capture_submission(self.root, str(source), execution_mode='exploration')
         report = caught.exception.report
-        self.assertTrue({'/objects/0/size', '/objects/0/cast_shadows'} <=
+        self.assertTrue({'/objects/0/size', '/objects/0/appearance/ior'} <=
                         {row['path'] for row in report['issues']})
         self.assertEqual(json.loads(Path(report['report_path']).read_text(encoding='utf-8')), report)
         self.assertEqual(json.loads(Path(report['program_snapshot_path']).read_text(encoding='utf-8')), program)
@@ -156,3 +144,7 @@ class CapturePreflightTests(unittest.TestCase):
                 self.assertFalse(report['passed'])
                 self.assertIn('scene_plan', {row['code'] for row in report['issues']})
                 self.assertIn('/objects/0/size', {row['path'] for row in report['issues']})
+
+
+if __name__ == '__main__':
+    unittest.main()
