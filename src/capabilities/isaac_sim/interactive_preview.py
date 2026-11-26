@@ -39,7 +39,7 @@ def fetch_preview(settings, identity, camera, directory, generation):
         return urlopen(Request(url + route, json.dumps(values).encode(),
                                {'Content-Type': 'application/json'}), timeout=45)
 
-    with post('/v1/prepare', data) as response:
+    with post('/v1/prepare', {**data, 'views': [{'camera': camera}]}) as response:
         version = json.loads(response.read(4096))['version']
     with post('/v1/preview', {**data, 'version': version}) as response:
         if response.headers.get_content_type() != 'image/png' or response.headers.get('X-Scene-Version') != version:
