@@ -49,3 +49,7 @@ BenchForge 预设按已配置模型的窗口和回答预算生成压缩策略。
 ```json
 {"url": "http://127.0.0.1:18325", "size": 1024, "spp": 4}
 ```
+
+### node1 服务日志
+
+node1 的 DA3、FLUX、SAM3、TRELLIS 和 IsaacSim 的 gRPC、场景、预览服务共用 `config/node1-service-logs/99-benchforge-logs.conf`。systemd 将标准输出和标准错误追加到 `/slow_share2/jby/benchforge-logs/node1/<服务名>.log`，其中 `%N` 展开为服务名。修改共享盘位置时，先创建服务账号可写的新目录，再更新该配置，执行 `systemctl --user daemon-reload` 并在作业结束后重启相应服务。可用 `readlink /proc/$(systemctl --user show spatialforge-trellis -p MainPID --value)/fd/1` 核对实际写入路径。
