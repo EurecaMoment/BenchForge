@@ -124,11 +124,8 @@ class SceneLifecycle:
         return {**unit, 'scene_review_policy_version': SCENE_ACCEPTANCE_POLICY_VERSION}
 
     # 依据失败阶段、操作反馈和恢复模式构造下一次尝试，同时保留既有成功产物。
-    def retry(self, task, feedback, capture_mode, directory_for):
-        if capture_mode == 'review_only':
-            if feedback is not None:
-                raise ValueError('Review-only retry uses frozen evidence and accepts no repair feedback')
-            return self.review_only(task)
+    def validate_retry(self, task, feedback, directory_for):
+        """Validate frozen scene and service inputs without holding a database transaction."""
         tid = task["id"]
         recovery_id = None
         if is_execution_diagnosis(task.get('failure') or {}):
@@ -198,6 +195,16 @@ class SceneLifecycle:
                     or recovery_id == task["unit"].get("review_transport_recovery_id")
                 ):
                     raise ValueError("Review transport recovery budget exhausted")
+        return settings_changed, recovery_id
+
+    def retry(self, task, feedback, capture_mode, directory_for, *, validation=None):
+        if capture_mode == 'review_only':
+            if feedback is not None:
+                raise ValueError('Review-only retry uses frozen evidence and accepts no repair feedback')
+            return self.review_only(task)
+        settings_changed, recovery_id = validation if validation is not None else self.validate_retry(
+            task, feedback, directory_for)
+        tid = task['id']
         unit = dict(task["unit"])
         phase = unit["phase"]
         old = directory_for(tid, unit["revision"])

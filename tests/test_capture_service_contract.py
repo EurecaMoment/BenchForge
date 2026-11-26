@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 from google.protobuf.json_format import ParseDict
 from capabilities.isaac_sim.capture_contract import (
-    capture_service_issues, native_import_arguments, require_capture_service, unsupported_fields,
+    checked_service_issues, capture_service_issues, native_import_arguments, require_capture_service, unsupported_fields,
 )
 from capabilities.isaac_sim.capture_stage import execute_capture
 from capabilities.isaac_sim.grpc import simulator_pb2 as pb
@@ -76,6 +76,21 @@ class CaptureServiceContractTests(unittest.TestCase):
             {'view_indices': [], 'scene_export_requested': False}), [])
         issues = capture_service_issues(catalog, scene, {'view_indices': [0], 'scene_export_requested': True})
         self.assertEqual({row['operation'] for row in issues}, {'extension.scene.capture', 'extension.scene.export'})
+
+    def test_busy_worker_recovers_before_any_mutation(self):
+        ready = capabilities()
+        busy = deepcopy(ready)
+        busy['capabilities'][0].update(availability='UNAVAILABLE', reason='Worker health checks timed out')
+        client = Mock()
+        client.call.side_effect = [ParseDict(value, pb.Capabilities()) for value in (busy, ready)]
+        waiting = Mock()
+        issues = checked_service_issues(client, compiled(), {'view_indices': [0], 'scene_export_requested': True},
+                                       stop=Event(), delays=(0,), on_wait=waiting)
+        self.assertEqual(issues, [])
+        self.assertEqual(client.call.call_count, 2)
+        waiting.assert_called_once()
+        client.submit.assert_not_called()
+        client.upload.assert_not_called()
 
     def test_closed_edit_items_report_all_fields_without_guessing_union_branches(self):
         """编辑数组的明确拒绝一次报告，含值域分支的组合合同交由服务校验。"""

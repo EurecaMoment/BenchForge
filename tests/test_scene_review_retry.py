@@ -65,6 +65,18 @@ class SceneReviewRetryTests(unittest.TestCase):
         self.assertEqual(self.writes, ['runs', 'work_items'])
         self.store.repo.event.assert_called_once()
 
+    def test_capture_admission_releases_connection_before_expensive_checks(self):
+        self.task['unit']['phase'] = 'capture'
+        def validate(task, feedback, directory_for):
+            self.assertFalse(self.read_connection)
+            self.assertFalse(self.write_transaction)
+            return False, None
+        self.store.lifecycle.validate_retry.side_effect = validate
+        self.store.lifecycle.retry.return_value = {**self.task['unit'], 'capture_recovery_mode': 'restart'}
+        result = self.store.retry(self.task['id'])
+        self.assertEqual(result['capture_recovery_mode'], 'restart')
+        self.assertEqual(self.writes, ['runs', 'work_items'])
+
     def test_fences_changes_to_task_run_and_policy_during_validation(self):
         for name, target, key, value, error in (
             ('capture revision', self.task['unit'], 'revision', 4, 'task changed'),

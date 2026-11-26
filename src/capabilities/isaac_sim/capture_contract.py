@@ -1,6 +1,9 @@
 """Compare adapter requests with live service fields before any scene is created."""
 
+import time
+
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
+from service_access.request_context import check_cancelled
 
 
 def native_import_arguments(item, identity):
@@ -83,6 +86,12 @@ def capture_service_issues(capabilities, compiled, scope):
         unsupported = unsupported_fields(schema, fields)
         if availability == 'AVAILABLE' and not unsupported:
             continue
+        if availability == 'UNAVAILABLE' and not unsupported:
+            issues.append({'code': 'service_not_ready', 'path': path, 'operation': name,
+                'message': f"{name}: {contract.get('reason') or 'worker unavailable'}. Recheck readiness before capture.",
+                'basis': 'live_isaac_sim_schema', 'severity': 'error', 'blocking': True,
+                'repair_owner': 'service_configuration_or_adapter', 'retry_unchanged': True})
+            continue
         issues.append({'code': 'service_contract_mismatch', 'path': path,
             'message': f'{name}: service availability={availability}' +
                        (f'; adapter fields rejected by live schema: {", ".join(unsupported)}' if unsupported else '') +
@@ -109,9 +118,27 @@ def capture_capabilities(client):
     except grpc.RpcError as error:
         issue = {'code': 'service_unavailable', 'path': '', 'severity': 'error', 'blocking': True,
                  'basis': 'live_isaac_sim_schema', 'repair_owner': 'service_configuration_or_adapter',
-                 'retry_unchanged': False,
+                 'retry_unchanged': error.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED),
                  'message': f'Configured Isaac Sim discovery failed: {error.code().name}; preserve scene requirements.'}
         raise UnsupportedScene(issue['message'], issues=[issue]) from error
+
+
+def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None, delays=(2, 4, 8, 12)):
+    """Recheck transient worker readiness before any mutation. Schema errors return immediately."""
+    for delay in (*delays, None):
+        check_cancelled(stop, 'Isaac readiness')
+        try:
+            issues = capture_service_issues(capture_capabilities(client), compiled, scope)
+        except UnsupportedScene as error:
+            issues = error.issues
+        if not issues or delay is None or not all(issue.get('retry_unchanged') for issue in issues):
+            return issues
+        if on_wait:
+            on_wait(issues[0]['message'], delay)
+        if stop is None:
+            time.sleep(delay)
+        else:
+            stop.wait(delay)
 
 
 def capture_service_client(config):
@@ -144,11 +171,10 @@ def inspect_live_capture_service(program, settings, *, scope=None):
                     'catalog': {'source_up_axis': binding['source_up_axis']} if kind == 'native' else ASSETS[kind]})
     client = capture_service_client({'providers': {'IsaacSim4A100': settings}})
     try:
-        capabilities = capture_capabilities(client)
         # 预检尚未绑定输出选择，只核对必经步骤；执行前再核对实际相机和导出请求。
         if scope is None:
             scope = capture_scope(program, {'view_indices': [], 'export_scene': False})
-        return capture_service_issues(capabilities, compiled, scope)
+        return checked_service_issues(client, compiled, scope, delays=(2,))
     except UnsupportedScene as error:
         return error.issues
     finally:

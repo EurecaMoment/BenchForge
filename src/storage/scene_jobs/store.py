@@ -232,7 +232,7 @@ class Store:
             )
             return result.rowcount == 1
 
-    def _review_retry_snapshot(self, tid):
+    def _retry_snapshot(self, tid):
         with self.repo.engine.connect() as connection:
             task = connection.execute(select(tasks).where(tasks.c.id == tid)).mappings().one()
             run = connection.execute(select(runs).where(runs.c.id == task['run_id'])).mappings().one()
@@ -266,11 +266,10 @@ class Store:
             raise ValueError('capture_mode must be auto, resume, restart or review_only')
         if feedback is not None and (not isinstance(feedback,str) or not 1<=len(feedback)<=12000):
             raise ValueError('retry feedback must be 1..12000 characters')
-        original = None
+        original, original_run = self._retry_snapshot(tid)
         if capture_mode == 'review_only':
             if feedback is not None:
                 raise ValueError('Review-only retry uses frozen evidence and accepts no repair feedback')
-            original, original_run = self._review_retry_snapshot(tid)
             if self.lifecycle.review_only_requested(original['unit']):
                 return self._review_retry_response(original)
             self._require_retryable(original, original_run)
@@ -279,21 +278,24 @@ class Store:
             try:
                 unit = self.lifecycle.review_only(original)
             except (ValueError, OSError):
-                current, _ = self._review_retry_snapshot(tid)
+                current, _ = self._retry_snapshot(tid)
                 if self._same_review_retry(current, original):
                     return self._review_retry_response(current)
                 raise
+        else:
+            self._require_retryable(original, original_run)
+            validation = self.lifecycle.validate_retry(original, feedback, self.directory)
         with self.repo.transaction() as c:
             task=c.execute(select(tasks).where(tasks.c.id==tid).with_for_update()).mappings().one()
             run=c.execute(select(runs).where(runs.c.id==task['run_id']).with_for_update()).mappings().one()
-            if original is not None and self._same_review_retry(task, original):
+            if capture_mode == 'review_only' and self._same_review_retry(task, original):
                 return self._review_retry_response(task)
             self._require_retryable(task, run)
-            if original is None:
-                unit = self.lifecycle.retry(task, feedback, capture_mode, self.directory)
-            elif (run['code_revision'] != original_run['code_revision'] or any(
+            if (run['code_revision'] != original_run['code_revision'] or any(
                     task[key] != original[key] for key in ('run_id', 'unit', 'attempt', 'failure'))):
-                raise ValueError('Scene task changed during review-only validation; retry the current task')
+                raise ValueError('Scene task changed during retry validation; retry the current task')
+            if capture_mode != 'review_only':
+                unit = self.lifecycle.retry(task, feedback, capture_mode, self.directory, validation=validation)
             phase = task['unit']['phase']
             c.execute(runs.update().where(runs.c.id==run['id']).values(state='PENDING'))
             c.execute(tasks.update().where(tasks.c.id==tid).values(state='READY',unit=unit,failure=None,result=None,ready_at=0,lease_owner=None,lease_expires_at=None))

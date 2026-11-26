@@ -11,9 +11,9 @@ from capabilities.isaac_sim.evidence import (
     common_render_metadata, measured_entities, physics_summary, render_metadata, resolve_artifact, save_frame,
 )
 from capabilities.isaac_sim.native_geometry import exported_entities
-from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
+from capabilities.isaac_sim.scene_requirements import UnsupportedScene, validate_scene_requirements
 from capabilities.isaac_sim.capture_contract import (
-    capture_capabilities, capture_service_client, native_edit_arguments, native_import_arguments, require_capture_service,
+    checked_service_issues, capture_service_client, native_edit_arguments, native_import_arguments,
 )
 from capabilities.isaac_sim.asset_bundle import (
     export_binary_usd, stage_texture_dependencies, upload_asset_bundle,
@@ -117,8 +117,11 @@ def execute_capture(store, task, stop, *, config, client=None):
                 job_id=job.job_id, operation=job.operation, remote_state=document(job)['state'],
                 receipt=str(attempt / 'jobs')))
         try:
-            capability = capture_capabilities(client)
-            require_capture_service(capability, compiled, scope)
+            issues = checked_service_issues(client, compiled, scope, stop=stop,
+                on_wait=lambda reason, delay: record_progress(directory, 'isaac_sim_waiting_for_worker',
+                    reason=reason, retry_in_seconds=delay))
+            if issues:
+                raise UnsupportedScene('\n'.join(issue['message'] for issue in issues), issues=issues)
             source_ref = upload_asset_bundle(client, upload_source, attempt, texture_files)
             _, imported = requests.extension('import', 'asset.import', {'source': source_ref, 'path': '/World/Scene'})
             identity = imported['session_id']
