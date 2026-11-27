@@ -8,6 +8,7 @@ from service_access.resource_files import (
 )
 
 _UNRESOLVED_DESIGN = object()
+_DECLARATION_METADATA = {'plan_path', 'plan_version', 'authority', 'iteration_rule', 'scene_style'}
 
 DETAIL_FIELDS = ('purpose', 'reason', 'simplifications', 'retained_constraints', 'excluded_claims')
 
@@ -341,10 +342,21 @@ def validate_brief_revision(design, path, root=None):
 def require_prior_brief(brief, directory, root=None):
     """A known captured parent cannot be detached by omitting revision metadata."""
     directory=_resource(directory,root,must_exist=False)
-    if not (directory/'scene_brief.json').is_file():return
-    previous=brief.get('previous_capture_directory')
-    if not previous or Path(previous).resolve()!=directory.resolve():
-        raise ValueError('Scene revision must reference the frozen brief of its captured parent')
+    frozen_path = directory/'scene_brief.json'
+    if not frozen_path.is_file():
+        return
+    previous = brief.get('previous_capture_directory')
+    if previous and Path(previous).resolve() == directory.resolve():
+        return
+    frozen, _ = _document(frozen_path, root)
+    # Execution-only repairs inherit the unchanged brief from the known parent.
+    # A change to the brief still needs explicit revision and prior evidence.
+    if brief.get('id') and isinstance(frozen, dict) and (
+        {key: value for key, value in brief.items() if key not in _DECLARATION_METADATA} ==
+        {key: value for key, value in frozen.items() if key not in _DECLARATION_METADATA}
+    ):
+        return
+    raise ValueError('Scene revision must reference the frozen brief of its captured parent')
 
 
 # 解析已准入的冻结场景目录，即使尚未产生采集也允许恢复该输入。
@@ -394,8 +406,7 @@ def plan_declaration_current(declaration):
                           and row.get('scene_id') == declaration.get('scene_id')), None)
         else:
             saved = next((row for row in scenes.get('designs', []) if row.get('id') == declaration.get('id')), None)
-        metadata = {'plan_path', 'plan_version', 'authority', 'iteration_rule', 'scene_style'}
-        expected = {key: value for key, value in declaration.items() if key not in metadata}
+        expected = {key: value for key, value in declaration.items() if key not in _DECLARATION_METADATA}
         return saved is not None and saved == expected
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         return False

@@ -138,9 +138,10 @@ const programInput={type:'string',description:'Complete SceneProgram JSON in the
   ctx.tools.register(defineTool({name:'benchforge_wait',description:"Wait for a scene, layout or asset run. Scene captures are tracked automatically. Use background=true to register or recover tracking of a run in this conversation. The host resumes this session when the run finishes or tracking fails. Continue independent work or finish this turn while waiting. Synchronous waits are bounded at 1..60 seconds. Read benchforge_scene_status with detail=true for full saved reports.",parameters:{run_id:{type:'string',required:true},background:{type:'boolean',description:'Register or recover one background observer for this session/run; no repeated wait calls are needed.'},timeout_seconds:{type:'integer',description:'Synchronous wait only, 1..60 seconds.'}},output:observationOutput,/** 通过统一服务入口执行 /observe 操作，并传递当前调用的取消信号。 */ execute:async(args,exec)=>{
     const {background,...request}=args;
     if(background){
+      const observedAfter = Date.now();
       const scoped = await observation('/observe',request,exec.signal);
       exec.signal.throwIfAborted();
-      return tracking.wait(exec.agent,request.run_id,scoped);
+      return tracking.wait(exec.agent,request.run_id,scoped,{observedAfter});
     }
     return observation('/wait',request,exec.signal);
   }}));

@@ -395,6 +395,23 @@ test('retrying a settled service task tracks its new attempt and receives one ne
   assert.equal(h.sent.length,2);assert.notEqual(h.sent[0].source.noticeKey,h.sent[1].source.noticeKey);await h.dispose();
 });
 
+test('a background wait resumes an external retry without replaying a stale active observation',async t=>{
+  const h=harness();t.after(()=>h.dispose());h.plan();h.capture();
+  await h.runtime.register(h.agent,{run_id:'sf_scene',call_id:'first'});
+  await h.runtime.settled();h.consume();
+  const [{finished_at}] = h.runtime.records(h.agent.id);
+  const stale = await h.runtime.wait(h.agent,'sf_scene',running,{observedAfter:finished_at-1});
+  assert.equal(stale.watch.accepted,false);
+  assert.equal(h.sent.length,1);
+
+  const resumed = await h.runtime.wait(h.agent,'sf_scene',running,{observedAfter:finished_at+1});
+  assert.equal(resumed.watch.accepted,true);
+  assert.equal(resumed.state,'RUNNING');
+  await h.runtime.settled();
+  assert.equal(h.sent.length,2);
+  assert.notEqual(h.sent[0].source.noticeKey,h.sent[1].source.noticeKey);
+});
+
 test('a retry supersedes an active observation without losing the new generation',/** 验证采集后台观察、状态恢复和通知投递在该用例中的具体边界，完成准备、调用和结果断言。用例：a retry supersedes an active observation without losing the new generation。 */ async()=>{
   const entered=Promise.withResolvers();let reads=0,aborted=false;
   const h=harness({/** 提供该用例定义的可控采集服务响应，模拟等待、终态、取消或短暂不可用。 */ read:async(_route,_args,signal)=>{

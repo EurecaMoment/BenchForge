@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from capabilities.scene_authoring.contracts.scene_design import (
-    saved_design, validate_brief_revision, plan_declaration_current,
+    saved_design, validate_brief_revision, plan_declaration_current, require_prior_brief,
 )
 from database.access import AccessScope
 from service_access.access_scope import TrustedAccess, access_context
@@ -42,6 +42,18 @@ class SceneDesignAccessTests(unittest.TestCase):
         with access_context(self.access), patch.dict(os.environ, {'BENCHFORGE_ARTIFACTS': str(self.artifacts)}):
             with self.assertRaises(PermissionError):
                 saved_design(program)
+
+    def test_execution_repair_inherits_the_unchanged_frozen_brief(self):
+        directory = self.workspace / 'prior'
+        directory.mkdir()
+        design = {'id': 'room', 'hard_requirements': ['retain real objects']}
+        frozen = {**design, 'plan_version': [120, 10], 'plan_path': 'old-plan.json'}
+        (directory / 'scene_brief.json').write_text(json.dumps(frozen), encoding='utf-8')
+        current = {**design, 'plan_version': [155, 12], 'plan_path': 'current-plan.json'}
+        with access_context(self.access):
+            require_prior_brief(current, directory, self.artifacts)
+            with self.assertRaisesRegex(ValueError, 'reference the frozen brief'):
+                require_prior_brief({**current, 'hard_requirements': []}, directory, self.artifacts)
 
     # 验证不能从其他会话的采集目录读取设计简报。
     def test_foreign_brief_directory_is_denied(self):

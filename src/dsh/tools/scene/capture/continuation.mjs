@@ -229,7 +229,7 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     active.set(key,observer);
   }
   /** 串行登记当前会话的采集提交，保留幂等关系并按需恢复已暂停观察。 */
-  async function register(agent, submission, {resume = false, observation} = {}) {
+  async function register(agent, submission, {resume = false, observation, observedAfter} = {}) {
     if (closed) throw Error('Capture tracking is unloading; the submitted task is retained by the service');
     const run = captureRunId(submission.run_id), owner = agent.id;
     if (!/^[A-Za-z0-9_-]+$/.test(owner) || !/^sf_[A-Za-z0-9_-]+$/.test(run)) throw Error('Capture tracking requires a native session and run identity');
@@ -237,12 +237,18 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     const key = keyOf(owner,run), previous = registration.get(key) || Promise.resolve();
     const operation = previous.catch(()=>{}).then(/** 在同一会话运行队列内建立或升级续接记录，再启动对应代际的宿主观察器。 */ async()=>{
       let record = table.get(key);
-      if (!record) record = await save({owner,run_id:run,generation:submission.call_id || run,
-        submitted_at:submission.submitted_at || now(),task_seq:submission.task_seq ?? history(agent.session).taskSeq,state:'watching',
-        ...(observation ? {observation} : {})});
-      if (submission.retry && submission.call_id && record.generation !== submission.call_id) {
-        record = await save({owner,run_id:run,generation:submission.call_id,
-          submitted_at:submission.submitted_at || now(),task_seq:submission.task_seq ?? history(agent.session).taskSeq,state:'watching'}, {replace:true});
+      const taskSeq = submission.task_seq ?? history(agent.session).taskSeq;
+      const submittedRetry = submission.retry && submission.call_id && record?.generation !== submission.call_id;
+      // A retry from outside this host can leave a delivered record behind.
+      // Only a service read begun after settlement may reopen that record.
+      const observedRetry = resume && pendingRunObservation(observation) &&
+        ['terminal','delivered'].includes(record?.state) && record.task_seq === taskSeq &&
+        (record.finished_at ?? record.submitted_at) < observedAfter;
+      if (!record || submittedRetry || observedRetry) {
+        const generation = submittedRetry ? submission.call_id :
+          observedRetry ? record.generation + ':resume:' + observedAfter : submission.call_id || run;
+        record = await save({owner,run_id:run,generation,task_seq:taskSeq,state:'watching',
+          submitted_at:submission.submitted_at || now(),...(observation ? {observation} : {})}, {replace:!!record});
       }
       if (resume && (['paused','observer_failed'].includes(record.state) || record.error)) {
         const {error,notice_key,...retained} = record;
@@ -257,10 +263,10 @@ export function createCaptureContinuation({table, artifacts, read, resolveAgent,
     registration.set(key,operation);
     try {return await operation;} finally {if(registration.get(key)===operation)registration.delete(key);}
   }
-  async function wait(agent, run, observation) {
+  async function wait(agent, run, observation, {observedAfter = now()} = {}) {
     if (observation?.run_id !== captureRunId(run)) throw new Error('Invalid background wait identity');
     if (!pendingRunObservation(observation)) return observation;
-    const registered = await register(agent,{run_id:observation.run_id},{resume:true,observation});
+    const registered = await register(agent,{run_id:observation.run_id},{resume:true,observation,observedAfter});
     return {...observation,...registered,watch:{...registered.watch,accepted:registered.watch.state === 'watching'}};
   }
 
