@@ -1,6 +1,6 @@
 # DSH 与 Isaac Sim 接口对照
 
-状态（2026-11-19）：本文包含本轮源码中的会话隔离与接口适配。正式 gRPC `50051` 尚未切换到全部候选改动；工具注册、阶段测试和本文更新都不证明已经上线。
+本文描述合并分支的仿真接口。部署支持的操作可通过 `Health`、`GetCapabilities` 和 `GetApiCatalog` 查询。
 
 BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `isaacsim_rpc.v1.SimulationService` gRPC 服务。常规场景生产则由 `benchforge_capture` 等工具提交给 BenchForge 后端，再由后端调用同一 gRPC 服务。**运行时以服务返回的能力、参数定义和实际作业结果为准，不读取 Git 提交号判断功能。** Git 子模块信息只用于维护者部署与追溯源码。
 
@@ -39,7 +39,7 @@ BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `isaacsim_rpc.v1.S
 | `cancel` | `GetJob` + `CancelJob` | `job_id` | 取消由服务确认；已执行的 GPU 作业可能无法取消，不能把断开观察当成停止 |
 | `download` | `GetJob` + `DownloadArtifact` | 已成功的 `job_id` | 仅下载该作业清单中的产物到当前工作区；返回实际文件路径和展示引用 |
 
-`RunTasks` 是原生协议的双向流式方法，当前 DSH 工具没有单独的 `action`。这属于尚未映射的协议能力，不是失效接口，也不需要删除协议定义。
+并发任务分别通过 `SubmitJob` 提交，客户端保存各自的作业 ID。断线后可用 `GetJob` 或 `WatchJob` 续查同一作业。
 
 任务与资产使用不同身份：`operation_id` 是 BenchForge 一次工具调用记录；`job_id` 是原生作业；原生 `session_id` 是仿真场景会话，与 DSH 会话 ID 不同。作业、上传资产和 retained scene/world 的归属按工作区、DSH 会话及端点保存于 PostgreSQL。其他会话不能凭外部 ID 下载、控制或覆盖资源。严格会话模式拒绝没有独立世界身份的全局操作；后文原生任务表描述协议能力，不代表全部原生任务都对受限模型开放。
 
@@ -195,19 +195,19 @@ BenchForge 可并发提交独立场景并限制在途数量；这不等于每个
 | 客户端使用的协议副本 | [src/capabilities/isaac_sim/grpc/simulation.proto](../src/capabilities/isaac_sim/grpc/simulation.proto)；同目录 `protocol.json` 仅记录来源 |
 | 预设及角色说明 | [src/dsh/presets/preset_definition.py](../src/dsh/presets/preset_definition.py) |
 
-| 责任 | IsaacSim4A100 源码（`A100` 分支） |
+| 责任 | IsaacSim4A100 源码（见本仓固定的子模块版本） |
 | --- | --- |
-| 对外 gRPC 协议 | [simulation.proto](https://github.com/EurecaMoment/IsaacSim4A100/blob/merge/main-develop-pr4/rtx4090_grpc/proto/isaacsim_rpc/v1/simulation.proto) |
-| gRPC 方法及后端选择 | [a100/a100sim/rpc/server.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/server.py) |
-| 产品功能目录及 `InvokeFeature` 映射 | [a100/a100sim/rpc/catalog.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/catalog.py) |
-| 基础任务路由、能力边界与独立工作流 | [a100/a100sim/rpc/backend.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/backend.py)、[workflows.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/workflows.py) |
-| 作业队列、状态和回执 | [a100/a100sim/rpc/jobs.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/jobs.py) |
-| 资产边界与产物清单 | [a100/a100sim/rpc/storage.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/storage.py) |
-| retained scene 操作注册、资产解析与服务路由 | [a100/a100sim/rpc/scenes.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/scenes.py) |
-| 场景服务生命周期和队列 | [a100/a100sim/scenes/service.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/scenes/service.py) |
-| 导入、编辑、物理、观测、采集、导出实现 | [a100/a100sim/scenes/sessions.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/scenes/sessions.py) |
-| 场景渲染 | [a100/a100sim/usd_renderer.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/usd_renderer.py)、`a100/a100sim/scenes/materials.py`、`meshes.py` |
-| 新场景服务与 gRPC 启动脚本 | [a100/start-scenes.sh](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/start-scenes.sh)、[a100/serve-grpc.sh](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/serve-grpc.sh) |
+| 对外 gRPC 协议 | [simulation.proto](../third_party/IsaacSim4A100/rtx4090_grpc/proto/isaacsim_rpc/v1/simulation.proto) |
+| gRPC 方法及后端选择 | [a100/a100sim/rpc/server.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/server.py) |
+| 产品功能目录及 `SubmitJob.native_feature` 映射 | [a100/a100sim/rpc/catalog.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/catalog.py) |
+| 基础任务路由、能力边界与独立工作流 | [a100/a100sim/rpc/backend.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/backend.py)、[workflows.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/workflows.py) |
+| 作业队列、状态和回执 | [a100/a100sim/rpc/jobs.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/jobs.py) |
+| 资产边界与产物清单 | [a100/a100sim/rpc/storage.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/storage.py) |
+| retained scene 操作注册、资产解析与服务路由 | [a100/a100sim/rpc/scenes.py](../third_party/IsaacSim4A100/a100/a100sim/rpc/scenes.py) |
+| 场景服务生命周期和队列 | [a100/a100sim/scenes/service.py](../third_party/IsaacSim4A100/a100/a100sim/scenes/service.py) |
+| 导入、编辑、物理、观测、采集、导出实现 | [a100/a100sim/scenes/sessions.py](../third_party/IsaacSim4A100/a100/a100sim/scenes/sessions.py) |
+| 场景渲染 | [a100/a100sim/usd_renderer.py](../third_party/IsaacSim4A100/a100/a100sim/usd_renderer.py)、`a100/a100sim/scenes/materials.py`、`meshes.py` |
+| 新场景服务与 gRPC 启动脚本 | [a100/start-scenes.sh](../third_party/IsaacSim4A100/a100/start-scenes.sh)、[a100/serve-grpc.sh](../third_party/IsaacSim4A100/a100/serve-grpc.sh) |
 
 ### 候选部署适配的来源
 
