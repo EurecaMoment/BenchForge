@@ -113,10 +113,10 @@ message RenderSpec {
   // RTX backend only supports mesh.
   optional string kind = 1;
 
-  // Image edge in pixels; the upstream service allows 64..1024.
+  // Square image edge in pixels (minimum 64; maximum from Health).
   optional uint32 size = 2;
 
-  // RTX subframes; the upstream service allows 1..256.
+  // Samples per pixel on Mitsuba or real-time subframes on RTX (minimum 1; maximum from Health).
   optional uint32 spp = 3;
 
   optional uint32 seed = 4;
@@ -344,4 +344,6 @@ message HealthResponse {
   uint32 retention_seconds = 24;
   uint32 max_views = 25;
   repeated string capabilities = 26;
+  uint32 max_image_size = 27;
+  uint32 max_samples_per_pixel = 28;
 }
