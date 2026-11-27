@@ -139,7 +139,7 @@
             embed multiline scripts or large JSON in a shell command argument. Filesystem,
             jobs, file tools and runtime inspection remain available. Use BenchForge
             tools for production operations; the backend submits directly to the configured
-            a100sim.v1.Simulator service. Use benchforge_isaac_sim for live catalog
+            isaacsim_rpc.v1.SimulationService service. Use benchforge_isaac_sim for live catalog
             discovery, explicit native session/robot/world commands and job artifact
             downloads. No separate capture process is required.
 

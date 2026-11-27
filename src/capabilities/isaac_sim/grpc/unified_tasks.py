@@ -1,7 +1,6 @@
 """Durable request identity and restart recovery above the public SimulationService."""
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -9,15 +8,10 @@ import time
 
 import grpc
 
-from capabilities.isaac_sim.grpc.receipts import receipt_lock
+from capabilities.isaac_sim.grpc.receipts import receipt_lock, request_id
 from capabilities.isaac_sim.grpc.unified_transport import PROTOCOL, TRANSIENT, document, job_state
 from service_access.request_context import RunCancelled
 from storage.files import write_json
-
-
-# 由命名空间和操作键生成稳定请求标识，供远程服务实现幂等提交。
-def request_id(namespace, key):
-    return 'benchforge-' + hashlib.sha256((namespace + '\0' + key).encode()).hexdigest()
 
 
 class DurableJobs:

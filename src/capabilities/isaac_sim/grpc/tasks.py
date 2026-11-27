@@ -1,7 +1,6 @@
-"""Durable request identity and restart recovery above the public A100 protocol."""
+"""Durable request identity and restart recovery for retained tasks on SimulationService."""
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -9,15 +8,10 @@ import time
 
 import grpc
 
-from capabilities.isaac_sim.grpc.receipts import receipt_lock
-from capabilities.isaac_sim.grpc.transport import document, TRANSIENT
+from capabilities.isaac_sim.grpc.receipts import receipt_lock, request_id
+from capabilities.isaac_sim.grpc.unified_transport import PROTOCOL, document, TRANSIENT
 from service_access.request_context import RunCancelled
 from storage.files import write_json
-
-
-# 由命名空间和操作键生成稳定请求标识，供远程服务实现幂等提交。
-def request_id(namespace, key):
-    return 'benchforge-' + hashlib.sha256((namespace + '\0' + key).encode()).hexdigest()
 
 
 class DurableTasks:
@@ -32,13 +26,18 @@ class DurableTasks:
             raise ValueError('Invalid Isaac Sim receipt key')
         directory = self.directory / key
         identity = request_id(self.namespace, key)
-        frozen = {'protocol': 'a100sim.v1.Simulator', 'endpoint': self.client.endpoint,
+        frozen = {'protocol': PROTOCOL, 'endpoint': self.client.endpoint,
                   'request_id': identity, 'feature': feature, 'payload': payload}
         with receipt_lock(directory):
             file = directory / 'request.json'
-            if file.exists() and json.loads(file.read_text()) != frozen:
-                raise ValueError('Isaac Sim request changed; preserve its receipt and submit a new identity')
-            if not file.exists():
+            if file.exists():
+                saved = json.loads(file.read_text())
+                # Historical requests used the same native payload and stable request ID.
+                if saved.get('protocol') == 'a100sim.v1.Simulator':
+                    saved['protocol'] = PROTOCOL
+                if saved != frozen:
+                    raise ValueError('Isaac Sim request changed; preserve its receipt and submit a new identity')
+            else:
                 write_json(file, frozen)
             receipt = directory / 'receipt.json'
             if receipt.exists():

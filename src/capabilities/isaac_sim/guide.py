@@ -17,7 +17,7 @@ def usage(capabilities, catalog, *, operation=None, feature_id=None):
             raise ValueError('Feature is absent from the live Isaac Sim catalog')
     return {
         'schema': 'benchforge.isaac-sim-guide/v1',
-        'service': 'a100sim.v1.Simulator',
+        'service': 'isaacsim_rpc.v1.SimulationService',
         'capability_source': 'Live GetCapabilities and GetApiCatalog responses; no repository inspection',
         'rules': [
             'Use public capability and catalog responses to select operations. Do not inspect Git, '
@@ -26,8 +26,8 @@ def usage(capabilities, catalog, *, operation=None, feature_id=None):
             'and PARTIAL require checking the stated scope; UNAVAILABLE/UNSUPPORTED are not promises.',
             'Use the exact published parameter_schema or request_schema. A schema without properties '
             'does not document its fields: do not infer either support or rejection from missing properties.',
-            'An extension capability name starts with extension.; SubmitTask uses the suffix in '
-            'request.extension.operation. InvokeFeature takes a catalog feature id, not an operation name.',
+            'An extension capability name starts with extension.; the submit action uses the suffix in '
+            'request.extension.operation. The invoke action takes a catalog feature id, not an operation name.',
             'Submit/invoke return accepted work. Observe the same job until SUCCEEDED, then download '
             'its manifest artifacts. Failure and timeout are not completed work or accepted data.',
             'Retain request_id and payload when recovering a lost submission reply. A changed payload '
@@ -57,8 +57,8 @@ def usage(capabilities, catalog, *, operation=None, feature_id=None):
             'catalog': 'GetApiCatalog: feature ids, support, availability and request schemas; filter with feature_id.',
             'assets': 'ListAssets: uploaded asset identities and their relative paths.',
             'upload': 'UploadAsset: source_path is an existing file inside this workspace; retain the returned handle.',
-            'submit': 'SubmitTask: request is the native task object without request_id.',
-            'invoke': 'InvokeFeature: feature_id is from the live catalog; request is its arguments object.',
+            'submit': 'SubmitJob.native_task carries the native task. Put request_id at the tool request root.',
+            'invoke': 'SubmitJob.native_feature carries the live catalog feature_id and its arguments.',
             'status': 'GetJob: job_id must belong to this conversation and configured endpoint.',
             'wait': 'WatchJob/GetJob: observe job_id for timeout_seconds in (0, 60], without resubmission.',
             'cancel': 'CancelJob: a running GPU job can refuse cancellation; inspect the returned state.',

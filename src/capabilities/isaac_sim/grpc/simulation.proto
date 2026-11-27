@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package isaacsim_rpc.v1;
 
+import "google/protobuf/empty.proto";
+import "isaacsim_rpc/v1/native.proto";
+
 // Isaac Sim RTX gRPC facade used by BenchForge.
 //
 // The service owns simulation and rendering on the remote machine. BenchForge
@@ -10,6 +13,10 @@ package isaacsim_rpc.v1;
 // can reclaim disk space.
 
 service SimulationService {
+  rpc GetCapabilities(google.protobuf.Empty) returns (native.Capabilities);
+  rpc GetApiCatalog(google.protobuf.Empty) returns (native.ApiCatalog);
+  rpc ListAssets(google.protobuf.Empty) returns (native.AssetList);
+  rpc UploadAsset(stream native.UploadChunk) returns (native.AssetFile);
   // Service health and runtime metadata.
   rpc Health(HealthRequest) returns (HealthResponse);
 
@@ -162,7 +169,11 @@ message SimulateRequest {
 message SubmitJobRequest {
   // Stable client identity (recommended 32+ hex characters).
   string request_id = 1;
-  SimulateRequest simulation = 2;
+  oneof workload {
+    SimulateRequest simulation = 2;
+    native.SubmitTaskRequest native_task = 3;
+    native.FeatureRequest native_feature = 4;
+  }
 }
 
 message JobHandle {
@@ -172,8 +183,8 @@ message JobHandle {
 }
 
 message GetJobRequest {
-  // 32 lower-case hexadecimal characters.
   string job_id = 1;
+  uint64 after_revision = 2;
 }
 
 message BodyState {
@@ -279,6 +290,7 @@ message Job {
   string phase = 25;
   uint32 frames_done = 26;
   uint32 frames_total = 27;
+  native.Job native_job = 28;
 }
 
 // ---------------------------------------------------------------------------

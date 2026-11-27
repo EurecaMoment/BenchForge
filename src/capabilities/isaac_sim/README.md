@@ -1,14 +1,14 @@
 # Isaac Sim A100 integration
 
-BenchForge calls the public `a100sim.v1.Simulator` service from
-[IsaacSim4A100, branch A100](https://github.com/EurecaMoment/IsaacSim4A100/tree/A100).
+BenchForge calls the public `isaacsim_rpc.v1.SimulationService` service from
+[IsaacSim4A100](https://github.com/EurecaMoment/IsaacSim4A100).
 The backend schedules capture as an ordinary leased stage. No additional
 BenchForge capture daemon, device lock, callback endpoint or local Kit runtime is needed.
 
 | Module | Responsibility |
 | --- | --- |
-| `grpc/simulator.proto`, generated stubs, `protocol.json` | Upstream protocol and provenance |
-| `grpc/transport.py` | RPC, bounded job observation and manifest-based file transfer |
+| `grpc/simulation.proto`, `grpc/native.proto`, generated bindings, `protocol.json` | Upstream protocol and provenance |
+| `grpc/transport.py` | Retained native tasks and features on SimulationService, bounded observation and manifest-based transfer |
 | `grpc/tasks.py` | Durable request IDs, frozen payloads and job receipts |
 | `grpc/receipts.py` | Per-request and per-download ownership across subprocesses |
 | `tool_api.py` | Workspace operation behind the DSH `benchforge_isaac_sim` tool |
@@ -47,8 +47,10 @@ current readiness, not task acceptance; the actual job result and artifacts rema
 necessary. See [DSH–Isaac Sim interface map](../../../docs/DSH-IsaacSim-接口对照.md)
 for calls, source locations and the separate deployment acceptance record.
 
-The DSH tool reads the live catalog and uses native submit/invoke, status/wait,
-cancel, upload and download operations. Submission is not completion. Reusing
+The DSH tool reads discovery and sends both retained tasks and catalog features
+through `SubmitJob` on the same service as RTX snapshots. It uses `GetJob`,
+`WatchJob`, `CancelJob`, `UploadAsset` and `DownloadArtifact` there. The tool
+returns the native job receipt with its original job and request IDs. Submission is not completion. Reusing
 a request identity requires the same payload. Disconnecting a wait does not
 cancel the simulator job; cancellation must be confirmed by the service.
 Job ownership is persisted by workspace, session and simulator endpoint in

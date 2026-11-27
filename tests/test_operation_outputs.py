@@ -157,7 +157,7 @@ class ScopedOperationOutputTests(unittest.TestCase):
     # 验证真实 Isaac 查询工具经私有输出上下文发布回执。
     def test_real_isaac_query_publishes_its_receipt(self):
         from capabilities.isaac_sim.tool_api import execute
-        from capabilities.isaac_sim.grpc import simulator_pb2 as pb
+        from capabilities.isaac_sim.grpc import native_pb2 as pb
         with (access_context(self.access), operation_outputs(self.workspace, 'isaac', scoped=True) as directory,
               patch('capabilities.isaac_sim.tool_api.A100Client') as factory,
               patch('capabilities.isaac_sim.tool_api.NativeResources')):

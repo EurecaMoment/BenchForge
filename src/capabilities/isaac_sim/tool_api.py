@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 
-from capabilities.isaac_sim.grpc import simulator_pb2 as pb
+from capabilities.isaac_sim.grpc import native_pb2 as pb
 from capabilities.isaac_sim.grpc.tasks import DurableTasks
 from capabilities.isaac_sim.grpc.transport import A100Client, RemoteJobFailed, document
 from capabilities.isaac_sim.guide import usage
@@ -130,6 +130,8 @@ def execute(args, directory, config):
                     job = client.wait(job, timeout=timeout)
                 except (RemoteJobFailed, TimeoutError):
                     job = client.get(job_id)
+            if job.request_id != request_id:
+                raise PermissionError('Native job request identity changed')
             result = {'action': action, 'job': document(job)}
             resources.observe(result['job'])
             if (action in ('status', 'wait') and job.state == pb.FAILED

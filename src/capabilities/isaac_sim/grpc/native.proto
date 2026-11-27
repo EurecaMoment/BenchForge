@@ -1,38 +1,9 @@
 syntax = "proto3";
 
-package a100sim.v1;
+package isaacsim_rpc.v1.native;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
-
-// Clients need this contract only. No Kit, CUDA, filesystem mounts or HTTP
-// backend addresses are part of the caller's runtime requirements.
-service Simulator {
-  rpc GetCapabilities(google.protobuf.Empty) returns (Capabilities);
-  // The complete 30-domain audit, including explicit integration and hardware gaps.
-  rpc GetApiCatalog(google.protobuf.Empty) returns (ApiCatalog);
-  // Invoke a catalog feature using its discoverable, typed task argument schema.
-  // Unsupported features fail before queue admission; no placeholder jobs run.
-  rpc InvokeFeature(FeatureRequest) returns (Job);
-  // request_id is required. Reusing it with the same task returns the same job;
-  // a different task with that ID fails with ALREADY_EXISTS. Never retry a
-  // mutating request with a newly generated ID after an ambiguous timeout.
-  rpc SubmitTask(SubmitTaskRequest) returns (Job);
-  rpc GetJob(JobRequest) returns (Job);
-  // Cancelling this stream cancels observation, not accepted simulation work.
-  rpc WatchJob(WatchJobRequest) returns (stream Job);
-  // Only work still queued in the gateway can be cancelled safely.
-  rpc CancelJob(JobRequest) returns (Job);
-  // Process tasks in stream order; each response is a terminal job. Disconnects
-  // do not revoke work already accepted under its request_id.
-  rpc RunTasks(stream SubmitTaskRequest) returns (stream Job);
-  rpc ListAssets(google.protobuf.Empty) returns (AssetList);
-  // One file per stream. The first chunk supplies an optional existing asset_id
-  // and relative_path. File contents are immutable after successful upload.
-  rpc UploadAsset(stream UploadChunk) returns (AssetFile);
-  // Only artifacts returned by this job are accessible. Offsets support resume.
-  rpc DownloadArtifact(DownloadRequest) returns (stream DownloadChunk);
-}
 
 enum Availability {
   AVAILABILITY_UNSPECIFIED = 0;

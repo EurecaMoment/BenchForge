@@ -37,7 +37,7 @@ namespaces = false
 "pipelines.scene_production" = ["recipes/*.json"]
 "pipelines.benchmark" = ["recipes/*.json"]
 "ui" = ["training_monitor/*.html", "training_monitor/*.js", "training_monitor/*.css"]
-"capabilities.isaac_sim.grpc" = ["simulator.proto", "protocol.json", "UPSTREAM-LICENSE"]
+"capabilities.isaac_sim.grpc" = ["simulation.proto", "native.proto", "protocol.json", "UPSTREAM-LICENSE"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["**/__pycache__/*", "**/*.pyc", "**/*.pyo"]

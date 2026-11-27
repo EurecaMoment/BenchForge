@@ -12,18 +12,19 @@ from pathlib import Path
 import time
 
 import grpc
+from google.protobuf.empty_pb2 import Empty
 from google.protobuf.json_format import MessageToDict, ParseDict
 
 from capabilities.isaac_sim.grpc import simulation_pb2 as pb
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.simulation_pb2_grpc import SimulationServiceStub
-from service_access.configuration import isaac_config, isaac_endpoint
+from service_access.configuration import isaac_config, isaac_endpoint, isaac_unified_settings
 from service_access.request_context import RunCancelled
 from storage.files import safe_path, write_json
 
 
 PROTOCOL = 'isaacsim_rpc.v1.SimulationService'
-TERMINAL = {'succeeded', 'failed', 'interrupted'}
+TERMINAL = {'succeeded', 'failed', 'cancelled', 'interrupted'}
 TRANSIENT = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED,
              grpc.StatusCode.RESOURCE_EXHAUSTED}
 
@@ -68,7 +69,7 @@ class SimulationClient:
 
     # 从服务配置建立带认证与可选 TLS 的 gRPC 连接，设置请求和任务超时。
     def __init__(self, config):
-        settings = isaac_config(config)
+        settings = isaac_unified_settings(isaac_config(config))
         connection = settings.get('grpc', {})
         self.endpoint = isaac_endpoint(connection)
         self.timeout = connection.get('timeout_seconds', 60)
@@ -98,7 +99,9 @@ class SimulationClient:
         self.channel.close()
 
     # 带统一认证元数据和超时调用指定 gRPC 方法。
-    def call(self, method, request, *, timeout=None):
+    def call(self, method, request=None, *, timeout=None):
+        if request is None:
+            request = Empty()
         return getattr(self.stub, method)(request, timeout=timeout or self.timeout,
                                          metadata=self.metadata)
 

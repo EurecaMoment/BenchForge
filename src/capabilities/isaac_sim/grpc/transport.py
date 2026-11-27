@@ -1,4 +1,4 @@
-"""The A100 Simulator protocol. No simulator runtime or shared filesystem required."""
+"""Retained tasks and their historical receipt format on SimulationService."""
 from __future__ import annotations
 
 import hashlib
@@ -7,34 +7,23 @@ from pathlib import Path
 import time
 
 import grpc
-from google.protobuf.empty_pb2 import Empty
-from google.protobuf.json_format import MessageToDict, ParseDict
+from google.protobuf.json_format import ParseDict
 
-from capabilities.isaac_sim.grpc import simulator_pb2 as pb
-from capabilities.isaac_sim.grpc.receipts import receipt_lock
-from capabilities.isaac_sim.grpc.simulator_pb2_grpc import SimulatorStub
-from service_access.configuration import isaac_config, isaac_endpoint
+from capabilities.isaac_sim.grpc import native_pb2 as pb, simulation_pb2 as rpc
+from capabilities.isaac_sim.grpc.unified_transport import SimulationClient, TRANSIENT, document
 from service_access.request_context import RunCancelled
 from storage.files import safe_path, write_json
 
 
 TERMINAL = {pb.SUCCEEDED, pb.FAILED, pb.CANCELLED, pb.INTERRUPTED}
-TRANSIENT = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED,
-             grpc.StatusCode.RESOURCE_EXHAUSTED}
 
 
-# 保留协议字段名与默认值转换为JSON，并将负零规范化以兼容宿主。
-def document(message):
-    """Preserve protocol names and defaults; DSH JSON also requires positive zero."""
-    # 递归清理字典和数组，把浮点零统一为正零。
-    def clean(value):
-        if isinstance(value, dict):
-            return {key: clean(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [clean(item) for item in value]
-        return 0 if isinstance(value, float) and value == 0 else value
-    return clean(MessageToDict(message, preserving_proto_field_name=True,
-                              always_print_fields_with_no_presence=True))
+def native_job(envelope, job_id):
+    """An RTX snapshot cannot be mistaken for a retained, session-owned job."""
+    if (not envelope.HasField('native_job') or envelope.id != job_id
+            or envelope.native_job.job_id != job_id):
+        raise ValueError('Isaac Sim returned an inconsistent native job identity')
+    return envelope.native_job
 
 
 class RemoteJobFailed(RuntimeError):
@@ -45,54 +34,25 @@ class RemoteJobFailed(RuntimeError):
                          f"{job.failure.code}: {job.failure.message}")
 
 
-class A100Client:
-    """A shared thread-safe channel; each independent scene owns its own request IDs."""
+class A100Client(SimulationClient):
+    """Retained-session operations share the snapshot client's endpoint and credentials."""
 
-    # 从服务配置建立带认证与可选TLS的gRPC连接，设置请求和任务超时。
-    def __init__(self, config):
-        settings = isaac_config(config)
-        connection = settings.get('grpc', {})
-        self.endpoint = isaac_endpoint(connection)
-        self.timeout = connection.get('timeout_seconds', 60)
-        self.job_timeout = settings.get('capture_timeout_seconds', 1800)
-        token_name = connection.get('token_env')
-        token = os.environ.get(token_name, '') if token_name else ''
-        if token_name and not token:
-            raise ValueError(f'Isaac Sim token environment variable is unset: {token_name}')
-        self.metadata = (('authorization', 'Bearer ' + token),) if token else ()
-        certificate = connection.get('tls_ca_file')
-        options = [('grpc.max_receive_message_length', 32 * 1024 * 1024),
-                   ('grpc.enable_http_proxy', 0)]
-        if certificate:
-            credentials = grpc.ssl_channel_credentials(Path(certificate).read_bytes())
-            self.channel = grpc.secure_channel(self.endpoint, credentials, options=options)
-        else:
-            self.channel = grpc.insecure_channel(self.endpoint, options=options)
-        self.stub = SimulatorStub(self.channel)
-
-    # 关闭原生模拟器的gRPC连接。
-    def close(self):
-        self.channel.close()
-
-    # 带统一认证元数据和超时调用指定gRPC方法。
-    def call(self, method, request=None, *, timeout=None):
-        return getattr(self.stub, method)(request or Empty(), timeout=timeout or self.timeout,
-                                         metadata=self.metadata)
-
-    # 把普通或功能请求转换为协议消息，并附上幂等请求标识提交。
     def submit(self, payload, request_id, *, feature=False):
-        message = pb.FeatureRequest() if feature else pb.SubmitTaskRequest()
-        ParseDict({**payload, 'request_id': request_id}, message)
-        return self.call('InvokeFeature' if feature else 'SubmitTask', message)
+        message = rpc.SubmitJobRequest(request_id=request_id)
+        ParseDict(payload, message.native_feature if feature else message.native_task)
+        handle = self.call('SubmitJob', message)
+        if not handle.id:
+            raise ValueError('Isaac Sim returned an empty job handle')
+        job = self.get(handle.id)
+        if job.request_id != request_id:
+            raise ValueError('Isaac Sim returned another request identity')
+        return job
 
-    # 按任务标识读取远程任务的最新状态。
     def get(self, job_id):
-        return self.call('GetJob', pb.JobRequest(job_id=job_id))
+        return native_job(super().get(job_id), job_id)
 
-    # 向服务请求取消任务，由服务决定排队任务能否取消。
     def cancel(self, job_id):
-        """The server alone decides whether a queued job can be cancelled."""
-        return self.call('CancelJob', pb.JobRequest(job_id=job_id))
+        return native_job(super().cancel(job_id), job_id)
 
     # 轮询任务直至终态、超时或停止，区分显式取消和仅停止本地观察。
     def wait(self, job, *, stop=None, on_status=lambda job: None, timeout=None):
@@ -117,12 +77,13 @@ class A100Client:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError(f'Isaac Sim job {job.job_id} still exists; resume the retained receipt')
-            stream = self.stub.WatchJob(pb.WatchJobRequest(job_id=job.job_id,
+            stream = self.stub.WatchJob(rpc.GetJobRequest(job_id=job.job_id,
                                         after_revision=job.revision),
                                         timeout=min(3, remaining), metadata=self.metadata)
             try:
-                for current in stream:
-                    if current.job_id != job.job_id or current.revision < job.revision:
+                for envelope in stream:
+                    current = native_job(envelope, job.job_id)
+                    if current.request_id != job.request_id or current.revision < job.revision:
                         raise ValueError('Isaac Sim returned an inconsistent job stream')
                     job = current
                     on_status(job)
@@ -157,12 +118,6 @@ class A100Client:
             raise ValueError('Isaac Sim asset upload receipt does not match source bytes')
         return document(result)
 
-    # 在回执锁内下载任务清单指定的产物，支持校验偏移和断点续传。
-    def download(self, job, directory, *, stop=None):
-        """Download manifest identities with checked offsets, resumable files and receipts."""
-        with receipt_lock(directory):
-            return self._download(job, directory, stop=stop)
-
     def _download_file(self, job, item, target, partial, stop):
         """Reconnect read-only streams at their committed local offset."""
         deadline = None
@@ -173,9 +128,10 @@ class A100Client:
             offset = partial.stat().st_size if partial.exists() else 0
             if offset > item.size_bytes:
                 raise ValueError('Partial artifact exceeds its immutable manifest size')
-            stream = self.stub.DownloadArtifact(pb.DownloadRequest(job_id=job.job_id,
-                artifact_id=item.artifact_id, offset=offset),
-                timeout=self.timeout, metadata=self.metadata)
+            request = rpc.DownloadArtifactRequest(
+                job_id=job.job_id, artifact_id=item.artifact_id, offset=offset,
+                chunk_bytes=min(self.chunk_bytes, 1024 * 1024))
+            stream = self.call('DownloadArtifact', request)
             try:
                 with partial.open('ab') as output:
                     for block in stream:
