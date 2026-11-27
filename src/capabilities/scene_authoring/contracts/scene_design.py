@@ -257,8 +257,14 @@ def validate_scene_brief(design, object_ids=None):
                 problems.append(f'/relations/{index}: Scene brief needs concrete typed spatial relations')
                 valid_relations = False
                 continue
-            if object_ids is not None and (row['source'] not in object_ids or row['target'] not in object_ids | {'ground'}):
-                problems.append(f'/relations/{index}: Scene brief relation references an unavailable object')
+            if object_ids is not None:
+                if row['type'] == 'mounted_to' and row['target'] == 'ground' and 'ground' not in object_ids:
+                    problems.append(
+                        f'/relations/{index}/target: mounted_to requires an actual static scene object, '
+                        'such as the declared wall. Implicit ground is a supported_by surface.'
+                    )
+                elif row['source'] not in object_ids or row['target'] not in object_ids | {'ground'}:
+                    problems.append(f'/relations/{index}: Scene brief relation references an unavailable object')
     if valid_relations:
         try:
             validate_reference(design, object_ids)

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from capabilities.scene_authoring.contracts.scene_design import (
     saved_design, validate_brief_revision, plan_declaration_current, require_prior_brief,
+    validate_scene_brief,
 )
 from database.access import AccessScope
 from service_access.access_scope import TrustedAccess, access_context
@@ -55,6 +56,25 @@ class SceneDesignAccessTests(unittest.TestCase):
             require_prior_brief(current, directory, self.artifacts)
             with self.assertRaisesRegex(ValueError, 'reference the frozen brief'):
                 require_prior_brief({**current, 'hard_requirements': []}, directory, self.artifacts)
+
+    def test_implicit_ground_is_support_and_requires_a_named_object_for_mounting(self):
+        relation = {'type': 'mounted_to', 'source': 'cabinet', 'target': 'ground',
+                    'description': 'Mount cabinet to the west wall.'}
+        brief = {
+            'name': 'Reading room', 'summary': 'Room with a mounted cabinet.',
+            'hard_requirements': ['Keep the west wall cabinet'],
+            'physical_assumptions': ['Static fixtures'],
+            'object_roles': [{'object_id': 'cabinet', 'role': 'storage'}],
+            'relations': [relation],
+        }
+        objects = {'cabinet', 'west_wall'}
+        with self.assertRaisesRegex(ValueError, '/relations/0/target: mounted_to requires'):
+            validate_scene_brief(brief, objects)
+        validate_scene_brief(brief, objects | {'ground'})
+        relation['target'] = 'west_wall'
+        validate_scene_brief(brief, objects)
+        relation.update(type='supported_by', target='ground', description='Cabinet rests on the ground.')
+        validate_scene_brief(brief, objects)
 
     # 验证不能从其他会话的采集目录读取设计简报。
     def test_foreign_brief_directory_is_denied(self):
