@@ -297,7 +297,8 @@ def compile_scene(program, assets_root, settings, *, packed_meshes=None):
         kind = 'DomeLight' if light['kind'] == 'environment' else 'RectLight'
         light_inputs.append({'prim_path': '/World/Scene/Lights/Light' + str(index), 'kind': kind,
             'authored': {key: light[key] for key in ('id', 'color', 'intensity', 'size') if key in light}})
-        attrs = ['color3f inputs:color = ' + usd(light.get('color', [1, 1, 1])),
+        attrs = ['custom string benchforge:intensityUnit = "linear_radiance"',
+                 'color3f inputs:color = ' + usd(light.get('color', [1, 1, 1])),
                  'float inputs:intensity = ' + usd(light.get('intensity', 1))]
         if kind == 'RectLight':
             position, direction = light['position'], light.get('direction', [0, 0, -1])

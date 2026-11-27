@@ -66,12 +66,12 @@ class EvidenceContractTests(unittest.TestCase):
         self.assertIn('PhysicsRigidBodyAPI', compiled['usd'])
         self.assertIn('PhysicsMaterialAPI', compiled['usd'])
         self.assertIn('a100sim:semanticLabel', compiled['usd'])
+        self.assertIn('custom string benchforge:intensityUnit = "linear_radiance"', compiled['usd'])
         self.assertNotIn('isaacsim', compiled['usd'])
         self.assertEqual(compiled['entities']['cube']['initial_center'], [0, 0, 1.1])
-        with self.assertRaises(UnsupportedScene):
-            program = scene_program()
-            program['render_environment'] = {'renderer': 'RaytracedLighting'}
-            compile_scene(program, Path('.'), {})
+        program = scene_program()
+        program['render_environment'] = {'renderer': 'RaytracedLighting'}
+        self.assertEqual(compile_scene(program, Path('.'), {})['usd'], compiled['usd'])
 
     # 验证证据读取采用仿真步进后的变换，而非编译时初始位姿。
     def test_post_step_native_transform_is_used_instead_of_initial_pose(self):
