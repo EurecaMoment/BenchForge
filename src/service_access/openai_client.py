@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import time
 import urllib.request
+from urllib.parse import urlsplit
 from service_access.runtime_config import environment_value
 from service_access.request_context import RunContext
 from service_access.request_context import check_cancelled
@@ -152,16 +153,18 @@ def _completion_once(
                     chat_template_kwargs={'enable_thinking':False})
         body.pop('thinking_token_budget',None)
     run_context = RunContext.from_record(context)
+    base=model_url.rstrip('/')
+    url=base if base.endswith('/chat/completions') else base+'/chat/completions'
+    endpoint=urlsplit(url)
     request_record = {
         **body,
         'messages':[{'role':'user','content':prompt}],
         'image_files':[str(p) for p in images],
+        'endpoint':endpoint._replace(netloc=endpoint.netloc.rsplit('@',1)[-1], query='', fragment='').geturl(),
     }
     if run_context:
         request_record['run_context'] = run_context.to_dict()
     (trace_dir/'request.json').write_text(json.dumps(request_record,ensure_ascii=False,indent=2),encoding='utf8')
-    base=model_url.rstrip('/')
-    url=base if base.endswith('/chat/completions') else base+'/chat/completions'
     request=urllib.request.Request(url,data=json.dumps(body).encode(),headers=model_request_headers())
     pieces=[];thinking=[];usage={};finish=None;done=False;start=time.time()
     last_progress=0;characters=0;error=None

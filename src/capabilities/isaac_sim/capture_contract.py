@@ -56,7 +56,7 @@ def unsupported_fields(schema, fields, prefix=''):
     return issues
 
 
-def capture_service_issues(capabilities, compiled, scope):
+def capture_service_issues(capabilities, compiled, scope, *, upload_sizes=()):
     """批量对账整个采集流程的接口和字段，覆盖所有原生本体并保留用户物理要求。"""
     expected = [
         ('asset.import', '', {'source': {'asset_id': {}, 'relative_path': {}}, 'path': {}}),
@@ -79,6 +79,16 @@ def capture_service_issues(capabilities, compiled, scope):
                                   center=[0, 0, 0], scale=[1, 1, 1]))))
     published = {row['name']: row for row in capabilities.get('capabilities', [])}
     issues = []
+    limit = published.get('asset_upload', {}).get('details', {}).get('max_upload_bytes')
+    if type(limit) in (int, float) and 0 < limit < float('inf'):
+        issues.extend(
+            {'code': 'asset_upload_limit_exceeded', 'path': name, 'operation': 'UploadAsset',
+             'size_bytes': size, 'limit_bytes': int(limit), 'severity': 'error', 'blocking': True,
+             'message': f'Packed file {name} is {size} bytes. Isaac Sim accepts up to {int(limit)} bytes per file.',
+             'basis': 'live_isaac_sim_schema', 'repair_owner': 'service_configuration_or_adapter',
+             'retry_unchanged': False}
+            for name, size in upload_sizes if size > limit
+        )
     for operation, path, fields in expected:
         name = 'extension.' + operation
         contract = published.get(name, {})
@@ -124,12 +134,14 @@ def capture_capabilities(client):
         raise UnsupportedScene(issue['message'], issues=[issue]) from error
 
 
-def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None, delays=(2, 4, 8, 12, 20, 20, 20)):
+def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None,
+                           delays=(2, 4, 8, 12, 20, 20, 20), upload_sizes=()):
     """Recheck transient worker readiness before any mutation. Schema errors return immediately."""
     for delay in (*delays, None):
         check_cancelled(stop, 'Isaac readiness')
         try:
-            issues = capture_service_issues(capture_capabilities(client), compiled, scope)
+            issues = capture_service_issues(
+                capture_capabilities(client), compiled, scope, upload_sizes=upload_sizes)
         except UnsupportedScene as error:
             issues = error.issues
         if not issues or delay is None or not all(issue.get('retry_unchanged') for issue in issues):

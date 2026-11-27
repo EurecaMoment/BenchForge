@@ -39,6 +39,19 @@ def compiled():
 
 
 class CaptureServiceContractTests(unittest.TestCase):
+    def test_packed_layers_use_the_live_per_file_upload_limit(self):
+        catalog = capabilities()
+        catalog['capabilities'].append({'name': 'asset_upload',
+            'details': {'max_upload_bytes': 536870912.0}})
+        sizes = [('scene.usdc', 570539341), ('textures/color.png', 226104)]
+        scope = {'view_indices': [0], 'scene_export_requested': True}
+        issues = capture_service_issues(catalog, compiled(), scope, upload_sizes=sizes)
+        self.assertEqual([(row['code'], row['path'], row['size_bytes'], row['limit_bytes'])
+                          for row in issues],
+                         [('asset_upload_limit_exceeded', 'scene.usdc', 570539341, 536870912)])
+        catalog['capabilities'][-1]['details']['max_upload_bytes'] = 805306368
+        self.assertEqual(capture_service_issues(catalog, compiled(), scope, upload_sizes=sizes), [])
+
     def test_old_schema_reports_all_native_objects_and_fields_without_mutation(self):
         """一次报告旧网关对每个本体拒绝的全部字段，不建议删除硬要求。"""
         catalog, scene = capabilities(), compiled()

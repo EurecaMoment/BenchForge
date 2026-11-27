@@ -132,6 +132,8 @@ def execute_capture(store, task, stop, *, config, client=None):
             packed_meshes.clear()
         texture_files = stage_texture_dependencies(
             compiled.get('texture_dependencies', []), attempt)
+        upload_sizes = [(upload_source.name, upload_source.stat().st_size)]
+        upload_sizes.extend((item['relative_path'], item['path'].stat().st_size) for item in texture_files)
         own_client = client is None
         client = client or capture_service_client({'providers': {'IsaacSim4A100': settings}})
         requests = DurableTasks(client, attempt / 'jobs', token, stop=stop,
@@ -139,7 +141,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                 job_id=job.job_id, operation=job.operation, remote_state=document(job)['state'],
                 receipt=str(attempt / 'jobs')))
         try:
-            issues = checked_service_issues(client, compiled, scope, stop=stop,
+            issues = checked_service_issues(client, compiled, scope, stop=stop, upload_sizes=upload_sizes,
                 on_wait=lambda reason, delay: record_progress(directory, 'isaac_sim_waiting_for_worker',
                     reason=reason, retry_in_seconds=delay))
             if issues:
