@@ -127,8 +127,8 @@ class SimulationClient:
         return self.call('CancelJob', pb.GetJobRequest(job_id=job_id))
 
     # 确认产物已在本地校验落盘，允许服务端回收磁盘。
-    def ack(self, job_id):
-        return self.call('AckJob', pb.AckJobRequest(job_id=job_id))
+    def ack(self, job_id, *, timeout=None):
+        return self.call('AckJob', pb.AckJobRequest(job_id=job_id), timeout=timeout)
 
     # 可选的服务端推送；轮询仍是主要机制。
     def watch(self, job_id, *, timeout=None):

@@ -7,6 +7,7 @@ import shutil
 
 from capabilities.capture.capture_scope import capture_scope
 from capabilities.isaac_sim.authoring import compile_scene
+from capabilities.isaac_sim.artifact_ack import acknowledge_published, prepare_acknowledgments
 from capabilities.isaac_sim.evidence import (
     common_render_metadata, measured_entities, physics_summary, render_metadata, resolve_artifact, save_frame,
 )
@@ -92,6 +93,7 @@ def execute_capture(store, task, stop, *, config, client=None):
             if report.get('token') != token:
                 raise ValueError('An immutable capture already exists for a different attempt')
             store.update(task['id'], state='READY', unit={**unit, 'phase': 'review', 'capture_token': token})
+            acknowledge_published(attempt, destination, token, client)
             return
         program = json.loads((directory / 'program.json').read_text())
         settings = dict(isaac_config(config))
@@ -168,12 +170,14 @@ def execute_capture(store, task, stop, *, config, client=None):
             incoming = attempt / 'capture'
             incoming.mkdir(exist_ok=True)
             frames, native_jobs = [], [physics_job.job_id]
+            downloaded_jobs = []
             rendered_sources = {}
             entities = measured_entities(compiled, prims)
             native = {key: value for key, value in compiled['entities'].items() if not value.get('geometry_parts')}
             if native:
                 job, exported = requests.extension('geometry', 'scene.export', {'session_id': identity, 'format': 'usd'})
                 files = requests.download('geometry', job)
+                downloaded_jobs.append(job.job_id)
                 source_geometry = incoming / 'native_geometry.usdc'
                 shutil.copyfile(resolve_artifact(exported['scene'], files), source_geometry)
                 entities.update(exported_entities(source_geometry, native))
@@ -200,6 +204,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                     'session_id': identity, 'cameras': [compiled['cameras'][i] for i in indices],
                     **_capture_render_arguments(settings, compiled)})
                 files = requests.download(key, job)
+                downloaded_jobs.append(job.job_id)
                 if len(captured.get('frames', [])) != len(indices):
                     raise ValueError('Isaac Sim did not return every requested camera')
                 for index, frame in zip(indices, captured['frames']):
@@ -218,6 +223,7 @@ def execute_capture(store, task, stop, *, config, client=None):
             if scope['scene_export_requested']:
                 job, exported = requests.extension('export', 'scene.export', {'session_id': identity, 'format': 'usdz'})
                 files = requests.download('export', job)
+                downloaded_jobs.append(job.job_id)
                 shutil.copyfile(resolve_artifact(exported['scene'], files), incoming / 'scene.usdc')
                 shutil.copyfile(resolve_artifact(exported['package'], files), incoming / 'scene.usdz')
                 (incoming / 'scene.usda').write_text('#usda 1.0\n(subLayers = [@scene.usdc@])\n')
@@ -250,7 +256,9 @@ def execute_capture(store, task, stop, *, config, client=None):
             # Release the CUDA world before publishing. On reload the same
             # retained close request and immutable capture files are reused.
             requests.extension('close', 'scene.close', {'session_id': identity, 'delete': False})
+            prepare_acknowledgments(attempt, token, client.endpoint, downloaded_jobs)
             store.publish_capture(task['id'], token, incoming)
+            acknowledge_published(attempt, destination, token, client)
             record_progress(directory, 'isaac_sim_captured', views=len(frames),
                             capture_directory=str(destination), session_id=identity)
         finally:
