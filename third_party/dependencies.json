@@ -10,7 +10,7 @@
     },
     "IsaacSim4A100": {
       "path": "third_party/IsaacSim4A100",
-      "usage": "Isaac Sim deployment and simulation support on A100"
+      "usage": "Isaac Sim deployment and unified gRPC service on A100 and RTX 4090"
     },
     "FastSAM3": {
       "path": "third_party/FastSAM3",
