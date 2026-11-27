@@ -43,6 +43,11 @@ class SimulationServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Health = channel.unary_unary(
+                '/isaacsim_rpc.v1.SimulationService/Health',
+                request_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthRequest.SerializeToString,
+                response_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthResponse.FromString,
+                _registered_method=True)
         self.GetCapabilities = channel.unary_unary(
                 '/isaacsim_rpc.v1.SimulationService/GetCapabilities',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -53,6 +58,11 @@ class SimulationServiceStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=isaacsim__rpc_dot_v1_dot_native__pb2.ApiCatalog.FromString,
                 _registered_method=True)
+        self.SubmitJob = channel.unary_unary(
+                '/isaacsim_rpc.v1.SimulationService/SubmitJob',
+                request_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.SubmitJobRequest.SerializeToString,
+                response_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.JobHandle.FromString,
+                _registered_method=True)
         self.ListAssets = channel.unary_unary(
                 '/isaacsim_rpc.v1.SimulationService/ListAssets',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -62,16 +72,6 @@ class SimulationServiceStub(object):
                 '/isaacsim_rpc.v1.SimulationService/UploadAsset',
                 request_serializer=isaacsim__rpc_dot_v1_dot_native__pb2.UploadChunk.SerializeToString,
                 response_deserializer=isaacsim__rpc_dot_v1_dot_native__pb2.AssetFile.FromString,
-                _registered_method=True)
-        self.Health = channel.unary_unary(
-                '/isaacsim_rpc.v1.SimulationService/Health',
-                request_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthRequest.SerializeToString,
-                response_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthResponse.FromString,
-                _registered_method=True)
-        self.SubmitJob = channel.unary_unary(
-                '/isaacsim_rpc.v1.SimulationService/SubmitJob',
-                request_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.SubmitJobRequest.SerializeToString,
-                response_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.JobHandle.FromString,
                 _registered_method=True)
         self.GetJob = channel.unary_unary(
                 '/isaacsim_rpc.v1.SimulationService/GetJob',
@@ -110,8 +110,17 @@ class SimulationServiceServicer(object):
 
     """
 
+    def Health(self, request, context):
+        """Service health and runtime metadata.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetCapabilities(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Typed simulator capabilities and feature catalog. Unsupported features
+        remain discoverable and are rejected before queue admission.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -122,28 +131,23 @@ class SimulationServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SubmitJob(self, request, context):
+        """Idempotent submission across ordinary simulations and typed native tasks.
+        The same request_id and payload return the original job.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ListAssets(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Upload one immutable asset file using the native asset contract.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def UploadAsset(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Health(self, request, context):
-        """Service health and runtime metadata.
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SubmitJob(self, request, context):
-        """Idempotent submission: the same request_id and payload return the original job.
-        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -186,6 +190,11 @@ class SimulationServiceServicer(object):
 
 def add_SimulationServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Health': grpc.unary_unary_rpc_method_handler(
+                    servicer.Health,
+                    request_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthRequest.FromString,
+                    response_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthResponse.SerializeToString,
+            ),
             'GetCapabilities': grpc.unary_unary_rpc_method_handler(
                     servicer.GetCapabilities,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
@@ -196,6 +205,11 @@ def add_SimulationServiceServicer_to_server(servicer, server):
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=isaacsim__rpc_dot_v1_dot_native__pb2.ApiCatalog.SerializeToString,
             ),
+            'SubmitJob': grpc.unary_unary_rpc_method_handler(
+                    servicer.SubmitJob,
+                    request_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.SubmitJobRequest.FromString,
+                    response_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.JobHandle.SerializeToString,
+            ),
             'ListAssets': grpc.unary_unary_rpc_method_handler(
                     servicer.ListAssets,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
@@ -205,16 +219,6 @@ def add_SimulationServiceServicer_to_server(servicer, server):
                     servicer.UploadAsset,
                     request_deserializer=isaacsim__rpc_dot_v1_dot_native__pb2.UploadChunk.FromString,
                     response_serializer=isaacsim__rpc_dot_v1_dot_native__pb2.AssetFile.SerializeToString,
-            ),
-            'Health': grpc.unary_unary_rpc_method_handler(
-                    servicer.Health,
-                    request_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthRequest.FromString,
-                    response_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthResponse.SerializeToString,
-            ),
-            'SubmitJob': grpc.unary_unary_rpc_method_handler(
-                    servicer.SubmitJob,
-                    request_deserializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.SubmitJobRequest.FromString,
-                    response_serializer=isaacsim__rpc_dot_v1_dot_simulation__pb2.JobHandle.SerializeToString,
             ),
             'GetJob': grpc.unary_unary_rpc_method_handler(
                     servicer.GetJob,
@@ -258,6 +262,33 @@ class SimulationService(object):
     can reclaim disk space.
 
     """
+
+    @staticmethod
+    def Health(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/isaacsim_rpc.v1.SimulationService/Health',
+            isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthRequest.SerializeToString,
+            isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def GetCapabilities(request,
@@ -314,6 +345,33 @@ class SimulationService(object):
             _registered_method=True)
 
     @staticmethod
+    def SubmitJob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/isaacsim_rpc.v1.SimulationService/SubmitJob',
+            isaacsim__rpc_dot_v1_dot_simulation__pb2.SubmitJobRequest.SerializeToString,
+            isaacsim__rpc_dot_v1_dot_simulation__pb2.JobHandle.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def ListAssets(request,
             target,
             options=(),
@@ -357,60 +415,6 @@ class SimulationService(object):
             '/isaacsim_rpc.v1.SimulationService/UploadAsset',
             isaacsim__rpc_dot_v1_dot_native__pb2.UploadChunk.SerializeToString,
             isaacsim__rpc_dot_v1_dot_native__pb2.AssetFile.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def Health(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/isaacsim_rpc.v1.SimulationService/Health',
-            isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthRequest.SerializeToString,
-            isaacsim__rpc_dot_v1_dot_simulation__pb2.HealthResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SubmitJob(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/isaacsim_rpc.v1.SimulationService/SubmitJob',
-            isaacsim__rpc_dot_v1_dot_simulation__pb2.SubmitJobRequest.SerializeToString,
-            isaacsim__rpc_dot_v1_dot_simulation__pb2.JobHandle.FromString,
             options,
             channel_credentials,
             insecure,

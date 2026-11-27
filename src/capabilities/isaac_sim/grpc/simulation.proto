@@ -13,15 +13,21 @@ import "isaacsim_rpc/v1/native.proto";
 // can reclaim disk space.
 
 service SimulationService {
-  rpc GetCapabilities(google.protobuf.Empty) returns (native.Capabilities);
-  rpc GetApiCatalog(google.protobuf.Empty) returns (native.ApiCatalog);
-  rpc ListAssets(google.protobuf.Empty) returns (native.AssetList);
-  rpc UploadAsset(stream native.UploadChunk) returns (native.AssetFile);
   // Service health and runtime metadata.
   rpc Health(HealthRequest) returns (HealthResponse);
 
-  // Idempotent submission: the same request_id and payload return the original job.
+  // Typed simulator capabilities and feature catalog. Unsupported features
+  // remain discoverable and are rejected before queue admission.
+  rpc GetCapabilities(google.protobuf.Empty) returns (native.Capabilities);
+  rpc GetApiCatalog(google.protobuf.Empty) returns (native.ApiCatalog);
+
+  // Idempotent submission across ordinary simulations and typed native tasks.
+  // The same request_id and payload return the original job.
   rpc SubmitJob(SubmitJobRequest) returns (JobHandle);
+
+  // Upload one immutable asset file using the native asset contract.
+  rpc ListAssets(google.protobuf.Empty) returns (native.AssetList);
+  rpc UploadAsset(stream native.UploadChunk) returns (native.AssetFile);
 
   // Job state, progress and the complete artifact manifest once succeeded.
   rpc GetJob(GetJobRequest) returns (Job);
@@ -183,7 +189,9 @@ message JobHandle {
 }
 
 message GetJobRequest {
+  // 32 lower-case hexadecimal characters.
   string job_id = 1;
+  // Used by WatchJob to resume after a known state transition.
   uint64 after_revision = 2;
 }
 
@@ -290,6 +298,9 @@ message Job {
   string phase = 25;
   uint32 frames_done = 26;
   uint32 frames_total = 27;
+
+  // Present for jobs submitted through the native task/feature contract. It is
+  // retained as the original typed receipt for durable job ownership.
   native.Job native_job = 28;
 }
 
