@@ -1,5 +1,6 @@
 """Resolve the provider settings used by DSH and the production service."""
 
+import math
 import re
 from ipaddress import IPv6Address
 from urllib.parse import urlsplit
@@ -139,7 +140,8 @@ def validate_providers(config):
     isaac = isaac_config(config)
     field = f'providers.{ISAAC_PROVIDER}'
     _validate_fields(isaac, field, {'grpc', 'capture_timeout_seconds', 'max_concurrent_captures',
-                                  'image_size', 'samples_per_pixel', 'asset_sources', 'interactive_preview'})
+                                  'image_size', 'samples_per_pixel', 'asset_sources', 'interactive_preview',
+                                  'unified_capture'})
     for key, low, high, default in (('max_concurrent_captures', 1, 32, 4),
                                    ('image_size', 64, 2048, 1024), ('samples_per_pixel', 1, 1024, 256)):
         value = isaac.get(key, default)
@@ -164,18 +166,43 @@ def validate_providers(config):
         _validate_fields(binding, field + '.asset_sources.' + identity, {'asset_id', 'relative_path', 'fix_base'})
         if not all(isinstance(binding.get(key), str) and binding[key] for key in ('asset_id', 'relative_path')):
             raise ValueError('Isaac Sim asset binding needs asset_id and relative_path')
-    grpc = isaac.get('grpc', {})
+    _validate_isaac_grpc(isaac.get('grpc', {}), field + '.grpc')
+    if 'unified_capture' in isaac:
+        unified = isaac['unified_capture']
+        if not isinstance(unified, dict):
+            raise ValueError(f'{field}.unified_capture must be an object')
+        _validate_fields(unified, field + '.unified_capture', {'grpc', 'mesh_assets'})
+        if 'grpc' in unified:
+            _validate_isaac_grpc(unified['grpc'], field + '.unified_capture.grpc')
+        meshes = unified.get('mesh_assets', {})
+        if not isinstance(meshes, dict):
+            raise ValueError(f'{field}.unified_capture.mesh_assets must be an object')
+        for binding in meshes.values():
+            if not isinstance(binding, dict) or set(binding) != {'asset_id', 'bounds_m'}:
+                raise ValueError('A registered mesh requires asset_id and bounds_m')
+            asset_id = binding['asset_id']
+            if not isinstance(asset_id, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', asset_id):
+                raise ValueError('A registered mesh asset_id must be a portable registry name')
+            bounds = binding['bounds_m']
+            if (not isinstance(bounds, list) or len(bounds) != 2 or
+                    any(not isinstance(row, list) or len(row) != 3 or
+                        any(type(x) not in (int, float) or not math.isfinite(x) for x in row) for row in bounds)
+                    or any(lo >= hi for lo, hi in zip(*bounds))):
+                raise ValueError('A registered mesh bounds_m requires two ordered xyz corners in meters')
+    timeout = capture_timeout(isaac)
+    if type(timeout) not in (int, float) or not 0 < timeout < float('inf'):
+        raise ValueError(f'{field}.capture_timeout_seconds must be a positive number')
+
+
+def _validate_isaac_grpc(grpc, field):
     if not isinstance(grpc, dict):
-        raise ValueError(f'providers.{ISAAC_PROVIDER}.grpc must be a JSON object')
-    _validate_fields(grpc, f'providers.{ISAAC_PROVIDER}.grpc', {'host', 'port', 'timeout_seconds', 'token_env', 'tls_ca_file'})
-    _validate_token(grpc, f'providers.{ISAAC_PROVIDER}.grpc')
+        raise ValueError(f'{field} must be a JSON object')
+    _validate_fields(grpc, field, {'host', 'port', 'timeout_seconds', 'token_env', 'tls_ca_file'})
+    _validate_token(grpc, field)
     if grpc.get('host') is not None:
         isaac_endpoint(grpc)
     if 'timeout_seconds' in grpc and (type(grpc['timeout_seconds']) is not int or grpc['timeout_seconds'] <= 0):
-        raise ValueError(f'providers.{ISAAC_PROVIDER}.grpc.timeout_seconds must be a positive integer')
-    timeout = capture_timeout(isaac)
-    if type(timeout) not in (int, float) or not 0 < timeout < float('inf'):
-        raise ValueError(f'providers.{ISAAC_PROVIDER}.capture_timeout_seconds must be a positive number')
+        raise ValueError(f'{field}.timeout_seconds must be a positive integer')
 
 
 # 拒绝配置对象中超出指定允许集合的字段，指出出错配置位置。
