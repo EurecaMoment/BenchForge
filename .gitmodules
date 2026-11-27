@@ -9,7 +9,7 @@
 [submodule "third_party/IsaacSim4A100"]
 	path = third_party/IsaacSim4A100
 	url = https://github.com/EurecaMoment/IsaacSim4A100.git
-	branch = A100
+	branch = main
 	shallow = true
 [submodule "third_party/FastSAM3"]
 	path = third_party/FastSAM3
