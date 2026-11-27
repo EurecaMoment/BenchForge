@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from storage.files import safe_path, write_json
+from service_access.runtime_config import environment_value
 from capabilities.scene_authoring.program_submission import submission_identity
 from capabilities.scene_authoring.validation.acceptance import (
     SCENE_ACCEPTANCE_POLICY_VERSION, admit_program, native_capture, require_accepted, verify_capture_versions,
@@ -12,6 +13,21 @@ from capabilities.isaac_sim.scene_requirements import validate_scene_requirement
 from pipelines.scene_production.service_failures import (
     is_execution_diagnosis, is_service_failure, verify_capture_service_recovery,
 )
+
+
+def retryable_review_failure(failure):
+    """Recognize transport failures and restored model credentials in stored review failures."""
+    kind = failure.get('error')
+    if kind == 'HTTPError':
+        return str(failure.get('detail', '')).startswith(tuple(
+            f'HTTP Error {code}:' for code in (408, 429, 500, 502, 503, 504)
+        ))
+    if kind == 'ValueError':
+        name = environment_value('BENCHFORGE_MODEL_API_KEY_ENV')
+        return bool(name and failure.get('detail') == f'The scene model token_env references unset variable {name}'
+                    and environment_value(name))
+    return kind in {'TimeoutError', 'URLError', 'ConnectionError', 'OSError', 'RemoteDisconnected',
+                    'ConnectionResetError', 'ConnectionAbortedError'}
 
 
 def review_retry_evidence(directory, unit, *, archived):
@@ -159,16 +175,7 @@ class SceneLifecycle:
             review_failure = (
                 task["unit"]["phase"] == "review"
                 and feedback is None
-                and (task.get("failure") or {}).get("error")
-                in {
-                    "TimeoutError",
-                    "URLError",
-                    "ConnectionError",
-                    "OSError",
-                    "RemoteDisconnected",
-                    "ConnectionResetError",
-                    "ConnectionAbortedError",
-                }
+                and retryable_review_failure(failure)
             )
             if not capture_failure and not review_failure:
                 raise ValueError(

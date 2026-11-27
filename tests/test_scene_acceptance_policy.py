@@ -13,7 +13,7 @@ from capabilities.scene_authoring.validation.acceptance import (
     SCENE_ACCEPTANCE_POLICY_VERSION, VISUAL_CHECKS, capture_acceptance, native_capture,
 )
 from capabilities.scene_authoring.validation.support_relations import support_check, support_path
-from pipelines.scene_production.lifecycle import SceneLifecycle
+from pipelines.scene_production.lifecycle import SceneLifecycle, retryable_review_failure
 from pipelines.scene_production.review import review_scene
 
 
@@ -193,6 +193,20 @@ class AcceptancePolicyTests(unittest.TestCase):
                             'policy_version': 2,
                             'evidence_versions': versions}
         (self.directory / 'scene_acceptance.json').write_text(json.dumps(self.old_receipt), encoding='utf-8')
+
+    def test_review_retry_recognizes_only_the_restored_configured_credential(self):
+        failure = {'error': 'ValueError', 'detail': 'The scene model token_env references unset variable REVIEW_TEST_KEY'}
+        with patch.dict('os.environ', {'BENCHFORGE_MODEL_API_KEY_ENV': 'REVIEW_TEST_KEY', 'REVIEW_TEST_KEY': ''}):
+            self.assertFalse(retryable_review_failure(failure))
+            with patch.dict('os.environ', {'REVIEW_TEST_KEY': 'test-value'}):
+                self.assertTrue(retryable_review_failure(failure))
+                self.assertFalse(retryable_review_failure({**failure, 'detail': 'Review rejected the scene'}))
+                self.assertFalse(retryable_review_failure({**failure, 'detail': failure['detail'] + '_OTHER'}))
+
+    def test_review_retry_matches_transient_http_responses_only(self):
+        for code, expected in [(503, True), (429, True), (422, False), (403, False)]:
+            failure = {'error': 'HTTPError', 'detail': f'HTTP Error {code}: upstream'}
+            self.assertEqual(retryable_review_failure(failure), expected)
 
     def test_review_only_consumes_original_evidence_and_preserves_prior_receipt(self):
         self.write_old_review()
