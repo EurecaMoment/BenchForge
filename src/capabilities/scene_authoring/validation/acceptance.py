@@ -6,6 +6,7 @@ flag potential contact for review. Critical unresolved contact blocks acceptance
 import json
 import hashlib
 import math
+import re
 from pathlib import Path
 
 from capabilities.scene_authoring.geometry.relations import native_part_bounds
@@ -20,6 +21,51 @@ from capabilities.scene_authoring.validation.support_relations import (
     native_support, relation_requires_measurement, support_check, support_path, visual_relation_indices,
 )
 from storage.files import safe_path
+
+
+def native_capture(report, evidence, capture):
+    """Recognize a unified capture only when its published frames match its native job manifest."""
+    protocol = 'isaacsim_rpc.v1.SimulationService'
+    if evidence.get('origin') == 'isaac_native':
+        return True
+    if (evidence.get('origin') != 'isaacsim_rpc' or report.get('protocol') != protocol
+            or evidence.get('protocol') != protocol or not report.get('token')
+            or report['token'] != evidence.get('token') or report.get('manifest') != 'manifest.json'):
+        return False
+    try:
+        manifest = json.loads((capture / 'manifest.json').read_text(encoding='utf-8'))
+        jobs = manifest['jobs']
+        ids = [job['job_id'] for job in jobs]
+        if (not ids or ids != report.get('job_ids') or ids != evidence.get('job_ids')
+                or manifest['protocol'] != protocol or manifest['capture_token'] != report['token']
+                or manifest['schema'] != 'benchforge.isaacsim_manifest/v1'):
+            return False
+        images = {(job['job_id'], item['relative_path'].removeprefix(job['job_id'] + '/')): item
+                  for job in jobs for item in job['artifacts'] if item['name'] == 'render.png'}
+        frames = evidence['frames']
+        if not frames:
+            return False
+        for frame in frames:
+            name = frame['frame_id']
+            match = re.fullmatch(r'(?:view_(\d+)|process_view_(\d+)_step_(\d+))', name)
+            if not match or frame['image'] != name + '.png':
+                return False
+            step = frame['step_id']
+            if match[3] and int(match[3]) != step:
+                return False
+            source = f'frames/frame_{step:06d}/views/view_{match[1] or match[2]}/render.png'
+            records = [images[job_id, source] for job_id in ids if (job_id, source) in images]
+            if len(records) != 1:
+                return False
+            image = safe_path(capture, frame['image'], must_exist=True)
+            if image.stat().st_size != records[0]['size_bytes']:
+                return False
+            with image.open('rb') as stream:
+                if hashlib.file_digest(stream, 'sha256').hexdigest() != records[0]['sha256']:
+                    return False
+    except (OSError, TypeError, KeyError, ValueError):
+        return False
+    return True
 
 SCENE_ACCEPTANCE_POLICY_VERSION = 3
 
@@ -76,7 +122,7 @@ def capture_acceptance(root, program, report, evidence, review, capture, executi
         issues.extend(format_issue(row) for row in admission['issues'] if row['blocking'])
     except (ValueError, OSError, KeyError, TypeError) as error:issues.append(str(error))
     physics = evidence.get('physics', {})
-    if report.get('status') != 'captured' or report.get('renderable') is not True or evidence.get('origin') != 'isaac_native':
+    if report.get('status') != 'captured' or report.get('renderable') is not True or not native_capture(report, evidence, capture):
         issues.append('Actual native rendered capture is required')
     if not report.get('token') or evidence.get('token') != report.get('token'):
         issues.append('Native capture evidence must bind this exact capture token')

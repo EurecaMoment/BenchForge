@@ -1,5 +1,6 @@
 """Regression coverage for physical advisories and frozen S2 re-review."""
 import json
+import hashlib
 import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -9,7 +10,7 @@ from unittest.mock import Mock, patch
 
 from capabilities.scene_authoring.geometry.relations import native_part_bounds
 from capabilities.scene_authoring.validation.acceptance import (
-    SCENE_ACCEPTANCE_POLICY_VERSION, VISUAL_CHECKS, capture_acceptance,
+    SCENE_ACCEPTANCE_POLICY_VERSION, VISUAL_CHECKS, capture_acceptance, native_capture,
 )
 from capabilities.scene_authoring.validation.support_relations import support_check, support_path
 from pipelines.scene_production.lifecycle import SceneLifecycle
@@ -56,6 +57,25 @@ class AcceptancePolicyTests(unittest.TestCase):
         with patch('capabilities.scene_authoring.validation.acceptance._policy_for_mode', return_value={'enabled': True}), \
                 patch('capabilities.scene_authoring.validation.acceptance.admit_program', return_value=self.admission):
             return capture_acceptance(self.root, self.program, self.report, self.evidence, self.review, self.capture)
+
+    def test_unified_capture_requires_bound_native_job_and_published_rgb(self):
+        protocol = 'isaacsim_rpc.v1.SimulationService'
+        report = dict(self.report, protocol=protocol, manifest='manifest.json', job_ids=['job'])
+        evidence = dict(self.evidence, origin='isaacsim_rpc', protocol=protocol, job_ids=['job'],
+                        frames=[{'frame_id': 'view_0', 'image': 'view_0.png', 'step_id': 180}])
+        image = self.capture / 'view_0.png'
+        content = image.read_bytes()
+        manifest = {'schema': 'benchforge.isaacsim_manifest/v1', 'capture_token': report['token'],
+                    'protocol': protocol, 'jobs': [{'job_id': 'job', 'artifacts': [
+                        {'name': 'render.png', 'relative_path': 'job/frames/frame_000180/views/view_0/render.png',
+                         'size_bytes': len(content), 'sha256': hashlib.sha256(content).hexdigest()}]}]}
+        (self.capture / 'manifest.json').write_text(json.dumps(manifest))
+        self.assertTrue(native_capture(report, evidence, self.capture))
+        self.assertFalse(native_capture(report, dict(evidence, origin='preview'), self.capture))
+        self.assertFalse(native_capture(report, dict(evidence, protocol='other'), self.capture))
+        self.assertFalse(native_capture(dict(report, job_ids=['other']), evidence, self.capture))
+        image.write_bytes(bytes(len(content)))
+        self.assertFalse(native_capture(report, evidence, self.capture))
 
     def test_static_bounds_are_advisory_for_a_visible_usable_scene(self):
         result = self.accept()

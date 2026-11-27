@@ -5,7 +5,7 @@ from pathlib import Path
 from storage.files import safe_path, write_json
 from capabilities.scene_authoring.program_submission import submission_identity
 from capabilities.scene_authoring.validation.acceptance import (
-    SCENE_ACCEPTANCE_POLICY_VERSION, admit_program, require_accepted, verify_capture_versions,
+    SCENE_ACCEPTANCE_POLICY_VERSION, admit_program, native_capture, require_accepted, verify_capture_versions,
 )
 from capabilities.scene_authoring.validation.policy import policy_for, check_references
 from capabilities.isaac_sim.scene_requirements import validate_scene_requirements
@@ -33,7 +33,7 @@ def review_retry_evidence(directory, unit, *, archived):
     if (not token or any(row.get(key) != token for row, key in (
             (receipt, 'capture_token'), (report, 'token'), (evidence, 'token')))
             or report.get('status') != 'captured' or report.get('renderable') is not True
-            or evidence.get('origin') != 'isaac_native' or not camera_count
+            or not native_capture(report, evidence, directory / 'capture') or not camera_count
             or any(f'capture/view_{index}.png' not in versions or f'view_{index}' not in frame_ids
                    for index in range(camera_count))):
         raise ValueError('Review-only retry needs the original native capture token and all frozen camera views')

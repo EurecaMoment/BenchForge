@@ -9,7 +9,7 @@ from service_access.progress import record_progress
 from capabilities.scene_authoring.geometry.preview import compact_preview
 from capabilities.scene_authoring.validation.support_relations import visual_relation_indices
 from capabilities.scene_authoring.validation.acceptance import (
-    SCENE_ACCEPTANCE_POLICY_VERSION, capture_acceptance, verify_capture_versions,
+    SCENE_ACCEPTANCE_POLICY_VERSION, capture_acceptance, native_capture, verify_capture_versions,
 )
 from capabilities.scene_authoring.validation.review_reference import review_spatial_context
 from capabilities.scene_authoring.validation.review_reference import GUIDANCE as REFERENCE_GUIDANCE
@@ -187,7 +187,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
     if spatial_context is not None:review['spatial_reference_context']=spatial_context
     review['physical_stable']=report.get('physics',{}).get('stable',False);review['renderable']=report.get('renderable',False)
     frames=evidence.get('frames',[])
-    native=evidence.get('origin')=='isaac_native'
+    native=native_capture(report, evidence, capture)
     views=[frame for frame in frames if isinstance(frame,dict) and isinstance(frame.get('frame_id'),str) and (capture/(frame['frame_id']+'.png')).is_file()]
     quality_capture={**report,'views':views,'depth':[],'segmentation':{},'semantic_labels':{},'interaction':evidence.get('interaction',{})}
     for frame in views:
