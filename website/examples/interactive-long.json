@@ -1,0 +1,68 @@
+{
+  "provenance": {
+    "source_supplement_page": [12, 14, 15],
+    "scope": "selected_fields_transcribed_from_supplement"
+  },
+  "disclosure": "This JSON transcribes selected fields reported in the supplementary material. It omits complete simulator-restoration data and executable scoring/verifier code; it is not a complete runnable task package.",
+  "task": {
+    "task_id": "Bathroom403-00-wash-stow",
+    "eval_set": "long_hard",
+    "instructions": {
+      "micro": "Rinse the soap bar at the sink and put it on the counter top; rinse the cloth at the sink and put it on the counter top; put the scrub brush on the counter top; put the plunger on the counter top."
+    },
+    "scene": {
+      "floor_plan": "FloorPlan403",
+      "room_type": "Bathroom",
+      "random_spawn": {
+        "seed": 0,
+        "object_counts": {
+          "SoapBar": 1,
+          "Cloth": 1,
+          "ScrubBrush": 1,
+          "Plunger": 1
+        }
+      }
+    },
+    "pddl_params": {
+      "subtasks": [
+        {
+          "task_type": "pick_clean_then_place_in_recep",
+          "pddl_params": { "object_target": "SoapBar", "parent_target": "CounterTop" }
+        },
+        {
+          "task_type": "pick_clean_then_place_in_recep",
+          "pddl_params": { "object_target": "Cloth", "parent_target": "CounterTop" }
+        },
+        {
+          "task_type": "pick_and_place_simple",
+          "pddl_params": { "object_target": "ScrubBrush", "parent_target": "CounterTop" }
+        },
+        {
+          "task_type": "pick_and_place_simple",
+          "pddl_params": { "object_target": "Plunger", "parent_target": "CounterTop" }
+        }
+      ]
+    },
+    "completion": { "mode": "all" }
+  },
+  "execution": {
+    "model": "GPT-5.5",
+    "subtasks_completed": 4,
+    "steps": 60,
+    "invalid_actions": 4,
+    "success": true,
+    "trajectory_eqa": { "correct": 9, "total": 15, "display": "9/15" },
+    "trajectory_scope": "Selected observations and action labels reported in the supplement; this is not the complete 60-step trajectory.",
+    "trajectory_checkpoints": [
+      { "step": 0, "event": "Restored initial state." },
+      { "step": 8, "action": "Place the plunger." },
+      { "step": 16, "action": "Place the scrub brush." },
+      { "step": 25, "action": "Pick up the cloth." },
+      { "step": 31, "action": "Place the rinsed cloth." },
+      { "step": 45, "action": "Search near the shower." },
+      { "step": 51, "action": "Rinse the soap bar." },
+      { "step": 60, "action": "Place the soap bar on the counter." }
+    ],
+    "reported_result": "GPT-5.5 completes all four subtasks in 60 actions. Four invalid actions are recorded, but execution continues and all goal conditions are eventually satisfied."
+  }
+}

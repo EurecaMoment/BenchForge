@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Embodied-BenchForge: A Closed-Loop Agentic Workflow for Embodied Benchmark Construction.">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#ffffff">
+  <title>Embodied-BenchForge: Embodied Benchmark Construction</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/data/cases.js" defer></script>
+  <script src="assets/data/showcase.js" defer></script>
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#abstract">Skip to content</a>
+  <main>
+    <header class="paper-header container">
+      <h1><span class="project-name">Embodied-BenchForge:</span><br>A Closed-Loop Agentic Workflow for<br class="desktop-break"> Embodied Benchmark Construction</h1>
+      <p class="authors"><span>Baoyang Jiang<sup>1</sup>,</span> <span>Fengchun Zhang<sup>2</sup>,</span> <span>Leyuan Wang<sup>3</sup>,</span> <span>Haotian Li<sup>3</sup>,</span> <span>Yida Wang<sup>3</sup>,</span> <span>Zhe Ji<sup>4</sup>,</span><br class="desktop-break"> <span>Jinshan Lai<sup>2</sup>,</span> <span>Xi Ren<sup>5</sup>,</span> <span>Danyang Li<sup>6</sup>,</span> <span>Zheng Yang<sup>6</sup>,</span> <span>Jianwei Hu<sup>1</sup>,</span> <span>Qiang Ma<sup>1,†</sup></span></p>
+      <p class="affiliations"><span><sup>1</sup>QiYuan Lab</span><span><sup>2</sup>University of Electronic Science and Technology of China</span><br class="desktop-break"><span><sup>3</sup>Beijing University of Posts and Telecommunications</span><span><sup>4</sup>Northeastern University</span><br class="desktop-break"><span><sup>5</sup>Beihang University</span><span><sup>6</sup>Tsinghua University</span><span>† Corresponding author</span></p>
+      <div class="publication-links" aria-label="Paper resources">
+        <a class="resource-button" href="https://arxiv.org/abs/2609.13082" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l5 5v15H5V2h1Zm7 2v5h5M8 13h8M8 17h8"/></svg>Paper</a>
+        <a class="resource-button" href="https://github.com/EurecaMoment/BenchForge" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18"/></svg>Code</a>
+        <a class="resource-button" href="#examples"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>Examples</a>
+      </div>
+    </header>
+
+    <section class="teaser container" aria-label="Framework overview">
+      <figure>
+        <a class="figure-link" href="assets/images/overview.webp" target="_blank" rel="noopener" aria-label="Open the framework overview at full resolution"><img src="assets/images/overview.webp" alt="Embodied-BenchForge overview: forward artifact synthesis and backward verification and repair produce offline QA and interactive task artifacts." width="1721" height="763"></a>
+        <figcaption><strong>Embodied-BenchForge</strong> transforms evaluation intents and embodied resources into grounded question-answering benchmarks and executable tasks through artifact-specific verification and targeted repair.</figcaption>
+      </figure>
+      <nav class="section-nav" aria-label="Page sections"><a href="#abstract">Abstract</a><span>·</span><a href="#method">Method</a><span>·</span><a href="#examples">Benchmark examples</a><span>·</span><a href="#interactive">Interactive tasks</a><span>·</span><a href="#results">Results</a></nav>
+    </section>
+
+    <section class="abstract-section" id="abstract">
+      <div class="text-container section-pad">
+        <h2>Abstract</h2>
+        <p>Building embodied benchmarks requires consistent observations, evidence, questions, reference answers, task specifications, and executable verifiers. Errors in intermediate artifacts can propagate through construction and compromise the resulting evaluation. We present <strong>Embodied-BenchForge</strong>, an agentic framework that transforms user-specified evaluation intents into complete embodied benchmark artifacts. The framework combines forward artifact synthesis with backward verification and repair. Typed, reusable skills compose the construction workflow, artifact-specific requirement contracts check intermediate outputs, and recorded provenance guides local re-execution or upstream rollback when verification fails. Using this framework, we construct six benchmarks in the Offline EQA Track and an Interactive Embodied Track containing 220 executable tasks. The two tracks evaluate observation-based understanding and closed-loop task execution. Artifact-quality assessment, construction-cost analysis, component ablations, and model evaluations examine the resulting benchmarks and the roles of verification and repair.</p>
+      </div>
+    </section>
+
+    <section class="container section-pad" id="method">
+      <h2>Method Overview</h2>
+      <p class="section-intro">Benchmark construction is organized around dependent artifacts, each with explicit requirements and recorded provenance.</p>
+      <div class="method-description">
+        <p><strong>Skill-orchestrated synthesis.</strong> Typed, reusable skills connect intent blueprinting, data collection, evidence and state structuring, benchmark synthesis, and evaluation reporting. Inputs and outputs remain traceable throughout the workflow.</p>
+        <p><strong>Artifact-specific verification.</strong> Requirements check structure, grounding, semantics, or execution according to the artifact type. For example, an answer must follow from the model-visible evidence, while an interactive instruction must agree with its goal and terminal verifier.</p>
+        <p><strong>Provenance-guided repair.</strong> A failed requirement is traced to the affected construction dependencies. The workflow can correct a field, re-execute a skill, or roll back to an upstream artifact, then reconstruct and revalidate the affected descendants.</p>
+      </div>
+      <figure class="method-figure"><a class="figure-link" href="assets/images/method-overview.webp" target="_blank" rel="noopener" aria-label="Open the detailed construction and verification workflow"><img src="assets/images/method-overview.webp" alt="Detailed construction workflow with typed intermediate artifacts, requirement contracts, quality gates, and dependency-guided repair." loading="lazy"></a><figcaption>The construction and verification workflow. Candidate artifacts pass requirement contracts and track-specific quality gates; failures trigger diagnosis and repair of the affected dependencies.</figcaption></figure>
+    </section>
+
+    <section class="examples-section section-pad" id="examples">
+      <div class="container">
+        <h2>Generated Benchmark Examples</h2>
+        <p class="section-intro">The Offline EQA Track contains <strong>60,000 questions</strong> across six embodied settings, with <strong>10,000 items per setting</strong>.<br> Browse 33 selected examples with their source images, original questions, and reference answers.</p>
+        <div class="example-tabs" id="example-tabs" role="tablist" aria-label="Offline benchmark settings"></div>
+        <article id="example-content" class="example-content" role="tabpanel"></article>
+        <details class="repair-library"><summary>Verification and repair case studies</summary><div class="repair-library-controls"><label for="repair-select">Case study</label><select id="repair-select"><option value="sht">Household: answer and scoring key</option><option value="shn">Navigation: answer-revealing option</option><option value="sd">Driving: visual anchors</option><option value="sa">Manipulation: temporal evidence</option><option value="sq">Quadruped: image–pose binding</option><option value="su">UAV: insufficient evidence</option></select></div><div id="repair-content"></div></details>
+        <noscript><p>Enable JavaScript to browse the benchmark examples, or read the <a href="https://arxiv.org/abs/2609.13082" target="_blank" rel="noopener">paper</a>.</p></noscript>
+      </div>
+    </section>
+
+    <section class="container section-pad" id="interactive">
+      <h2>Interactive Embodied Tasks</h2>
+      <p class="section-intro">Executable task specifications include an initial state, an instruction, an action space, and a terminal verifier.<br> Recorded trajectories support a separate assessment of trajectory-grounded question answering.</p>
+      <div class="trajectory-tabs" role="tablist" aria-label="Interactive examples"><button id="tab-short" role="tab" aria-controls="trajectory-content" aria-selected="true" tabindex="0" data-task="0">Short task: Slice and place</button><button id="tab-long" role="tab" aria-controls="trajectory-content" aria-selected="false" tabindex="-1" data-task="1">Long task: Wash and stow</button></div>
+      <div id="trajectory-content" role="tabpanel" aria-labelledby="tab-short"></div>
+      <p class="small-note">JSON downloads contain selected task fields and recorded trajectory checkpoints.</p>
+      <details class="consistency-example"><summary>Example of instruction–goal consistency repair</summary><div class="consistency-body"><p>For <code>Kitchen26-00-hot-meal</code>, the visible instruction and the executable PDDL goal initially assign four objects to different destinations. Repair aligns the task specification and recompiles the verifier; old reference trajectories and evaluation records are invalidated.</p><div class="state-toggle" role="group" aria-label="Instruction goal state"><button id="goal-before" aria-pressed="true" class="is-active">Before repair</button><button id="goal-after" aria-pressed="false">After repair</button></div><div class="table-scroll" id="goal-table"></div><p id="goal-verdict" class="small-note" aria-live="polite"></p></div></details>
+    </section>
+
+    <section class="results-section section-pad" id="results">
+      <div class="container">
+        <h2>Construction Results</h2>
+        <p class="section-intro">Verification and repair are evaluated through system-level and process-level ablations.</p>
+        <div class="result-tables">
+          <div><h3>System-level ablation</h3><p class="table-subtitle">Average across the six Offline EQA benchmarks</p><div class="table-scroll"><table class="paper-table"><thead><tr><th scope="col">Setting</th><th scope="col">Human quality</th><th scope="col">Valid rate</th></tr></thead><tbody><tr class="ours"><td>Full system</td><td><strong>91.28</strong></td><td><strong>93.7%</strong></td></tr><tr><td>w/o verification &amp; repair</td><td>68.03</td><td>62.4%</td></tr><tr><td>w/o source grounding</td><td>72.12</td><td>73.6%</td></tr><tr><td>w/o evidence skill</td><td>74.08</td><td>80.8%</td></tr></tbody></table></div><p class="table-caption">Selected rows from Table 7. Valid rate measures candidates satisfying all mandatory requirements before release.</p></div>
+          <div><h3>Provenance-guided repair</h3><p class="table-subtitle">SpatialUAV, with the same request for 1,000 items</p><div class="table-scroll"><table class="paper-table"><thead><tr><th scope="col">Setting</th><th scope="col">Tokens</th><th scope="col">Valid rate</th></tr></thead><tbody><tr class="ours"><td>Full process</td><td><strong>2.62M</strong></td><td><strong>93.7%</strong></td></tr><tr><td>w/o provenance-guided repair</td><td>3.93M</td><td>91.8%</td></tr></tbody></table></div><p class="table-caption">Selected rows from Table 8. Tokens include synthesis, verification, diagnosis, and repair; the comparison fixes the request size.</p></div>
+        </div>
+        <p class="results-link">See the <a href="https://arxiv.org/abs/2609.13082" target="_blank" rel="noopener">paper</a> for the full experimental protocols and results.</p>
+      </div>
+    </section>
+
+    <section class="container resources section-pad" id="resources"><h2>Resources</h2><p><a href="https://arxiv.org/abs/2609.13082" target="_blank" rel="noopener">Paper</a><span> / </span><a href="https://github.com/EurecaMoment/BenchForge" target="_blank" rel="noopener">Source code</a><span> / </span><a href="downloads/selected-examples.zip" download>Selected example records</a></p></section>
+    <section class="container citation-section" id="citation"><h2>BibTeX</h2><pre><code>@article{jiang2026embodiedbenchforge,
+  title={Embodied-BenchForge: A Closed-Loop Agentic Workflow
+         for Embodied Benchmark Construction},
+  author={Jiang, Baoyang and Zhang, Fengchun and Wang, Leyuan
+          and Li, Haotian and Wang, Yida and Ji, Zhe
+          and Lai, Jinshan and Ren, Xi and Li, Danyang
+          and Yang, Zheng and Hu, Jianwei and Ma, Qiang},
+  journal={arXiv preprint arXiv:2609.13082},
+  year={2026}
+}</code></pre></section>
+  </main>
+  <footer><div class="text-container"><p>Embodied-BenchForge: A Closed-Loop Agentic Workflow for Embodied Benchmark Construction</p><p class="footer-note">Figures and examples are drawn from the research materials accompanying this work.</p></div></footer>
+</body>
+</html>
