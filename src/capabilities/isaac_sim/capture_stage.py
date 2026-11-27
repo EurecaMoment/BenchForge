@@ -96,11 +96,17 @@ def execute_capture(store, task, stop, *, config, client=None):
         settings = dict(isaac_config(config))
         preview_settings = settings.pop('interactive_preview', None)
         scope = capture_scope(program, unit['intent'].get('capture_options'))
+        frozen_path = attempt / 'capture.json'
+        previous = json.loads(frozen_path.read_text()) if frozen_path.exists() else None
+        if settings.get('unified_capture') or previous and previous.get('protocol') == 'isaacsim_rpc.v1.SimulationService':
+            from capabilities.isaac_sim.unified_capture import try_unified
+            if try_unified(store, task, stop, directory, attempt, program, settings, scope, token, previous,
+                           client=client):
+                return
+        settings.pop('unified_capture', None)
         validate_scene_requirements(program, settings=settings)
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
                   'protocol': 'a100sim.v1.Simulator', 'capture_token': token}
-        frozen_path = attempt / 'capture.json'
-        previous = json.loads(frozen_path.read_text()) if frozen_path.exists() else None
         if previous is None or previous.get('mesh_encoding') == 'typed_usdc':
             frozen['mesh_encoding'] = 'typed_usdc'
         if previous is not None and previous != frozen:
