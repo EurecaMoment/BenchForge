@@ -1,9 +1,13 @@
 import base64
+from io import BytesIO
 import json
 from pathlib import Path
 import time
 import urllib.request
 from urllib.parse import urlsplit
+
+from PIL import Image
+
 from service_access.runtime_config import environment_value
 from service_access.request_context import RunContext
 from service_access.request_context import check_cancelled
@@ -131,10 +135,23 @@ def _completion_once(
         trace_dir=trace_dir/f'retry_{attempt}';trace_dir.mkdir()
     if invalid_json:
         prompt+='\nYour previous response was not valid JSON. Return strict JSON only: double-quoted strings and keys, no single-quoted strings or trailing commas. Keep the original task criteria unchanged.'
-    content=[{'type':'text','text':prompt}]
+    scene_review = bounded_review and (trace_dir.name == 'scene_review' or
+                                       any(parent.name == 'scene_review' for parent in trace_dir.parents))
+    content = [{'type': 'text', 'text': prompt}]
     for path in images:
         check_cancelled(stop, 'model image preparation')
-        content.append({'type':'image_url','image_url':{'url':'data:image/png;base64,'+base64.b64encode(Path(path).read_bytes()).decode()}})
+        if scene_review:
+            # Full-resolution review images need a smaller wire representation.
+            # The captured RGB files and annotations remain the source evidence.
+            with Image.open(path) as image, BytesIO() as buffer:
+                image.convert('RGB').save(buffer, 'JPEG', quality=95, subsampling=0)
+                data = buffer.getvalue()
+            mime = 'image/jpeg'
+        else:
+            data = Path(path).read_bytes()
+            mime = 'image/png'
+        url = f'data:{mime};base64,' + base64.b64encode(data).decode('ascii')
+        content.append({'type': 'image_url', 'image_url': {'url': url}})
     thinking_budget=min(8192,max(1024,max_tokens//2))
     model_id=environment_value('BENCHFORGE_MODEL_ID')
     if not model_id:
@@ -156,19 +173,21 @@ def _completion_once(
     base=model_url.rstrip('/')
     url=base if base.endswith('/chat/completions') else base+'/chat/completions'
     endpoint=urlsplit(url)
+    request_body = json.dumps(body).encode()
     request_record = {
         **body,
         'messages':[{'role':'user','content':prompt}],
         'image_files':[str(p) for p in images],
+        'image_mime': 'image/jpeg' if scene_review else 'image/png',
+        'request_bytes': len(request_body),
         'endpoint':endpoint._replace(netloc=endpoint.netloc.rsplit('@',1)[-1], query='', fragment='').geturl(),
     }
     if run_context:
         request_record['run_context'] = run_context.to_dict()
     (trace_dir/'request.json').write_text(json.dumps(request_record,ensure_ascii=False,indent=2),encoding='utf8')
-    request=urllib.request.Request(url,data=json.dumps(body).encode(),headers=model_request_headers())
+    request=urllib.request.Request(url,data=request_body,headers=model_request_headers())
     pieces=[];thinking=[];usage={};finish=None;done=False;start=time.time()
     last_progress=0;characters=0;error=None
-    scene_review=bounded_review and (trace_dir.name=='scene_review' or any(p.name=='scene_review' for p in trace_dir.parents))
     try:
         with (trace_dir/'stream.jsonl').open('w',encoding='utf8') as trace, urllib.request.urlopen(request,timeout=90 if bounded_review else 600) as response:
             for raw in response:

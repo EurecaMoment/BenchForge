@@ -1,4 +1,5 @@
 """The scene reviewer honors operator model settings across the startup boundary."""
+import base64
 import io
 import json
 import os
@@ -7,11 +8,44 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
+from PIL import Image
+
 from service_access.openai_client import completion
 from service_access.runtime_config import apply_runtime_environment, load_service_config
 
 
 class ModelReasoningTests(unittest.TestCase):
+    def test_scene_review_sends_native_dimensions_without_changing_capture(self):
+        environment = {
+            'BENCHFORGE_MODEL_ID': 'review-model',
+            'BENCHFORGE_MODEL_URL': 'http://127.0.0.1:8000/v1',
+        }
+        with TemporaryDirectory() as temporary, patch.dict(os.environ, environment, clear=True):
+            root = Path(temporary)
+            photo = root / 'view_0.png'
+            Image.new('RGB', (96, 64), '#3486a5').save(photo)
+            original = photo.read_bytes()
+            request_bodies = []
+
+            def respond(request, **_):
+                request_bodies.append(request.data)
+                event = {'choices': [{'delta': {'content': '{"passed":true}'}, 'finish_reason': 'stop'}]}
+                return io.BytesIO(('data: ' + json.dumps(event) + '\n\ndata: [DONE]\n').encode())
+
+            trace = root / 'scene_review' / 'policy_3'
+            with patch('service_access.openai_client.urllib.request.urlopen', side_effect=respond):
+                result = completion('Review this scene', trace, [photo], bounded_review=True)
+            self.assertEqual(result, {'passed': True})
+            body = json.loads(request_bodies[0])
+            url = body['messages'][0]['content'][1]['image_url']['url']
+            header, encoded = url.split(',', 1)
+            self.assertEqual(header, 'data:image/jpeg;base64')
+            with Image.open(io.BytesIO(base64.b64decode(encoded))) as uploaded:
+                self.assertEqual(uploaded.size, (96, 64))
+            self.assertEqual(photo.read_bytes(), original)
+            record = json.loads((trace / 'request.json').read_text(encoding='utf-8'))
+            self.assertEqual(record['request_bytes'], len(request_bodies[0]))
+
     # 验证配置的推理强度传至有界评审请求，且不会关闭模型思考。
     def test_configured_effort_reaches_bounded_review_without_disabling_thinking(self):
         with TemporaryDirectory() as temporary, patch.dict(os.environ, {}, clear=True):
