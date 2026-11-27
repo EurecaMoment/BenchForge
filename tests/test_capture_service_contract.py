@@ -13,7 +13,8 @@ from capabilities.isaac_sim.capture_contract import (
     checked_service_issues, capture_service_issues, native_import_arguments, require_capture_service, unsupported_fields,
 )
 from capabilities.isaac_sim.capture_stage import execute_capture
-from capabilities.isaac_sim.grpc import simulator_pb2 as pb
+from capabilities.isaac_sim.grpc import native_pb2 as pb
+from capabilities.isaac_sim.grpc import simulation_pb2 as rpc
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
 from pipelines.scene_production.preflight import inspect_capture_program
 from test_scene_diagnostics import sample
@@ -119,6 +120,8 @@ class CaptureServiceContractTests(unittest.TestCase):
             store = Mock(root=directory)
             store.directory.return_value = directory
             client = Mock()
+            client.health.return_value = rpc.HealthResponse(status='ready', engine='a100sim',
+                capabilities=['native_operations'])
             client.call.return_value = ParseDict({'capabilities': []}, pb.Capabilities())
             task = {'id': 'capture.scene0', 'unit': {'revision': 0, 'intent': {}}}
             with (patch('capabilities.isaac_sim.capture_stage._compile_for_task', return_value=compiled()),

@@ -4,6 +4,7 @@ import time
 
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
 from service_access.request_context import check_cancelled
+from capabilities.isaac_sim.unified_requirements import unified_service_error
 
 
 def native_import_arguments(item, identity):
@@ -140,11 +141,12 @@ def checked_service_issues(client, compiled, scope, *, stop=None, on_wait=None, 
             time.sleep(1)
 
 
-def capture_service_client(config):
+def capture_service_client(config, *, snapshot=False):
     """把连接配置错误归于服务，避免凭据或证书故障触发场景重写。"""
     from capabilities.isaac_sim.grpc.transport import A100Client
+    from capabilities.isaac_sim.grpc.unified_transport import SimulationClient
     try:
-        return A100Client(config)
+        return (SimulationClient if snapshot else A100Client)(config)
     except (ValueError, OSError) as error:
         issue = {'code': 'service_configuration_invalid', 'path': '', 'severity': 'error',
                  'blocking': True, 'basis': 'configured_isaac_sim_service',
@@ -153,10 +155,25 @@ def capture_service_client(config):
         raise UnsupportedScene(issue['message'], issues=[issue]) from error
 
 
-def inspect_live_capture_service(program, settings, *, scope=None):
+def service_health(client):
+    import grpc
+    try:
+        health = client.health()
+    except grpc.RpcError as error:
+        raise unified_service_error(f'SimulationService.Health failed: {error.code().name}: {error.details()}',
+            retry=error.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED)) from error
+    if health.status != 'ready':
+        raise unified_service_error(f'Isaac Sim {health.engine} health is {health.status}: {health.error}', retry=True)
+    return health
+
+
+def inspect_live_capture_service(program, settings, *, scope=None, assets_root=None):
     """只读发现实际配置服务的能力；不创建世界、上传资产或执行仿真。"""
     from capabilities.capture.capture_scope import capture_scope
     from capabilities.scene_authoring.catalog.native import ASSETS
+    from capabilities.isaac_sim.unified_mapping import select_snapshot_plan
+    from service_access.configuration import isaac_unified_settings
+    settings = isaac_unified_settings(settings)
     compiled = {'imports': []}
     for obj in program['objects']:
         kind = obj['kind']
@@ -170,9 +187,11 @@ def inspect_live_capture_service(program, settings, *, scope=None):
                     'catalog': {'source_up_axis': binding['source_up_axis']} if kind == 'native' else ASSETS[kind]})
     client = capture_service_client({'providers': {'IsaacSim4A100': settings}})
     try:
-        # 预检尚未绑定输出选择，只核对必经步骤；执行前再核对实际相机和导出请求。
+        # Before output selection, test one authored view. Execution checks the full scope.
         if scope is None:
-            scope = capture_scope(program, {'view_indices': [], 'export_scene': False})
+            scope = capture_scope(program, {'view_indices': list(range(min(1, len(program['cameras']))))})
+        if select_snapshot_plan(program, settings, scope, service_health(client), assets_root=assets_root) is not None:
+            return []
         return checked_service_issues(client, compiled, scope, delays=(2,))
     except UnsupportedScene as error:
         return error.issues

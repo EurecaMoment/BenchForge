@@ -132,7 +132,8 @@ def start_capture_request(
     submission_reader=read_capture_submission,
 ):
     mode = resolve_execution_mode(value.get("execution_mode"))
-    submission = submission_reader(store.root, value["scene_program_path"], execution_mode=mode)
+    submission = submission_reader(store.root, value["scene_program_path"], execution_mode=mode,
+                                   capture_options=value.get("capture_options", {}))
     policy_for(store.root, mode)
     intent = {
         "name": value.get("name", submission["program"]["title"]),

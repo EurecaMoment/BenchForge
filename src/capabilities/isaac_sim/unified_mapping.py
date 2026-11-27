@@ -6,14 +6,15 @@ substituted or scaled.
 """
 from __future__ import annotations
 
+import json
 import math
 
-from capabilities.isaac_sim.unified_requirements import UnsupportedScene
+from capabilities.isaac_sim.unified_requirements import UnsupportedScene, capture_requirement_issues, unified_service_error
 from capabilities.scene_authoring.catalog.native import ASSETS
 from capabilities.scene_authoring.geometry.support_graph import objects_in_support_order
 
 
-DEFAULT_SIMULATION = {'steps': 180, 'dt': 1 / 60, 'gravity': 9.81, 'ground': True,
+DEFAULT_SIMULATION = {'steps': 180, 'dt': 1 / 60, 'gravity': 9.81, 'ground': False,
                       'capture_every_steps': None, 'capture_target_frames': 24}
 DEFAULT_RENDER = {'fov_degrees': 50.0, 'seed': 0, 'image_size': 768, 'samples_per_pixel': 32}
 PROTOCOL = 'isaacsim_rpc.v1.SimulationService'
@@ -108,10 +109,14 @@ def _object_bodies(obj, index, row, program, settings, issues):
     color = body_color(program, obj)
     mass = float(obj.get('mass_kg', 0)) if obj.get('dynamic') else None
     if kind == 'box':
+        if any(not .001 <= edge <= 100 for edge in row['size']):
+            issues.append(_issue(path + '/size', 'Shared simulation cube edges must be within .001..100 meters', identity))
         return [_body(identity, 'cube', row['center'], yaw, color,
                       size=row['size'], mass=mass)]
     if kind == 'sphere':
         size = row['size']
+        if not .001 <= size[0] / 2 <= 100:
+            issues.append(_issue(path + '/size', 'Shared simulation sphere radius must be within .001..100 meters', identity))
         if max(abs(size[0] - size[1]), abs(size[1] - size[2])) > 1e-6:
             issues.append(_issue(path + '/size',
                 'sphere requires a uniform declared size so radius can be expressed faithfully',
@@ -183,9 +188,8 @@ def _object_bodies(obj, index, row, program, settings, issues):
 
 # 把 SceneProgram 光源映射到 LightingSpec；无法表达的灯型明确拒绝。
 def _lighting(program, issues):
-    lights = [light for light in program.get('lights') or [] if light.get('enabled', True)]
-    if not lights:
-        return None
+    lights = [light for light in program.get('lights') or [{'kind': 'environment', 'intensity': 1}]
+              if light.get('enabled', True)]
     dome, areas = None, []
     for index, light in enumerate(lights):
         kind, path = light.get('kind'), f'/lights/{index}'
@@ -193,14 +197,14 @@ def _lighting(program, issues):
             if dome is not None:
                 issues.append(_issue(path, 'only one environment light can map to the dome light'))
                 continue
-            dome = {'color': _vec(light.get('color', [1, 1, 1]))}
+            dome = {'color': _vec(light.get('color', [1, 1, 1])), 'intensity': 1.0}
             if light.get('intensity') is not None:
                 dome['intensity'] = float(light['intensity'])
         elif kind == 'area':
             position = [float(value) for value in light['position']]
             direction = light.get('direction', [0, 0, -1])
             size = light.get('size', [1, 1])
-            area = {'color': _vec(light.get('color', [1, 1, 1])),
+            area = {'color': _vec(light.get('color', [1, 1, 1])), 'intensity': 1.0,
                     'origin': _vec(position),
                     'target': _vec([position[axis] + float(direction[axis]) for axis in range(3)]),
                     'width': float(size[0]), 'height': float(size[1])}
@@ -210,10 +214,13 @@ def _lighting(program, issues):
         else:
             issues.append(_issue(path + '/kind',
                 f'light kind {kind!r} has no LightingSpec mapping; use environment or area lights'))
-    lighting = {}
+    # Both backends otherwise add their own dome and key to the authored scene.
+    lighting = {'dome': {'intensity': 0.0}, 'key': {'intensity': 0.0}}
     if dome is not None:
         lighting['dome'] = dome
     if areas:
+        if len(areas) > 9:
+            issues.append(_issue('/lights', 'Shared simulation accepts one key and at most eight fill lights'))
         lighting['key'] = areas[0]
         if len(areas) > 1:
             lighting['fills'] = areas[1:]
@@ -230,8 +237,6 @@ def camera_view(index, camera, issues):
         issues.append(_issue(f'/cameras/{index}', 'camera position and target must differ'))
         return None
     elevation = math.degrees(math.asin(max(-1.0, min(1.0, delta[2] / distance))))
-    # 服务端摄像机仰角限制为 [-80, 80]（正俯视会算出 90，会被 INVALID_ARGUMENT 拒绝）。
-    elevation = max(-80.0, min(80.0, elevation))
     azimuth = math.degrees(math.atan2(delta[1], delta[0]))
     return {'index': index, 'camera': camera, 'target': target,
             'azimuth': azimuth, 'elevation': elevation, 'distance': distance}
@@ -247,7 +252,6 @@ def capture_sampling(steps, settings, scope, issues):
     every = options.get('every')
     if frames:
         frames = sorted(set(frames))
-        every = None
         path = '/capture_options/frames'
     elif every is not None:
         every = int(every)
@@ -283,10 +287,6 @@ def simulation_plan(program, settings, scope):
     spp = int(render.get('samples_per_pixel', 32))
     if size < 1 or spp < 1:
         issues.append(_issue('/render', 'image_size and samples_per_pixel must be positive'))
-    if scope.get('scene_export_requested'):
-        issues.append(_issue('/capture_options/export_scene',
-            'scene export has no v2 artifact; remove export_scene or keep it false'))
-
     rows = placements(program)
     bodies, entities = [], {}
     for index, obj in enumerate(program['objects']):
@@ -307,6 +307,8 @@ def simulation_plan(program, settings, scope):
              for view in [camera_view(index, program['cameras'][index], issues)] if view]
     sampling = capture_sampling(steps, settings, scope, issues)
     lighting = _lighting(program, issues)
+    if not 1 <= len(bodies) <= 256:
+        issues.append(_issue('/objects', 'Shared simulation accepts 1..256 rigid bodies per world'))
     if issues:
         raise UnsupportedScene('\n'.join(row['path'] + ': ' + row['message'] for row in issues),
                                issues=issues)
@@ -322,6 +324,9 @@ def simulation_plan(program, settings, scope):
 
 
 def simulation_request(plan):
+    simulation = {key: plan[key] for key in ('bodies', 'steps', 'dt', 'gravity', 'ground')}
+    if not plan['views']:
+        return simulation
     render = {key: value for key, value in plan['render'].items() if key in ('size', 'spp', 'seed')}
     render['views'] = []
     for view in plan['views']:
@@ -337,5 +342,80 @@ def simulation_request(plan):
     capture = {'frames': plan['capture']['frames']}
     if plan['capture']['every'] is not None:
         capture['every'] = plan['capture']['every']
-    return {**{key: plan[key] for key in ('bodies', 'steps', 'dt', 'gravity', 'ground')},
-            'render': render, 'capture': capture}
+    return {**simulation, 'render': render, 'capture': capture}
+
+
+def snapshot_settings(program, settings):
+    from service_access.configuration import isaac_unified_settings
+    resolved = isaac_unified_settings(settings)
+    environment = program.get('render_environment') or {}
+    resolved['render'] = {'image_size': resolved.get('image_size', 1024),
+                          'samples_per_pixel': max(resolved.get('samples_per_pixel', 256),
+                                                   environment.get('samples_per_pixel', 0))}
+    return resolved
+
+
+def select_snapshot_plan(program, settings, scope, health, *, assets_root=None, preview=False):
+    """Return a faithful snapshot plan or select the advertised persistent scene service."""
+    config = snapshot_settings(program, settings)
+    views = scope['view_indices']
+    capabilities = set(health.capabilities)
+    limits = [('image_size', health.max_image_size), ('samples_per_pixel', health.max_samples_per_pixel)]
+    for field, limit in limits:
+        if views and limit and config['render'][field] > limit:
+            raise unified_service_error(f"{health.engine} {field} limit is {limit}, requested {config['render'][field]}",
+                                        path='/render/' + field)
+    renderer = (program.get('render_environment') or {}).get('renderer')
+    if views and renderer:
+        actual = 'RaytracedLighting' if health.native_rtx else 'PathTracing'
+        if actual != renderer:
+            raise unified_service_error(f'{health.engine} provides {actual}; scene requires {renderer}',
+                                        path='/render_environment/renderer')
+    issues = capture_requirement_issues(program, settings=config)
+    source_materials = {}
+    for index, obj in enumerate(program['objects']):
+        asset = obj.get('asset_id')
+        if obj['kind'] == 'mesh' and asset and assets_root is not None and asset not in source_materials:
+            directory = assets_root / asset
+            # Registered NPZ can carry vertex channels, but cannot transport GLB/UV materials.
+            rich = (directory / 'asset.glb').is_file()
+            if not rich and asset in config.get('mesh_assets', {}) and (directory / 'mesh.json').is_file():
+                source = json.loads((directory / 'mesh.json').read_text(encoding='utf-8'))
+                rich = any(source.get(key) for key in ('materials', 'material_textures', 'texcoords',
+                                                       'face_materials', 'appearance'))
+            source_materials[asset] = rich
+        if (obj['kind'] not in ('box', 'sphere', 'mesh') or obj.get('physics') or obj.get('mesh_transform')
+                or obj.get('render_representation') == 'gaussian' or source_materials.get(asset) or obj.get('kind') == 'mesh'
+                and (obj.get('material_id') or obj.get('appearance') or 'color' in obj)):
+            issues.append({'path': f'/objects/{index}',
+                           'message': f"{obj['id']} requires authored USD geometry, physics or material bindings"})
+    if preview or settings.get('interactive_preview') and views:
+        issues.append({'path': '/interactive_preview', 'message': 'Interactive preview requires a persistent session'})
+    if views:
+        missing = {'multiview_frames', 'metric_depth', 'semantic_masks'} - capabilities
+        if not capabilities.intersection({'instance_ids', 'instance_masks'}):
+            missing.add('instance_ids')
+        if missing:
+            issues.append({'path': '/cameras', 'message': 'Missing capture capabilities: ' + ', '.join(sorted(missing))})
+        if len(views) > health.max_views:
+            issues.append({'path': '/cameras', 'message': f'{len(views)} cameras exceed the shared snapshot limit {health.max_views}'})
+    if any(obj['kind'] == 'mesh' for obj in program['objects']) and 'registered_mesh_npz' not in capabilities:
+        issues.append({'path': '/objects', 'message': 'Registered mesh BodySpec support is unavailable'})
+    if not issues:
+        try:
+            plan = simulation_plan(program, config, scope)
+        except UnsupportedScene as error:
+            issues = error.issues
+        else:
+            missing_shapes = {body['shape'] for body in plan['bodies']} - set(health.supported_shapes)
+            if not health.supported_shapes or not missing_shapes:
+                return plan
+            issues.append({'path': '/objects', 'message': 'Unsupported body shapes: ' + ', '.join(sorted(missing_shapes))})
+    if scope.get('capture_frames'):
+        raise unified_service_error('Process frames require a supported shared snapshot. ' +
+            '; '.join(row['message'] for row in issues), path='/capture_options')
+    if 'native_operations' in capabilities:
+        return None
+    message = f'{health.engine} does not provide persistent scene operations. ' + '; '.join(
+        f"{issue['path']}: {issue['message']}" for issue in issues)
+    raise unified_service_error(message, path=issues[0]['path'])

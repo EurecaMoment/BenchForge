@@ -73,7 +73,8 @@
       "max_concurrent_captures": 4,
       "image_size": 1024,
       "samples_per_pixel": 256,
-      "asset_sources": {}
+      "asset_sources": {},
+      "mesh_assets": {}
     }
   }
 }

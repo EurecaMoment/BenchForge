@@ -23,7 +23,8 @@ from capabilities.scene_authoring.catalog.native_reference import native_referen
 from capabilities.isaac_sim.grpc.receipts import receipt_lock
 from capabilities.isaac_sim.grpc.tasks import DurableTasks, request_id
 from capabilities.isaac_sim.grpc.transport import document
-from service_access.configuration import isaac_config
+from capabilities.isaac_sim.grpc.unified_transport import PROTOCOL
+from service_access.configuration import isaac_config, isaac_unified_settings
 from service_access.progress import record_progress
 from service_access.request_context import check_cancelled
 from storage.files import write_json
@@ -98,23 +99,32 @@ def execute_capture(store, task, stop, *, config, client=None):
         scope = capture_scope(program, unit['intent'].get('capture_options'))
         frozen_path = attempt / 'capture.json'
         previous = json.loads(frozen_path.read_text()) if frozen_path.exists() else None
-        if settings.get('unified_capture') or previous and previous.get('protocol') == 'isaacsim_rpc.v1.SimulationService':
-            from capabilities.isaac_sim.unified_capture import try_unified
-            if try_unified(store, task, stop, directory, attempt, program, settings, scope, token, previous,
-                           client=client):
-                return
-        settings.pop('unified_capture', None)
+        from capabilities.isaac_sim.unified_capture import try_unified
+        if try_unified(store, task, stop, directory, attempt, program, settings, scope, token, previous,
+                       client=client, preview=bool(preview_settings and scope['view_indices'])):
+            return
+        historical = previous is not None and previous.get('protocol') == 'a100sim.v1.Simulator'
+        if historical:
+            settings.pop('unified_capture', None)
+        else:
+            settings = isaac_unified_settings(settings)
         validate_scene_requirements(program, settings=settings)
         frozen = {'program': program, 'capture_scope': scope, 'settings': settings,
-                  'protocol': 'a100sim.v1.Simulator', 'capture_token': token}
+                  'protocol': previous['protocol'] if historical else PROTOCOL, 'capture_token': token}
+        if not historical:
+            frozen['mode'] = 'persistent_scene'
         if previous is None or previous.get('mesh_encoding') == 'typed_usdc':
             frozen['mesh_encoding'] = 'typed_usdc'
         if previous is not None and previous != frozen:
             raise ValueError('Frozen capture inputs/configuration changed; an explicit new attempt is required')
-        write_json(frozen_path, frozen)
-        record_progress(directory, 'isaac_sim_preparing', protocol='a100sim.v1.Simulator')
+        if previous is None:
+            write_json(frozen_path, frozen)
+        record_progress(directory, 'isaac_sim_preparing', protocol=PROTOCOL, mode='persistent_scene')
         packed_meshes = {} if 'mesh_encoding' in frozen else None
         compiled = _compile_for_task(store, task, program, settings, packed_meshes=packed_meshes)
+        if not historical:
+            compiled['samples_per_pixel'] = max(settings.get('samples_per_pixel', 256),
+                                                (program.get('render_environment') or {}).get('samples_per_pixel', 0))
         if packed_meshes is None:
             # Existing attempts retain their original upload identity on resume.
             source = attempt / 'scene.usda'
@@ -126,7 +136,7 @@ def execute_capture(store, task, stop, *, config, client=None):
         texture_files = stage_texture_dependencies(
             compiled.get('texture_dependencies', []), attempt)
         own_client = client is None
-        client = client or capture_service_client(config)
+        client = client or capture_service_client({'providers': {'IsaacSim4A100': settings}})
         requests = DurableTasks(client, attempt / 'jobs', token, stop=stop,
             on_status=lambda job: record_progress(directory, 'isaac_sim_capture',
                 job_id=job.job_id, operation=job.operation, remote_state=document(job)['state'],
@@ -195,11 +205,16 @@ def execute_capture(store, task, stop, *, config, client=None):
                 for index, frame in zip(indices, captured['frames']):
                     if frame['camera'] != compiled['cameras'][index]:
                         raise ValueError('Isaac Sim returned a different camera')
+                    if list(frame['resolution']) != [settings.get('image_size', 1024)] * 2:
+                        raise ValueError('Native frame resolution differs from the requested render size')
                     observed_frame = {**render_metadata(frame, captured), **frame}
                     frames.append(save_frame(observed_frame, files, index, program, incoming,
                         physics_tick=observed.get('physics_tick'), dt=observed.get('dt', dt)))
                     observe_render_sources(rendered_sources, frame)
                 native_jobs.append(job.job_id)
+                record_progress(directory, 'isaac_sim_capture', protocol=PROTOCOL,
+                                mode='persistent_scene', operation='scene.capture', job_id=job.job_id,
+                                frames_done=len(frames), frames_total=len(views))
             if scope['scene_export_requested']:
                 job, exported = requests.extension('export', 'scene.export', {'session_id': identity, 'format': 'usdz'})
                 files = requests.download('export', job)
@@ -209,7 +224,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                 native_jobs.append(job.job_id)
             render = common_render_metadata(frames)
             evidence = {'schema': 'benchforge.evidence/v1', 'truth_domain': 'synthetic_world',
-                'origin': 'isaac_native', 'token': token, 'protocol': 'a100sim.v1.Simulator',
+                'origin': 'isaac_native', 'token': token, 'protocol': PROTOCOL, 'mode': 'persistent_scene',
                 'session_id': identity, 'job_ids': native_jobs, 'physics': physics,
                 'entities': entities, 'frames': frames, 'render_settings': render, 'capture_scope': scope,
                 **appearance_evidence(compiled, json.loads((attempt / 'asset.json').read_text()),
@@ -217,7 +232,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                 'realism': {'mass_and_contact_properties': 'uncalibrated synthetic priors',
                             'sim2real_gap': 'not measured'},
                 'interaction': {'validated': False, 'reason': 'no executable interaction requested', 'action_results': []}}
-            report = {'token': token, 'status': 'captured',
+            report = {'token': token, 'status': 'captured', 'protocol': PROTOCOL, 'mode': 'persistent_scene',
                 'renderable': all(frame['quality']['passed'] for frame in frames) if frames else None,
                 'frames': len(frames), 'physics': physics, 'errors': [], 'render_settings': render,
                 'interaction': evidence['interaction'],
@@ -225,7 +240,8 @@ def execute_capture(store, task, stop, *, config, client=None):
                     'passed': all(frame['quality']['passed'] for frame in frames) if frames else None,
                     'failed_views': [{'frame_id': frame['frame_id'], 'reasons': frame['quality']['reasons']}
                                      for frame in frames if not frame['quality']['passed']]},
-                'capture_scope': scope, 'scene_format': 'usdc', 'scene_resources': [],
+                'capture_scope': scope, 'scene_format': 'usdc' if scope['scene_export_requested'] else None,
+                'scene_resources': [],
                 'native_receipts': str(attempt / 'jobs'), 'session_id': identity}
             write_json(incoming / 'evidence.json', evidence)
             write_json(incoming / 'report.json', report)

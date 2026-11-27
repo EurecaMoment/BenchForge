@@ -53,6 +53,12 @@ def isaac_config(config):
     return config.get('providers', {}).get(ISAAC_PROVIDER, {})
 
 
+def isaac_unified_settings(settings):
+    """Resolve the former opt-in configuration to one SimulationService endpoint."""
+    options = settings.get('unified_capture', {})
+    return {**{key: value for key, value in settings.items() if key != 'unified_capture'}, **options}
+
+
 # 校验 gRPC 主机与端口并规范 IPv6 地址，返回可连接的端点。
 def isaac_endpoint(grpc):
     host = grpc.get('host')
@@ -141,7 +147,7 @@ def validate_providers(config):
     field = f'providers.{ISAAC_PROVIDER}'
     _validate_fields(isaac, field, {'grpc', 'capture_timeout_seconds', 'max_concurrent_captures',
                                   'image_size', 'samples_per_pixel', 'asset_sources', 'interactive_preview',
-                                  'unified_capture'})
+                                  'mesh_assets', 'unified_capture'})
     for key, low, high, default in (('max_concurrent_captures', 1, 32, 4),
                                    ('image_size', 64, 2048, 1024), ('samples_per_pixel', 1, 1024, 256)):
         value = isaac.get(key, default)
@@ -174,9 +180,10 @@ def validate_providers(config):
         _validate_fields(unified, field + '.unified_capture', {'grpc', 'mesh_assets'})
         if 'grpc' in unified:
             _validate_isaac_grpc(unified['grpc'], field + '.unified_capture.grpc')
-        meshes = unified.get('mesh_assets', {})
+    for location, meshes in ((field, isaac.get('mesh_assets', {})),
+                             (field + '.unified_capture', isaac.get('unified_capture', {}).get('mesh_assets', {}))):
         if not isinstance(meshes, dict):
-            raise ValueError(f'{field}.unified_capture.mesh_assets must be an object')
+            raise ValueError(f'{location}.mesh_assets must be an object')
         for binding in meshes.values():
             if not isinstance(binding, dict) or set(binding) != {'asset_id', 'bounds_m'}:
                 raise ValueError('A registered mesh requires asset_id and bounds_m')

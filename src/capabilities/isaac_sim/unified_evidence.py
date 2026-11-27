@@ -30,8 +30,8 @@ def resolve_artifact(reference, files):
         normalized = reference.replace('\\', '/').rstrip('/')
         # 相对路径是唯一标识：服务端绝对路径以它结尾时优先精确命中，
         # 避免每帧同名的 render.png/depth_m.npy 被 basename 匹配放大成歧义。
-        matches = [item for item in files
-                   if normalized.endswith('/' + item['relative_path'].lstrip('/'))]
+        matches = [item for item in files if normalized == item['relative_path']
+                   or normalized.endswith('/' + item['relative_path'].lstrip('/'))]
         if not matches:
             # A gateway job can wrap a backend job with another directory ID.
             matches = [item for item in files if '/' in item['relative_path']
@@ -215,7 +215,7 @@ def _load_array(path):
 
 # 逐帧保存 RGB、深度和语义数组，并生成与下游一致的 evidence 帧记录。
 def frame_evidence(frame, files, camera_index, camera, program, plan, output, *,
-                   canonical, physics_tick, dt, job=None):
+                   canonical, physics_tick, dt, job=None, render=None):
     output = Path(output)
     step = int(_get(frame, 'frame', 0))
     frame_id = (f'view_{camera_index}' if canonical
@@ -227,6 +227,13 @@ def frame_evidence(frame, files, camera_index, camera, program, plan, output, *,
     labels_file = resolve_artifact(_get(frame, 'semantic_labels'), files)
     labels = json.loads(labels_file.read_text())
     classes, _, depth_convention, backend = _labels(labels)
+    if not depth_convention and frame.get('annotations'):
+        observation = json.loads(resolve_artifact(frame['annotations'], files).read_text())
+        if observation['view_id'] != f'view_{camera_index}' or observation['frame'] != step:
+            raise ValueError('Depth annotation belongs to a different view or frame')
+        depth_convention = observation['depth_convention']
+    if not depth_convention:
+        raise ValueError('Snapshot depth annotation omitted its measurement convention')
     instance_data = json.loads(resolve_artifact(frame['instance_labels'], files).read_text())
     instances = {str(k): str(v.get('prim_path') if isinstance(v, dict) else v)
                  for k, v in instance_data['idToLabels'].items()}
@@ -246,6 +253,8 @@ def frame_evidence(frame, files, camera_index, camera, program, plan, output, *,
     with Image.open(image) as opened:
         if opened.size != (width, height):
             raise ValueError('Isaac Sim image and annotation resolution disagree')
+        if opened.size != (plan['render']['size'],) * 2:
+            raise ValueError('Snapshot image resolution differs from the requested render size')
         rgb = np.asarray(opened.convert('RGB'))
     objects = []
     for entity in plan['entities'].values():
@@ -269,6 +278,24 @@ def frame_evidence(frame, files, camera_index, camera, program, plan, output, *,
     if matrix.shape != (4, 4) or calibration['width'] != width or calibration['height'] != height:
         raise ValueError('Camera calibration does not match captured dimensions')
     quality = assess_view(rgb, depth, objects)
+    render = render or {}
+    native_rtx = bool(job.native_rtx)
+    render_settings = {'resolution': [width, height], 'native_rtx': native_rtx,
+                       'cpu_fallback': bool(render.get('cpu_fallback', job.cpu_fallback)),
+                       'replicator': native_rtx, 'fov_degrees': calibration['fov_y_degrees']}
+    for key, value in (('renderer', render.get('renderer') or job.render.renderer),
+                       ('render_backend', labels.get('render_backend') or render.get('render_backend') or job.render.backend),
+                       ('requested_spp', render.get('requested_spp') or job.render.requested_spp or plan['render']['spp']),
+                       ('rt_subframes', render.get('rt_subframes') or job.render.rt_subframes)):
+        if value:
+            render_settings[key] = value
+    for view_render in render.get('frames', []):
+        if view_render.get('view_id') == calibration['id']:
+            for key in ('renderer', 'render_backend', 'cpu_fallback'):
+                if key in view_render:
+                    render_settings[key] = view_render[key]
+            if view_render.get('spp'):
+                render_settings['samples_per_pixel'] = view_render['spp']
     result = {'frame_id': frame_id, 'image': frame_id + '.png',
         'image_size': {'width': width, 'height': height},
         'step_id': step,
@@ -284,7 +311,7 @@ def frame_evidence(frame, files, camera_index, camera, program, plan, output, *,
             'depth_convention': depth_convention,
             'render_product_resolution': {'width': width, 'height': height},
             'meters_per_scene_unit': 1.0,
-            'camera_path': camera.get('prim_path') or camera.get('id'),
+            'camera_path': calibration.get('prim_path'), 'view_id': calibration['id'],
             'pixel_center_offset_px': [.5, .5],
             'pixel_coordinates': 'upper-left pixel boundary is (0,0); pixel centers are (u+0.5,v+0.5)',
             'calibration_source': 'simulator_camera_receipt'},
@@ -292,7 +319,7 @@ def frame_evidence(frame, files, camera_index, camera, program, plan, output, *,
         'depth_kind': 'optical_axis_z_m', 'depth_unit': 'meter',
         'semantic_info': {'idToLabels': classes},
         'instance_info': {'idToLabels': instances},
-        'native_rtx': bool(_get(job, 'native_rtx', False)),
+        'native_rtx': native_rtx, 'render_settings': render_settings,
         'annotation_backend': backend or 'isaacsim_rpc.v1',
         'instance_source': 'native_instance_ids',
         'fov_degrees': calibration['fov_y_degrees']}

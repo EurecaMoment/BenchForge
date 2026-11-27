@@ -7,16 +7,7 @@ is silently substituted, scaled or exported.
 from capabilities.scene_authoring.catalog.native import ASSETS
 from capabilities.scene_authoring.catalog.native_reference import native_references
 from capabilities.scene_authoring.contracts.scene_program import APPEARANCE_FIELDS
-
-
-class UnsupportedScene(ValueError):
-    """An explicit requirement has no faithful SceneProgram adapter mapping."""
-    code = 'unsupported_scene'
-
-    # 保存结构化的不支持问题，并构建场景能力异常。
-    def __init__(self, message, *, issues=()):
-        self.issues = list(issues)
-        super().__init__(message)
+from capabilities.isaac_sim.scene_requirements import UnsupportedScene
 
 
 # 检查场景对适配器的要求，遇到不支持项即阻止执行。
@@ -29,8 +20,7 @@ def native_reference_issues(program, settings=None):
     if not isinstance(program, dict):
         return []
     return [_issue(f'/objects/{index}/native_asset',
-                   'native assets require upload/session support that isaacsim_rpc.v1 '
-                   'does not provide; pre-stage a mesh.npz and use kind=mesh',
+                   'Native asset imports require persistent scene operations on this endpoint',
                    obj.get('id'))
             for index, obj in native_references(program)]
 
@@ -60,8 +50,7 @@ def scene_requirement_issues(program, *, settings=None):
     field = 'interactions' if 'interactions' in program else 'affordances'
     return native_reference_issues(program, settings) + [_issue(f'/{field}/{index}',
                    'This SceneProgram action requires native session commands and interaction '
-                   'receipts. isaacsim_rpc.v1 only runs a forward simulation with frame capture; '
-                   'robot/contact/trajectory execution cannot be silently substituted.',
+                   'receipts. The shared snapshot request only runs forward simulation.',
                    row.get('object_id'))
             for index, row in enumerate(_records(program.get(field, [])))
             if isinstance(row, dict) and row.get('action') in ('apply_force', 'robot_push', 'record_trajectory')]
@@ -83,7 +72,7 @@ def _appearance_issues(appearance, path, identity, issues):
     for key in sorted(set(appearance) & APPEARANCE_FIELDS):
         issues.append(_issue(f'{path}/{key}',
             f'isaacsim_rpc.v1 BodySpec has no appearance {key!r} mapping; only color/base_color '
-            'is expressible, so this requirement must be changed', identity))
+            'is expressible in a shared snapshot', identity))
 
 
 # 无需编译或连接 GPU 即可收集采集适配器的独立限制。
@@ -101,8 +90,7 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
         _appearance_issues(obj.get('appearance'), path + '/appearance', identity, issues)
         if 'cast_shadows' in obj:
             issues.append(_issue(path + '/cast_shadows',
-                'isaacsim_rpc.v1 BodySpec has no shadow control; remove cast_shadows instead of '
-                'silently dropping the requirement', identity))
+                'Per-object shadow controls require persistent scene authoring', identity))
         if kind == 'sphere':
             _uniform(obj.get('size'), path + '/size', identity, issues)
         elif kind == 'composite':
@@ -135,18 +123,15 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
                 issues.append(_issue(path + '/asset_id', 'mesh needs a registered asset_id', identity))
             elif settings is not None and not (settings.get('mesh_assets') or {}).get(asset_id):
                 issues.append(_issue(path + '/asset_id',
-                    f'mesh asset {asset_id!r} needs an absolute providers.IsaacSim4A100.mesh_assets '
-                    'binding to a server directory containing mesh.npz', identity))
+                    f'Mesh {asset_id!r} requires its registered mesh_assets binding or persistent USD import', identity))
         elif kind == 'generated':
             issues.append(_issue(path + '/kind',
-                'generated meshes cannot be uploaded by isaacsim_rpc.v1; stage mesh.npz on the '
-                'service and use kind=mesh with mesh_assets', identity))
+                'Generated assets require persistent USD import to preserve authored materials', identity))
         elif kind == 'native':
             continue  # Already reported by native_reference_issues.
         elif kind in ASSETS:
             issues.append(_issue(path + '/kind',
-                f'built-in native asset {kind!r} is not supported by the v2 body contract; '
-                'pre-stage a mesh.npz and use kind=mesh with mesh_assets', identity))
+                f'Native catalog asset {kind!r} requires persistent scene import', identity))
         else:
             issues.append(_issue(path + '/kind', f'unsupported geometry kind {kind!r}', identity))
     for index, material in enumerate(_records(program.get('materials'))):
@@ -155,7 +140,7 @@ def capture_requirement_issues(program, assets_root=None, settings=None):
         for key in sorted((set(material) - {'id', 'name', 'base_color'}) & APPEARANCE_FIELDS):
             issues.append(_issue(f'/materials/{index}/{key}',
                 f'isaacsim_rpc.v1 BodySpec has no material {key!r} mapping; only base_color '
-                'is expressible, so this requirement must be changed'))
+                'is expressible in a shared snapshot'))
         _appearance_issues(material.get('appearance'), f'/materials/{index}/appearance',
                            None, issues)
     environment = program.get('render_environment')
@@ -191,3 +176,11 @@ def _require_supported(issues):
 # 在进入采集前统一拒绝不支持的场景声明。
 def validate_capture_requirements(program, assets_root, settings):
     _require_supported(capture_requirement_issues(program, assets_root, settings))
+
+
+def unified_service_error(message, *, path='', retry=False):
+    issue = {'code': 'service_not_ready' if retry else 'service_contract_mismatch',
+             'path': path, 'message': message, 'severity': 'error', 'blocking': True,
+             'basis': 'SimulationService.Health', 'repair_owner': 'service_configuration_or_adapter',
+             'retry_unchanged': retry}
+    return UnsupportedScene(message, issues=[issue])
