@@ -22,6 +22,25 @@ from pipelines.scene_production.lifecycle import review_retry_evidence
 from pipelines.scene_production.planning import _strict_policy
 from pipelines.scene_production.repair_progress import capture_ref, comparison_prompt, load_baseline, repair_decision
 
+def _review_frames(frames):
+    """Keep the final cameras and at most three time samples per camera in the review prompt."""
+    selected = []
+    by_camera = {}
+    for frame in frames:
+        name = frame.get('frame_id', '')
+        if not name.startswith('process_view_'):
+            selected.append(frame)
+            continue
+        camera = name.partition('_step_')[0]
+        by_camera.setdefault(camera, []).append(frame)
+    for samples in by_camera.values():
+        samples.sort(key=lambda row: row.get('step_id', 0))
+        if len(samples) > 3:
+            samples = [samples[0], samples[len(samples) // 2], samples[-1]]
+        selected.extend(samples)
+    return selected
+
+
 # 检查采集报告、真实证据与场景质量，保存验收回执或修复反馈并响应取消。
 def review_scene(store,task,stop,*,capture_only=False):
     if stop.is_set():
@@ -135,7 +154,7 @@ physics 是动作前沉降；interaction 是实际施力轨迹，view_N 是动�
         if geometry_path.is_file() and not strict_policy:
             prompt+='\n仿真前的程序几何建议：'+json.dumps(compact_preview(
                 json.loads(geometry_path.read_text()), full_report=str(geometry_path)),ensure_ascii=False)
-        camera_receipts=[{'frame_id':frame.get('frame_id'),'image':frame.get('image'),'camera':frame.get('camera'),'step_id':frame.get('step_id')} for frame in evidence.get('frames',[])]
+        camera_receipts=[{'frame_id':frame.get('frame_id'),'image':frame.get('image'),'camera':frame.get('camera'),'step_id':frame.get('step_id')} for frame in _review_frames(evidence.get('frames',[]))]
         prompt+='\n相机执行记录：'+json.dumps(camera_receipts,ensure_ascii=False)
         prompt+='\n实际外力动作证据：'+json.dumps(evidence.get('interaction',{}),ensure_ascii=False)
         if evidence.get('environment_dependencies'):

@@ -10,14 +10,14 @@ def scene_contract_capabilities():
     """Machine-readable summary for DSH and planners; no runtime probing."""
     return {
         'schemas': {
-            'benchforge.scene/v1': {'max_objects': SCENE_V1_MAX_OBJECTS, 'max_cameras':64, 'executor': 'a100sim.v1.Simulator'},
-            'benchforge.scene/v2': {'max_objects': SCENE_V2_MAX_OBJECTS, 'max_cameras':64, 'executor': 'a100sim.v1.Simulator'},
+            'benchforge.scene/v1': {'max_objects': SCENE_V1_MAX_OBJECTS, 'max_cameras':64, 'executor': 'isaacsim_rpc.v1.SimulationService'},
+            'benchforge.scene/v2': {'max_objects': SCENE_V2_MAX_OBJECTS, 'max_cameras':64, 'executor': 'isaacsim_rpc.v1.SimulationService'},
         },
         'extensions': ['scene_graph', 'rooms', 'zones', 'portals', 'assets', 'materials', 'lights', 'render_environment', 'navigation', 'affordances', 'semantic_layers', 'provenance'],
         'mounting': MOUNTING_CONTRACT,
         'asset_sources': ['builtin', 'usd', 'mesh', 'generated', 'diffusion', 'trellis', 'sam3d', 'procedural', 'imported'],
         'native_assets': {key:{field:value for field,value in asset.items() if field!='path'} for key,asset in ASSETS.items()},
-        'capture_adapter': {'protocol': 'a100sim.v1.Simulator', 'native_rtx': False,
+        'capture_adapter': {'protocol': 'isaacsim_rpc.v1.SimulationService', 'hardware_capabilities': 'Read native_rtx, annotators and limits from the configured endpoint Health response',
             'tool': 'benchforge_isaac_sim', 'catalog_action': 'catalog',
             'native_asset_binding': 'kind=native with native_asset from this conversation upload, or a configured catalog kind; no source/config edits',
             'unknown_or_unsupported_requirements': 'reject before submission; never substitute geometry or evidence'},
@@ -25,7 +25,7 @@ def scene_contract_capabilities():
             'declared_schema_fields': sorted(APPEARANCE_FIELDS),
             'base_color': 'linear RGB constants or transported mesh vertex colors',
             'unsupported': ['texture_id', 'uv_scale_m', 'texture_tint', 'native_opacity_multiplier', 'ior', 'specular'],
-            'imported_materials': 'source-authored materials must be supported by the native A100 renderer'},
+            'imported_materials': 'source-authored materials must be supported by the deployed renderer'},
         'texture_ids': [],
         'environment_maps': {},
         'lighting_controls': {'kinds': ['environment', 'area'],

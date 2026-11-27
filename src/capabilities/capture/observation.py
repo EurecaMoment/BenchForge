@@ -137,7 +137,7 @@ def observe(store, run_id):
                 if quality['scene_quality_passed'] is False or quality['visual_realism']=='needs_improvement':
                     row['next_action']='inspect_quality_gaps'
         if task['state']=='READY' and unit['phase']=='capture':
-            row['queue']={'reason':'isaac_sim_capacity', 'protocol':'a100sim.v1.Simulator'}
+            row['queue']={'reason':'isaac_sim_capacity', 'protocol':'isaacsim_rpc.v1.SimulationService'}
         if snap['state']=='CANCELED':
             row['next_action']='inspect_remote_cancellation' if task.get('lease_owner') else 'inspect_evidence'
         if complete:

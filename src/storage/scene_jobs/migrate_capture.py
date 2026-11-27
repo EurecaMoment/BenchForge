@@ -55,7 +55,7 @@ def migrate_capture(store):
             state = 'CANCELED' if run_states[task['run_id']] == 'CANCELED' else 'FAILED_FINAL'
             failure = {'stage': 'capture_execution', 'code': 'CAPTURE_PROTOCOL_MIGRATED',
                 'detail': 'The prior capture protocol was retired. Artifacts and history are preserved. '
-                          'Retry this task explicitly to submit it to a100sim.v1.Simulator.',
+                          'Retry this task explicitly to submit it to isaacsim_rpc.v1.SimulationService.',
                 'backup_path': str(backup)}
             connection.execute(tasks.update().where(tasks.c.id == task['id']).values(
                 state=state, lease_owner=None, lease_expires_at=None, failure=failure))
