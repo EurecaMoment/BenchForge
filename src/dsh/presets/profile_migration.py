@@ -54,6 +54,8 @@ def _merge_preset(row, previous):
     prior = previous.get('config', {})
     base.preserve_context_overrides(incoming['plugins'], prior.get('plugins', []))
     previous_plugins = {plugin['id']: plugin for plugin in prior.get('plugins', []) if 'id' in plugin}
+    if base.preset_id(row) == base.BENCHFORGE_ID:
+        previous_plugins.pop('agent-team', None)
     plugins = []
     for plugin in incoming['plugins']:
         old = previous_plugins.pop(plugin['id'], {})

@@ -490,10 +490,6 @@
       - id: tool-plugin-market
         name: '@deepseek-ai/dsh-plugin-market/tools'
         disabled: true
-      - id: agent-team
-        name: '@deepseek-ai/dsh-agent-team'
-        config:
-          defaultEnabled: true
       - id: tool-agent-team
         name: '@deepseek-ai/dsh-tool-agent-team'
       - id: benchforge-skill-files

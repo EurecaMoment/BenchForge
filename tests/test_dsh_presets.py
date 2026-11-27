@@ -50,16 +50,19 @@ class DshPresetTests(unittest.TestCase):
             self.assertFalse(by_id['tool-bash'].get('disabled'))
         self.assertNotIn('disabled', rows[-2])
 
-    def test_agent_team_default_is_scoped_to_benchforge(self):
-        """Enable Team mode for BenchForge sessions without changing Standard."""
+    def test_team_tools_reuse_host_service_after_generation_and_upgrade(self):
         source = standard()
         standard_plugins = source[0]['insert'][0]['config']['plugins']
         generated = build(source, 'python3', Path('/missing/config.json'),
                           Path('/missing/service.json'), package_imports=True)
-        team_plugins = {row['id']: row for row in plugins(generated)}
-        self.assertEqual(team_plugins['agent-team']['name'], '@deepseek-ai/dsh-agent-team')
-        self.assertIs(team_plugins['agent-team']['config']['defaultEnabled'], True)
-        self.assertEqual(team_plugins['tool-agent-team']['name'], '@deepseek-ai/dsh-tool-agent-team')
+        prior = deepcopy(generated)
+        plugins(prior).append({'id': 'agent-team', 'name': '@deepseek-ai/dsh-agent-team',
+                               'config': {'defaultEnabled': True}})
+        for profile in (generated, migrate_profile(prior, generated)):
+            rows = plugins(profile)
+            self.assertNotIn('agent-team', [row['id'] for row in rows])
+            self.assertEqual([row['name'] for row in rows if row['id'] == 'tool-agent-team'],
+                             ['@deepseek-ai/dsh-tool-agent-team'])
         self.assertNotIn('agent-team', {row['id'] for row in standard_plugins})
         self.assertNotIn('tool-agent-team', {row['id'] for row in standard_plugins})
 
