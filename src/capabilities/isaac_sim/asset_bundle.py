@@ -47,6 +47,19 @@ def write_mesh_layer(scene_text, packed_meshes, destination):
     return destination
 
 
+def capture_layer(directory, scene_text, packed_meshes):
+    """Reuse an uploaded layer byte-for-byte when resuming a frozen attempt."""
+    destination = directory / 'scene.usdc'
+    if (directory / 'asset.json').is_file() and destination.is_file():
+        # upload_asset_bundle validates the saved bytes against the original receipt.
+        return destination
+    if packed_meshes is not None:
+        return write_mesh_layer(scene_text, packed_meshes, destination)
+    source = directory / 'scene.usda'
+    source.write_text(scene_text, encoding='utf-8')
+    return export_binary_usd(source, destination)
+
+
 # 按路径稳定暂存贴图依赖，并应用 OmniPBR ORM 粗糙度贴图的金属度因子。
 def stage_texture_dependencies(dependencies, directory):
     staged = []

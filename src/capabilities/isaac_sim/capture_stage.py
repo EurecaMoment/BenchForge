@@ -17,7 +17,7 @@ from capabilities.isaac_sim.capture_contract import (
     checked_service_issues, capture_service_client, native_edit_arguments, native_import_arguments,
 )
 from capabilities.isaac_sim.asset_bundle import (
-    export_binary_usd, stage_texture_dependencies, upload_asset_bundle, write_mesh_layer,
+    capture_layer, stage_texture_dependencies, upload_asset_bundle,
 )
 from capabilities.isaac_sim.appearance_evidence import appearance_evidence, observe_render_sources
 from capabilities.scene_authoring.catalog.native_reference import native_references
@@ -127,13 +127,8 @@ def execute_capture(store, task, stop, *, config, client=None):
         if not historical:
             compiled['samples_per_pixel'] = max(settings.get('samples_per_pixel', 256),
                                                 (program.get('render_environment') or {}).get('samples_per_pixel', 0))
-        if packed_meshes is None:
-            # Existing attempts retain their original upload identity on resume.
-            source = attempt / 'scene.usda'
-            source.write_text(compiled['usd'], encoding='utf-8')
-            upload_source = export_binary_usd(source, attempt / 'scene.usdc')
-        else:
-            upload_source = write_mesh_layer(compiled['usd'], packed_meshes, attempt / 'scene.usdc')
+        upload_source = capture_layer(attempt, compiled['usd'], packed_meshes)
+        if packed_meshes is not None:
             packed_meshes.clear()
         texture_files = stage_texture_dependencies(
             compiled.get('texture_dependencies', []), attempt)

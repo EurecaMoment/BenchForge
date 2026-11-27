@@ -10,7 +10,7 @@ from PIL import Image
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 import trimesh
 
-from capabilities.isaac_sim.asset_bundle import write_mesh_layer
+from capabilities.isaac_sim.asset_bundle import capture_layer, write_mesh_layer
 from capabilities.isaac_sim.authoring import compile_scene
 from capabilities.isaac_sim.mesh_materials import prepare_mesh_textures
 from capabilities.isaac_sim.scene_requirements import UnsupportedScene
@@ -18,6 +18,16 @@ from tests.test_asset_capture_contract import scene_program
 
 
 class MeshMaterialTests(unittest.TestCase):
+    def test_uploaded_capture_layer_survives_compiler_changes_on_resume(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'asset.json').write_text('{"asset_id":"frozen"}')
+            original = root / 'scene.usdc'
+            original.write_bytes(b'previously uploaded scene')
+            for packed_meshes in (None, {}):
+                self.assertEqual(capture_layer(root, 'a newer compiler output', packed_meshes), original)
+                self.assertEqual(original.read_bytes(), b'previously uploaded scene')
+
     # 为每个测试建立独立的注册资产目录。
     def setUp(self):
         temp = TemporaryDirectory()
