@@ -157,6 +157,20 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
         error.job['state'] = 'CANCELLED'
         self.assertFalse(is_execution_diagnosis(stage_failure(error, 'capture')))
 
+    def test_snapshot_failure_retains_job_progress_for_execution_recovery(self):
+        from capabilities.isaac_sim.grpc.simulation_pb2 import Job
+        from capabilities.isaac_sim.grpc.unified_transport import RemoteJobFailed
+
+        error = RemoteJobFailed(Job(id='snapshot-1', state='failed', error='Renderer stopped',
+                                    phase='rendering', frames_done=1, frames_total=2))
+        failure = stage_failure(error, 'capture')
+        self.assertEqual(failure['remote_job_failure'], {
+            'job_id': 'snapshot-1', 'operation': 'simulation', 'state': 'FAILED',
+            'failure': {'message': 'Renderer stopped'}, 'phase': 'rendering',
+            'frames_done': 1, 'frames_total': 2})
+        self.assertEqual(failure['repair_owner'], 'isaac_sim_execution')
+        self.assertFalse(failure['retry_unchanged'])
+
     def test_missing_native_geometry_is_typed_as_execution_diagnosis(self):
         """Missing measured geometry/colliders are retained outside layout repair."""
         error = NativeAssetGeometryError('wheel', geometry_present=True, colliders_present=False)
@@ -272,8 +286,25 @@ class CaptureServiceRecoveryTests(unittest.TestCase):
         ]
         for invalid in invalid_jobs:
             with self.subTest(job=invalid):
-                with self.assertRaisesRegex(ValueError, 'newer SUCCEEDED native capture'):
+                with self.assertRaisesRegex(ValueError, 'newer SUCCEEDED native job'):
                     self.retry_annotation_fixture(task, invalid)
+
+    def test_export_recovery_requires_packaged_output_from_original_session(self):
+        task, job = self.annotation_recovery_fixture()
+        base = self.root / 'isaac_sim/attempt_0/jobs'
+        (base / 'views-0').rename(base / 'export')
+        failed = task['failure']['remote_job_failure']
+        failed['operation'] = 'extension.scene.export'
+        (base / 'export/receipt.json').write_text(json.dumps(failed))
+        (base / 'export/request.json').write_text(json.dumps(
+            {'payload': {'extension': {'arguments': {'session_id': 'studio', 'format': 'usdz'}}}}))
+        job.update(operation=failed['operation'], result={
+            'scene': 'artifact://usd', 'package': 'artifact://usdz', 'session_id': 'another-room'},
+            artifacts=[{'artifact_id': 'usd'}, {'artifact_id': 'usdz'}])
+        with self.assertRaisesRegex(ValueError, 'same retained session'):
+            self.retry_annotation_fixture(task, job)
+        job['result']['session_id'] = 'studio'
+        self.assertEqual(self.retry_annotation_fixture(task, job)['capture_generation'], 1)
 
     def test_recovered_terminal_job_still_cannot_resume_failed_receipt(self):
         task, job = self.annotation_recovery_fixture()

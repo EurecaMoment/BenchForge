@@ -157,7 +157,7 @@ def execute_capture(store, task, stop, *, config, client=None):
                 {'session_id': identity, 'steps': steps, 'dt': dt})
             if preview_settings and scope['view_indices']:
                 from capabilities.isaac_sim.interactive_preview import start_preview
-                start_preview(preview_settings, identity, compiled['cameras'][scope['view_indices'][0]],
+                start_preview(config, preview_settings, identity, compiled['cameras'][scope['view_indices'][0]],
                               directory, generation)
             body_paths = [item['prim_path'] for item in compiled['entities'].values()
                           if item['dynamic'] and not item.get('articulation_roots')]

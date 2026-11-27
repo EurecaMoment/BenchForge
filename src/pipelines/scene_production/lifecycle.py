@@ -128,12 +128,17 @@ class SceneLifecycle:
         """Validate frozen scene and service inputs without holding a database transaction."""
         tid = task["id"]
         recovery_id = None
-        if is_execution_diagnosis(task.get('failure') or {}):
+        failure = task.get('failure') or {}
+        remote = failure.get('remote_job_failure') or {}
+        export_probe = (remote.get('operation') in ('scene.export', 'extension.scene.export')
+                        and (directory_for(tid, task['unit']['revision']) /
+                             'isaac_sim/service_recovery.json').is_file())
+        if is_execution_diagnosis(failure) and not export_probe:
             raise ValueError(
                 'Inspect the retained Isaac Sim failure and correct the asset or execution path '
                 'before retrying; unchanged capture is blocked'
             )
-        service_recovery = is_service_failure(task.get('failure') or {})
+        service_recovery = export_probe or is_service_failure(failure)
         settings_changed = False
         if service_recovery:
             if task['unit']['phase'] != 'capture' or feedback is not None:

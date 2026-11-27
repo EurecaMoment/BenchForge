@@ -117,7 +117,7 @@ v5 增加会话身份、关系约束和 RLS；v6 增加个人库授权、资产�
 
 ## 6. Isaac Sim 和服务代读
 
-协议保持 `a100sim.v1.Simulator` gRPC。BenchForge 校验原生作业、上传资产、retained scene/world 的会话与端点归属。知道外部 ID 不足以查询、控制、上传覆盖或下载。严格会话模式拒绝没有独立世界身份的全局机器人操作；这不代表全部原生 RPC 已实现多租户隔离。
+仿真服务使用 `isaacsim_rpc.v1.SimulationService` gRPC。BenchForge 校验原生作业、上传资产、retained scene/world 的会话与端点归属。知道外部 ID 不足以查询、控制、上传覆盖或下载。严格会话模式拒绝没有独立世界身份的全局机器人操作；这不代表全部原生 RPC 已实现多租户隔离。
 
 上传先冻结输入，再检查 USD/USDZ、URDF/MJCF、glTF/GLB、OBJ/MTL 等引用。USD 只读取 layer 元数据，不先打开并遍历未授权 Stage；缺解析器时拒绝。`/World/Robot` 等 USD prim 路径按协议处理，不当作主机路径。原生产物按作业清单下载。
 

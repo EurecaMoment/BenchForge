@@ -1,12 +1,14 @@
 """Optional interactive RGB preview of the settled scene, outside capture evidence."""
-import json
 import logging
 from pathlib import Path
 import re
 import struct
 import tempfile
 import threading
-from urllib.request import Request, urlopen
+
+from capabilities.isaac_sim.evidence import resolve_artifact
+from capabilities.isaac_sim.grpc.tasks import DurableTasks
+from capabilities.isaac_sim.grpc.transport import A100Client
 
 PREVIEW_NAME = re.compile(r'preview/attempt_(?:0|[1-9][0-9]*)/first_view\.png')
 _slots = threading.BoundedSemaphore(16)
@@ -31,17 +33,21 @@ def current_preview_file(folder):
         return public_preview_file(folder, max(attempts))
 
 
-def fetch_preview(settings, identity, camera, directory, generation):
-    url = settings['url'].rstrip('/')
+def fetch_preview(config, settings, identity, camera, directory, generation):
     size = settings.get('size', 1024)
     data = {'session_id': identity, 'camera': camera, 'size': size, 'spp': settings.get('spp', 1)}
-    # The preview endpoint prepares a cold stage and checks its version again
-    # after rendering. Request the first PNG directly, including on a cache miss.
-    request = Request(url + '/v1/preview', json.dumps(data).encode(), {'Content-Type': 'application/json'})
-    with urlopen(request, timeout=120) as response:
-        if response.headers.get_content_type() != 'image/png' or not response.headers.get('X-Scene-Version'):
-            raise ValueError('Preview returned an unversioned image or unexpected media')
-        image = response.read(16 * 1024 * 1024 + 1)
+    attempt = directory / 'isaac_sim' / f'attempt_{generation}'
+    client = A100Client(config)
+    try:
+        jobs = DurableTasks(client, attempt / 'jobs', str(attempt))
+        job, result = jobs.extension('preview', 'scene.preview', data)
+        if not result.get('scene_version'):
+            raise ValueError('Preview returned no scene version')
+        source = resolve_artifact(result['image'], jobs.download('preview', job))
+        with source.open('rb') as handle:
+            image = handle.read(16 * 1024 * 1024 + 1)
+    finally:
+        client.close()
     if (len(image) > 16 * 1024 * 1024 or image[:8] != b'\x89PNG\r\n\x1a\n' or
             len(image) < 33 or struct.unpack('>II', image[16:24]) != (size, size) or image[-8:-4] != b'IEND'):
         raise ValueError('Incomplete or mismatched preview PNG')
@@ -58,12 +64,12 @@ def fetch_preview(settings, identity, camera, directory, generation):
             temp.unlink(missing_ok=True)
 
 
-def start_preview(settings, identity, camera, directory, generation):
+def start_preview(config, settings, identity, camera, directory, generation):
     if not settings or public_preview_file(directory, generation) or not _slots.acquire(blocking=False):
         return
     def work():
         try:
-            fetch_preview(settings, identity, camera, directory, generation)
+            fetch_preview(config, settings, identity, camera, directory, generation)
         except Exception:
             logging.getLogger(__name__).warning('Interactive preview unavailable for %s', identity, exc_info=True)
         finally:

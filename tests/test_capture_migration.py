@@ -115,6 +115,13 @@ class CaptureStoreTests(unittest.TestCase):
         self.assertEqual(prepare_retry(directory, {}, 'auto')['capture_generation'], 1)
         with self.assertRaisesRegex(ValueError, 'terminal'):
             prepare_retry(directory, {}, 'resume')
+        write_json(receipt, {'id': 'snapshot-job', 'state': 'running'})
+        with self.assertRaisesRegex(ValueError, 'snapshot-job'):
+            prepare_retry(directory, {}, 'restart')
+        write_json(receipt, {'id': 'snapshot-job', 'state': 'failed'})
+        retry = prepare_retry(directory, {}, 'auto')
+        self.assertEqual(retry['capture_generation'], 1)
+        self.assertEqual(retry['capture_attempt_history'][0]['jobs'], ['snapshot-job'])
 
 
 class ConfigurationMigrationTests(unittest.TestCase):

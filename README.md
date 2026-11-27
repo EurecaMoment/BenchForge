@@ -371,15 +371,14 @@ docker ps --filter "label=com.docker.compose.project=$project" --filter 'label=c
 | `FastSAM3` | `benchforge_scene_sam3` 调用 Chat Completions，获取文本或框提示对应的分割掩码。 |
 | `FastDA3` | `benchforge_depth` 调用 Depth Estimations，保存预测深度、相机参数和预览。 |
 | `FastTrellis2` | `benchforge_trellis` 提交 3D 任务并下载 Y-up GLB。用 `benchforge_mesh_import` 注册选中的网格。 |
-| `IsaacSim4A100` | 后端直接调用 A100 gRPC；`benchforge_isaac_sim` 提供同一原生协议入口。 |
+| `IsaacSim4A100` | 生产采集和 `benchforge_isaac_sim` 共用 A100 与 RTX 的 SimulationService。 |
 
 四个 HTTP 提供方各自配置以 `/v1` 结尾的 `url`、`model` 和 `timeout_seconds`。
 需要认证时，把密钥变量名填入该提供方的 `token_env`，值从启动环境或
 `config/dsh.env` 读取。可在 `request_defaults` 中设置提供方 API 参数，例如
 FLUX 的 `num_inference_steps` 或 DA3 的 `process_res`。
 
-Isaac Sim 使用 [A100 分支原生协议](src/capabilities/isaac_sim/grpc/simulator.proto)，服务名为
-`a100sim.v1.Simulator`。在 `providers.IsaacSim4A100.grpc` 填写 `host`、`port` 和
+Isaac Sim 使用统一作业协议 `isaacsim_rpc.v1.SimulationService`。[协议定义](src/capabilities/isaac_sim/grpc/simulation.proto)在 `providers.IsaacSim4A100.grpc` 填写 `host`、`port` 和
 `timeout_seconds`；可选 `token_env`、`tls_ca_file`。`capture_timeout_seconds` 是观察期限，
 超时保留远端作业；`max_concurrent_captures` 控制后端并发场景数，默认 4。
 
@@ -387,13 +386,9 @@ Isaac Sim 使用 [A100 分支原生协议](src/capabilities/isaac_sim/grpc/simul
 无需额外采集进程。DSH 原生工具 `benchforge_isaac_sim` 通过公共工具注册和执行器提供
 capabilities、catalog、assets、upload、submit、invoke、status、wait、cancel、download。
 先读取在线 catalog，再按其 schema 提交；返回 job_id 表示受理，只有 SUCCEEDED 和真实产物才能证明执行完成。
-CancelJob 只能取消服务尚未执行的作业，不能把断开观察当作 GPU 已停止。
+取消后通过 `GetJob` 核对作业终态。中断客户端观察时，服务继续保存已受理的作业。
 
-`benchforge_capture` 将已保存的 SceneProgram 转换为 USD，通过同一 gRPC 接口导入、物理步进、
-多相机采集和下载；每批最多 32 个相机，更多机位分批保留。RGB、深度、法向和语义/实例 ID
-来自 A100 CUDA 输出，保持原有场景与数据验收。原生资产必须显式配置 `asset_sources` 的
-asset_id/relative_path，不能自动以简化几何代替机器人。A100 没有 RTX：纹理、RTX 专属字段或
-尚未映射的 SceneProgram 交互会明确拒绝；机器人控制和并行采集通过原生 session/world 接口使用。
+`benchforge_capture` 依据 `Health` 选择共享快照或持久 USD 场景采集。同一场景的机位使用同一物理状态。带原始 PBR 贴图的 TRELLIS 网格通过资产登记、USD 导入和正式采集保留材质。后端下载 RGB、米制深度与独立实例标注，将产物和作业回执交给场景验收。原生资产可用 `asset_sources` 或已授权的上传句柄引用。机器人与世界交互按部署公开的操作目录调用。
 
 版本 4 的本地配置由 `sync` 迁移到版本 5，先保存旧配置副本再统一提供方拼写，移除旧采集连接配置。
 数据库历史、会话和产物保留。旧的设备租约需运行一次
@@ -436,7 +431,7 @@ npm ci --prefix src/dsh
 [`src/dsh/presets/hot_update.py`](src/dsh/presets/hot_update.py) 更新。
 旧采集部署切换到 A100 gRPC 时，按
 [Isaac Sim 接入与迁移说明](src/capabilities/isaac_sim/README.md) 备份配置并迁移队列。
-历史产物保留；旧协议下未完成的采集需显式重试，不会在升级时自动重新执行。
+历史产物保留。原 A100 作业可凭同一端点保留的作业 ID 和回执在新版服务续查。迁移到空作业库时须先处理仍在执行的旧任务。
 
 ### 10. 常见失败及处理
 

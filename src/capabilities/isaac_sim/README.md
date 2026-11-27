@@ -1,4 +1,4 @@
-# Isaac Sim A100 integration
+# Isaac Sim integration
 
 BenchForge calls the public `isaacsim_rpc.v1.SimulationService` service from
 [IsaacSim4A100](https://github.com/EurecaMoment/IsaacSim4A100).
@@ -25,12 +25,11 @@ BenchForge capture daemon, device lock, callback endpoint or local Kit runtime i
 Set `providers.IsaacSim4A100.grpc` in `config/benchforge.local.json`, then
 run `python benchforge_app.py sync` and the usual backend/DSH launch scripts.
 Configuration version 4 migrates once to version 5, preserving model settings
-and backing up retired settings. image_size controls the square capture resolution
-from 64 to 2048 pixels. samples_per_pixel is a quality floor, so the effective
-request uses the larger of that value and the SceneProgram value. The default is
-1024 pixels and 256 spp, with a maximum of 1024 spp. On first backend start, the old queue is
-backed up and unfinished old-protocol captures require an explicit retry.
-That retry creates a new scene revision and leaves previous capture paths intact.
+and backing up retired settings. Captures default to 1024 pixels and 256 spp.
+The effective sampling rate is the larger of the configured floor and the
+SceneProgram request. `Health` supplies the selected engine's maximum image
+size, samples per pixel and number of views. When a gateway retains an old
+A100 job, its original ID and request receipt remain usable on the new service.
 
 The unused local Kit collector (`data_acquisition/collectors/isaac.py`) and legacy
 `capture_requests/` recorder helpers have been removed. Repository references and
@@ -70,8 +69,7 @@ parallelism depends on the selected backend. Multiple cameras use native batches
 of up to 32; additional authored views are split into further batches without
 dropping views. The simulator owns synchronization inside each world.
 
-SceneProgram capture supports portable geometry and the A100 renderer's
-supported materials, lights and annotations. Read the capability catalog for
+SceneProgram capture supports portable geometry, registered textured meshes and the selected renderer’s materials, lights and annotations. Read the capability catalog for
 adapter limits and use the live gRPC catalog for native robot/world operations.
 Unsupported requirements fail explicitly; no proxy robot, fabricated motion,
 RTX claim or synthetic acceptance is substituted.

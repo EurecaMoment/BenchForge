@@ -2,7 +2,7 @@
 
 状态（2026-11-19）：本文包含本轮源码中的会话隔离与接口适配。正式 gRPC `50051` 尚未切换到全部候选改动；工具注册、阶段测试和本文更新都不证明已经上线。
 
-BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `a100sim.v1.Simulator` gRPC 服务。常规场景生产则由 `benchforge_capture` 等工具提交给 BenchForge 后端，再由后端调用同一 gRPC 服务。**运行时以服务返回的能力、参数定义和实际作业结果为准，不读取 Git 提交号判断功能。** Git 子模块信息只用于维护者部署与追溯源码。
+BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `isaacsim_rpc.v1.SimulationService` gRPC 服务。常规场景生产则由 `benchforge_capture` 等工具提交给 BenchForge 后端，再由后端调用同一 gRPC 服务。**运行时以服务返回的能力、参数定义和实际作业结果为准，不读取 Git 提交号判断功能。** Git 子模块信息只用于维护者部署与追溯源码。
 
 本说明区分三件事：工具已经注册、服务声明可用、真实任务验收通过。前两项都不能单独证明第三项。协议中的 `api_version`、`simulator_version` 可以帮助诊断，但不能替代具体操作及参数检查。
 
@@ -32,8 +32,8 @@ BenchForge 的 DSH 预设通过 `benchforge_isaac_sim` 使用 `a100sim.v1.Simula
 | `catalog` | `GetApiCatalog` | 可选 `feature_id` | 产品能力目录、`support`、`availability`、`request_schema`、`fixed_arguments` 和实现边界 |
 | `assets` | `ListAssets` | 无额外输入 | 本会话已登记授权的上传资产，不返回任意服务端文件浏览能力 |
 | `upload` | `UploadAsset` | 工作区中的 `source_path`；可选 `asset_id`、`relative_path` | 返回 `asset_id` / `relative_path`；后续请求引用这对标识，不传服务端绝对路径 |
-| `submit` | `SubmitTask` | `request`、可选稳定 `request_id` | `request` 是原生任务消息，不在其中重复嵌入 `request_id`；返回受理作业，不代表完成 |
-| `invoke` | `InvokeFeature` | `feature_id`、`request`、可选稳定 `request_id` | `request` 直接放该功能的参数；不要套 `extension` 外壳。功能 ID 从当前目录读取 |
+| `submit` | `SubmitJob.native_task` | `request`、可选稳定 `request_id` | `request` 是原生任务消息，不在其中重复嵌入 `request_id`；返回受理作业，不代表完成 |
+| `invoke` | `SubmitJob.native_feature` | `feature_id`、`request`、可选稳定 `request_id` | `request` 直接放该功能的参数；不要套 `extension` 外壳。功能 ID 从当前目录读取 |
 | `status` | `GetJob` | 同一会话持有的 `job_id` | 读取原生状态、失败原因、结果和产物清单 |
 | `wait` | `GetJob` + `WatchJob` | `job_id`、`timeout_seconds` | 每次观察最长 60 秒。超时保留远端任务，不重新提交，也不等于失败或取消 |
 | `cancel` | `GetJob` + `CancelJob` | `job_id` | 取消由服务确认；已执行的 GPU 作业可能无法取消，不能把断开观察当成停止 |
@@ -192,12 +192,12 @@ BenchForge 可并发提交独立场景并限制在途数量；这不等于每个
 | `capture/refine/extend/retry` 注册 | [src/dsh/tools/scene/tools.mjs](../src/dsh/tools/scene/tools.mjs) |
 | SceneProgram 编译与采集执行 | [authoring.py](../src/capabilities/isaac_sim/authoring.py)、[capture_stage.py](../src/capabilities/isaac_sim/capture_stage.py)、[evidence.py](../src/capabilities/isaac_sim/evidence.py) |
 | 后台观察、通知与续行 | [src/dsh/tools/scene/capture/capture_runtime.mjs](../src/dsh/tools/scene/capture/capture_runtime.mjs) |
-| 客户端使用的协议副本 | [src/capabilities/isaac_sim/grpc/simulator.proto](../src/capabilities/isaac_sim/grpc/simulator.proto)；同目录 `protocol.json` 仅记录来源 |
+| 客户端使用的协议副本 | [src/capabilities/isaac_sim/grpc/simulation.proto](../src/capabilities/isaac_sim/grpc/simulation.proto)；同目录 `protocol.json` 仅记录来源 |
 | 预设及角色说明 | [src/dsh/presets/preset_definition.py](../src/dsh/presets/preset_definition.py) |
 
 | 责任 | IsaacSim4A100 源码（`A100` 分支） |
 | --- | --- |
-| 对外 gRPC 协议 | [a100/a100sim/rpc/v1/simulator.proto](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/v1/simulator.proto) |
+| 对外 gRPC 协议 | [simulation.proto](https://github.com/EurecaMoment/IsaacSim4A100/blob/merge/main-develop-pr4/rtx4090_grpc/proto/isaacsim_rpc/v1/simulation.proto) |
 | gRPC 方法及后端选择 | [a100/a100sim/rpc/server.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/server.py) |
 | 产品功能目录及 `InvokeFeature` 映射 | [a100/a100sim/rpc/catalog.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/catalog.py) |
 | 基础任务路由、能力边界与独立工作流 | [a100/a100sim/rpc/backend.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/backend.py)、[workflows.py](https://github.com/EurecaMoment/IsaacSim4A100/blob/A100/a100/a100sim/rpc/workflows.py) |

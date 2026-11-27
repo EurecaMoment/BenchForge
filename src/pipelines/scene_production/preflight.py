@@ -18,9 +18,6 @@ def inspect_capture_program(root, program, *, settings=None, capture_options=Non
     if settings:
         settings = isaac_unified_settings(settings)
     issues = capture_requirement_issues(program, assets, settings)
-    if settings and settings.get('grpc'):
-        # The native USD compiler is A100-specific. The selected service may provide RTX.
-        issues = [row for row in issues if row['path'] != '/render_environment/renderer']
     report = inspect_program(root, program, **options, additional_issues=issues)
     if report['passed'] and settings and settings.get('grpc'):
         from capabilities.isaac_sim.capture_contract import inspect_live_capture_service

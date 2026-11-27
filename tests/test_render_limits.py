@@ -12,10 +12,10 @@ from test_scene_diagnostics import sample
 
 
 class RenderLimitTests(unittest.TestCase):
-    def test_runtime_configuration_accepts_new_limits_and_rejects_values_above_them(self):
+    def test_runtime_configuration_defers_render_ceilings_to_the_selected_service(self):
         validate_providers({'providers': {'IsaacSim4A100': {
-            'image_size': 2048, 'samples_per_pixel': 1024}}})
-        for field, value in (('image_size', 2049), ('samples_per_pixel', 1025)):
+            'image_size': 4096, 'samples_per_pixel': 2048}}})
+        for field, value in (('image_size', 63), ('samples_per_pixel', 0)):
             with self.subTest(field=field):
                 with self.assertRaisesRegex(ValueError, f'{field} must be an integer'):
                     validate_providers({'providers': {'IsaacSim4A100': {field: value}}})
@@ -24,12 +24,14 @@ class RenderLimitTests(unittest.TestCase):
         program = sample()
         program['render_environment'] = {'samples_per_pixel': 1024}
         validate_program(program)
-        program['render_environment']['samples_per_pixel'] = 1025
-        with self.assertRaisesRegex(ValueError, 'samples_per_pixel must be 16..1024'):
+        program['render_environment']['samples_per_pixel'] = 2048
+        validate_program(program)
+        program['render_environment']['samples_per_pixel'] = 0
+        with self.assertRaisesRegex(ValueError, 'at least 16'):
             validate_program(program)
         controls = scene_contract_capabilities()['render_controls']
-        self.assertEqual(controls['samples_per_pixel'], [1, 1024])
-        self.assertEqual(controls['image_size'], [64, 2048])
+        self.assertIn('max_samples_per_pixel', controls['runtime_limits'])
+        self.assertIn('max_image_size', controls['runtime_limits'])
 
     def test_configured_samples_are_a_floor_and_reach_capture_arguments(self):
         program = sample()

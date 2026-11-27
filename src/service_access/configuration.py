@@ -149,7 +149,7 @@ def validate_providers(config):
                                   'image_size', 'samples_per_pixel', 'asset_sources', 'interactive_preview',
                                   'mesh_assets', 'unified_capture'})
     for key, low, high, default in (('max_concurrent_captures', 1, 32, 4),
-                                   ('image_size', 64, 2048, 1024), ('samples_per_pixel', 1, 1024, 256)):
+                                   ('image_size', 64, 2**32 - 1, 1024), ('samples_per_pixel', 1, 2**32 - 1, 256)):
         value = isaac.get(key, default)
         if type(value) is not int or not low <= value <= high:
             raise ValueError(f'{field}.{key} must be an integer in {low}..{high}')
@@ -158,7 +158,8 @@ def validate_providers(config):
         if not isinstance(preview, dict):
             raise ValueError(f'{field}.interactive_preview must be an object')
         _validate_fields(preview, field + '.interactive_preview', {'url', 'size', 'spp'})
-        _configured_url(preview.get('url'), field + '.interactive_preview.url')
+        if 'url' in preview:  # Accept configuration from deployments predating gRPC preview.
+            _configured_url(preview['url'], field + '.interactive_preview.url')
         for key, low, high, default in (('size', 64, 1024, 1024), ('spp', 1, 4, 1)):
             value = preview.get(key, default)
             if type(value) is not int or not low <= value <= high:

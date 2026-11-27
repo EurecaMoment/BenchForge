@@ -77,7 +77,7 @@ class CapturePreflightTests(unittest.TestCase):
         paths = {row['path'] for row in report['issues']}
         self.assertTrue({'/objects/0/size', '/objects/0/appearance/ior', '/objects/1/kind',
                          '/objects/1/cast_shadows', '/objects/2/appearance/specular',
-                         '/render_environment/renderer', '/render_environment/exposure',
+                         '/render_environment/exposure',
                          '/lights/0/kind', '/interactions/0', '/interactions/1'} <= paths)
         self.assertFalse(report['passed'])
         self.assertEqual(program, original)
@@ -102,7 +102,7 @@ class CapturePreflightTests(unittest.TestCase):
         with self.assertRaises(UnsupportedScene) as caught:
             compile_scene(program, self.root, {})
         self.assertEqual(caught.exception.issues, expected)
-        self.assertEqual(len(expected), 4)
+        self.assertEqual(len(expected), 3)
 
     # 验证无效提交保存两类完整诊断，但不会创建队列任务。
     def test_submission_saves_adapter_and_contract_diagnostics_without_queueing(self):

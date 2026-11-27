@@ -57,6 +57,12 @@ def remote_job_failure(value):
     job = getattr(value, 'job', None)
     if not isinstance(job, dict):
         return None
+    if isinstance(job.get('id'), str) and job['id'] and job.get('state') == 'failed':
+        message = job.get('error')
+        if isinstance(message, str):
+            return {'job_id': job['id'], 'operation': 'simulation', 'state': 'FAILED',
+                    'failure': {'message': message}, **{key: job[key] for key in
+                    ('phase', 'frames_done', 'frames_total') if key in job}}
     failure = job.get('failure')
     if (not isinstance(job.get('job_id'), str) or not job['job_id']
             or not isinstance(job.get('operation'), str) or not job['operation']
@@ -150,13 +156,15 @@ def verify_capture_service_recovery(task, directory):
     settings = current_capture_settings(frozen.get('settings'))
     program = json.loads((directory / 'program.json').read_text(encoding='utf-8'))
     require_live_service(program, settings, unit.get('intent', {}).get('capture_options'))
-    if capture_service_defect(task.get('failure') or {}):
-        verify_annotated_capture_recovery(task, directory, settings)
+    failure = task.get('failure') or {}
+    remote = failure.get('remote_job_failure') or {}
+    if capture_service_defect(failure) or remote.get('operation') in ('scene.export', 'extension.scene.export'):
+        verify_native_recovery(task, directory, settings)
     return bool(frozen and frozen.get('settings') != settings)
 
 
-def verify_annotated_capture_recovery(task, directory, settings):
-    """Require a newer successful annotated native capture on the configured service."""
+def verify_native_recovery(task, directory, settings):
+    """Verify the repaired operation on the original endpoint before a fresh attempt."""
     from capabilities.isaac_sim.capture_contract import capture_service_client
     from capabilities.isaac_sim.grpc.transport import document
     from storage.files import write_json
@@ -164,8 +172,8 @@ def verify_annotated_capture_recovery(task, directory, settings):
     failed = task['failure']['remote_job_failure']
     marker = directory / 'isaac_sim/service_recovery.json'
     if not marker.is_file() or marker.stat().st_size > 4096:
-        raise ValueError('Annotated capture service recovery requires isaac_sim/service_recovery.json '
-                         'binding the failed job to a verified annotated capture job')
+        raise ValueError('Service recovery requires isaac_sim/service_recovery.json '
+                         'binding the failed job to a verified simulator job')
     recovery = json.loads(marker.read_text(encoding='utf-8'))
     if (not isinstance(recovery, dict)
             or recovery.get('schema') != 'benchforge.isaac-service-recovery/v1'
@@ -175,7 +183,9 @@ def verify_annotated_capture_recovery(task, directory, settings):
             or recovery['verified_job_id'] == failed['job_id']):
         raise ValueError('Service recovery evidence must name this failed native job and a new verified job')
     generation = task['unit'].get('capture_generation', 0)
-    receipt = directory / 'isaac_sim' / f'attempt_{generation}/jobs/views-0/receipt.json'
+    exporting = failed['operation'] in ('scene.export', 'extension.scene.export')
+    jobs = directory / 'isaac_sim' / f'attempt_{generation}/jobs'
+    receipt = jobs / ('export' if exporting else 'views-0') / 'receipt.json'
     original = json.loads(receipt.read_text(encoding='utf-8')) if receipt.is_file() else {}
     failed_at = original.get('created_at_unix', 0)
     client = capture_service_client({'providers': {'IsaacSim4A100': settings}})
@@ -202,14 +212,25 @@ def verify_annotated_capture_recovery(task, directory, settings):
                 and annotation.get('instance_count', 0) > 0
                 and annotation.get('class_count', 0) > 0)
 
+    if exporting:
+        request = json.loads((receipt.parent / 'request.json').read_text(encoding='utf-8'))
+        arguments = request['payload']['extension']['arguments']
+        result = job.get('result') or {}
+        valid_result = (job.get('operation') in ('scene.export', 'extension.scene.export')
+                        and result.get('session_id') == arguments['session_id']
+                        and all(isinstance(result.get(key), str) and result[key].startswith('artifact://')
+                                and result[key].removeprefix('artifact://') in artifacts for key in ('scene', 'package')))
+        detail = 'a USD scene and package from the same retained session'
+    else:
+        valid_result = (job.get('operation') in ('scene.capture', 'extension.scene.capture')
+                        and frames and all(annotated(frame) for frame in frames))
+        detail = 'RGB, metric depth and semantic/instance artifacts'
     if (original.get('job_id') != failed['job_id'] or not failed_at
             or job.get('job_id') != recovery['verified_job_id']
             or job.get('state') != 'SUCCEEDED'
-            or job.get('operation') not in {'scene.capture', 'extension.scene.capture'}
             or job.get('created_at_unix', 0) <= failed_at
-            or not frames or not all(annotated(frame) for frame in frames)):
-        raise ValueError('Service recovery requires a newer SUCCEEDED native capture with RGB, '
-                         'metric depth and semantic/instance artifacts; schema discovery alone is insufficient')
+            or not valid_result):
+        raise ValueError('Service recovery requires a newer SUCCEEDED native job with ' + detail)
     write_json(directory / 'isaac_sim/service_recovery/verified_receipt.json',
                {'schema': 'benchforge.isaac-service-recovery/v1', 'failed_job_id': failed['job_id'],
                 'endpoint': recovery['endpoint'], 'verified_job': job})
