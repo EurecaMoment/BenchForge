@@ -43,6 +43,7 @@ class SceneDesignAccessTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 saved_design(program)
 
+    @unittest.skipUnless(os.name == 'posix', 'Descriptor-relative file reads require Linux')
     def test_execution_repair_inherits_the_unchanged_frozen_brief(self):
         directory = self.workspace / 'prior'
         directory.mkdir()
